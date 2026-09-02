@@ -2001,7 +2001,7 @@ export function StaffSpace({
         {admin && <AdminUsersPanel lang={lang} />}
         {admin && <CreateUserPanel lang={lang} />}
         {!institution && <MyStudentsPanel lang={lang} />}
-        <ContentStructureForm lang={lang} courses={managedCourses} admin={admin} />
+        <ContentStructureForm lang={lang} courses={managedCourses} />
         <QuizBuilder lang={lang} />
         <FinalExamBuilder lang={lang} />
         <GradingQueuePanel lang={lang} />
@@ -2031,7 +2031,6 @@ export function InstitutionSpace() {
 function ContentStructureForm({
   lang,
   courses,
-  admin,
 }: {
   lang: Lang;
   courses: Array<{
@@ -2040,7 +2039,6 @@ function ContentStructureForm({
     titleFr: string;
     titleEn: string;
   }>;
-  admin: boolean;
 }) {
   const [courseId, setCourseId] = useState(0);
   const [unitId, setUnitId] = useState(0);
@@ -2125,13 +2123,11 @@ function ContentStructureForm({
       ),
     onError: error => setMessage(error.message),
   });
-  // The teacher hosting the live session must be the one to connect their
-  // own Google account — an admin connecting theirs would make the admin
-  // the Meet host instead of the actual teacher, so this whole feature is
-  // hidden (not just disabled) from the admin view of this shared form.
-  const calendarStatus = trpc.teacher.googleCalendarStatus.useQuery(undefined, {
-    enabled: !admin,
-  });
+  // Available to both teacher and admin — whoever connects their own
+  // Google account becomes the Meet host for events they create, so an
+  // admin using this is deliberately allowed (e.g. an admin covering a
+  // live session directly), not just a teacher.
+  const calendarStatus = trpc.teacher.googleCalendarStatus.useQuery();
   const disconnectCalendar = trpc.teacher.disconnectGoogleCalendar.useMutation({
     onSuccess: () => calendarStatus.refetch(),
   });
@@ -2167,48 +2163,46 @@ function ContentStructureForm({
           ? "أنشئ البنية التعليمية المرتبطة بدوراتك. ستُحفظ العناصر كمسودات."
           : "Create curriculum items owned by your course. New items are saved as drafts."}
       </p>
-      {!admin && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            margin: "10px 0 22px",
-            padding: "12px 15px",
-            border: "1px solid rgba(255,255,255,.08)",
-            borderRadius: 10,
-          }}
-        >
-          <Calendar size={16} />
-          {calendarStatus.data?.connected ? (
-            <>
-              <small>
-                {lang === "ar"
-                  ? `Google Calendar متصل${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`
-                  : `Google Calendar connected${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`}
-              </small>
-              <Button
-                className="table-action danger"
-                onClick={() => disconnectCalendar.mutate()}
-              >
-                {lang === "ar" ? "فصل الاتصال" : "Disconnect"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <small>
-                {lang === "ar"
-                  ? "اربط Google Calendar لإنشاء رابط Google Meet تلقائيًا للحصص المباشرة."
-                  : "Connect Google Calendar to auto-generate Google Meet links for live lessons."}
-              </small>
-              <a className="quiet-button" href="/api/google-calendar/connect">
-                {lang === "ar" ? "ربط Google Calendar" : "Connect Google Calendar"}
-              </a>
-            </>
-          )}
-        </div>
-      )}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          margin: "10px 0 22px",
+          padding: "12px 15px",
+          border: "1px solid rgba(255,255,255,.08)",
+          borderRadius: 10,
+        }}
+      >
+        <Calendar size={16} />
+        {calendarStatus.data?.connected ? (
+          <>
+            <small>
+              {lang === "ar"
+                ? `Google Calendar متصل${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`
+                : `Google Calendar connected${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`}
+            </small>
+            <Button
+              className="table-action danger"
+              onClick={() => disconnectCalendar.mutate()}
+            >
+              {lang === "ar" ? "فصل الاتصال" : "Disconnect"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <small>
+              {lang === "ar"
+                ? "اربط Google Calendar لإنشاء رابط Google Meet تلقائيًا للحصص المباشرة."
+                : "Connect Google Calendar to auto-generate Google Meet links for live lessons."}
+            </small>
+            <a className="quiet-button" href="/api/google-calendar/connect">
+              {lang === "ar" ? "ربط Google Calendar" : "Connect Google Calendar"}
+            </a>
+          </>
+        )}
+      </div>
       <div className="admin-form-grid">
         <select
           value={selectedCourseId}
@@ -2556,7 +2550,7 @@ function ContentStructureForm({
                   >
                     {lang === "ar" ? "حذف" : "Delete"}
                   </Button>
-                  {!admin && lesson.type === "live" && (
+                  {lesson.type === "live" && (
                     <Button
                       className="table-action"
                       disabled={createLiveSession.isPending}
