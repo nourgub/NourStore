@@ -4,6 +4,8 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkRateLimit, getRateLimitStatus } from "./rateLimit";
+import { MAX_VIDEO_UPLOAD_BYTES } from "./uploadValidation";
+import { createMeetEvent } from "./_core/googleCalendar";
 import { createSessionToken } from "./_core/session";
 import {
   hashPassword,
@@ -71,6 +73,15 @@ import {
   getAllUsers,
   toPublicUser,
   updateUserRole,
+  createManagedUser,
+  setAccountStatus,
+  getStudentsForTeacher,
+  createLearnerReport,
+  getReportsForParent,
+  getReportsForLearner,
+  getGoogleCalendarStatus,
+  disconnectGoogleCalendar,
+  setLessonLiveSession,
   uploadLessonAsset,
   getLessonAssets,
   getManagedQuiz,
@@ -111,6 +122,7 @@ import {
   getAllSubjects,
   createSubject,
   setSubjectActive,
+  deleteSubject,
   getPendingPaymentReceipts,
   reviewPaymentReceipt,
   notifyAdminsOfStaleReceipts,
@@ -302,12 +314,23 @@ export const appRouter = router({
             code: "TOO_MANY_REQUESTS",
             message: "Too many attempts, try again later",
           });
-        const storedHash = await getEmailUserPasswordHash(openId);
-        const valid = await verifyPassword(input.password, storedHash);
+        const record = await getEmailUserPasswordHash(openId);
+        const valid = await verifyPassword(input.password, record?.passwordHash ?? null);
         if (!valid)
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: "Invalid email or password",
+          });
+        if (record?.accountStatus === "pending")
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Your account is pending activation by an administrator.",
+          });
+        if (record?.accountStatus === "suspended")
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Your account has been suspended.",
           });
         await markUserSignedIn(openId);
         const sessionToken = await createSessionToken(openId, {});
@@ -437,12 +460,16 @@ export const appRouter = router({
           role: ctx.user.role,
         })
       ),
+    myReports: learnerProcedure.query(({ ctx }) =>
+      getReportsForLearner(ctx.user.id)
+    ),
   }),
   parent: router({
     links: parentProcedure.query(({ ctx }) => getParentLinks(ctx.user.id)),
     dashboard: parentProcedure.query(({ ctx }) =>
       getParentDashboard(ctx.user.id)
     ),
+    reports: parentProcedure.query(({ ctx }) => getReportsForParent(ctx.user.id)),
     createInvite: adminProcedure
       .input(z.object({ childId: z.number().int().positive() }))
       .mutation(async ({ input }) => {
@@ -1768,16 +1795,22 @@ export const appRouter = router({
             "text/plain",
             "text/markdown",
             "application/zip",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           ]),
+          // Real cap is enforced per-MIME-type against the *decoded* bytes
+          // in validateUploadBytes (server/uploadValidation.ts) — video
+          // gets a higher MAX_VIDEO_UPLOAD_BYTES. This upper bound just
+          // needs to comfortably cover the largest of those.
           sizeBytes: z
             .number()
             .int()
             .positive()
-            .max(15 * 1024 * 1024),
+            .max(MAX_VIDEO_UPLOAD_BYTES),
           data: z
             .string()
             .min(1)
-            .max(21 * 1024 * 1024),
+            .max(Math.ceil(MAX_VIDEO_UPLOAD_BYTES * 1.37)),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -1807,6 +1840,84 @@ export const appRouter = router({
     learnerCount: teacherProcedure.query(({ ctx }) =>
       getManagedLearnerCount(ctx.user.role)
     ),
+    myStudents: teacherProcedure.query(({ ctx }) =>
+      getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "institution" | "admin")
+    ),
+    googleCalendarStatus: teacherProcedure.query(({ ctx }) =>
+      getGoogleCalendarStatus(ctx.user.id)
+    ),
+    disconnectGoogleCalendar: teacherProcedure.mutation(({ ctx }) =>
+      disconnectGoogleCalendar(ctx.user.id)
+    ),
+    // Creates a real Google Calendar event with an auto-attached Meet link
+    // on the teacher's own connected calendar, then saves the resulting
+    // link/time onto the lesson (setLessonLiveSession) — this is what
+    // actually auto-generates the Meet URL, as opposed to a teacher
+    // pasting one manually into content.updateLesson's liveUrl field.
+    createLiveSession: teacherProcedure
+      .use(rateLimit("teacher-create-live-session", 30, 60 * 60 * 1000))
+      .input(
+        z.object({
+          lessonId: z.number().int().positive(),
+          title: z.string().min(2).max(255),
+          startsAt: z.string().datetime(),
+          durationMinutes: z.number().int().min(10).max(240).default(60),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const meetResult = await createMeetEvent({
+          teacherId: ctx.user.id,
+          summary: input.title,
+          startsAt: new Date(input.startsAt),
+          durationMinutes: input.durationMinutes,
+        });
+        if (!meetResult.ok) {
+          if (meetResult.reason === "not_connected")
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                "Connect your Google Calendar first (Teacher panel → Google Meet).",
+            });
+          throw new TRPCError({
+            code: "BAD_GATEWAY",
+            message: "Google Calendar rejected the request. Try again shortly.",
+          });
+        }
+        const saved = await setLessonLiveSession({
+          id: input.lessonId,
+          role: ctx.user.role as "teacher" | "institution" | "admin",
+          userId: ctx.user.id,
+          liveUrl: meetResult.meetUrl,
+          liveStartsAt: new Date(input.startsAt).getTime(),
+        });
+        if (!saved)
+          throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+        return { ok: true, meetUrl: meetResult.meetUrl };
+      }),
+    sendReport: teacherProcedure
+      .use(rateLimit("teacher-send-report", 60, 60 * 60 * 1000))
+      .input(
+        z.object({
+          learnerId: z.number().int().positive(),
+          courseId: z.number().int().positive().optional(),
+          level: z.string().min(1).max(40),
+          title: z.string().min(2).max(255),
+          notes: z.string().min(2).max(4000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await createLearnerReport({
+          teacherId: ctx.user.id,
+          role: ctx.user.role as "teacher" | "institution" | "admin",
+          ...input,
+        });
+        if (!result.ok)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Student not found in one of your own courses",
+          });
+        return result;
+      }),
   }),
   institution: router({
     courses: institutionProcedure.query(({ ctx }) =>
@@ -1923,6 +2034,66 @@ export const appRouter = router({
         });
         return result;
       }),
+    // Admin-created account — distinct from self-service auth.registerWithEmail.
+    // The admin picks the role directly, so a teacher/learner account here
+    // starts "pending" (see createManagedUser) until activateUser confirms
+    // payment. An admin-created "admin" account starts active immediately.
+    createUser: adminProcedure
+      .use(rateLimit("admin-create-user", 30, 60 * 60 * 1000))
+      .input(
+        z.object({
+          name: z.string().min(2).max(100),
+          email: z.string().email().max(320),
+          password: z.string().min(1).max(200),
+          role: z.enum(["learner", "teacher", "admin"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const strength = validatePasswordStrength(input.password);
+        if (!strength.ok)
+          throw new TRPCError({ code: "BAD_REQUEST", message: strength.reason });
+        const passwordHash = await hashPassword(input.password);
+        const result = await createManagedUser({
+          email: input.email.trim().toLowerCase(),
+          name: input.name,
+          passwordHash,
+          role: input.role,
+        });
+        if (!result.ok)
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "An account with this email already exists",
+          });
+        await logAdminAction({
+          actorId: ctx.user.id,
+          action: "create_user",
+          targetType: "user",
+          targetId: result.userId,
+          details: { role: input.role, email: input.email },
+        });
+        return { ok: true, userId: result.userId };
+      }),
+    // Confirms payment was received outside the platform (bank transfer,
+    // in-person, etc.) and unblocks login for an admin-created teacher/
+    // learner account — see the "pending" gate in loginWithEmail above.
+    activateUser: adminProcedure
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          status: z.enum(["active", "pending", "suspended"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await setAccountStatus(input.userId, input.status);
+        await logAdminAction({
+          actorId: ctx.user.id,
+          action: "set_account_status",
+          targetType: "user",
+          targetId: input.userId,
+          details: { status: input.status, succeeded: result },
+        });
+        return { ok: result };
+      }),
     algorithmExercises: adminProcedure.query(() => getAllAlgorithmExercises()),
     createAlgorithmExercise: adminProcedure
       .input(
@@ -1998,6 +2169,27 @@ export const appRouter = router({
         z.object({ id: z.number().int().positive(), isActive: z.boolean() })
       )
       .mutation(({ input }) => setSubjectActive(input.id, input.isActive)),
+    deleteSubject: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await deleteSubject(input.id);
+        if (!result.ok) {
+          if (result.reason === "in_use")
+            throw new TRPCError({
+              code: "CONFLICT",
+              message:
+                "Cannot delete: courses or skills still use this subject.",
+            });
+          throw new TRPCError({ code: "NOT_FOUND", message: "Subject not found" });
+        }
+        await logAdminAction({
+          actorId: ctx.user.id,
+          action: "delete_subject",
+          targetType: "subject",
+          targetId: input.id,
+        });
+        return result;
+      }),
     // No cron/scheduler exists in this environment — a real deployment must
     // hit this from an external scheduled job (e.g. daily cron) for
     // subscription-expiring notifications to go out automatically.

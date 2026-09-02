@@ -20,4 +20,6 @@ export * from "./db/gamification";
 export * from "./db/support";
 export * from "./db/coupons";
 export * from "./db/errorLog";
+export * from "./db/reports";
+export * from "./db/googleCalendarConnections";
 export { getDb } from "./db/shared";

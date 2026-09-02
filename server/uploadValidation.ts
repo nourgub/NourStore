@@ -6,7 +6,17 @@
 //   - the filename isn't a disguised executable (e.g. "notes.pdf.exe").
 // This module performs those checks against the *decoded* bytes, server-side.
 
-export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB, matches the tRPC input bound
+export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15MB, matches the tRPC input bound for non-video files
+// Video specifically gets a higher cap — see the comment on VIDEO_MIME_TYPES
+// below for why this is still nowhere near "upload a full lecture
+// recording" territory.
+export const MAX_VIDEO_UPLOAD_BYTES = 120 * 1024 * 1024; // 120MB
+
+export const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm"]);
+
+function maxBytesFor(mimeType: string): number {
+  return VIDEO_MIME_TYPES.has(mimeType) ? MAX_VIDEO_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+}
 
 const MIME_TO_EXTENSIONS: Record<string, string[]> = {
   "application/pdf": ["pdf"],
@@ -18,6 +28,10 @@ const MIME_TO_EXTENSIONS: Record<string, string[]> = {
   "text/plain": ["txt"],
   "text/markdown": ["md", "markdown"],
   "application/zip": ["zip"],
+  "application/msword": ["doc"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    "docx",
+  ],
 };
 
 // Executable / script extensions that must never be accepted regardless of the
@@ -103,6 +117,25 @@ const MAGIC_BYTES: Record<string, (bytes: Buffer) => boolean> = {
     // encoders/exporters vary in the brand that follows (isom, mp42,
     // qt, M4V, etc.), so this checks for "ftyp" itself, not one brand.
     bytes.length >= 8 && bytes.subarray(4, 8).toString("latin1") === "ftyp",
+  // .docx is a ZIP container (Office Open XML) — same signature as
+  // application/zip above, just declared under the Word MIME type.
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    bytes =>
+      bytes.length >= 4 &&
+      bytes[0] === 0x50 &&
+      bytes[1] === 0x4b &&
+      (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07),
+  // Legacy binary .doc — OLE Compound File Binary Format signature.
+  "application/msword": bytes =>
+    bytes.length >= 8 &&
+    bytes[0] === 0xd0 &&
+    bytes[1] === 0xcf &&
+    bytes[2] === 0x11 &&
+    bytes[3] === 0xe0 &&
+    bytes[4] === 0xa1 &&
+    bytes[5] === 0xb1 &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0xe1,
 };
 
 export type UploadValidationResult =
@@ -131,7 +164,7 @@ export function validateUploadBytes(input: {
     return { ok: false, reason: "extension_mime_mismatch" };
 
   if (input.decodedByteLength <= 0) return { ok: false, reason: "empty_file" };
-  if (input.decodedByteLength > MAX_UPLOAD_BYTES)
+  if (input.decodedByteLength > maxBytesFor(input.mimeType))
     return { ok: false, reason: "file_too_large" };
 
   // The client-declared sizeBytes must roughly match what was actually decoded

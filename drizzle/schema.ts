@@ -35,6 +35,15 @@ export const users = mysqlTable("users", {
   // "admin" is never selectable here — it is only ever granted via
   // OWNER_OPEN_ID bootstrap or an existing admin's manual promotion.
   roleChosenAt: timestamp("roleChosenAt"),
+  // Gates login for accounts an admin creates directly (see
+  // createManagedUser in server/db/usersAuth.ts) — held "pending" until an
+  // admin confirms payment and flips it to "active" (admin.activateUser).
+  // Self-registered accounts (auth.registerWithEmail) are always "active"
+  // immediately, unaffected by this — role is unknown at that point (see
+  // auth.chooseRole), so there is nothing yet to gate.
+  accountStatus: mysqlEnum("accountStatus", ["active", "pending", "suspended"])
+    .default("active")
+    .notNull(),
   country: varchar("country", { length: 2 }),
   currency: varchar("currency", { length: 3 }).default("DZD"),
   language: varchar("language", { length: 5 }).default("ar"),
@@ -1109,3 +1118,55 @@ export const errorLog = mysqlTable(
 );
 
 export type ErrorLogEntry = typeof errorLog.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Learner reports: a teacher's written progress report on one of their own
+// students, surfaced to that learner's linked parent(s) (see
+// server/db/reports.ts). Deliberately separate from quizAttempts/
+// courseEnrollments — this is a human-authored assessment, not a derived
+// metric.
+// ---------------------------------------------------------------------------
+
+export const learnerReports = mysqlTable(
+  "learnerReports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    learnerId: int("learnerId")
+      .notNull()
+      .references(() => users.id),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    courseId: int("courseId").references(() => courses.id),
+    level: varchar("level", { length: 40 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    notes: text("notes").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    learnerIdx: index("learnerReports_learnerId_idx").on(table.learnerId),
+    teacherIdx: index("learnerReports_teacherId_idx").on(table.teacherId),
+  })
+);
+
+export type LearnerReport = typeof learnerReports.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Per-teacher Google Calendar OAuth connection, used only to create a real
+// Google Meet link for a live lesson (server/_core/googleCalendar.ts). This
+// is a separate, additional OAuth grant from the existing Google *login*
+// (server/_core/googleAuth.ts) — a teacher can log in with email+password
+// and still separately connect Google Calendar just for this feature.
+// ---------------------------------------------------------------------------
+
+export const googleCalendarConnections = mysqlTable("googleCalendarConnections", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique().references(() => users.id),
+  refreshToken: text("refreshToken").notNull(),
+  accessToken: text("accessToken"),
+  accessTokenExpiresAt: timestamp("accessTokenExpiresAt"),
+  googleEmail: varchar("googleEmail", { length: 320 }),
+  connectedAt: timestamp("connectedAt").defaultNow().notNull(),
+});
+
+export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;

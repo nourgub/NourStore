@@ -2,6 +2,8 @@ import {
   eq,
 } from "drizzle-orm";
 import {
+  courses,
+  skills,
   subjects,
 } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
@@ -55,4 +57,43 @@ export async function setSubjectActive(id: number, isActive: boolean) {
     .set({ isActive: isActive ? 1 : 0 })
     .where(eq(subjects.id, id));
   return true;
+}
+
+export type DeleteSubjectResult =
+  | { ok: true }
+  | { ok: false; reason: "not_found" | "in_use" };
+
+/**
+ * Real delete — unlike setSubjectActive (a soft toggle), this removes the
+ * row outright. Refuses when any course or skill still references the
+ * subject's slug (both store it as a plain string, not a foreign key — see
+ * the comment on `subjects` above — so a stale reference would otherwise
+ * silently survive the subject's own deletion). The admin is expected to
+ * reassign or archive that content first; this never cascades.
+ */
+export async function deleteSubject(id: number): Promise<DeleteSubjectResult> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: "not_found" };
+  const rows = await db
+    .select({ slug: subjects.slug })
+    .from(subjects)
+    .where(eq(subjects.id, id))
+    .limit(1);
+  const subject = rows[0];
+  if (!subject) return { ok: false, reason: "not_found" };
+  const [courseRows, skillRows] = await Promise.all([
+    db
+      .select({ id: courses.id })
+      .from(courses)
+      .where(eq(courses.subject, subject.slug))
+      .limit(1),
+    db
+      .select({ id: skills.id })
+      .from(skills)
+      .where(eq(skills.subject, subject.slug))
+      .limit(1),
+  ]);
+  if (courseRows.length || skillRows.length) return { ok: false, reason: "in_use" };
+  await db.delete(subjects).where(eq(subjects.id, id));
+  return { ok: true };
 }

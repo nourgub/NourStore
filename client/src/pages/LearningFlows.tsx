@@ -820,6 +820,9 @@ export function ParentSpace() {
       dashboardQuery.refetch();
     },
   });
+  const reportsQuery = trpc.parent.reports.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   if (!isAuthenticated || !["parent", "admin"].includes(user?.role || ""))
     return <AccessGate title={t.parent} lang={lang} setLang={setLang} />;
   const children = dashboardQuery.data ?? [];
@@ -1063,6 +1066,43 @@ export function ParentSpace() {
                           : "Latest score"}
                     </span>
                     <strong>{child.latestScore}%</strong>
+                  </div>
+                )}
+                {(reportsQuery.data ?? []).filter(
+                  report => report.learnerId === child.childId
+                ).length > 0 && (
+                  <div style={{ marginTop: 18 }}>
+                    <span className="section-kicker">
+                      {lang === "ar"
+                        ? "تقارير الأستاذ"
+                        : lang === "fr"
+                          ? "Rapports de l'enseignant"
+                          : "Teacher reports"}
+                    </span>
+                    {(reportsQuery.data ?? [])
+                      .filter(report => report.learnerId === child.childId)
+                      .map(report => (
+                        <div
+                          key={report.id}
+                          style={{
+                            marginTop: 10,
+                            paddingTop: 10,
+                            borderTop: "1px solid rgba(255,255,255,.08)",
+                          }}
+                        >
+                          <strong style={{ display: "block", fontSize: 12 }}>
+                            {report.title} — {report.level}
+                          </strong>
+                          <p className="quiet-label" style={{ margin: "4px 0" }}>
+                            {report.notes}
+                          </p>
+                          <small style={{ color: "#706b63" }}>
+                            {new Date(report.createdAt).toLocaleDateString(
+                              lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-US"
+                            )}
+                          </small>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
@@ -1959,6 +1999,8 @@ export function StaffSpace({
         )}
         {admin && <PlacementAdminPanel lang={lang} />}{" "}
         {admin && <AdminUsersPanel lang={lang} />}
+        {admin && <CreateUserPanel lang={lang} />}
+        {!institution && <MyStudentsPanel lang={lang} />}
         <ContentStructureForm lang={lang} courses={managedCourses} />
         <QuizBuilder lang={lang} />
         <FinalExamBuilder lang={lang} />
@@ -2081,6 +2123,21 @@ function ContentStructureForm({
       ),
     onError: error => setMessage(error.message),
   });
+  const calendarStatus = trpc.teacher.googleCalendarStatus.useQuery();
+  const disconnectCalendar = trpc.teacher.disconnectGoogleCalendar.useMutation({
+    onSuccess: () => calendarStatus.refetch(),
+  });
+  const createLiveSession = trpc.teacher.createLiveSession.useMutation({
+    onSuccess: data => {
+      setMessage(
+        lang === "ar"
+          ? `تم إنشاء رابط Google Meet: ${data.meetUrl}`
+          : `Google Meet link created: ${data.meetUrl}`
+      );
+      curriculum.refetch();
+    },
+    onError: error => setMessage(error.message),
+  });
   const selectedCourseId = courseId || courses[0]?.id || 0;
   return (
     <div className="flow-card staff-form">
@@ -2102,6 +2159,46 @@ function ContentStructureForm({
           ? "أنشئ البنية التعليمية المرتبطة بدوراتك. ستُحفظ العناصر كمسودات."
           : "Create curriculum items owned by your course. New items are saved as drafts."}
       </p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          margin: "10px 0 22px",
+          padding: "12px 15px",
+          border: "1px solid rgba(255,255,255,.08)",
+          borderRadius: 10,
+        }}
+      >
+        <Calendar size={16} />
+        {calendarStatus.data?.connected ? (
+          <>
+            <small>
+              {lang === "ar"
+                ? `Google Calendar متصل${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`
+                : `Google Calendar connected${calendarStatus.data.googleEmail ? " (" + calendarStatus.data.googleEmail + ")" : ""}`}
+            </small>
+            <Button
+              className="table-action danger"
+              onClick={() => disconnectCalendar.mutate()}
+            >
+              {lang === "ar" ? "فصل الاتصال" : "Disconnect"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <small>
+              {lang === "ar"
+                ? "اربط Google Calendar لإنشاء رابط Google Meet تلقائيًا للحصص المباشرة."
+                : "Connect Google Calendar to auto-generate Google Meet links for live lessons."}
+            </small>
+            <a className="quiet-button" href="/api/google-calendar/connect">
+              {lang === "ar" ? "ربط Google Calendar" : "Connect Google Calendar"}
+            </a>
+          </>
+        )}
+      </div>
       <div className="admin-form-grid">
         <select
           value={selectedCourseId}
@@ -2257,21 +2354,23 @@ function ContentStructureForm({
                 ? "جاري رفع الملف…"
                 : "Uploading file…"
               : lang === "ar"
-                ? "رفع ملف للدرس المحدد (15MB كحد أقصى)"
-                : "Upload to selected lesson (15MB max)"}
+                ? "رفع ملف للدرس المحدد (فيديو حتى 120MB، غير ذلك حتى 15MB)"
+                : "Upload to selected lesson (video up to 120MB, other files up to 15MB)"}
           </span>
           <input
             disabled={uploadAsset.isPending}
             type="file"
-            accept=".pdf,.mp4,.webm,.png,.jpg,.jpeg,.webp,.txt,.md,.zip"
+            accept=".pdf,.mp4,.webm,.png,.jpg,.jpeg,.webp,.txt,.md,.zip,.doc,.docx"
             onChange={event => {
               const file = event.target.files?.[0];
               if (!file) return;
-              if (file.size > 15 * 1024 * 1024) {
+              const isVideo = file.type === "video/mp4" || file.type === "video/webm";
+              const maxBytes = isVideo ? 120 * 1024 * 1024 : 15 * 1024 * 1024;
+              if (file.size > maxBytes) {
                 setMessage(
                   lang === "ar"
-                    ? "حجم الملف يتجاوز 15MB."
-                    : "File exceeds the 15MB limit."
+                    ? `حجم الملف يتجاوز الحد المسموح (${isVideo ? "120MB" : "15MB"}).`
+                    : `File exceeds the allowed limit (${isVideo ? "120MB" : "15MB"}).`
                 );
                 return;
               }
@@ -2291,7 +2390,9 @@ function ContentStructureForm({
                     | "image/webp"
                     | "text/plain"
                     | "text/markdown"
-                    | "application/zip",
+                    | "application/zip"
+                    | "application/msword"
+                    | "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                   sizeBytes: file.size,
                   data,
                 });
@@ -2445,6 +2546,38 @@ function ContentStructureForm({
                   >
                     {lang === "ar" ? "حذف" : "Delete"}
                   </Button>
+                  {lesson.type === "live" && (
+                    <Button
+                      className="table-action"
+                      disabled={createLiveSession.isPending}
+                      onClick={() => {
+                        const when = window.prompt(
+                          lang === "ar"
+                            ? "موعد الحصة (YYYY-MM-DD HH:MM)"
+                            : "Session date/time (YYYY-MM-DD HH:MM)"
+                        );
+                        if (!when) return;
+                        const parsed = new Date(when.replace(" ", "T"));
+                        if (Number.isNaN(parsed.getTime())) {
+                          setMessage(
+                            lang === "ar"
+                              ? "تنسيق التاريخ غير صحيح."
+                              : "Invalid date format."
+                          );
+                          return;
+                        }
+                        createLiveSession.mutate({
+                          lessonId: lesson.id,
+                          title:
+                            lang === "ar" ? lesson.titleAr : lesson.titleEn,
+                          startsAt: parsed.toISOString(),
+                          durationMinutes: 60,
+                        });
+                      }}
+                    >
+                      {lang === "ar" ? "Meet تلقائي" : "Auto Meet link"}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -2699,13 +2832,15 @@ function AdminUsersPanel({ lang }: { lang: Lang }) {
   const updateRole = trpc.admin.updateUserRole.useMutation({
     onSuccess: () => users.refetch(),
   });
-  const roles = [
-    "learner",
-    "parent",
-    "teacher",
-    "institution",
-    "admin",
-  ] as const;
+  const activateUser = trpc.admin.activateUser.useMutation({
+    onSuccess: () => users.refetch(),
+  });
+  const statusLabel = (status: string) => {
+    if (status === "pending")
+      return lang === "ar" ? "بانتظار التفعيل" : "Pending activation";
+    if (status === "suspended") return lang === "ar" ? "موقوف" : "Suspended";
+    return lang === "ar" ? "نشط" : "Active";
+  };
   return (
     <div className="flow-card staff-table">
       <div className="flow-card-title">
@@ -2731,7 +2866,9 @@ function AdminUsersPanel({ lang }: { lang: Lang }) {
             </span>
             <p>
               <strong>{item.name || item.email || `User #${item.id}`}</strong>
-              <small>{item.email || `ID ${item.id}`}</small>
+              <small>
+                {item.email || `ID ${item.id}`} · {statusLabel(item.accountStatus)}
+              </small>
             </p>
             <select
               value={item.role}
@@ -2748,12 +2885,250 @@ function AdminUsersPanel({ lang }: { lang: Lang }) {
               <option value="institution">institution</option>
               <option value="admin">admin</option>
             </select>
+            {item.accountStatus === "pending" ? (
+              <Button
+                className="table-action"
+                disabled={activateUser.isPending}
+                onClick={() =>
+                  activateUser.mutate({ userId: item.id, status: "active" })
+                }
+              >
+                {lang === "ar" ? "تفعيل" : "Activate"}
+              </Button>
+            ) : item.accountStatus === "active" ? (
+              <Button
+                className="table-action danger"
+                disabled={activateUser.isPending}
+                onClick={() =>
+                  activateUser.mutate({ userId: item.id, status: "suspended" })
+                }
+              >
+                {lang === "ar" ? "إيقاف" : "Suspend"}
+              </Button>
+            ) : (
+              <Button
+                className="table-action"
+                disabled={activateUser.isPending}
+                onClick={() =>
+                  activateUser.mutate({ userId: item.id, status: "active" })
+                }
+              >
+                {lang === "ar" ? "إعادة تفعيل" : "Reactivate"}
+              </Button>
+            )}
           </div>
         ))
       ) : (
         <div className="staff-empty">
           <Users size={20} />
           <p>{lang === "ar" ? "لا يوجد مستخدمون بعد." : "No users yet."}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CreateUserPanel({ lang }: { lang: Lang }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"learner" | "teacher" | "admin">("learner");
+  const [message, setMessage] = useState("");
+  const users = trpc.admin.users.useQuery();
+  const createUser = trpc.admin.createUser.useMutation({
+    onSuccess: () => {
+      setMessage(
+        lang === "ar"
+          ? role === "admin"
+            ? "تم إنشاء الحساب وهو نشط فورًا."
+            : "تم إنشاء الحساب — بانتظار التفعيل بعد تأكيد الدفع."
+          : role === "admin"
+            ? "Account created and active immediately."
+            : "Account created — pending activation once payment is confirmed."
+      );
+      setName("");
+      setEmail("");
+      setPassword("");
+      users.refetch();
+    },
+    onError: error => setMessage(error.message),
+  });
+  const canCreate = name.length >= 2 && /.+@.+\..+/.test(email) && password.length >= 8;
+  return (
+    <div className="flow-card staff-form">
+      <div className="flow-card-title">
+        <div>
+          <span className="section-kicker">NOURIX / NEW ACCOUNT</span>
+          <h2>
+            {lang === "ar"
+              ? "إضافة حساب جديد"
+              : lang === "fr"
+                ? "Ajouter un compte"
+                : "Add a new account"}
+          </h2>
+        </div>
+        <Users size={18} />
+      </div>
+      <p className="quiet-label">
+        {lang === "ar"
+          ? "حساب أستاذ أو متعلم يُنشأ هنا يبقى معلَّقًا حتى تؤكّد الدفع وتضغط «تفعيل» في القائمة أدناه."
+          : "A teacher or learner account created here stays pending until you confirm payment and press Activate below."}
+      </p>
+      <div className="admin-form-grid">
+        <Input
+          placeholder={lang === "ar" ? "الاسم الكامل" : "Full name"}
+          aria-label={lang === "ar" ? "الاسم الكامل" : "Full name"}
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
+        <Input
+          type="email"
+          placeholder={lang === "ar" ? "البريد الإلكتروني" : "Email"}
+          aria-label={lang === "ar" ? "البريد الإلكتروني" : "Email"}
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
+        <Input
+          type="password"
+          placeholder={lang === "ar" ? "كلمة المرور" : "Password"}
+          aria-label={lang === "ar" ? "كلمة المرور" : "Password"}
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+        />
+        <select value={role} onChange={e => setRole(e.target.value as typeof role)}>
+          <option value="learner">{lang === "ar" ? "متعلم" : "Learner"}</option>
+          <option value="teacher">{lang === "ar" ? "أستاذ" : "Teacher"}</option>
+          <option value="admin">{lang === "ar" ? "إداري" : "Admin"}</option>
+        </select>
+        <Button
+          className="quiet-button"
+          disabled={!canCreate || createUser.isPending}
+          onClick={() => createUser.mutate({ name, email, password, role })}
+        >
+          {lang === "ar" ? "إنشاء الحساب" : "Create account"}
+          <Plus size={15} />
+        </Button>
+      </div>
+      {message && <small className="form-success">{message}</small>}
+    </div>
+  );
+}
+
+function MyStudentsPanel({ lang }: { lang: Lang }) {
+  const students = trpc.teacher.myStudents.useQuery();
+  const [openReportFor, setOpenReportFor] = useState<number | null>(null);
+  const [level, setLevel] = useState("جيد");
+  const [title, setTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const sendReport = trpc.teacher.sendReport.useMutation({
+    onSuccess: () => {
+      toast.success(
+        lang === "ar" ? "تم إرسال التقرير لولي الأمر." : "Report sent to the parent."
+      );
+      setOpenReportFor(null);
+      setTitle("");
+      setNotes("");
+    },
+    onError: error => toast.error(error.message),
+  });
+  const courseLabel = (row: NonNullable<typeof students.data>[number]) =>
+    lang === "ar" ? row.courseTitleAr : lang === "fr" ? row.courseTitleFr : row.courseTitleEn;
+  return (
+    <div className="flow-card staff-table">
+      <div className="flow-card-title">
+        <div>
+          <span className="section-kicker">NOURIX / MY STUDENTS</span>
+          <h2>
+            {lang === "ar" ? "طلابي" : lang === "fr" ? "Mes élèves" : "My students"}
+          </h2>
+        </div>
+        <Users size={18} />
+      </div>
+      {students.isLoading ? (
+        <p>{lang === "ar" ? "جاري التحميل…" : "Loading…"}</p>
+      ) : students.data?.length ? (
+        students.data.map(row => (
+          <Fragment key={`${row.learnerId}-${row.courseId}`}>
+            <div className="staff-row">
+              <span>
+                <Users size={17} />
+              </span>
+              <p>
+                <strong>{row.learnerName || row.learnerEmail}</strong>
+                <small>
+                  {courseLabel(row)} · {row.progressPercent}%
+                  {row.latestScore !== null
+                    ? ` · ${lang === "ar" ? "آخر نتيجة" : "latest score"}: ${row.latestScore}`
+                    : ""}
+                </small>
+              </p>
+              <Button
+                className="table-action"
+                onClick={() =>
+                  setOpenReportFor(
+                    openReportFor === row.learnerId ? null : row.learnerId
+                  )
+                }
+              >
+                {lang === "ar" ? "إرسال تقرير" : "Send report"}
+              </Button>
+            </div>
+            {openReportFor === row.learnerId && (
+              <div className="admin-form-grid" style={{ paddingBottom: 16 }}>
+                <select value={level} onChange={e => setLevel(e.target.value)}>
+                  <option value="ممتاز">
+                    {lang === "ar" ? "ممتاز" : "Excellent"}
+                  </option>
+                  <option value="جيد جداً">
+                    {lang === "ar" ? "جيد جداً" : "Very good"}
+                  </option>
+                  <option value="جيد">{lang === "ar" ? "جيد" : "Good"}</option>
+                  <option value="متوسط">
+                    {lang === "ar" ? "متوسط" : "Average"}
+                  </option>
+                  <option value="ضعيف">
+                    {lang === "ar" ? "بحاجة لدعم" : "Needs support"}
+                  </option>
+                </select>
+                <Input
+                  placeholder={lang === "ar" ? "عنوان التقرير" : "Report title"}
+                  aria-label={lang === "ar" ? "عنوان التقرير" : "Report title"}
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                />
+                <Input
+                  placeholder={lang === "ar" ? "ملاحظات" : "Notes"}
+                  aria-label={lang === "ar" ? "ملاحظات" : "Notes"}
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                />
+                <Button
+                  className="quiet-button"
+                  disabled={!title || !notes || sendReport.isPending}
+                  onClick={() =>
+                    sendReport.mutate({
+                      learnerId: row.learnerId,
+                      courseId: row.courseId,
+                      level,
+                      title,
+                      notes,
+                    })
+                  }
+                >
+                  {lang === "ar" ? "إرسال" : "Send"}
+                </Button>
+              </div>
+            )}
+          </Fragment>
+        ))
+      ) : (
+        <div className="staff-empty">
+          <Users size={20} />
+          <p>
+            {lang === "ar"
+              ? "لا يوجد طلاب مسجَّلون في دوراتك بعد."
+              : "No students enrolled in your courses yet."}
+          </p>
         </div>
       )}
     </div>
@@ -3762,6 +4137,20 @@ function SubjectsAdminPanel({ lang }: { lang: Lang }) {
   const toggle = trpc.admin.setSubjectActive.useMutation({
     onSuccess: () => subjectsQuery.refetch(),
   });
+  const remove = trpc.admin.deleteSubject.useMutation({
+    onSuccess: () => subjectsQuery.refetch(),
+    onError: error => {
+      toast.error(
+        error.data?.code === "CONFLICT"
+          ? lang === "ar"
+            ? "لا يمكن حذف مادة بها دورات أو مهارات مرتبطة — عطّلها بدلًا من ذلك."
+            : "Can't delete a subject with courses or skills using it — disable it instead."
+          : lang === "ar"
+            ? "تعذر حذف المادة."
+            : "Couldn't delete the subject."
+      );
+    },
+  });
   const iconOptions = SUBJECT_ICON_KEYS;
   return (
     <div className="flow-card staff-form">
@@ -3870,6 +4259,22 @@ function SubjectsAdminPanel({ lang }: { lang: Lang }) {
                     : lang === "ar"
                       ? "تفعيل"
                       : "Enable"}
+                </Button>
+                <Button
+                  className="table-action danger"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        lang === "ar"
+                          ? "حذف هذه المادة نهائيًا؟"
+                          : "Delete this subject permanently?"
+                      )
+                    )
+                      remove.mutate({ id: item.id });
+                  }}
+                >
+                  {lang === "ar" ? "حذف" : "Delete"}
                 </Button>
               </div>
             );

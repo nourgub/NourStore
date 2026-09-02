@@ -4,6 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleAuthRoutes } from "./googleAuth";
+import { registerGoogleCalendarRoutes } from "./googleCalendar";
 import { registerLocalStorageServer } from "./localStorageServer";
 import { registerProtectedFileRoutes } from "../protectedFiles";
 import { registerSitemap } from "../sitemap";
@@ -52,16 +53,20 @@ async function startServer() {
   // equivalent) must be computed over these exact bytes, not a
   // re-serialized JSON.stringify(req.body), which is not guaranteed to
   // byte-for-byte match what the sender actually signed.
+  // 170mb accommodates a base64-encoded video upload up to
+  // MAX_VIDEO_UPLOAD_BYTES (server/uploadValidation.ts) — base64 inflates
+  // the raw byte size by ~33%.
   app.use(
     express.json({
-      limit: "50mb",
+      limit: "170mb",
       verify: (req, _res, buf) => {
         (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
       },
     })
   );
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.urlencoded({ limit: "170mb", extended: true }));
   registerGoogleAuthRoutes(app);
+  registerGoogleCalendarRoutes(app);
   registerLocalStorageServer(app);
   registerProtectedFileRoutes(app);
   registerSitemap(app);

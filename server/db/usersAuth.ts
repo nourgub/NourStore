@@ -124,11 +124,70 @@ export async function getEmailUserPasswordHash(openId: string) {
   const db = await getDb();
   if (!db) return null;
   const rows = await db
-    .select({ passwordHash: users.passwordHash })
+    .select({ passwordHash: users.passwordHash, accountStatus: users.accountStatus })
     .from(users)
     .where(eq(users.openId, openId))
     .limit(1);
-  return rows[0]?.passwordHash ?? null;
+  return rows[0] ?? null;
+}
+
+export type ManagedUserRole = "learner" | "teacher" | "admin";
+
+export type CreateManagedUserResult =
+  | { ok: true; userId: number }
+  | { ok: false; reason: "email_taken" };
+
+/**
+ * An admin creating an account directly from the admin panel — distinct
+ * from createEmailUser (self-service signup, always "learner", always
+ * immediately usable). Here the admin chooses the role up front, and a new
+ * teacher/learner account starts "pending": it exists but cannot log in
+ * (see loginWithEmail in routers.ts) until an admin confirms payment and
+ * calls setAccountStatus to flip it "active". An admin-created admin
+ * account has no payment step, so it starts active.
+ */
+export async function createManagedUser(input: {
+  email: string;
+  name: string;
+  passwordHash: string;
+  role: ManagedUserRole;
+}): Promise<CreateManagedUserResult> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: "email_taken" };
+  const openId = `email_${input.email}`;
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
+  if (existing.length) return { ok: false, reason: "email_taken" };
+  const [result] = await db.insert(users).values({
+    openId,
+    email: input.email,
+    name: input.name,
+    loginMethod: "email",
+    passwordHash: input.passwordHash,
+    role: input.role,
+    roleChosenAt: new Date(),
+    accountStatus: input.role === "admin" ? "active" : "pending",
+    lastSignedIn: new Date(),
+  });
+  return { ok: true, userId: (result as { insertId: number }).insertId };
+}
+
+export async function setAccountStatus(
+  userId: number,
+  accountStatus: "active" | "pending" | "suspended"
+) {
+  const db = await getDb();
+  if (!db) return false;
+  const [result] = await db
+    .update(users)
+    .set({ accountStatus })
+    .where(eq(users.id, userId));
+  return (result as { affectedRows?: number }).affectedRows
+    ? (result as { affectedRows?: number }).affectedRows! > 0
+    : false;
 }
 
 export async function markUserSignedIn(openId: string) {
@@ -149,6 +208,7 @@ export async function getAllUsers() {
       name: users.name,
       email: users.email,
       role: users.role,
+      accountStatus: users.accountStatus,
       createdAt: users.createdAt,
       lastSignedIn: users.lastSignedIn,
     })

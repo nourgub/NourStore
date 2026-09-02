@@ -826,6 +826,45 @@ export async function updateManagedLesson(input: {
   return true;
 }
 
+/**
+ * Narrow sibling of updateManagedLesson — sets only liveUrl/liveStartsAt
+ * (and the lesson type, always "live") without requiring the caller to
+ * re-supply the title fields updateManagedLesson mandates. Used by
+ * teacher.createLiveSession once a Google Meet link has been generated.
+ */
+export async function setLessonLiveSession(input: {
+  id: number;
+  role: "teacher" | "institution" | "admin";
+  userId: number;
+  liveUrl: string;
+  liveStartsAt: number;
+}) {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ lessonId: lessons.id })
+    .from(lessons)
+    .leftJoin(units, eq(units.id, lessons.unitId))
+    .leftJoin(courses, eq(courses.id, units.courseId))
+    .where(
+      and(
+        eq(lessons.id, input.id),
+        input.role === "admin" ? undefined : eq(courses.ownerId, input.userId)
+      )
+    )
+    .limit(1);
+  if (!rows.length) return false;
+  await db
+    .update(lessons)
+    .set({
+      type: "live",
+      liveUrl: input.liveUrl,
+      liveStartsAt: input.liveStartsAt,
+    })
+    .where(eq(lessons.id, input.id));
+  return true;
+}
+
 export async function deleteManagedLesson(input: {
   id: number;
   role: "teacher" | "institution" | "admin";

@@ -44,10 +44,40 @@ describe("upload validation", () => {
     expect(result).toEqual({ ok: false, reason: "size_mismatch" });
   });
 
-  it("rejects a file larger than the real maximum regardless of declared size", () => {
+  it("rejects a non-video file larger than the real maximum regardless of declared size", () => {
     const oversized = 16 * 1024 * 1024;
     const result = validateUploadBytes({
-      fileName: "video.mp4",
+      fileName: "notes.pdf",
+      mimeType: "application/pdf",
+      declaredSizeBytes: oversized,
+      decodedByteLength: oversized,
+    });
+    expect(result).toEqual({ ok: false, reason: "file_too_large" });
+  });
+
+  // Video gets a higher cap (MAX_VIDEO_UPLOAD_BYTES) than every other type —
+  // a real recorded lesson clip is expected to exceed the general 15MB cap.
+  it("accepts a video file above the general 15MB cap but under the video-specific cap", () => {
+    const size = 16 * 1024 * 1024;
+    const bytes = Buffer.concat([
+      Buffer.from([0, 0, 0, 0]),
+      Buffer.from("ftyp"),
+      Buffer.alloc(size - 8),
+    ]);
+    const result = validateUploadBytes({
+      fileName: "lesson-recording.mp4",
+      mimeType: "video/mp4",
+      declaredSizeBytes: size,
+      decodedByteLength: size,
+      bytes,
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("rejects a video file above the video-specific maximum", () => {
+    const oversized = 130 * 1024 * 1024;
+    const result = validateUploadBytes({
+      fileName: "lesson-recording.mp4",
       mimeType: "video/mp4",
       declaredSizeBytes: oversized,
       decodedByteLength: oversized,
@@ -57,12 +87,39 @@ describe("upload validation", () => {
 
   it("rejects a MIME type outside the allowlist", () => {
     const result = validateUploadBytes({
-      fileName: "notes.docx",
-      mimeType: "application/msword",
+      fileName: "notes.dat",
+      mimeType: "application/octet-stream",
       declaredSizeBytes: 10,
       decodedByteLength: 10,
     });
     expect(result).toEqual({ ok: false, reason: "unsupported_mime_type" });
+  });
+
+  it("accepts a real .docx (Office Open XML, a ZIP container) upload", () => {
+    const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]);
+    const result = validateUploadBytes({
+      fileName: "report-card.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      declaredSizeBytes: bytes.length,
+      decodedByteLength: bytes.length,
+      bytes,
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("accepts a real legacy .doc (OLE compound file) upload", () => {
+    const bytes = Buffer.from([
+      0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 5, 6,
+    ]);
+    const result = validateUploadBytes({
+      fileName: "report-card.doc",
+      mimeType: "application/msword",
+      declaredSizeBytes: bytes.length,
+      decodedByteLength: bytes.length,
+      bytes,
+    });
+    expect(result).toEqual({ ok: true });
   });
 
   describe("magic-byte (real file signature) verification", () => {
