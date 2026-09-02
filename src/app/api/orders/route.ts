@@ -5,6 +5,11 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { generateOrderNumber } from "@/lib/orders";
+import { createMerchant, findMerchantByPhone } from "@/lib/merchants";
+import { verifyPassword } from "@/lib/password";
+import { createMerchantSessionToken, MERCHANT_SESSION_COOKIE } from "@/lib/merchant-auth";
+import { sendWhatsappMessage } from "@/lib/whatsapp";
+import { formatDzd } from "@/lib/utils";
 
 const orderSchema = z.object({
   productSlug: z.string().min(1),
@@ -17,6 +22,7 @@ const orderSchema = z.object({
   whatsapp: z.string().trim().max(20).nullish().or(z.literal("")),
   notes: z.string().trim().max(1000).nullish().or(z.literal("")),
   paymentMethod: z.enum(["baridimob", "ccp", "bank_transfer"]),
+  password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل").max(100),
 });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -33,6 +39,7 @@ export async function POST(request: Request) {
     whatsapp: formData.get("whatsapp"),
     notes: formData.get("notes"),
     paymentMethod: formData.get("paymentMethod"),
+    password: formData.get("password"),
   });
 
   if (!parsed.success) {
@@ -47,6 +54,29 @@ export async function POST(request: Request) {
   });
   if (!product || !product.active) {
     return NextResponse.json({ error: "الخدمة غير موجودة" }, { status: 404 });
+  }
+
+  const existingMerchant = await findMerchantByPhone(parsed.data.phone);
+  let merchantId: string;
+  if (existingMerchant) {
+    if (!verifyPassword(parsed.data.password, existingMerchant.passwordHash)) {
+      return NextResponse.json(
+        {
+          error:
+            "رقم الهاتف مسجّل مسبقًا بحساب. أدخل كلمة المرور الصحيحة لهذا الحساب أو سجّل الدخول من صفحة الحساب.",
+        },
+        { status: 409 },
+      );
+    }
+    merchantId = existingMerchant.id;
+  } else {
+    const merchant = await createMerchant({
+      name: parsed.data.merchantName,
+      storeName: parsed.data.storeName,
+      phone: parsed.data.phone,
+      password: parsed.data.password,
+    });
+    merchantId = merchant.id;
   }
 
   let proofImagePath: string | null = null;
@@ -78,6 +108,7 @@ export async function POST(request: Request) {
     data: {
       orderNumber,
       productId: product.id,
+      merchantId,
       merchantName: parsed.data.merchantName,
       storeName: parsed.data.storeName,
       phone: parsed.data.phone,
@@ -89,5 +120,20 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ orderNumber: order.orderNumber });
+  const notifyPhone = parsed.data.whatsapp || parsed.data.phone;
+  void sendWhatsappMessage(
+    notifyPhone,
+    `مرحبًا ${parsed.data.merchantName}، تم استلام طلبك لخدمة "${product.name}" برقم ${orderNumber} بمبلغ ${formatDzd(product.priceDzd)}. سنتواصل معك قريبًا لتأكيد الدفع.`,
+  );
+
+  const sessionToken = await createMerchantSessionToken(merchantId);
+  const response = NextResponse.json({ orderNumber: order.orderNumber });
+  response.cookies.set(MERCHANT_SESSION_COOKIE, sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  return response;
 }

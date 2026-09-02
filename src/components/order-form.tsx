@@ -74,6 +74,21 @@ export function OrderForm({ productSlug }: { productSlug: string }) {
         />
       </div>
 
+      <div className="rounded-xl border border-line bg-muted/40 p-4">
+        <Field
+          label="كلمة مرور الحساب"
+          name="password"
+          required
+          type="password"
+          placeholder="6 أحرف على الأقل"
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          سننشئ لك حسابًا تلقائيًا لمتابعة كل طلباتك وفواتيرك من صفحة{" "}
+          <span className="font-semibold text-foreground">حسابي</span>. إن كان لديك حساب بنفس
+          رقم الهاتف، أدخل كلمة مروره لتسجيل الدخول تلقائيًا.
+        </p>
+      </div>
+
       <div>
         <span className="mb-1.5 block text-sm font-semibold text-foreground">طريقة الدفع</span>
         <div className="flex flex-wrap gap-2">

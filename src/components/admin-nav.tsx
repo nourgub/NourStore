@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/admin/orders", label: "الطلبات" },
   { href: "/admin/products", label: "الكتالوج" },
+  { href: "/admin/whatsapp", label: "واتساب" },
 ];
 
 export function AdminNav() {
@@ -28,7 +29,7 @@ export function AdminNav() {
             href={link.href}
             className={cn(
               "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
-              pathname === link.href
+              pathname === link.href || pathname.startsWith(`${link.href}/`)
                 ? "bg-brand text-white"
                 : "text-muted-foreground hover:bg-muted",
             )}

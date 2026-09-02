@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { getOrderByNumber, paymentInstructions } from "@/lib/orders";
@@ -75,6 +76,23 @@ export default async function OrderConfirmationPage({
       <p className="mt-8 text-center text-sm text-muted-foreground">
         سيتواصل معك فريقنا على رقم <span className="font-semibold text-foreground">{order.phone}</span> لتأكيد الطلب وتفعيل الخدمة.
       </p>
+
+      <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <Link
+          href="/account/dashboard"
+          className="text-sm font-semibold text-brand-dark underline"
+        >
+          متابعة كل طلباتي من حسابي
+        </Link>
+        <a
+          href={`/api/invoices/${order.orderNumber}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm font-semibold text-brand-dark underline"
+        >
+          تحميل الفاتورة
+        </a>
+      </div>
     </div>
   );
 }

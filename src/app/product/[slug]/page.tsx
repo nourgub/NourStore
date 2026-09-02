@@ -45,7 +45,7 @@ export default async function ProductPage({
           </ul>
         </div>
 
-        <div className="h-fit rounded-2xl border border-line bg-card p-6 sm:sticky sm:top-24">
+        <div className="h-fit rounded-2xl border border-line bg-card p-6 shadow-sm shadow-brand/5 sm:sticky sm:top-24">
           <p className="text-sm text-muted-foreground">السعر</p>
           <p className="mt-1 text-3xl font-extrabold text-foreground">
             {formatDzd(product.priceDzd)}

@@ -27,6 +27,7 @@ export default async function AdminOrdersPage() {
               <th className="px-4 py-3 font-semibold">المبلغ</th>
               <th className="px-4 py-3 font-semibold">الدفع</th>
               <th className="px-4 py-3 font-semibold">إثبات</th>
+              <th className="px-4 py-3 font-semibold">فاتورة</th>
               <th className="px-4 py-3 font-semibold">الحالة</th>
             </tr>
           </thead>
@@ -58,13 +59,23 @@ export default async function AdminOrdersPage() {
                   )}
                 </td>
                 <td className="px-4 py-3">
+                  <a
+                    href={`/api/invoices/${order.orderNumber}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-brand-dark underline"
+                  >
+                    PDF
+                  </a>
+                </td>
+                <td className="px-4 py-3">
                   <OrderStatusSelect orderId={order.id} status={order.status} />
                 </td>
               </tr>
             ))}
             {orders.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   لا توجد طلبات بعد.
                 </td>
               </tr>

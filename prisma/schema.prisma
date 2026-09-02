@@ -23,6 +23,11 @@ enum PaymentMethod {
   bank_transfer
 }
 
+enum WhatsappDirection {
+  inbound
+  outbound
+}
+
 model Product {
   id          String   @id @default(cuid())
   slug        String   @unique
@@ -42,11 +47,25 @@ model Product {
   orders Order[]
 }
 
+model Merchant {
+  id           String   @id @default(cuid())
+  name         String
+  storeName    String
+  phone        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders Order[]
+}
+
 model Order {
   id            String        @id @default(cuid())
   orderNumber   String        @unique
   productId     String
   product       Product       @relation(fields: [productId], references: [id])
+  merchantId    String
+  merchant      Merchant      @relation(fields: [merchantId], references: [id])
   merchantName  String
   storeName     String
   phone         String
@@ -57,4 +76,15 @@ model Order {
   status        OrderStatus   @default(pending_payment)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model WhatsappMessage {
+  id        String            @id @default(cuid())
+  phone     String // E.164-ish phone number of the customer side of the thread
+  direction WhatsappDirection
+  body      String
+  status    String? // outbound delivery status from the provider, if known
+  createdAt DateTime          @default(now())
+
+  @@index([phone])
 }
