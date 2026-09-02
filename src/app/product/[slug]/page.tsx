@@ -1,9 +1,24 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { getProductBySlug } from "@/lib/products";
 import { formatDzd } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product) return {};
+  return {
+    title: `${product.name} — نور ستور`,
+    description: product.tagline,
+  };
+}
 
 export default async function ProductPage({
   params,

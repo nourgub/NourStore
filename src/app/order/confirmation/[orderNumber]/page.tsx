@@ -66,7 +66,11 @@ export default async function OrderConfirmationPage({
             )}
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
-            بعد الدفع، أرسل صورة إثبات الدفع مع رقم طلبك عبر واتساب إلى{" "}
+            بعد الدفع، ارفع صورة إثبات الدفع من{" "}
+            <Link href="/account/dashboard" className="font-semibold text-foreground underline">
+              صفحة حسابي
+            </Link>{" "}
+            أو أرسلها مع رقم طلبك عبر واتساب إلى{" "}
             <span className="font-semibold text-foreground">{instructions.supportWhatsapp}</span>
             .
           </p>

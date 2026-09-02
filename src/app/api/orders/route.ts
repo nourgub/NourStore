@@ -1,8 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { generateOrderNumber } from "@/lib/orders";
 import { createMerchant, findMerchantByPhone } from "@/lib/merchants";
@@ -10,6 +7,8 @@ import { verifyPassword } from "@/lib/password";
 import { createMerchantSessionToken, MERCHANT_SESSION_COOKIE } from "@/lib/merchant-auth";
 import { sendWhatsappMessage } from "@/lib/whatsapp";
 import { formatDzd } from "@/lib/utils";
+import { saveUploadedImage, UploadValidationError } from "@/lib/upload";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 
 const orderSchema = z.object({
   productSlug: z.string().min(1),
@@ -25,10 +24,15 @@ const orderSchema = z.object({
   password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل").max(100),
 });
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
-
 export async function POST(request: Request) {
+  const limit = rateLimit(`create-order:${getClientIp(request)}`, 10, 60 * 60 * 1000);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "طلبات كثيرة جدًا خلال وقت قصير، حاول لاحقًا" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   const formData = await request.formData();
 
   const parsed = orderSchema.safeParse({
@@ -82,25 +86,14 @@ export async function POST(request: Request) {
   let proofImagePath: string | null = null;
   const proofFile = formData.get("proofImage");
   if (proofFile instanceof File && proofFile.size > 0) {
-    if (proofFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "حجم الصورة كبير جدًا (الحد الأقصى 5 ميجا)" },
-        { status: 400 },
-      );
+    try {
+      proofImagePath = await saveUploadedImage(proofFile);
+    } catch (error) {
+      if (error instanceof UploadValidationError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
     }
-    if (!ALLOWED_TYPES.includes(proofFile.type)) {
-      return NextResponse.json(
-        { error: "صيغة الصورة غير مدعومة (PNG, JPG, WEBP فقط)" },
-        { status: 400 },
-      );
-    }
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
-    const extension = proofFile.type.split("/")[1] === "jpeg" ? "jpg" : proofFile.type.split("/")[1];
-    const fileName = `${nanoid(16)}.${extension}`;
-    const bytes = Buffer.from(await proofFile.arrayBuffer());
-    await writeFile(path.join(uploadsDir, fileName), bytes);
-    proofImagePath = `/uploads/${fileName}`;
   }
 
   const orderNumber = generateOrderNumber();

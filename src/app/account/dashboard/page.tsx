@@ -4,6 +4,9 @@ import { getCurrentMerchant } from "@/lib/current-merchant";
 import { formatDzd } from "@/lib/utils";
 import { AccountNav } from "@/components/account-nav";
 import { StatusBadge } from "@/components/status-badge";
+import { ProofUploadForm } from "@/components/account/proof-upload-form";
+
+const AWAITING_PROOF_STATUSES = new Set(["pending_payment", "proof_submitted"]);
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,17 @@ export default async function AccountDashboardPage() {
                 تحميل الفاتورة
               </a>
             </div>
+
+            {AWAITING_PROOF_STATUSES.has(order.status) && (
+              <div className="mt-3 border-t border-line pt-3">
+                <p className="text-xs text-muted-foreground">
+                  {order.proofImage
+                    ? "تم رفع إثبات دفع — يمكنك استبداله إن أردت قبل تأكيد الطلب."
+                    : "لم يُرفع إثبات دفع بعد."}
+                </p>
+                <ProofUploadForm orderNumber={order.orderNumber} />
+              </div>
+            )}
           </div>
         ))}
 

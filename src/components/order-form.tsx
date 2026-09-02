@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -127,6 +128,18 @@ export function OrderForm({ productSlug }: { productSlug: string }) {
       <Button type="submit" size="lg" className="w-full" disabled={submitting}>
         {submitting ? "جارٍ الإرسال..." : "إرسال الطلب"}
       </Button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        بإرسال الطلب فإنك توافق على{" "}
+        <Link href="/terms" className="underline">
+          الشروط والأحكام
+        </Link>{" "}
+        و{" "}
+        <Link href="/privacy" className="underline">
+          سياسة الخصوصية
+        </Link>
+        .
+      </p>
     </form>
   );
 }
