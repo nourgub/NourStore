@@ -19,3 +19,7 @@ coverage/
 
 # Local uploads/storage (local storage provider writes here)
 uploads/
+
+# Self-contained Replit setup: generated secrets + local MySQL data
+# directory (see scripts/replit-start.sh) — never commit either.
+.replit-data/

@@ -1,4 +1,4 @@
-run = "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install && pnpm dev"
+run = "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install && bash scripts/replit-start.sh"
 modules = ["nodejs-20"]
 
 [nix]
@@ -12,5 +12,5 @@ localPort = 3000
 externalPort = 80
 
 [deployment]
-run = ["sh", "-c", "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install && pnpm build && pnpm start"]
+run = ["sh", "-c", "corepack enable && corepack prepare pnpm@10.4.1 --activate && pnpm install && NODE_ENV=production bash scripts/replit-start.sh"]
 deploymentTarget = "cloudrun"
