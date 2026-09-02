@@ -1,0 +1,103 @@
+# Fully self-hosted MySQL — zero external service, zero account with any
+# company. Runs on any machine that has Docker installed (a normal, free,
+# offline software install — not a "sign up for an account" step).
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in real values (see below).
+#   2. docker compose up -d
+#   3. node scripts/migrate.mjs   (applies every drizzle/*.sql file, in order)
+#
+# That's it — a real, persistent MySQL database is now running on this
+# machine, with data stored in a Docker-managed volume that survives
+# restarts and `docker compose down` (only `docker compose down -v` erases
+# it, which is exactly how Docker volumes are supposed to work).
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_use_a_real_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nourix_academy}
+      MYSQL_USER: ${MYSQL_USER:-nourix}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changeme_use_a_real_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - nourix_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Only needed if you want rate limiting to work correctly across
+    # multiple app instances behind a load balancer — a single-instance
+    # deployment works fine without this at all (the app falls back to
+    # in-memory rate limiting automatically when REDIS_URL isn't set).
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - nourix_redis_data:/data
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: mysql://${MYSQL_USER:-nourix}:${MYSQL_PASSWORD:-changeme_use_a_real_password}@mysql:3306/${MYSQL_DATABASE:-nourix_academy}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-google}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      REDIS_URL: redis://redis:6379
+      CRON_SECRET: ${CRON_SECRET:-}
+      NODE_ENV: production
+    volumes:
+      - nourix_uploads:/app/uploads
+
+  # Fully self-hosted cron — zero external scheduling service, zero
+  # account with any company. Only starts doing anything once CRON_SECRET
+  # is set (see .env.example); otherwise the app's /api/scheduled/* routes
+  # refuse the unauthenticated requests anyway, so this is safe to leave
+  # running unconfigured.
+  cron:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Self-hosted cron sidecar started. Hitting app:3000/api/scheduled/* every hour."
+        while true; do
+          if [ -n "$$CRON_SECRET" ]; then
+            curl -sf -X POST http://app:3000/api/scheduled/expiring-subscriptions \
+              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
+              || echo "expiring-subscriptions sweep failed (app may still be starting)";
+            curl -sf -X POST http://app:3000/api/scheduled/stale-receipts \
+              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
+              || echo "stale-receipts sweep failed (app may still be starting)";
+            curl -sf -X POST http://app:3000/api/scheduled/payment-reminders \
+              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
+              || echo "payment-reminders sweep failed (app may still be starting)";
+          else
+            echo "CRON_SECRET not set — skipping sweep this cycle.";
+          fi
+          sleep 3600;
+        done
+
+volumes:
+  nourix_mysql_data:
+  nourix_uploads:
+  nourix_redis_data:

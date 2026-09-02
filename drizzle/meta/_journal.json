@@ -1,0 +1,111 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787873910770,
+      "tag": "0000_nourix_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787947063666,
+      "tag": "0001_add_security_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787949546890,
+      "tag": "0002_add_exams_and_open_grading",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787951639320,
+      "tag": "0003_add_payments_abstraction",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1787952465782,
+      "tag": "0004_add_skills_and_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787967317430,
+      "tag": "0005_add_dynamic_subjects",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787969480748,
+      "tag": "0006_add_whatsapp_payment_flow",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787991853483,
+      "tag": "0009_add_gamification",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788002180415,
+      "tag": "0010_add_support_tickets",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788010608475,
+      "tag": "0011_add_coupons",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1788059418018,
+      "tag": "0012_add_referrals",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1788115249737,
+      "tag": "0013_add_role_selection",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1788121916562,
+      "tag": "0014_add_email_password_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1788143958377,
+      "tag": "0015_add_admin_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1788178447643,
+      "tag": "0016_add_error_log",
+      "breakpoints": true
+    }
+  ]
+}

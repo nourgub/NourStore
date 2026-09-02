@@ -1,0 +1,25 @@
+# Project TODO
+
+- [x] Migrer l’expérience publique NouriX Academy et conserver le nom de marque
+- [x] Conserver le support multilingue AR / FR / EN
+- [x] Conserver le catalogue des cours avec données serveur réelles
+- [x] Conserver la recherche unifiée des cours, leçons et exercices publiés
+- [x] Conserver la vérification publique des certificats
+- [x] Migrer l’authentification Manus et la gestion des rôles
+- [x] Migrer la progression persistante des cours et l’espace apprenant
+- [x] Migrer le centre de notifications persistant
+- [x] Migrer les certificats persistants et leur émission à la complétion
+- [x] Migrer l’espace parent et les liens parent-enfant protégés
+- [x] Migrer le schéma Drizzle et les migrations cours/contenu/progression/abonnements/certificats/notifications
+- [x] Migrer les contrôles de propriété et d’accès par rôle côté serveur
+- [x] Valider le build et les tests Vitest
+- [x] Vérifier l’expérience responsive et les pages principales
+- [x] Créer le checkpoint WebDev final avant publication
+- [x] Préparer les instructions de publication HTTPS permanente
+- [x] Nettoyer et unifier l’historique Drizzle du projet permanent avec une séquence unique reproductible
+- [x] Vérifier explicitement les pages clés sur desktop et mobile, obtenir une preuve de rendu de `/courses` et corriger les problèmes visuels éventuels
+- [x] Vérifier les pages clés du projet permanent sur desktop et mobile, avec une preuve desktop réussie pour `/courses` et une route authentifiée
+- [x] Vérifier la protection d’une route authentifiée sans session réelle, avec couverture automatisée des rôles ; session utilisateur réelle non exécutée sur demande
+- [x] توثيق أن التحقق من الحساب الخاص تم آليًا وباختبارات الأدوار، دون جلسة متصفح مستخدم فعلية
+- [x] إزالة جميع الكتابات المائلة من التصميم وجعل الطباعة مستقيمة وواضحة
+- [x] التحقق بصريًا من النسخة الجديدة على سطح المكتب والهاتف وإنشاء checkpoint محدث

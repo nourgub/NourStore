@@ -1,0 +1,21 @@
+# Secrets — never commit real environment values
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Test/coverage artifacts
+coverage/
+
+# Editor/OS noise
+.DS_Store
+*.log
+
+# Local uploads/storage (local storage provider writes here)
+uploads/
