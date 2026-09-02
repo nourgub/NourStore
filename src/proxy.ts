@@ -21,9 +21,13 @@ async function handleAdminRoutes(request: NextRequest, pathname: string) {
 }
 
 async function handleAccountRoutes(request: NextRequest, pathname: string) {
-  const isAuthApi = pathname === "/api/account/login" || pathname === "/api/account/logout";
-  const isLoginPage = pathname === "/account/login";
-  if (isAuthApi || isLoginPage) return NextResponse.next();
+  const isAuthApi =
+    pathname === "/api/account/login" ||
+    pathname === "/api/account/logout" ||
+    pathname === "/api/account/forgot-password" ||
+    pathname === "/api/account/reset-password";
+  const isPublicPage = pathname === "/account/login" || pathname === "/account/forgot-password";
+  if (isAuthApi || isPublicPage) return NextResponse.next();
 
   const token = request.cookies.get(MERCHANT_SESSION_COOKIE)?.value;
   const merchantId = await verifyMerchantSessionToken(token);

@@ -56,7 +56,20 @@ model Merchant {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  orders Order[]
+  orders      Order[]
+  resetCodes  PasswordResetCode[]
+}
+
+model PasswordResetCode {
+  id         String    @id @default(cuid())
+  merchantId String
+  merchant   Merchant  @relation(fields: [merchantId], references: [id])
+  code       String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([merchantId])
 }
 
 model Order {

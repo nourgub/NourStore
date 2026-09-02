@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function AccountLoginPage() {
@@ -69,6 +70,12 @@ export default function AccountLoginPage() {
         <Button type="submit" size="lg" className="w-full" disabled={submitting}>
           {submitting ? "جارٍ التحقق..." : "دخول"}
         </Button>
+        <Link
+          href="/account/forgot-password"
+          className="block text-center text-sm text-muted-foreground hover:text-foreground"
+        >
+          نسيت كلمة المرور؟
+        </Link>
       </form>
 
       <p className="mt-6 text-center text-sm text-muted-foreground">
