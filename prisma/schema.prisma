@@ -1,0 +1,60 @@
+// Prisma schema for NourStore — a storefront for automation products aimed at merchants.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum OrderStatus {
+  pending_payment
+  proof_submitted
+  paid
+  fulfilled
+  cancelled
+}
+
+enum PaymentMethod {
+  baridimob
+  ccp
+  bank_transfer
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  tagline     String
+  description String
+  category    String
+  icon        String
+  priceDzd    Int
+  features    String // JSON-encoded string[]
+  active      Boolean  @default(true)
+  featured    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  orderNumber   String        @unique
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id])
+  merchantName  String
+  storeName     String
+  phone         String
+  whatsapp      String?
+  notes         String?
+  paymentMethod PaymentMethod
+  proofImage    String? // stored file path under /public/uploads
+  status        OrderStatus   @default(pending_payment)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
