@@ -3,6 +3,7 @@ modules = ["nodejs-20"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["mariadb", "nodejs_20"]
 
 [env]
 NODE_ENV = "development"
