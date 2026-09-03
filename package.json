@@ -61,6 +61,7 @@
     "ioredis": "^6.0.0",
     "jose": "6.1.0",
     "lucide-react": "^0.453.0",
+    "mysql-memory-server": "^1.16.0",
     "mysql2": "^3.15.0",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
