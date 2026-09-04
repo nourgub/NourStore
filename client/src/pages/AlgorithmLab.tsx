@@ -24,6 +24,7 @@ import {
   parseInputString,
   runPseudocode,
 } from "@shared/pseudocodeInterpreter";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const labels = {
@@ -170,7 +171,7 @@ export default function AlgorithmLab() {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const changeLang = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
 
   const exercisesQuery = trpc.learning.algorithmExercises.useQuery();

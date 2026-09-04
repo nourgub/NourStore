@@ -23,6 +23,7 @@ import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { subjectIcon } from "@/lib/subjectIcons";
 import { setDocumentMeta, resetDocumentMeta } from "@/lib/documentMeta";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const labels = {
@@ -225,7 +226,7 @@ export default function CourseDetail() {
   }, [course?.id, lang]);
   const changeLang = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
 
   // Flatten the course lesson order the same way the server does (unit order, then lesson order)

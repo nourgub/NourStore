@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { verifyCertificate } from "./db";
 import { generateCertificatePdf } from "./certificatePdf";
+import { checkRateLimit } from "./rateLimit";
 
 /**
  * Public, matching the existing /verify/certificate/:id page — a
@@ -14,6 +15,20 @@ export function registerCertificateDownload(app: Express) {
   app.get(
     "/api/certificates/:certificateId/pdf",
     async (req: Request, res: Response) => {
+      // Same protection as the tRPC certificates.verify procedure — this
+      // route does real PDF-generation work per request (not just a cheap
+      // DB read) and is just as public/unauthenticated, so it's at least
+      // as important not to leave unlimited.
+      if (
+        !(await checkRateLimit(
+          `certificate-pdf:${req.ip || "unknown"}`,
+          60,
+          60 * 60 * 1000
+        ))
+      ) {
+        res.status(429).json({ error: "Too many requests, please try again later" });
+        return;
+      }
       const { certificateId } = req.params;
       const lang =
         req.query.lang === "fr" || req.query.lang === "en"

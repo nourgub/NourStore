@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { QrCode } from "@/components/QrCode";
 import { Input } from "@/components/ui/input";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const copy = {
@@ -91,7 +92,7 @@ export default function CertificateVerify() {
     : "";
   const setLanguage = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
   const isRevoked = verification.data?.status === "revoked";
   const verifyUrl = verification.data

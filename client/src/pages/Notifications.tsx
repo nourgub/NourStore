@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const copy = {
@@ -48,7 +49,7 @@ export default function Notifications() {
   });
   const setLanguage = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
   if (!isAuthenticated)
     return (

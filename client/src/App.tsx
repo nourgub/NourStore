@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import UpdateBanner from "./components/UpdateBanner";
 import RoleOnboardingModal from "./components/RoleOnboardingModal";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { setStoredLanguage } from "@/lib/language";
 import Home from "./pages/Home";
 
 // Every route below the landing page is code-split via React.lazy() — each
@@ -28,28 +29,32 @@ const Search = lazy(() => import("./pages/Search"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
-// LearningFlows.tsx is the largest single file in the project (many admin
-// panels + several learner-facing flows bundled together) — splitting it
-// into its own chunk is the single biggest win here, since most visitors
-// (an anonymous browser, a learner just watching a lesson) never need any
-// of this code at all.
+// The former LearningFlows.tsx bundled learner-facing flows AND the entire
+// teacher/institution/admin panel into one file, so both ended up in the
+// SAME chunk — a learner taking a quiz downloaded the whole admin panel's
+// code too. Split into two independent modules (client/src/pages/flows/)
+// so each is fetched only by the visitors who actually need it.
 const PlacementTest = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({ default: m.PlacementTest }))
+  import("./pages/flows/LearnerFlows").then((m) => ({
+    default: m.PlacementTest,
+  }))
 );
 const UnitQuiz = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({ default: m.UnitQuiz }))
+  import("./pages/flows/LearnerFlows").then((m) => ({ default: m.UnitQuiz }))
 );
 const FinalExam = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({ default: m.FinalExam }))
+  import("./pages/flows/LearnerFlows").then((m) => ({ default: m.FinalExam }))
 );
 const ParentSpace = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({ default: m.ParentSpace }))
+  import("./pages/flows/LearnerFlows").then((m) => ({
+    default: m.ParentSpace,
+  }))
 );
 const StaffSpace = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({ default: m.StaffSpace }))
+  import("./pages/flows/StaffFlows").then((m) => ({ default: m.StaffSpace }))
 );
 const InstitutionSpace = lazy(() =>
-  import("./pages/LearningFlows").then((m) => ({
+  import("./pages/flows/StaffFlows").then((m) => ({
     default: m.InstitutionSpace,
   }))
 );
@@ -115,6 +120,19 @@ function Router() {
 }
 
 function App() {
+  // Belt-and-suspenders alongside the inline script in index.html: keeps
+  // the real <html> dir/lang in sync with the stored language so anything
+  // rendered outside a page's own per-language wrapper (most notably
+  // sonner's toasts, which portal into document.body) matches the
+  // selected language rather than always following index.html's static
+  // default.
+  useEffect(() => {
+    const stored = localStorage.getItem("nourix-language");
+    if (stored === "ar" || stored === "fr" || stored === "en") {
+      setStoredLanguage(stored);
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>

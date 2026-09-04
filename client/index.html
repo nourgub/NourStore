@@ -59,6 +59,22 @@
     <meta name="apple-mobile-web-app-title" content="Nourix" />
   </head>
   <body>
+    <!-- Runs before any React code, synchronously, so a returning visitor
+         who previously chose French/English never sees (or has anything
+         rendered against) the wrong document direction — this is the ONE
+         place that sets it, rather than every page's own language
+         switcher, so it can never be missed. See
+         client/src/lib/language.ts, which every switcher calls into to
+         keep this in sync after the initial load too. -->
+    <script>
+      (function () {
+        var lang = localStorage.getItem("nourix-language");
+        if (lang === "fr" || lang === "en") {
+          document.documentElement.lang = lang;
+          document.documentElement.dir = "ltr";
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

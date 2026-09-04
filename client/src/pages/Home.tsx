@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { ForwardArrow, BackArrow } from "@/components/DirectionalArrow";
 import { toast } from "sonner";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 
@@ -279,7 +280,7 @@ export default function Home() {
 
   const changeLanguage = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
     setLangOpen(false);
   };
 

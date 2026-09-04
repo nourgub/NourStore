@@ -626,7 +626,43 @@ export async function hasActiveSubscription(userId: number) {
 
 export async function getLessonAssets(lessonId: number, userId: number) {
   const db = await getDb();
-  if (!db || !(await hasActiveSubscription(userId))) return [];
+  if (!db) return [];
+  // Same ownership gate as getLessonForLearner (this lesson's specific
+  // course, published, and either free or an active subscription) plus
+  // its own sequencing lock — this function used to only check "does this
+  // user have ANY active subscription", which let any subscriber read any
+  // published course's lesson files regardless of whether they were
+  // actually enrolled in — or had unlocked — that specific lesson.
+  const courseRows = await db
+    .select({
+      courseId: courses.id,
+      isCoursePublished: courses.isPublished,
+      isCourseFree: courses.isFree,
+    })
+    .from(lessons)
+    .leftJoin(units, eq(units.id, lessons.unitId))
+    .leftJoin(courses, eq(courses.id, units.courseId))
+    .where(eq(lessons.id, lessonId))
+    .limit(1);
+  const courseRow = courseRows[0];
+  if (!courseRow || !courseRow.courseId || courseRow.isCoursePublished !== 1)
+    return [];
+  const enrolled = await db
+    .select({ id: courseEnrollments.id })
+    .from(courseEnrollments)
+    .where(
+      and(
+        eq(courseEnrollments.userId, userId),
+        eq(courseEnrollments.courseId, courseRow.courseId)
+      )
+    )
+    .limit(1);
+  if (!enrolled.length) return [];
+  const eligible =
+    courseRow.isCourseFree === 1 || (await hasActiveSubscription(userId));
+  if (!eligible) return [];
+  if (await isLessonLocked(db, userId, courseRow.courseId, lessonId))
+    return [];
   const rows = await db
     .select({
       id: lessonAssets.id,
@@ -638,15 +674,14 @@ export async function getLessonAssets(lessonId: number, userId: number) {
       createdAt: lessonAssets.createdAt,
     })
     .from(lessonAssets)
-    .leftJoin(lessons, eq(lessons.id, lessonAssets.lessonId))
-    .leftJoin(units, eq(units.id, lessons.unitId))
-    .leftJoin(courses, eq(courses.id, units.courseId))
-    .where(and(eq(lessonAssets.lessonId, lessonId), eq(courses.isPublished, 1)))
+    .where(eq(lessonAssets.lessonId, lessonId))
     .orderBy(desc(lessonAssets.createdAt));
-  // Local storage's raw URL is an unauthenticated static path — never
-  // hand that out for paid lesson content. Point at the authenticated
-  // proxy instead so every view re-checks real enrollment/eligibility.
-  // Real S3 presigned URLs are already genuinely protected and expiring.
+  // The stored URL is local storage's raw key path, not something a
+  // browser can fetch directly (no route serves UPLOAD_ROOT
+  // unauthenticated — see server/protectedFiles.ts) — rewritten here to
+  // the authenticated proxy path so every view re-checks real
+  // enrollment/eligibility. Real S3 presigned URLs are already genuinely
+  // protected and expiring.
   if (ENV.storageProvider !== "s3") {
     return rows.map(row => ({
       ...row,

@@ -21,6 +21,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const copy = {
@@ -282,7 +283,7 @@ export default function Dashboard() {
                   className={option === lang ? "active" : ""}
                   onClick={() => {
                     setLang(option);
-                    localStorage.setItem("nourix-language", option);
+                    setStoredLanguage(option);
                   }}
                 >
                   {option.toUpperCase()}

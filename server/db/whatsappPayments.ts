@@ -3,9 +3,11 @@ import {
   asc,
   desc,
   eq,
+  inArray,
   isNull,
   lt,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
 import {
   subscriptionPlans,
   users,
@@ -219,11 +221,13 @@ export async function getPendingPaymentReceipts() {
     // urgent" logic surfaced as a proactive notification, not just an
     // admin who happens to sort the list correctly by eye).
     .orderBy(asc(paymentReceipts.createdAt));
-  // Local storage's raw URL is an unauthenticated static path (see
-  // localStorageServer.ts) — never hand that out. Point at the
-  // authenticated proxy instead so every view re-checks who's asking.
-  // Real S3 presigned URLs (ENV.storageProvider === "s3") are already
-  // genuinely protected and expiring, so they pass through unchanged.
+  // The stored URL is local storage's raw key path, which no route
+  // actually serves unauthenticated (see server/protectedFiles.ts) — but
+  // it's still not a URL a browser can fetch directly, so it's rewritten
+  // to the authenticated proxy path here, which re-checks who's asking on
+  // every request. Real S3 presigned URLs (ENV.storageProvider === "s3")
+  // are already genuinely protected and expiring, so they pass through
+  // unchanged.
   const { ENV } = await import("../_core/env");
   if (ENV.storageProvider !== "s3") {
     return rows.map(row => ({
@@ -231,6 +235,84 @@ export async function getPendingPaymentReceipts() {
       url: `/api/protected-files/receipt/${row.id}`,
     }));
   }
+  return rows;
+}
+
+// Already-reviewed receipts (approved or rejected), most recent decision
+// first — so an admin reviewing a stale receipt from a learner can first
+// check whether that same learner has a history of rejected submissions,
+// and any admin can see who took the last action on a given receipt and
+// when, without cross-referencing the separate general audit log.
+export async function getPaymentReceiptHistory(limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  const reviewer = alias(users, "reviewer");
+  const rows = await db
+    .select({
+      id: paymentReceipts.id,
+      invoiceId: paymentReceipts.invoiceId,
+      status: paymentReceipts.status,
+      createdAt: paymentReceipts.createdAt,
+      reviewedAt: paymentReceipts.reviewedAt,
+      reviewerName: reviewer.name,
+      invoiceAmountCents: invoices.amountCents,
+      invoiceCurrency: invoices.currency,
+      invoiceUserId: invoices.userId,
+      learnerName: users.name,
+      planTitleAr: subscriptionPlans.titleAr,
+    })
+    .from(paymentReceipts)
+    .leftJoin(invoices, eq(invoices.id, paymentReceipts.invoiceId))
+    .leftJoin(users, eq(users.id, invoices.userId))
+    .leftJoin(reviewer, eq(reviewer.id, paymentReceipts.reviewedBy))
+    .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, invoices.planId))
+    .where(inArray(paymentReceipts.status, ["approved", "rejected"]))
+    .orderBy(desc(paymentReceipts.reviewedAt))
+    .limit(limit);
+  return rows;
+}
+
+// Invoices still "pending" (awaiting payment) that have been open for a
+// while with NO receipt submitted at all — distinct from the review queue
+// above, which only ever shows invoices that already HAVE a receipt
+// waiting. This is what lets an admin proactively nudge a learner before
+// expireStalePendingInvoices (server/db/subscriptions.ts) silently expires
+// the invoice after its own, much longer, threshold.
+export async function getOverdueInvoicesWithoutReceipt(hoursThreshold = 48) {
+  const db = await getDb();
+  if (!db) return [];
+  const cutoff = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      id: invoices.id,
+      createdAt: invoices.createdAt,
+      amountCents: invoices.amountCents,
+      currency: invoices.currency,
+      userId: invoices.userId,
+      learnerName: users.name,
+      planTitleAr: subscriptionPlans.titleAr,
+    })
+    .from(invoices)
+    .leftJoin(users, eq(users.id, invoices.userId))
+    .leftJoin(subscriptionPlans, eq(subscriptionPlans.id, invoices.planId))
+    .leftJoin(
+      paymentReceipts,
+      and(
+        eq(paymentReceipts.invoiceId, invoices.id),
+        // A rejected receipt doesn't count as "covering" the invoice — the
+        // learner still owes a fresh one, so that invoice should still
+        // surface here as needing a nudge.
+        inArray(paymentReceipts.status, ["pending_review", "approved"])
+      )
+    )
+    .where(
+      and(
+        eq(invoices.status, "pending"),
+        lt(invoices.createdAt, cutoff),
+        isNull(paymentReceipts.id)
+      )
+    )
+    .orderBy(asc(invoices.createdAt));
   return rows;
 }
 

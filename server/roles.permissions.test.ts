@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { getDb } from "./db/shared";
+import { createEmailUser } from "./db/usersAuth";
+import { hashPassword } from "./_core/emailAuth";
+import { users, courses, units, lessons } from "../drizzle/schema";
+import type { User } from "../drizzle/schema";
+
+// Most tests below only exercise router-level role/auth gates, which are
+// enforced before any database access — they hold whether or not a real
+// database is configured for this test run. The lesson-asset-upload
+// validation test is the one exception: it needs a real, owned lesson row
+// to reach the actual mime/size validation logic (server/uploadValidation.ts)
+// instead of failing earlier on "lesson not found". See its own setup below.
+const HAS_DB = !!process.env.DATABASE_URL;
+const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function contextFor(
   role: "learner" | "parent" | "teacher" | "institution" | "admin"
@@ -259,10 +274,95 @@ describe("role permissions", () => {
   });
 
   it("rejects unsupported lesson asset types and oversized uploads", async () => {
-    const caller = appRouter.createCaller(contextFor("teacher"));
+    // With no DATABASE_URL, uploadAsset's own DB lookup returns "unavailable"
+    // before ever reaching the mime/size validation this test is meant to
+    // exercise — that still resolves to BAD_REQUEST, so the assertion below
+    // holds either way, but only checks the real validation logic when a
+    // real, owned lesson row exists to look up. Build one when a real
+    // database is actually configured for this run.
+    let caller = appRouter.createCaller(contextFor("teacher"));
+    let lessonId = 1;
+    if (HAS_DB) {
+      const db = await getDb();
+      if (!db) throw new Error("DATABASE_URL is set but getDb() returned null");
+      const openId = `role-upload-teacher-${RUN}`;
+      const passwordHash = await hashPassword("Fixture-Pass-123");
+      const created = await createEmailUser({
+        openId,
+        email: `role-upload-teacher-${RUN}@nourix.test`,
+        name: "Fixture",
+        passwordHash,
+      });
+      if (!created.ok) throw new Error("Failed to create fixture teacher user");
+      await db.update(users).set({ role: "teacher" }).where(eq(users.openId, openId));
+      const teacherRows = await db
+        .select()
+        .from(users)
+        .where(eq(users.openId, openId))
+        .limit(1);
+      if (!teacherRows[0]) throw new Error("Fixture teacher user was not created");
+      const teacher = teacherRows[0] as User;
+
+      await db.insert(courses).values({
+        slug: `role-upload-course-${RUN}`,
+        subject: "math",
+        level: "foundation",
+        titleAr: "دورة اختبار",
+        titleFr: "Cours de test",
+        titleEn: "Test course",
+        descriptionAr: "لأغراض الاختبار الآلي فقط",
+        descriptionFr: "À des fins de test automatisé uniquement",
+        descriptionEn: "For automated testing purposes only",
+        ownerId: teacher.id,
+      });
+      const courseRows = await db
+        .select({ id: courses.id })
+        .from(courses)
+        .where(eq(courses.slug, `role-upload-course-${RUN}`))
+        .limit(1);
+      if (!courseRows[0]) throw new Error("Fixture course was not created");
+
+      await db.insert(units).values({
+        courseId: courseRows[0].id,
+        orderIndex: 0,
+        titleAr: "الوحدة",
+        titleFr: "Unité",
+        titleEn: "Unit",
+      });
+      const unitRows = await db
+        .select({ id: units.id })
+        .from(units)
+        .where(eq(units.courseId, courseRows[0].id))
+        .limit(1);
+      if (!unitRows[0]) throw new Error("Fixture unit was not created");
+
+      await db.insert(lessons).values({
+        unitId: unitRows[0].id,
+        orderIndex: 0,
+        titleAr: "الدرس",
+        titleFr: "Leçon",
+        titleEn: "Lesson",
+        type: "article",
+        content: "محتوى لأغراض الاختبار.",
+      });
+      const lessonRows = await db
+        .select({ id: lessons.id })
+        .from(lessons)
+        .where(eq(lessons.unitId, unitRows[0].id))
+        .limit(1);
+      if (!lessonRows[0]) throw new Error("Fixture lesson was not created");
+      lessonId = lessonRows[0].id;
+
+      caller = appRouter.createCaller({
+        user: teacher,
+        req: { protocol: "https", headers: {} } as TrpcContext["req"],
+        res: {} as TrpcContext["res"],
+      });
+    }
+
     await expect(
       caller.content.uploadAsset({
-        lessonId: 1,
+        lessonId,
         fileName: "script.exe",
         mimeType: "application/pdf" as "application/pdf",
         sizeBytes: 16 * 1024 * 1024,

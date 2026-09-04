@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const labels = {
@@ -76,7 +77,7 @@ export default function Support() {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const changeLang = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
 
   const utils = trpc.useUtils();

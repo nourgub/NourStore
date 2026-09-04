@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { trpc } from "@/lib/trpc";
 import { subjectIcon } from "@/lib/subjectIcons";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 
@@ -123,7 +124,7 @@ export default function CourseCatalog() {
   );
   const changeLang = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
   const duration = (minutes: number) =>
     `${Math.floor(minutes / 60)}h ${minutes % 60}m`;

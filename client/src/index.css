@@ -48,8 +48,8 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; background: #050505; overflow-x: hidden; }
-body { margin: 0; min-width: 320px; background: #050505; color: #f7f4ec; font-family: "DM Sans", "IBM Plex Sans Arabic", sans-serif; font-style: normal; overflow-x: hidden; }
+html { scroll-behavior: smooth; background: #050505; }
+body { margin: 0; min-width: 320px; background: #050505; color: #f7f4ec; font-family: "DM Sans", "IBM Plex Sans Arabic", sans-serif; font-style: normal; }
 body, button, input, textarea, select, h1, h2, h3, h4, h5, h6, p, span, a, label, small, strong, em, i, cite, address, blockquote, q, var, dfn, figcaption, legend, optgroup { font-style: normal; }
 /* Some browsers (notably Firefox) italicize input/textarea placeholder text by default — force it off everywhere. */
 ::placeholder, ::-webkit-input-placeholder, :-ms-input-placeholder { font-style: normal !important; }

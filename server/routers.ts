@@ -124,6 +124,8 @@ import {
   setSubjectActive,
   deleteSubject,
   getPendingPaymentReceipts,
+  getPaymentReceiptHistory,
+  getOverdueInvoicesWithoutReceipt,
   reviewPaymentReceipt,
   notifyAdminsOfStaleReceipts,
   getRevenueAnalytics,
@@ -227,7 +229,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (
           !(await checkRateLimit(
-            `frontend-error-report:${ctx.req.headers["x-forwarded-for"] || ctx.req.socket?.remoteAddress || "unknown"}`,
+            `frontend-error-report:${ctx.req.ip || "unknown"}`,
             30,
             60 * 60 * 1000
           ))
@@ -265,6 +267,22 @@ export const appRouter = router({
           !(await checkRateLimit(
             `email-register:${input.email.toLowerCase()}`,
             5,
+            60 * 60 * 1000
+          ))
+        )
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many attempts, try again later",
+          });
+        // The per-email limit above does nothing against an attacker who
+        // varies the email on every request — this caps mass account
+        // creation from a single source regardless of the email used.
+        // Looser than the per-email limit since a shared IP (an office, a
+        // school) can legitimately have several real people signing up.
+        if (
+          !(await checkRateLimit(
+            `email-register-ip:${ctx.req.ip || "unknown"}`,
+            20,
             60 * 60 * 1000
           ))
         )
@@ -552,6 +570,14 @@ export const appRouter = router({
       ["admin"],
       "Admin access required"
     ).query(() => getPendingPaymentReceipts()),
+    paymentReceiptHistory: roleProcedure(
+      ["admin"],
+      "Admin access required"
+    ).query(() => getPaymentReceiptHistory()),
+    overdueInvoices: roleProcedure(
+      ["admin"],
+      "Admin access required"
+    ).query(() => getOverdueInvoicesWithoutReceipt()),
     reviewPaymentReceipt: roleProcedure(["admin"], "Admin access required")
       .input(
         z.object({
@@ -1111,7 +1137,7 @@ export const appRouter = router({
         // endpoint anyone on the internet can hit with zero login.
         if (
           !(await checkRateLimit(
-            `certificate-verify:${ctx.req.headers["x-forwarded-for"] || ctx.req.socket?.remoteAddress || "unknown"}`,
+            `certificate-verify:${ctx.req.ip || "unknown"}`,
             60,
             60 * 60 * 1000
           ))

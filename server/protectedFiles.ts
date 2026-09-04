@@ -1,15 +1,17 @@
-// Two kinds of real, sensitive files were previously served through the
-// generic `/local-storage/*` static route with NO authentication at all:
+// Two kinds of real, sensitive files are stored under local storage
+// (server/storageProviders/local.ts):
 //   1. Payment receipt images (bank-transfer screenshots — real financial
 //      and personal data).
 //   2. Paid lesson video/attachment files.
-// The tRPC layer correctly restricted who is *told* each URL (admins for
+// The tRPC layer correctly restricts who is *told* each URL (admins for
 // receipts; enrolled/eligible learners for lesson assets), but the URL
 // itself, once known by anyone — a leaked screenshot, browser history
-// sync, a compromised device, a referrer header, a shared link — worked
-// forever for absolutely anyone, no login required. These routes close
-// that gap: they re-check real authorization on every single request,
-// not just once when the URL was first handed out.
+// sync, a compromised device, a referrer header, a shared link — would
+// work forever for absolutely anyone, no login required, if served as a
+// plain static file. These routes close that gap: they re-check real
+// authorization on every single request, not just once when the URL was
+// first handed out. There is no unauthenticated static route serving
+// UPLOAD_ROOT at all — this is the only way these files are ever served.
 //
 // Only applies when STORAGE_PROVIDER=local (the default, self-hosted-only
 // option). Under STORAGE_PROVIDER=s3, files already go through
@@ -38,7 +40,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webm": "video/webm",
 };
 
-/** Path-traversal guard, re-verified here independently rather than trusted from write time (same pattern as localStorageServer.ts). */
+/** Path-traversal guard, re-verified here independently rather than trusted from write time. */
 async function streamProtectedFile(
   res: Response,
   storageKey: string,

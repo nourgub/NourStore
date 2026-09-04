@@ -5,7 +5,6 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleAuthRoutes } from "./googleAuth";
 import { registerGoogleCalendarRoutes } from "./googleCalendar";
-import { registerLocalStorageServer } from "./localStorageServer";
 import { registerProtectedFileRoutes } from "../protectedFiles";
 import { registerSitemap } from "../sitemap";
 import { registerCertificateDownload } from "../certificateDownload";
@@ -45,6 +44,14 @@ async function startServer() {
   // /api/health or a confusing runtime error. See server/_core/env.ts.
   assertEnvOrExit();
   const app = express();
+  // Trust exactly one reverse-proxy hop (Replit's / any standard PaaS
+  // front door) so Express's own req.ip resolves the real client IP from
+  // the X-Forwarded-For header's right-most (proxy-appended) entry —
+  // never the client-supplied left-most entries, which a caller can set
+  // to anything. Rate-limit keys below use req.ip specifically so they
+  // can't be reset by an attacker just sending a different
+  // X-Forwarded-For value on every request.
+  app.set("trust proxy", 1);
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads.
   // The `verify` callback captures the exact, unparsed raw bytes onto
@@ -67,7 +74,6 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "170mb", extended: true }));
   registerGoogleAuthRoutes(app);
   registerGoogleCalendarRoutes(app);
-  registerLocalStorageServer(app);
   registerProtectedFileRoutes(app);
   registerSitemap(app);
   registerCertificateDownload(app);
@@ -95,7 +101,7 @@ async function startServer() {
   // failed to load — the one place robustness matters more than type
   // safety, since this is what reports "the app is already broken."
   app.post("/api/report-error", async (req, res) => {
-    const rateLimitKey = `frontend-error-report:${req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown"}`;
+    const rateLimitKey = `frontend-error-report:${req.ip || "unknown"}`;
     if (!(await checkRateLimit(rateLimitKey, 30, 60 * 60 * 1000))) {
       res.status(200).json({ ok: true }); // never surface a 2nd error from the error reporter itself
       return;

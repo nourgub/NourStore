@@ -18,6 +18,7 @@
 
 import { ENV } from "./_core/env";
 import { storagePut } from "./storage";
+import { validateUploadBytes } from "./uploadValidation";
 import {
   getInvoiceById,
   createPaymentReceipt,
@@ -28,6 +29,18 @@ import {
   markSessionReminded,
   createNotification,
 } from "./db";
+
+// WhatsApp's own "image" message type already constrains what Meta will
+// classify this way, but that's Meta's platform behavior, not something
+// this code enforces — so the extension is derived from the mime type
+// Meta reports (never hardcoded), and every inbound receipt photo still
+// goes through the exact same magic-byte/size validation as a web upload
+// (server/uploadValidation.ts) before ever reaching storage.
+const WHATSAPP_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 export function isWhatsAppBotConfigured(): boolean {
   return Boolean(
@@ -169,8 +182,24 @@ export async function handleWhatsAppInboundMessage(
     );
     return;
   }
+  const extension = WHATSAPP_IMAGE_EXTENSIONS[media.mimeType];
+  const fileName = `${message.messageId}.${extension || "jpg"}`;
+  const validation = validateUploadBytes({
+    fileName,
+    mimeType: media.mimeType,
+    declaredSizeBytes: media.bytes.length,
+    decodedByteLength: media.bytes.length,
+    bytes: media.bytes,
+  });
+  if (!extension || !validation.ok) {
+    await sendWhatsAppText(
+      message.from,
+      "الملف المُرسل ليس صورة صالحة أو حجمه غير مقبول. أرسل صورة الوصل بصيغة JPG أو PNG."
+    );
+    return;
+  }
   const uploaded = await storagePut(
-    `payment-receipts/${invoice.id}/${message.messageId}.jpg`,
+    `payment-receipts/${invoice.id}/${fileName}`,
     media.bytes,
     media.mimeType
   );

@@ -3,6 +3,7 @@ import { Link, useRoute } from "wouter";
 import { ForwardArrow, BackArrow } from "@/components/DirectionalArrow";
 import { Globe2, ShieldAlert } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 type Doc = "privacy" | "terms";
@@ -282,7 +283,7 @@ export default function Legal() {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const changeLang = (next: Lang) => {
     setLang(next);
-    localStorage.setItem("nourix-language", next);
+    setStoredLanguage(next);
   };
   const content = (doc === "privacy" ? privacyContent : termsContent)[lang];
 

@@ -53,7 +53,7 @@ export async function localGet(
   return { key, url: `/local-storage/${key}` };
 }
 
-/** No presigning concept for local disk storage — the file is just served directly by the app's own static route. */
+/** No presigning concept for local disk storage — this key-shaped path is never served as-is; every real caller rewrites it to the authenticated proxy path (server/protectedFiles.ts) before handing it to a client. */
 export async function localGetSignedUrl(relKey: string): Promise<string> {
   return `/local-storage/${normalizeKey(relKey)}`;
 }
