@@ -198,11 +198,16 @@ créer.
 3. `docker compose up -d` — démarre un vrai conteneur MySQL 8.0 avec les
    données stockées dans un volume Docker persistant (survit aux
    redémarrages ; seul `docker compose down -v` l'efface, comme prévu).
-4. `node scripts/migrate.mjs` (ou `pnpm migrate`) — script Node.js pur (le
-   même pilote `mysql2` déjà utilisé par l'application, aucun outil
-   externe) qui applique automatiquement les fichiers `drizzle/*.sql` dans
-   l'ordre, en suivant les migrations déjà appliquées dans une vraie table
-   `_migrations` (plus de détection par analyse du texte des erreurs SQL).
+4. Les migrations s'appliquent automatiquement au démarrage du conteneur
+   `app` (le `Dockerfile` lance `node scripts/migrate.mjs` avant
+   `node dist/index.js`) — rien à lancer manuellement. `migrate.mjs` reste
+   un script Node.js pur (le même pilote `mysql2` déjà utilisé par
+   l'application, aucun outil externe) qui applique les fichiers
+   `drizzle/*.sql` dans l'ordre, en suivant les migrations déjà appliquées
+   dans une vraie table `_migrations` (plus de détection par analyse du
+   texte des erreurs SQL) — donc sûr à ré-exécuter à chaque redémarrage.
+   Pour l'appliquer manuellement quand même (utile en debug) :
+   `docker compose exec app node scripts/migrate.mjs`.
    **Corrigé et vérifié réellement (2026-09-01)** contre quatre scénarios
    réels sur MySQL/MariaDB : base entièrement vierge (21/21 appliquées) ;
    ré-exécution immédiate sur la même base (0 appliquée, 21 déjà à jour,
@@ -254,6 +259,51 @@ Ce chemin ne nécessite la création d'aucun compte, sur aucun site, pour la
 base de données elle-même — seulement l'installation gratuite de Docker,
 exactement comme installer n'importe quel autre logiciel sur sa propre
 machine.
+
+## Railway (alternative à Replit pour un déploiement stable)
+
+Railway construit directement depuis le `Dockerfile` du dépôt — aucun
+fichier de config supplémentaire requis. Étapes :
+
+1. Créer un compte sur `railway.app`, puis **New Project → Deploy from
+   GitHub repo** et choisir `nourgub/NourStore` (branche
+   `claude/amal-run-t48ma3` ou celle mergée sur `main`).
+2. Railway détecte le `Dockerfile` et l'utilise automatiquement pour le
+   build — pas de configuration supplémentaire nécessaire pour ça.
+3. Ajouter une base de données : dans le même projet, **+ New → Database →
+   MySQL**. Railway l'expose sous forme de variables (`MYSQLHOST`,
+   `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`) — combiner
+   ces variables en une seule `DATABASE_URL` sur le service `app` (onglet
+   **Variables**) :
+   `mysql://${{MySQL.MYSQLUSER}}:${{MySQL.MYSQLPASSWORD}}@${{MySQL.MYSQLHOST}}:${{MySQL.MYSQLPORT}}/${{MySQL.MYSQLDATABASE}}`
+   (Railway remplace `${{...}}` par les vraies valeurs automatiquement).
+4. Sur le service `app`, définir au minimum ces variables (**Variables**
+   → **Raw Editor**, ou une par une) :
+   - `JWT_SECRET` — générer avec `openssl rand -hex 32`, jamais réutiliser
+     une valeur de test.
+   - `NODE_ENV=production`
+   - `AUTH_PROVIDER=email` (pour éviter de configurer Google OAuth tout de
+     suite) ou `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` si déjà en main.
+   - `CRON_SECRET` — une valeur aléatoire, nécessaire pour que les tâches
+     planifiées (rappels de paiement, expiration d'abonnement) fonctionnent.
+   - `OWNER_OPEN_ID` — voir la section "Créer le premier compte
+     administrateur" plus haut ; sans elle, aucun compte ne devient admin
+     automatiquement.
+5. Railway assigne `PORT` automatiquement (l'app le respecte déjà — voir
+   `server/_core/index.ts`) et fournit une URL publique HTTPS réelle sous
+   **Settings → Networking → Generate Domain**.
+6. Déployer. Les migrations s'appliquent automatiquement au démarrage du
+   conteneur (même mécanisme que docker-compose ci-dessus) — rien à lancer
+   manuellement.
+
+Pour le stockage de fichiers (reçus de paiement, pièces jointes de leçon) :
+`STORAGE_PROVIDER=local` fonctionne mais **le disque de Railway n'est pas
+garanti persistant entre les redéploiements** sans un volume attaché
+explicitement (**Settings → Volumes** sur le service `app`, monté sur
+`/app/uploads`). Pour une garantie plus forte à long terme, passer à
+`STORAGE_PROVIDER=s3` avec un vrai bucket S3-compatible (AWS S3,
+Cloudflare R2, Backblaze B2 — voir les variables `S3_*` dans
+`.env.example`).
 
 ## تصحيح (2026-09-01): القسم التالي كان يصف ميزة لم تُنفَّذ فعليًا قط
 

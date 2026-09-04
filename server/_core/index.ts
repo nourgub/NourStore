@@ -16,7 +16,7 @@ import { getDb } from "../db";
 import { logError, isUnexpectedError } from "../db/errorLog";
 import { checkRateLimit } from "../rateLimit";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./staticServe";
 import { assertEnvOrExit } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -144,8 +144,13 @@ async function startServer() {
       },
     })
   );
-  // development mode uses Vite, production mode uses static files
+  // development mode uses Vite, production mode uses static files. The
+  // dev-only module is loaded with a dynamic import specifically so a
+  // production install — where "vite" (a devDependency) is correctly not
+  // installed — never tries to resolve it at all. See staticServe.ts's
+  // header comment for why this used to crash production startups.
   if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("./viteDevServer");
     await setupVite(app, server);
   } else {
     serveStatic(app);

@@ -1,51 +1,19 @@
+// Production static-file serving — split out from vite.ts specifically so
+// this module never imports the "vite" package itself. vite.ts's
+// setupVite (dev-only) has a top-level `import ... from "vite"`, and since
+// server/_core/index.ts used to import both setupVite and serveStatic
+// from the same module, esbuild's bundle (--packages=external) kept that
+// import as a real runtime `import "vite"` in dist/index.js — which then
+// crashed on startup in ANY environment that correctly installs
+// production dependencies only (vite is a devDependency, absent there).
+// This was never caught because every test in this project's history
+// happened to have devDependencies installed too. Keeping this serving
+// logic in its own vite-free module, imported statically, and loading
+// setupVite only via a dynamic import gated on NODE_ENV (see index.ts),
+// means a production install genuinely never touches the vite package.
 import express, { type Express } from "express";
 import fs from "fs";
-import { type Server } from "http";
-import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
-
-export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
-  };
-
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    server: serverOptions,
-    appType: "custom",
-  });
-
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
-
-    try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "../..",
-        "client",
-        "index.html"
-      );
-
-      // always reload the index.html file from disk incase it changes
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
-    }
-  });
-}
 
 export function serveStatic(app: Express) {
   const distPath =

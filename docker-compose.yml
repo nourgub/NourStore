@@ -5,12 +5,14 @@
 # Usage:
 #   1. Copy .env.example to .env and fill in real values (see below).
 #   2. docker compose up -d
-#   3. node scripts/migrate.mjs   (applies every drizzle/*.sql file, in order)
 #
-# That's it — a real, persistent MySQL database is now running on this
-# machine, with data stored in a Docker-managed volume that survives
-# restarts and `docker compose down` (only `docker compose down -v` erases
-# it, which is exactly how Docker volumes are supposed to work).
+# That's it — the app container's own startup (see Dockerfile) applies
+# every not-yet-applied drizzle/*.sql migration automatically before
+# starting the server, tracked in a real _migrations table, so this is
+# safe to leave running on every future `docker compose up` too. MySQL's
+# data is stored in a Docker-managed volume that survives restarts and
+# `docker compose down` (only `docker compose down -v` erases it, which
+# is exactly how Docker volumes are supposed to work).
 
 services:
   mysql:
