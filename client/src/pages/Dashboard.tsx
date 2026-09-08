@@ -48,6 +48,7 @@ const copy = {
     notifications: "التنبيهات",
     certificates: "الشهادات",
     lang: "اللغة",
+    logout: "تسجيل الخروج",
   },
   fr: {
     kicker: "Espace d’apprentissage",
@@ -73,6 +74,7 @@ const copy = {
     notifications: "Notifications",
     certificates: "Certificats",
     lang: "Langue",
+    logout: "Se déconnecter",
   },
   en: {
     kicker: "Learning space",
@@ -97,6 +99,7 @@ const copy = {
     notifications: "Notifications",
     certificates: "Certificates",
     lang: "Language",
+    logout: "Log out",
   },
 } as const;
 
@@ -154,7 +157,7 @@ const invoiceDisplayStatus = (
 };
 
 export default function Dashboard() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [lang, setLang] = useState<Lang>(
     () => (localStorage.getItem("nourix-language") as Lang) || "ar"
   );
@@ -294,6 +297,15 @@ export default function Dashboard() {
               <UserRound size={14} />
               {user?.name || "Nourix learner"}
             </span>
+            <button
+              className="catalog-home-link"
+              onClick={() => {
+                logout();
+                window.location.href = "/";
+              }}
+            >
+              {t.logout}
+            </button>
           </div>
         </div>
       </header>

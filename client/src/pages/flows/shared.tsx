@@ -85,6 +85,8 @@ export const courseLabels = {
     manage: "إدارة المحتوى",
     published: "منشور",
     pending: "قيد المراجعة",
+    logout: "تسجيل الخروج",
+    dashboard: "لوحة التحكم",
   },
   fr: {
     placement: "Test de niveau",
@@ -108,6 +110,8 @@ export const courseLabels = {
     manage: "Gérer le contenu",
     published: "Publié",
     pending: "En révision",
+    logout: "Se déconnecter",
+    dashboard: "Tableau de bord",
   },
   en: {
     placement: "Placement test",
@@ -131,6 +135,8 @@ export const courseLabels = {
     manage: "Manage content",
     published: "Published",
     pending: "In review",
+    logout: "Log out",
+    dashboard: "Dashboard",
   },
 } as const;
 export function Shell({
@@ -148,6 +154,7 @@ export function Shell({
 }) {
   const t = courseLabels[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
+  const { user, logout } = useAuth();
   return (
     <div
       dir={dir}
@@ -186,6 +193,20 @@ export function Shell({
                 </button>
               ))}
             </div>
+            {user && (
+              <>
+                <span className="dashboard-user">{user.name || user.email}</span>
+                <button
+                  className="catalog-home-link"
+                  onClick={() => {
+                    logout();
+                    window.location.href = "/";
+                  }}
+                >
+                  {t.logout}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
