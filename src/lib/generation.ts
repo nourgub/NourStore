@@ -33,7 +33,7 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     return doc;
   });
 
-  const { steps, questions } = runMathAgentPipeline({
+  const { steps, questions } = await runMathAgentPipeline({
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
     topics: input.topics,

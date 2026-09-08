@@ -1,4 +1,5 @@
 import type { GeneratedQuestion } from "../types";
+import { scaleRubricToBudget } from "./scaleRubric";
 
 // Mocked question bank for the Math subject. Each generator produces a
 // parameterized question + full worked solution + grading rubric.
@@ -124,12 +125,6 @@ export function generateMathQuestion(
 ): GeneratedQuestion {
   const template = TOPIC_TEMPLATES[topic] ?? TOPIC_TEMPLATES["المعادلات الخطية"];
   const built = template.build(difficulty);
-  const rubricSum = built.rubric.reduce((s, r) => s + r.points, 0);
-  const scale = rubricSum > 0 ? pointsBudget / rubricSum : 1;
-  const scaledRubric = built.rubric.map((r) => ({
-    criterion: r.criterion,
-    points: Math.round(r.points * scale * 10) / 10,
-  }));
 
   return {
     id: `q_${Math.random().toString(36).slice(2, 10)}`,
@@ -138,6 +133,6 @@ export function generateMathQuestion(
     points: pointsBudget,
     prompt: built.prompt,
     solution: built.solution,
-    rubric: scaledRubric,
+    rubric: scaleRubricToBudget(built.rubric, pointsBudget),
   };
 }

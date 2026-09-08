@@ -1,5 +1,6 @@
 import type { AgentStep, CurriculumDocument, GeneratedQuestion } from "../types";
 import { AVAILABLE_MATH_TOPICS, generateMathQuestion } from "./mockContent";
+import { generateMathQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
 
 export interface PipelineInput {
   examTitle: string;
@@ -35,12 +36,12 @@ function pickDifficulty(mix: PipelineInput["difficultyMix"], index: number, tota
 /**
  * Runs the Math subject's agent team over the given request.
  *
- * Each function below stands in for a specialized agent. Today they run
- * mock/templated content synchronously; the seam to plug in real model
- * calls (e.g. the Claude API) is `generateMathQuestion` in mockContent.ts
- * plus the "curriculum compliance" note built by the reviewer step here.
+ * Question content comes from `generateMathQuestionsWithClaude` (real Claude
+ * API call) whenever ANTHROPIC_API_KEY is configured, falling back to the
+ * templated bank in mockContent.ts otherwise — or if the API call itself
+ * fails, so a request never hard-fails just because generation had a hiccup.
  */
-export function runMathAgentPipeline(input: PipelineInput): PipelineOutput {
+export async function runMathAgentPipeline(input: PipelineInput): Promise<PipelineOutput> {
   const steps: AgentStep[] = [];
 
   // 1) Curriculum Analyzer Agent
@@ -57,20 +58,47 @@ export function runMathAgentPipeline(input: PipelineInput): PipelineOutput {
     ),
   );
 
-  // 2) Exam Writer Agent
+  // 2) Exam Writer + Solution + Rubric agents (one Claude call covers all three
+  // when configured, since they share the same generation request)
   const totalPoints = 20;
   const pointsPerQuestion = Math.round((totalPoints / input.numQuestions) * 10) / 10;
-  const questions: GeneratedQuestion[] = [];
-  for (let i = 0; i < input.numQuestions; i++) {
-    const topic = requestedTopics[i % requestedTopics.length];
-    const difficulty = pickDifficulty(input.difficultyMix, i, input.numQuestions);
-    questions.push(generateMathQuestion(topic, difficulty, pointsPerQuestion));
+  const specs: QuestionSpec[] = Array.from({ length: input.numQuestions }, (_, i) => ({
+    topic: requestedTopics[i % requestedTopics.length],
+    difficulty: pickDifficulty(input.difficultyMix, i, input.numQuestions),
+    pointsBudget: pointsPerQuestion,
+  }));
+
+  let questions: GeneratedQuestion[];
+  let usedRealGeneration = false;
+  let fallbackReason: string | null = null;
+
+  if (isRealGenerationConfigured()) {
+    try {
+      questions = await generateMathQuestionsWithClaude({
+        examTitle: input.examTitle,
+        gradeLevel: input.gradeLevel,
+        styleNotes: styleNote,
+        specs,
+      });
+      usedRealGeneration = true;
+    } catch (err) {
+      fallbackReason = err instanceof Error ? err.message : "خطأ غير معروف في نداء نموذج الذكاء الاصطناعي";
+      questions = specs.map((s) => generateMathQuestion(s.topic, s.difficulty, s.pointsBudget));
+    }
+  } else {
+    questions = specs.map((s) => generateMathQuestion(s.topic, s.difficulty, s.pointsBudget));
   }
+
   steps.push(
     step(
       "واضع الأسئلة",
       "صياغة أسئلة الامتحان",
-      `تمت صياغة ${questions.length} سؤال(أسئلة) موزعة على المحاور: ${requestedTopics.join("، ")}.`,
+      `تمت صياغة ${questions.length} سؤال(أسئلة) موزعة على المحاور: ${requestedTopics.join("، ")} — ` +
+        (usedRealGeneration
+          ? "عبر نموذج الذكاء الاصطناعي (Claude)."
+          : fallbackReason
+            ? `تم التراجع إلى بنك الأسئلة التجريبي بسبب: ${fallbackReason}.`
+            : "عبر بنك الأسئلة التجريبي (لم يُفعَّل مفتاح Claude API بعد)."),
     ),
   );
 
