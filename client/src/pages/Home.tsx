@@ -248,6 +248,12 @@ export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: whatsappNumber } = trpc.platform.whatsapp.useQuery();
   const { data: socialLinks } = trpc.platform.socialLinks.useQuery();
+  // Same check as the login/register page and the teacher panel's Google
+  // Calendar link: without it, "Start learning" always calls startLogin()
+  // (Google OAuth) even on a deployment with no Google credentials set,
+  // landing a visitor on /api/auth/google/login's raw 501 text response
+  // instead of ever reaching the working email/password sign-up form.
+  const { data: authConfig } = trpc.auth.config.useQuery();
   const [langOpen, setLangOpen] = useState(false);
 
   // Captures ?ref=CODE on first visit (before the person even signs in) and
@@ -289,7 +295,11 @@ export default function Home() {
       window.location.href = "/dashboard";
       return;
     }
-    startLogin();
+    if (authConfig?.googleEnabled) {
+      startLogin();
+    } else {
+      window.location.href = "/register";
+    }
   };
 
   return (

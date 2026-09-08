@@ -35,12 +35,19 @@ function buildRedirectUri(req: Request): string {
 export function registerGoogleAuthRoutes(app: Express) {
   app.get("/api/auth/google/login", (req: Request, res: Response) => {
     if (!isGoogleConfigured()) {
-      // Fails honestly instead of redirecting into a broken OAuth flow.
-      res
-        .status(501)
-        .send(
-          "Google sign-in is not configured on this deployment. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
-        );
+      // Every "sign in" / "start learning" entry point across the client
+      // (Home, Support, CourseDetail, LessonViewer, Pricing, the shared
+      // Shell/AccessGate, useAuth's own redirect-on-unauthenticated effect,
+      // main.tsx's top-level auth guard — a dozen call sites in total) calls
+      // startLogin(), which just does window.location.href to this route.
+      // None of them know or check whether Google is actually configured.
+      // Failing here with a raw 501 text response used to mean every one of
+      // those entry points dead-ended a visitor on an unstyled error page
+      // instead of ever reaching the working email/password form. Redirecting
+      // to /login (which already hides its own Google button when
+      // isGoogleConfigured() is false — see auth.config in routers.ts) fixes
+      // all of them at once, in the one place they all actually go through.
+      res.redirect("/login");
       return;
     }
     const nonce = crypto.randomUUID();
