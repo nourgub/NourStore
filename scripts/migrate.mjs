@@ -93,16 +93,26 @@ async function main() {
   // silently connecting without TLS. Translate it into the option mysql2
   // actually understands; a plain DATABASE_URL with no ssl-mode param
   // (e.g. a local/self-hosted MySQL) is unaffected.
+  //
+  // Some of these providers (Aiven included) sign their server
+  // certificate with their own private CA, so verifying against Node's
+  // default trust store fails with "self-signed certificate in
+  // certificate chain" even though the connection is genuinely
+  // encrypted. DATABASE_CA_CERT (that CA's own certificate, PEM-encoded —
+  // never a secret) lets that verification actually succeed instead of
+  // falling back to rejectUnauthorized: false, which would accept ANY
+  // certificate and defeat the point of using TLS at all.
   let connectionOptions = { uri: databaseUrl, multipleStatements: true };
   try {
     const parsed = new URL(databaseUrl);
     const sslMode = parsed.searchParams.get("ssl-mode");
     if (sslMode) {
       parsed.searchParams.delete("ssl-mode");
+      const caCert = process.env.DATABASE_CA_CERT;
       connectionOptions = {
         uri: parsed.toString(),
         multipleStatements: true,
-        ssl: { rejectUnauthorized: true },
+        ssl: caCert ? { rejectUnauthorized: true, ca: caCert } : { rejectUnauthorized: true },
       };
     }
   } catch {
