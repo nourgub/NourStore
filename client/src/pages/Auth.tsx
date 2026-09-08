@@ -125,6 +125,12 @@ export default function AuthPage({
     if (register) registerMutation.mutate({ email, password, name });
     else loginMutation.mutate({ email, password });
   };
+  // Without this check, the Google button below always renders and always
+  // redirects into /api/auth/google/login's 501 "not configured" page on a
+  // deployment that hasn't set up Google OAuth (e.g. AUTH_PROVIDER=email) —
+  // looking, to a visitor, like there's no way to sign up at all.
+  const { data: authConfig } = trpc.auth.config.useQuery();
+  const googleEnabled = authConfig?.googleEnabled ?? false;
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="nourix-app auth-page">
@@ -175,38 +181,42 @@ export default function AuthPage({
                   : "Authentication failed. Please try again or check your account."}
             </div>
           )}
-          <Button className="gold-button auth-action" onClick={startLogin}>
-            {register ? <UserPlus size={17} /> : <LogIn size={17} />}
-            {register ? t.register : t.login}
-            <ForwardArrow dir={dir} size={15} />
-          </Button>
+          {googleEnabled && (
+            <>
+              <Button className="gold-button auth-action" onClick={startLogin}>
+                {register ? <UserPlus size={17} /> : <LogIn size={17} />}
+                {register ? t.register : t.login}
+                <ForwardArrow dir={dir} size={15} />
+              </Button>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              margin: "18px 0",
-              fontSize: 12,
-              opacity: 0.6,
-            }}
-          >
-            <span
-              style={{
-                flex: 1,
-                height: 1,
-                background: "rgba(255,255,255,.12)",
-              }}
-            />
-            <span>{t.or}</span>
-            <span
-              style={{
-                flex: 1,
-                height: 1,
-                background: "rgba(255,255,255,.12)",
-              }}
-            />
-          </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  margin: "18px 0",
+                  fontSize: 12,
+                  opacity: 0.6,
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    height: 1,
+                    background: "rgba(255,255,255,.12)",
+                  }}
+                />
+                <span>{t.or}</span>
+                <span
+                  style={{
+                    flex: 1,
+                    height: 1,
+                    background: "rgba(255,255,255,.12)",
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {register && (

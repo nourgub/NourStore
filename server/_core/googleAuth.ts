@@ -23,7 +23,7 @@ const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_ENDPOINT =
   "https://openidconnect.googleapis.com/v1/userinfo";
 
-function isGoogleConfigured(): boolean {
+export function isGoogleConfigured(): boolean {
   return Boolean(ENV.googleClientId && ENV.googleClientSecret);
 }
 

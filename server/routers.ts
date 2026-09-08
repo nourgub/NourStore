@@ -6,6 +6,7 @@ import { z } from "zod";
 import { checkRateLimit, getRateLimitStatus } from "./rateLimit";
 import { MAX_VIDEO_UPLOAD_BYTES } from "./uploadValidation";
 import { createMeetEvent } from "./_core/googleCalendar";
+import { isGoogleConfigured } from "./_core/googleAuth";
 import { createSessionToken } from "./_core/session";
 import {
   hashPassword,
@@ -249,6 +250,12 @@ export const appRouter = router({
   }),
   auth: router({
     me: publicProcedure.query(opts => (opts.ctx.user ? toPublicUser(opts.ctx.user) : null)),
+    // Lets the login/register page hide the Google sign-in button on a
+    // deployment that only has GOOGLE_CLIENT_ID/SECRET unset (e.g.
+    // AUTH_PROVIDER=email) — without this, that button always renders and
+    // always redirects into /api/auth/google/login's 501 "not configured"
+    // page, since the client has no way to know Google isn't set up.
+    config: publicProcedure.query(() => ({ googleEnabled: isGoogleConfigured() })),
     // Real email + password sign-up/sign-in — no external service, no
     // third-party account, works entirely self-hosted. Rate-limited by IP
     // via the session-less protectedProcedure not applying here (these are
