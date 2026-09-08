@@ -86,7 +86,29 @@ async function main() {
   for (const file of files) console.log(`  - ${file}`);
   console.log("");
 
-  const connection = await mysql.createConnection({ uri: databaseUrl, multipleStatements: true });
+  // Managed MySQL providers (Aiven, PlanetScale, etc.) commonly encode
+  // their TLS requirement as a `ssl-mode=REQUIRED` query param — mysql2
+  // doesn't recognize that as a connection option (only a real `ssl`
+  // object, passed separately) and just warns about and ignores it,
+  // silently connecting without TLS. Translate it into the option mysql2
+  // actually understands; a plain DATABASE_URL with no ssl-mode param
+  // (e.g. a local/self-hosted MySQL) is unaffected.
+  let connectionOptions = { uri: databaseUrl, multipleStatements: true };
+  try {
+    const parsed = new URL(databaseUrl);
+    const sslMode = parsed.searchParams.get("ssl-mode");
+    if (sslMode) {
+      parsed.searchParams.delete("ssl-mode");
+      connectionOptions = {
+        uri: parsed.toString(),
+        multipleStatements: true,
+        ssl: { rejectUnauthorized: true },
+      };
+    }
+  } catch {
+    // Not a parseable URL — let mysql2 raise its own clear error below.
+  }
+  const connection = await mysql.createConnection(connectionOptions);
 
   try {
     const trackingTableAlreadyExisted = await migrationsTableExists(connection);
