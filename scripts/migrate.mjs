@@ -90,9 +90,11 @@ async function main() {
   // their TLS requirement as a `ssl-mode=REQUIRED` query param — mysql2
   // doesn't recognize that as a connection option (only a real `ssl`
   // object, passed separately) and just warns about and ignores it,
-  // silently connecting without TLS. Translate it into the option mysql2
-  // actually understands; a plain DATABASE_URL with no ssl-mode param
-  // (e.g. a local/self-hosted MySQL) is unaffected.
+  // silently connecting without TLS. Every field is extracted explicitly
+  // below (rather than handing mysql2 the raw `uri` to parse itself) so
+  // percent-decoding happens in exactly one inspectable/loggable place. A
+  // plain DATABASE_URL with no ssl-mode param (e.g. a local/self-hosted
+  // MySQL) is unaffected.
   //
   // Some of these providers (Aiven included) sign their server
   // certificate with their own private CA, so verifying against Node's
@@ -107,13 +109,20 @@ async function main() {
     const parsed = new URL(databaseUrl);
     const sslMode = parsed.searchParams.get("ssl-mode");
     if (sslMode) {
-      parsed.searchParams.delete("ssl-mode");
       const caCert = process.env.DATABASE_CA_CERT;
       connectionOptions = {
-        uri: parsed.toString(),
+        host: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : 3306,
+        user: decodeURIComponent(parsed.username),
+        password: decodeURIComponent(parsed.password),
+        database: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
         multipleStatements: true,
         ssl: caCert ? { rejectUnauthorized: true, ca: caCert } : { rejectUnauthorized: true },
       };
+      // Non-secret connection metadata only — never the password itself.
+      console.log(
+        `Connecting to managed MySQL: host=${connectionOptions.host} port=${connectionOptions.port} user=${connectionOptions.user} database=${connectionOptions.database} passwordLength=${connectionOptions.password.length}`
+      );
     }
   } catch {
     // Not a parseable URL — let mysql2 raise its own clear error below.
