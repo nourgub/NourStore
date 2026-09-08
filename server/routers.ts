@@ -1876,9 +1876,13 @@ export const appRouter = router({
     myStudents: teacherProcedure.query(({ ctx }) =>
       getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "institution" | "admin")
     ),
-    googleCalendarStatus: teacherProcedure.query(({ ctx }) =>
-      getGoogleCalendarStatus(ctx.user.id)
-    ),
+    googleCalendarStatus: teacherProcedure.query(async ({ ctx }) => ({
+      ...(await getGoogleCalendarStatus(ctx.user.id)),
+      // Lets the "Connect Google Calendar" button hide itself instead of
+      // linking into /api/google-calendar/connect's 501 "not configured"
+      // page on a deployment with no GOOGLE_CLIENT_ID/SECRET set.
+      googleConfigured: isGoogleConfigured(),
+    })),
     disconnectGoogleCalendar: teacherProcedure.mutation(({ ctx }) =>
       disconnectGoogleCalendar(ctx.user.id)
     ),

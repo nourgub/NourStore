@@ -1113,7 +1113,7 @@ function ContentStructureForm({
               {lang === "ar" ? "فصل الاتصال" : "Disconnect"}
             </Button>
           </>
-        ) : (
+        ) : calendarStatus.data?.googleConfigured ? (
           <>
             <small>
               {lang === "ar"
@@ -1124,6 +1124,12 @@ function ContentStructureForm({
               {lang === "ar" ? "ربط Google Calendar" : "Connect Google Calendar"}
             </a>
           </>
+        ) : (
+          <small>
+            {lang === "ar"
+              ? "إنشاء رابط Google Meet تلقائيًا غير متاح على هذه الاستضافة. أدخلي رابط الحصة يدويًا (Zoom أو Google Meet) في الحقل أدناه."
+              : "Auto-generating a Google Meet link isn't available on this deployment. Paste a live-session link (Zoom or Google Meet) manually in the field below instead."}
+          </small>
         )}
       </div>
       <div className="admin-form-grid">
