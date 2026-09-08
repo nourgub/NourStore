@@ -85,12 +85,16 @@ export function UploadDocumentForm({ subjectId }: { subjectId: SubjectId }) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-brand-800">ملف المنهج (اختياري — PDF أو Word)</label>
+        <label className="mb-1 block text-sm font-medium text-brand-800">ملف المنهج (اختياري — PDF أو Word .docx)</label>
         <input
           type="file"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="w-full text-sm text-brand-700"
         />
+        <p className="mt-1 text-xs text-brand-500">
+          سيُقرأ محتوى الملف فعليًا ويُستخدم كسياق مرجعي عند توليد الأسئلة (صيغة .doc القديمة غير مدعومة).
+        </p>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className="flex gap-2">

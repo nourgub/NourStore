@@ -1,5 +1,5 @@
 import { withDb } from "./db";
-import type { CurriculumDocument, SubjectId } from "./types";
+import type { CurriculumDocument, ExtractionStatus, SubjectId } from "./types";
 
 export interface CreateDocumentInput {
   teacherId: string;
@@ -8,6 +8,8 @@ export interface CreateDocumentInput {
   gradeLevel: string;
   topics: string[];
   styleNotes: string;
+  extractionStatus?: ExtractionStatus;
+  extractedText?: string;
 }
 
 export async function createDocument(input: CreateDocumentInput): Promise<CurriculumDocument> {
@@ -19,6 +21,8 @@ export async function createDocument(input: CreateDocumentInput): Promise<Curric
     gradeLevel: input.gradeLevel,
     topics: input.topics,
     styleNotes: input.styleNotes,
+    extractionStatus: input.extractionStatus ?? "none",
+    extractedText: input.extractedText ?? "",
     createdAt: new Date().toISOString(),
   };
   await withDb((db) => {

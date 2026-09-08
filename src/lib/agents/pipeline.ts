@@ -47,12 +47,16 @@ export async function runMathAgentPipeline(input: PipelineInput): Promise<Pipeli
   // 1) Curriculum Analyzer Agent
   const requestedTopics = input.topics.length > 0 ? input.topics : AVAILABLE_MATH_TOPICS.slice(0, 3);
   const styleNote = input.document?.styleNotes?.trim();
+  const curriculumText = input.document?.extractionStatus === "extracted" ? input.document.extractedText : "";
   steps.push(
     step(
       "محلّل المنهج",
       "تحليل المنهج وأسلوب الأستاذ",
       input.document
-        ? `تم تحليل الوثيقة "${input.document.fileName}" (${input.document.gradeLevel}) واستخراج ${input.document.topics.length} محور(محاور).` +
+        ? `تم تحليل الوثيقة "${input.document.fileName}" (${input.document.gradeLevel}).` +
+            (curriculumText
+              ? ` تم استخراج ${curriculumText.length} حرفًا من محتوى الملف الفعلي واعتمادها كسياق مرجعي.`
+              : ` لم يتم استخراج نص من الملف (${input.document.extractionStatus === "unsupported" ? "نوع ملف غير مدعوم" : "تعذّر استخراج المحتوى"})، تم الاعتماد على المحاور المُدخلة يدويًا.`) +
             (styleNote ? ` ملاحظات الأسلوب المعتمدة: "${styleNote}".` : "")
         : `لا توجد وثيقة منهج مرفوعة لهذا الطلب — تم الاعتماد على المحاور المُدخلة يدويًا: ${requestedTopics.join("، ")}.`,
     ),
@@ -78,6 +82,7 @@ export async function runMathAgentPipeline(input: PipelineInput): Promise<Pipeli
         examTitle: input.examTitle,
         gradeLevel: input.gradeLevel,
         styleNotes: styleNote,
+        curriculumText,
         specs,
       });
       usedRealGeneration = true;

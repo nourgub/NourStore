@@ -16,6 +16,8 @@ export interface Session {
   expiresAt: string;
 }
 
+export type ExtractionStatus = "none" | "extracted" | "unsupported" | "failed";
+
 export interface CurriculumDocument {
   id: string;
   teacherId: string;
@@ -24,6 +26,8 @@ export interface CurriculumDocument {
   gradeLevel: string;
   topics: string[];
   styleNotes: string;
+  extractionStatus: ExtractionStatus;
+  extractedText: string;
   createdAt: string;
 }
 

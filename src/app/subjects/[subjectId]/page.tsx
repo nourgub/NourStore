@@ -62,8 +62,27 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
             <ul className="space-y-2">
               {documents.map((d) => (
                 <li key={d.id} className="rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm shadow-sm">
-                  <span className="font-semibold text-brand-800">{d.fileName}</span> — {d.gradeLevel} — المحاور:{" "}
-                  {d.topics.join("، ")}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-brand-800">{d.fileName}</span>
+                    {d.extractionStatus === "extracted" && (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        تم استخراج محتوى الملف ({d.extractedText.length.toLocaleString("ar")} حرفًا)
+                      </span>
+                    )}
+                    {d.extractionStatus === "unsupported" && (
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        نوع ملف غير مدعوم للاستخراج
+                      </span>
+                    )}
+                    {d.extractionStatus === "failed" && (
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                        تعذّر استخراج المحتوى
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-brand-700">
+                    {d.gradeLevel} — المحاور: {d.topics.join("، ")}
+                  </div>
                 </li>
               ))}
             </ul>
