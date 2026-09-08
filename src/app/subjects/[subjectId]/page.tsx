@@ -1,13 +1,23 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { ArrowRight, FileText, History, Search, PenLine, CheckSquare, Grid3x3, ShieldCheck } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { listDocumentsForTeacher } from "@/lib/documents";
 import { listGenerationsForTeacher } from "@/lib/generation";
 import { UploadDocumentForm } from "@/components/UploadDocumentForm";
 import { GenerateExamForm } from "@/components/GenerateExamForm";
+import { SiteHeader } from "@/components/SiteHeader";
 import type { SubjectId } from "@/lib/types";
 
 const SUBJECT_NAMES: Record<string, string> = { math: "الرياضيات" };
+
+const PIPELINE = [
+  { label: "محلّل المنهج", icon: Search },
+  { label: "واضع الأسئلة", icon: PenLine },
+  { label: "معدّ الحلول", icon: CheckSquare },
+  { label: "شبكة التنقيط", icon: Grid3x3 },
+  { label: "المراجع", icon: ShieldCheck },
+];
 
 export default async function SubjectPage({ params }: { params: Promise<{ subjectId: string }> }) {
   const { subjectId } = await params;
@@ -22,55 +32,73 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
   ]);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <Link href="/dashboard" className="mb-4 inline-block text-sm text-brand-600 hover:underline">
-        ← العودة إلى المواد
-      </Link>
-      <h1 className="mb-1 text-2xl font-bold text-brand-900">فريق وكلاء {SUBJECT_NAMES[subjectId]}</h1>
-      <p className="mb-8 text-sm text-brand-600">
-        محلّل المنهج ← واضع الأسئلة ← معدّ الحلول ← مصمم شبكة التنقيط ← المراجع
-      </p>
+    <>
+      <SiteHeader teacherName={teacher.fullName} />
+      <main className="mx-auto max-w-4xl px-4 py-10">
+        <Link href="/dashboard" className="mb-4 inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
+          <ArrowRight size={14} /> العودة إلى المواد
+        </Link>
+        <h1 className="mb-3 text-2xl font-bold text-brand-900">فريق وكلاء {SUBJECT_NAMES[subjectId]}</h1>
 
-      <section className="mb-6 space-y-4">
-        <h2 className="text-lg font-bold text-brand-800">وثائق المنهج المرفوعة ({documents.length})</h2>
-        {documents.length > 0 && (
-          <ul className="space-y-2">
-            {documents.map((d) => (
-              <li key={d.id} className="rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm">
-                <span className="font-semibold text-brand-800">{d.fileName}</span> — {d.gradeLevel} — المحاور:{" "}
-                {d.topics.join("، ")}
-              </li>
-            ))}
-          </ul>
-        )}
-        <UploadDocumentForm subjectId={subjectId as SubjectId} />
-      </section>
+        <div className="mb-8 flex flex-wrap items-center gap-2">
+          {PIPELINE.map((p, i) => {
+            const Icon = p.icon;
+            return (
+              <span key={p.label} className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 rounded-full border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700">
+                  <Icon size={13} /> {p.label}
+                </span>
+                {i < PIPELINE.length - 1 && <span className="text-brand-300">←</span>}
+              </span>
+            );
+          })}
+        </div>
 
-      <section className="mb-10">
-        <GenerateExamForm subjectId={subjectId as SubjectId} documents={documents} />
-      </section>
+        <section className="mb-6 space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-brand-800">
+            <FileText size={18} className="text-brand-500" /> وثائق المنهج المرفوعة ({documents.length})
+          </h2>
+          {documents.length > 0 && (
+            <ul className="space-y-2">
+              {documents.map((d) => (
+                <li key={d.id} className="rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm shadow-sm">
+                  <span className="font-semibold text-brand-800">{d.fileName}</span> — {d.gradeLevel} — المحاور:{" "}
+                  {d.topics.join("، ")}
+                </li>
+              ))}
+            </ul>
+          )}
+          <UploadDocumentForm subjectId={subjectId as SubjectId} />
+        </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-bold text-brand-800">الامتحانات السابقة ({generations.length})</h2>
-        {generations.length === 0 ? (
-          <p className="text-sm text-brand-500">لم يتم توليد أي امتحان بعد.</p>
-        ) : (
-          <ul className="space-y-2">
-            {generations.map((g) => (
-              <li key={g.id}>
-                <Link
-                  href={`/subjects/${subjectId}/results/${g.id}`}
-                  className="block rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm transition hover:border-brand-300"
-                >
-                  <span className="font-semibold text-brand-800">{g.examTitle}</span> — {g.gradeLevel} —{" "}
-                  {g.questions.length} أسئلة —{" "}
-                  <span className="text-brand-500">{new Date(g.createdAt).toLocaleString("ar")}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+        <section className="mb-10">
+          <GenerateExamForm subjectId={subjectId as SubjectId} documents={documents} />
+        </section>
+
+        <section>
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-brand-800">
+            <History size={18} className="text-brand-500" /> الامتحانات السابقة ({generations.length})
+          </h2>
+          {generations.length === 0 ? (
+            <p className="text-sm text-brand-500">لم يتم توليد أي امتحان بعد.</p>
+          ) : (
+            <ul className="space-y-2">
+              {generations.map((g) => (
+                <li key={g.id}>
+                  <Link
+                    href={`/subjects/${subjectId}/results/${g.id}`}
+                    className="block rounded-xl border border-brand-100 bg-white px-4 py-3 text-sm shadow-sm transition hover:border-brand-300 hover:shadow-md"
+                  >
+                    <span className="font-semibold text-brand-800">{g.examTitle}</span> — {g.gradeLevel} —{" "}
+                    {g.questions.length} أسئلة —{" "}
+                    <span className="text-brand-500">{new Date(g.createdAt).toLocaleString("ar")}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    </>
   );
 }

@@ -9,5 +9,6 @@ body {
 
 body {
   background-color: #f7faf9;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(61, 133, 105, 0.08), transparent);
   color: #1a2420;
 }
