@@ -923,6 +923,7 @@ export function StaffSpace({
         {admin && <PlacementAdminPanel lang={lang} />}{" "}
         {admin && <AdminUsersPanel lang={lang} />}
         {admin && <CreateUserPanel lang={lang} />}
+        {admin && <EnrollLearnerPanel lang={lang} />}
         {!institution && <MyStudentsPanel lang={lang} />}
         <ContentStructureForm lang={lang} courses={managedCourses} />
         <QuizBuilder lang={lang} />
@@ -1889,6 +1890,111 @@ function CreateUserPanel({ lang }: { lang: Lang }) {
           onClick={() => createUser.mutate({ name, email, password, role })}
         >
           {lang === "ar" ? "إنشاء الحساب" : "Create account"}
+          <Plus size={15} />
+        </Button>
+      </div>
+      {message && <small className="form-success">{message}</small>}
+    </div>
+  );
+}
+
+// Grants a learner direct access to a course — for the admin who already
+// confirmed a manual WhatsApp/bank-transfer payment outside the platform
+// and doesn't want to make the learner separately click "enroll"
+// themselves afterward (self-service enrollment still exists unchanged;
+// this is an additional path, not a replacement).
+function EnrollLearnerPanel({ lang }: { lang: Lang }) {
+  const [userId, setUserId] = useState<number | "">("");
+  const [courseId, setCourseId] = useState<number | "">("");
+  const [message, setMessage] = useState("");
+  const users = trpc.admin.users.useQuery();
+  const courses = trpc.admin.courses.useQuery();
+  const learners = (users.data ?? []).filter(u => u.role === "learner");
+  const publishedCourses = (courses.data ?? []).filter(c => c.isPublished);
+  const courseLabel = (course: (typeof publishedCourses)[number]) =>
+    lang === "ar"
+      ? course.titleAr
+      : lang === "fr"
+        ? course.titleFr
+        : course.titleEn;
+  const enrollLearner = trpc.admin.enrollLearner.useMutation({
+    onSuccess: data => {
+      setMessage(
+        data.alreadyEnrolled
+          ? lang === "ar"
+            ? "هذا الطالب مسجَّل بالفعل في هذه الدورة."
+            : "This learner is already enrolled in this course."
+          : lang === "ar"
+            ? "تم تسجيل الطالب في الدورة بنجاح."
+            : "Learner enrolled in the course successfully."
+      );
+      setUserId("");
+      setCourseId("");
+    },
+    onError: error => setMessage(error.message),
+  });
+  const canEnroll = userId !== "" && courseId !== "";
+  return (
+    <div className="flow-card staff-form">
+      <div className="flow-card-title">
+        <div>
+          <span className="section-kicker">NOURIX / ENROLLMENT</span>
+          <h2>
+            {lang === "ar"
+              ? "تسجيل طالب في دورة"
+              : lang === "fr"
+                ? "Inscrire un élève à un cours"
+                : "Enroll a learner in a course"}
+          </h2>
+        </div>
+        <Users size={18} />
+      </div>
+      <p className="quiet-label">
+        {lang === "ar"
+          ? "استخدمي هذا بعد تأكيد الدفع (واتساب/تحويل بنكي) لمنح الطالب وصولاً مباشراً للدورة، بدل انتظاره ليلتحق بنفسه."
+          : "Use this after confirming payment (WhatsApp/bank transfer) to grant the learner direct access, instead of waiting for them to enroll themselves."}
+      </p>
+      <div className="admin-form-grid">
+        <select
+          value={userId}
+          onChange={e => setUserId(e.target.value ? Number(e.target.value) : "")}
+        >
+          <option value="">
+            {lang === "ar" ? "اختر طالباً" : "Select a learner"}
+          </option>
+          {learners.map(learner => (
+            <option key={learner.id} value={learner.id}>
+              {learner.name || learner.email}
+              {learner.accountStatus === "pending"
+                ? lang === "ar"
+                  ? " (معلَّق)"
+                  : " (pending)"
+                : ""}
+            </option>
+          ))}
+        </select>
+        <select
+          value={courseId}
+          onChange={e => setCourseId(e.target.value ? Number(e.target.value) : "")}
+        >
+          <option value="">
+            {lang === "ar" ? "اختر دورة" : "Select a course"}
+          </option>
+          {publishedCourses.map(course => (
+            <option key={course.id} value={course.id}>
+              {courseLabel(course)}
+            </option>
+          ))}
+        </select>
+        <Button
+          className="quiet-button"
+          disabled={!canEnroll || enrollLearner.isPending}
+          onClick={() =>
+            canEnroll &&
+            enrollLearner.mutate({ userId: userId as number, courseId: courseId as number })
+          }
+        >
+          {lang === "ar" ? "تسجيل الطالب" : "Enroll learner"}
           <Plus size={15} />
         </Button>
       </div>

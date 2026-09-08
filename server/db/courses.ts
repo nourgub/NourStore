@@ -998,6 +998,12 @@ export async function archiveManagedCourse(
 export async function enrollInCourse(input: {
   userId: number;
   courseId: number;
+  // Set only by an admin manually granting access after confirming a
+  // WhatsApp/manual payment outside the platform (see admin.enrollLearner
+  // in routers.ts) — self-service enrollment (progress.enroll) never sets
+  // this, so the subscription check still applies to every learner-driven
+  // enrollment exactly as before.
+  bypassSubscriptionCheck?: boolean;
 }) {
     const db = await getDb();
   if (!db) return { ok: false as const, reason: "unavailable" as const };
@@ -1029,7 +1035,11 @@ export async function enrollInCourse(input: {
       enrollment: existing[0],
       alreadyEnrolled: true,
     };
-  if (course.isFree !== 1 && !(await hasActiveSubscription(input.userId))) {
+  if (
+    !input.bypassSubscriptionCheck &&
+    course.isFree !== 1 &&
+    !(await hasActiveSubscription(input.userId))
+  ) {
     return { ok: false as const, reason: "subscription_required" as const };
   }
   await db

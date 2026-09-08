@@ -2131,6 +2131,44 @@ export const appRouter = router({
         });
         return { ok: result };
       }),
+    // Directly grants a learner access to a course, bypassing the
+    // subscription check that gates self-service enrollment (progress.enroll)
+    // — for the admin who already confirmed a manual WhatsApp/bank-transfer
+    // payment outside the platform and doesn't want to make the learner
+    // separately click "enroll" themselves afterward.
+    enrollLearner: adminProcedure
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          courseId: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await enrollInCourse({
+          userId: input.userId,
+          courseId: input.courseId,
+          bypassSubscriptionCheck: true,
+        });
+        if (!result.ok) {
+          if (result.reason === "not_found")
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Course not found",
+            });
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Enrollment unavailable",
+          });
+        }
+        await logAdminAction({
+          actorId: ctx.user.id,
+          action: "enroll_learner",
+          targetType: "user",
+          targetId: input.userId,
+          details: { courseId: input.courseId, alreadyEnrolled: result.alreadyEnrolled },
+        });
+        return result;
+      }),
     algorithmExercises: adminProcedure.query(() => getAllAlgorithmExercises()),
     createAlgorithmExercise: adminProcedure
       .input(
