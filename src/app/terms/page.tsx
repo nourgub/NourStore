@@ -1,4 +1,4 @@
-export const metadata = { title: "الشروط والأحكام — نور ستور" };
+export const metadata = { title: "الشروط والأحكام" };
 
 export default function TermsPage() {
   return (

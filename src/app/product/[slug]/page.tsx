@@ -15,8 +15,10 @@ export async function generateMetadata({
   const product = await getProductBySlug(slug);
   if (!product) return {};
   return {
-    title: `${product.name} — نور ستور`,
+    title: product.name,
     description: product.tagline,
+    openGraph: { title: product.name, description: product.tagline },
+    twitter: { title: product.name, description: product.tagline },
   };
 }
 

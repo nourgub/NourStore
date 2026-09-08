@@ -9,6 +9,12 @@ export function SiteFooter() {
           <Link href="/catalog" className="hover:text-foreground">
             الكتالوج
           </Link>
+          <Link href="/about" className="hover:text-foreground">
+            من نحن
+          </Link>
+          <Link href="/contact" className="hover:text-foreground">
+            تواصل معنا
+          </Link>
           <Link href="/terms" className="hover:text-foreground">
             الشروط والأحكام
           </Link>

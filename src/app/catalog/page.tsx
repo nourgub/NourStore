@@ -4,7 +4,9 @@ import { getActiveProducts } from "@/lib/products";
 import { ProductCard } from "@/components/product-card";
 
 export const metadata = {
-  title: "الكتالوج — نور ستور",
+  title: "الكتالوج",
+  description:
+    "تصفّح خدمات automation جاهزة للتجار: رد آلي على واتساب، استرجاع السلات المتروكة، تنبيهات المخزون وأكثر.",
 };
 
 export default async function CatalogPage({

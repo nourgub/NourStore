@@ -9,10 +9,31 @@ const cairo = Cairo({
   subsets: ["arabic", "latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const title = "نور ستور — أتمتة الأعمال للتجار";
+const description =
+  "متجر خدمات automation جاهزة للتجار: رد آلي على واتساب، استرجاع السلات المتروكة، تنبيهات المخزون وأكثر.";
+
 export const metadata: Metadata = {
-  title: "نور ستور — أتمتة الأعمال للتجار",
-  description:
-    "متجر خدمات automation جاهزة للتجار: رد آلي على واتساب، استرجاع السلات المتروكة، تنبيهات المخزون وأكثر.",
+  metadataBase: new URL(siteUrl),
+  title: { default: title, template: "%s — نور ستور" },
+  description,
+  openGraph: {
+    title,
+    description,
+    siteName: "نور ستور",
+    locale: "ar_DZ",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
+};
+
+export const viewport = {
+  themeColor: "#2f6f5e",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
