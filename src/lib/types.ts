@@ -69,10 +69,3 @@ export interface GenerationRequest {
   createdAt: string;
   finishedAt?: string;
 }
-
-export interface DbShape {
-  teachers: Teacher[];
-  sessions: Session[];
-  documents: CurriculumDocument[];
-  requests: GenerationRequest[];
-}

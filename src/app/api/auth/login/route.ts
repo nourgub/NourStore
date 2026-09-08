@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withDb } from "@/lib/db";
+import { findTeacherByEmail } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth";
 import { createSessionCookie } from "@/lib/session";
 
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" }, { status: 400 });
   }
 
-  const teacher = await withDb((db) => db.teachers.find((t) => t.email === email) ?? null);
+  const teacher = findTeacherByEmail(email);
 
   if (!teacher || !verifyPassword(password, teacher.passwordHash, teacher.passwordSalt)) {
     return NextResponse.json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }, { status: 401 });

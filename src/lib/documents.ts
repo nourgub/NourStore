@@ -1,4 +1,4 @@
-import { withDb } from "./db";
+import { insertDocument, listDocuments } from "./db";
 import type { CurriculumDocument, ExtractionStatus, SubjectId } from "./types";
 
 export interface CreateDocumentInput {
@@ -25,16 +25,10 @@ export async function createDocument(input: CreateDocumentInput): Promise<Curric
     extractedText: input.extractedText ?? "",
     createdAt: new Date().toISOString(),
   };
-  await withDb((db) => {
-    db.documents.push(doc);
-  });
+  insertDocument(doc);
   return doc;
 }
 
 export async function listDocumentsForTeacher(teacherId: string, subjectId: SubjectId): Promise<CurriculumDocument[]> {
-  return withDb((db) =>
-    db.documents
-      .filter((d) => d.teacherId === teacherId && d.subjectId === subjectId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-  );
+  return listDocuments(teacherId, subjectId);
 }

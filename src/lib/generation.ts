@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { GENERATED_DIR, withDb } from "./db";
+import { GENERATED_DIR, findDocument, findRequest, insertRequest, listRequests } from "./db";
 import { runMathAgentPipeline } from "./agents/pipeline";
 import { buildExamDocx } from "./docx/buildExamDocx";
 import { buildSolutionDocx } from "./docx/buildSolutionDocx";
@@ -26,12 +26,11 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     throw new GenerationError("عدد الأسئلة يجب أن يكون بين 1 و20");
   }
 
-  const document = await withDb((db) => {
-    if (!input.documentId) return null;
-    const doc = db.documents.find((d) => d.id === input.documentId && d.teacherId === input.teacherId);
-    if (!doc) throw new GenerationError("وثيقة المنهج غير موجودة");
-    return doc;
-  });
+  let document = null;
+  if (input.documentId) {
+    document = findDocument(input.documentId, input.teacherId);
+    if (!document) throw new GenerationError("وثيقة المنهج غير موجودة");
+  }
 
   const { steps, questions } = await runMathAgentPipeline({
     examTitle: input.examTitle,
@@ -79,21 +78,15 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
 
   request.files = { examDocx: examPath, solutionDocx: solutionPath, rubricDocx: rubricPath };
 
-  await withDb((db) => {
-    db.requests.push(request);
-  });
+  insertRequest(request);
 
   return request;
 }
 
 export async function getGenerationForTeacher(teacherId: string, requestId: string): Promise<GenerationRequest | null> {
-  return withDb((db) => db.requests.find((r) => r.id === requestId && r.teacherId === teacherId) ?? null);
+  return findRequest(requestId, teacherId);
 }
 
 export async function listGenerationsForTeacher(teacherId: string, subjectId: SubjectId): Promise<GenerationRequest[]> {
-  return withDb((db) =>
-    db.requests
-      .filter((r) => r.teacherId === teacherId && r.subjectId === subjectId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-  );
+  return listRequests(teacherId, subjectId);
 }
