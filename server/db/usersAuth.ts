@@ -106,6 +106,11 @@ export async function createEmailUser(input: {
     .where(eq(users.openId, input.openId))
     .limit(1);
   if (existing.length) return { ok: false, reason: "email_taken" };
+  // Mirrors upsertUser's OWNER_OPEN_ID bootstrap (used by the Google OAuth
+  // path) — without this, a deployment running AUTH_PROVIDER=email has no
+  // way at all to grant its first admin except a direct database edit,
+  // since self-service signup otherwise always creates "learner".
+  const isOwner = input.openId === ENV.ownerOpenId;
   await db
     .insert(users)
     .values({
@@ -114,7 +119,8 @@ export async function createEmailUser(input: {
       name: input.name,
       loginMethod: "email",
       passwordHash: input.passwordHash,
-      role: "learner",
+      role: isOwner ? "admin" : "learner",
+      roleChosenAt: isOwner ? new Date() : undefined,
       lastSignedIn: new Date(),
     });
   return { ok: true, openId: input.openId };
