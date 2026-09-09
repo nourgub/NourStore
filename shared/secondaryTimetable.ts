@@ -22,10 +22,12 @@
 //  8. Sessions are spread over the whole week: every working day is used,
 //     and one subject never takes two sessions in the same day for the same
 //     class.
-//  9. Each subject keeps a pedagogical half-day: one morning per week with
-//     no session of that subject anywhere, freeing all of its teachers —
-//     and that morning is the one the ministry fixed for the subject
-//     (OFFICIAL_PEDAGOGICAL_DAYS below), not an arbitrary day.
+//  9. The pedagogical half-day: the director fixes one day per subject,
+//     the same day for every teacher of that subject (the ministry's own
+//     table, OFFICIAL_PEDAGOGICAL_DAYS below, is the default), and each of
+//     its teachers keeps either the morning or the afternoon of that day
+//     free — their own choice, endorsed by the director. A teacher is then
+//     given no session at all during that half-day, in any class.
 // 10. The ministerial weekly load per subject and per level is respected
 //     exactly — no subject is short or over its hours.
 //
@@ -136,8 +138,8 @@ export function slotWindow(
 // ---------------------------------------------------------------------------
 
 /**
- * The morning each subject keeps free so its teachers can attend in-service
- * training, as fixed by the official organisation of pedagogical time:
+ * The day each subject keeps for the in-service training of its teachers,
+ * as fixed by the official organisation of pedagogical time:
  *
  *   الأحد     — التاريخ والجغرافيا
  *   الاثنين   — اللغة العربية، التربية الإسلامية
@@ -145,15 +147,15 @@ export function slotWindow(
  *   الأربعاء  — الفيزياء، الكيمياء، العلوم الطبيعية
  *   الخميس    — الرياضيات، الاقتصاد والتسيير
  *
- * Subjects the note does not name (التكنولوجيا/الهندسة، الإعلام الآلي،
- * التربية البدنية) have no imposed day: the engine then picks whichever
- * morning it can keep free for them, which still satisfies rule 9.
+ * These are DEFAULTS, not a lock: the director sets the day of each
+ * subject when building the timetable (input.pedagogicalDays), and the
+ * choice then applies to every teacher of that subject. A day the director
+ * changes is reported as a note, so a deviation from the ministerial table
+ * is visible rather than silent.
  *
- * The note also allows the fixed day to be missed when it cannot be held
- * ("في حالة تعذر ذلك"), so the engine treats these days as strongly
- * preferred: it only moves a subject off its official day once no timetable
- * exists with it, and reports that move as a preference violation instead
- * of silently dropping it.
+ * Subjects the note does not name (التكنولوجيا/الهندسة، الإعلام الآلي،
+ * التربية البدنية) have no default day: the director picks one, and until
+ * they do the engine picks a day and says so.
  */
 export const OFFICIAL_PEDAGOGICAL_DAYS: Record<string, WorkingDay> = {
   "history-geography": "sunday",
@@ -173,6 +175,22 @@ export const OFFICIAL_PEDAGOGICAL_DAYS: Record<string, WorkingDay> = {
   // القانون is not named in the note; it is grouped with التسيير here since
   // it is taught by the same teachers of شعبة تسيير واقتصاد.
   law: "thursday",
+};
+
+/**
+ * One teacher's pedagogical half-day: the day of their subject, the half
+ * they keep free, and where each of the two came from.
+ */
+export type PedagogicalExemption = {
+  teacherId: string;
+  /** The subject whose pedagogical day applies — the one they teach most. */
+  subjectId: string;
+  day: WorkingDay;
+  halfDay: HalfDay;
+  /** The day is the one the ministerial table fixes for that subject. */
+  official: boolean;
+  /** The half-day was chosen by the teacher, not picked by the engine. */
+  chosen: boolean;
 };
 
 export const PEDAGOGICAL_DAY_SOURCE_AR =
@@ -228,6 +246,13 @@ export type Teacher = {
    * and any hour used here is reported so it stays a visible decision.
    */
   extraHours?: number;
+  /**
+   * Rule 9: which half of their subject's pedagogical day this teacher
+   * keeps free — the half-day they chose themselves, endorsed by the
+   * director. Left unset, the engine picks one and reports it so the
+   * director can settle it.
+   */
+  pedagogicalHalfDay?: HalfDay;
 };
 
 /** Rule 1: the statutory weekly load of this teacher (14h or 16h). */
@@ -296,9 +321,10 @@ export type TimetableInput = {
     teacherId: string;
   }>;
   /**
-   * Rule 9 overrides, subjectId → morning kept free. Defaults to
-   * OFFICIAL_PEDAGOGICAL_DAYS; a school whose direction fixed another day
-   * passes it here.
+   * Rule 9: the pedagogical day the director fixed for each subject,
+   * subjectId → day. It applies to every teacher of that subject; each of
+   * them then keeps the morning or the afternoon of that day free (see
+   * Teacher.pedagogicalHalfDay). Defaults to OFFICIAL_PEDAGOGICAL_DAYS.
    */
   pedagogicalDays?: Record<string, WorkingDay>;
   options?: {
@@ -319,6 +345,8 @@ export type ViolationCode =
   | "teacher_weekly_quota"
   | "teacher_overtime_hours"
   | "pedagogical_day_off_official"
+  | "pedagogical_day_not_set"
+  | "pedagogical_exemption_busy"
   | "late_half_day_start"
   | "student_gap"
   | "section_single_hour_half_day"
@@ -328,7 +356,6 @@ export type ViolationCode =
   | "pe_not_last"
   | "unused_day"
   | "subject_repeated_same_day"
-  | "missing_pedagogical_morning"
   | "hours_mismatch"
   | "unknown_subject"
   | "unknown_teacher"
@@ -519,6 +546,82 @@ export function assignTeachers(input: TimetableInput): {
 }
 
 // ---------------------------------------------------------------------------
+// Rule 9: turning the director's choices into one exemption per teacher
+// ---------------------------------------------------------------------------
+
+/**
+ * The teacher's own subject for rule 9 purposes: the one they teach most.
+ * A teacher carrying two subjects (history/geography plus civics, say)
+ * follows the pedagogical day of the subject that makes up their service.
+ */
+export function mainSubjectPerTeacher(
+  hoursByTeacherSubject: Map<string, number>
+): Map<string, string> {
+  const best = new Map<string, { subjectId: string; hours: number }>();
+  hoursByTeacherSubject.forEach((hours, key) => {
+    const separator = key.indexOf("::");
+    const teacherId = key.slice(0, separator);
+    const subjectId = key.slice(separator + 2);
+    const current = best.get(teacherId);
+    if (
+      !current ||
+      hours > current.hours ||
+      (hours === current.hours && subjectId < current.subjectId)
+    ) {
+      best.set(teacherId, { subjectId, hours });
+    }
+  });
+  const out = new Map<string, string>();
+  best.forEach((value, teacherId) => out.set(teacherId, value.subjectId));
+  return out;
+}
+
+/**
+ * One exemption per teacher who actually teaches: the day comes from the
+ * director's table for their main subject (falling back to the ministerial
+ * one, then to `fallbackDay` when nobody has decided yet), and the half-day
+ * from the teacher's own choice (falling back to `fallbackHalf`).
+ */
+export function resolveExemptions(
+  input: TimetableInput,
+  mainSubject: Map<string, string>,
+  fallback: {
+    day: (teacherId: string, index: number) => WorkingDay;
+    halfDay: (teacherId: string, index: number) => HalfDay;
+  }
+): PedagogicalExemption[] {
+  const directorDays = input.pedagogicalDays ?? {};
+  const out: PedagogicalExemption[] = [];
+  input.teachers.forEach((teacher, index) => {
+    const subjectId = mainSubject.get(teacher.id);
+    if (!subjectId) return; // no service, nothing to exempt
+    const chosenDay = directorDays[subjectId] ?? OFFICIAL_PEDAGOGICAL_DAYS[subjectId];
+    const day = chosenDay ?? fallback.day(teacher.id, index);
+    out.push({
+      teacherId: teacher.id,
+      subjectId,
+      day,
+      halfDay: teacher.pedagogicalHalfDay ?? fallback.halfDay(teacher.id, index),
+      official: OFFICIAL_PEDAGOGICAL_DAYS[subjectId] === day,
+      chosen: teacher.pedagogicalHalfDay != null,
+    });
+  });
+  return out;
+}
+
+/** Hours each teacher carries per subject, derived from a placed week. */
+export function hoursByTeacherSubject(
+  sessions: ScheduledSession[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const session of sessions) {
+    const key = `${session.teacherId}::${session.subjectId}`;
+    map.set(key, (map.get(key) ?? 0) + session.hours);
+  }
+  return map;
+}
+
+// ---------------------------------------------------------------------------
 // Generation
 // ---------------------------------------------------------------------------
 
@@ -531,15 +634,12 @@ export type GenerateResult = {
   assignmentProblems: AssignmentProblem[];
   violations: Violation[];
   /**
-   * Morning kept free per subject (rule 9). `official` is false when the
-   * ministerial day could not be held and another morning was freed
-   * instead — the fallback the note itself allows.
+   * Rule 9: the half-day each teacher keeps free, the day coming from
+   * their subject and the half from their own choice. Reported in full so
+   * the director sees what was applied — including the halves the engine
+   * had to pick because nobody had chosen yet (`chosen: false`).
    */
-  pedagogicalMornings: Array<{
-    subjectId: string;
-    day: WorkingDay;
-    official: boolean;
-  }>;
+  pedagogicalExemptions: PedagogicalExemption[];
   stats: {
     restarts: number;
     steps: number;
@@ -658,14 +758,15 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     return a.subjectId.localeCompare(b.subjectId);
   });
 
-  const officialDays = {
-    ...OFFICIAL_PEDAGOGICAL_DAYS,
-    ...(input.pedagogicalDays ?? {}),
-  };
-  const officialDayIndex = subjectIds.map(subjectId => {
-    const day = officialDays[subjectId];
-    return day ? grid.days.indexOf(day) : -1;
-  });
+  // Rule 9 works per teacher: the day of their main subject, the half-day
+  // they chose. Their main subject follows the service they were just
+  // assigned, so it is computed once from the blocks.
+  const teacherSubjectHours = new Map<string, number>();
+  for (const block of blocks) {
+    const key = `${block.teacherId}::${block.subjectId}`;
+    teacherSubjectHours.set(key, (teacherSubjectHours.get(key) ?? 0) + block.hours);
+  }
+  const mainSubject = mainSubjectPerTeacher(teacherSubjectHours);
 
   let steps = 0;
   let restarts = 0;
@@ -675,34 +776,31 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     hard: number;
     soft: number;
     unplaced: SessionBlock[];
-    pedagogicalMornings: GenerateResult["pedagogicalMornings"];
+    pedagogicalExemptions: PedagogicalExemption[];
   } | null = null;
 
   for (let attempt = 0; attempt < maxRestarts; attempt++) {
     restarts = attempt + 1;
     const random = mulberry32(seed + attempt * 7919);
 
-    // Rule 9: the ministerial day of each subject. A subject with an
-    // official day keeps it; the note allows missing it only when the
-    // timetable cannot be built otherwise, so official days are rotated
-    // only once half the restarts are spent. Subjects with no official day
-    // (technology, computer science, PE) rotate from the first restart.
-    const relaxOfficial = attempt >= Math.ceil(maxRestarts / 2);
-    const pedagogicalDay = new Int32Array(nSubjects);
-    for (let s = 0; s < nSubjects; s++) {
-      const official = officialDayIndex[s];
-      pedagogicalDay[s] =
-        official >= 0 && !relaxOfficial
-          ? official
-          : (s + attempt + (official >= 0 ? official : 0)) % nDays;
+    // Rule 9, resolved for this attempt: the day is the director's (or the
+    // ministry's) and never moves; only what nobody decided is left to the
+    // engine — the half-day of a teacher who has not chosen one (morning
+    // first, the other half on later restarts), and the day of a subject
+    // with no decision at all.
+    const exemptions = resolveExemptions(input, mainSubject, {
+      day: (_teacherId, index) => grid.days[(index + attempt) % nDays],
+      halfDay: (_teacherId, index) =>
+        attempt === 0 || (index + attempt) % 2 === 0 ? "morning" : "afternoon",
+    });
+    const exemptDay = new Int32Array(nTeachers).fill(-1);
+    const exemptHalf = new Int32Array(nTeachers).fill(-1);
+    for (const exemption of exemptions) {
+      const t = teacherIndex.get(exemption.teacherId);
+      if (t == null) continue;
+      exemptDay[t] = grid.days.indexOf(exemption.day);
+      exemptHalf[t] = exemption.halfDay === "morning" ? 0 : 1;
     }
-    const pedagogicalMornings: GenerateResult["pedagogicalMornings"] =
-      subjectIds.map((subjectId, s) => ({
-        subjectId,
-        day: grid.days[pedagogicalDay[s]],
-        official:
-          officialDayIndex[s] < 0 || officialDayIndex[s] === pedagogicalDay[s],
-      }));
 
     // --- state ----------------------------------------------------------
     const cells: SolverBlock[][] = Array.from({ length: nCells }, () => []);
@@ -749,7 +847,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     let sectionLone = 0; // rule 4, class side
     let emptyDays = nSections * nDays; // rule 8
     let coreAfternoon = 0; // rule 6
-    let pedagogicalMiss = 0; // rule 9
+    let inExemption = 0; // rule 9: hours taught inside a free half-day
     let subjectRepeat = 0; // rule 8, same subject twice in a day
     let practicalAfternoon = 0; // rule 5 (a preference)
     let reserveHours = 0; // hours pushed into the late afternoon
@@ -757,7 +855,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     const hardPenalty = () =>
       clashes * 100 +
       coreAfternoon * 80 +
-      pedagogicalMiss * 70 +
+      inExemption * 70 +
       emptyDays * 60 +
       subjectRepeat * 50 +
       sectionLone * 40 +
@@ -801,7 +899,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
       if (lane[sj] >= 1) subjectRepeat++;
       lane[sj]++;
       if (block.core && h === 1) coreAfternoon += block.hours;
-      if (h === 0 && pedagogicalDay[su] === d) pedagogicalMiss += block.hours;
+      if (exemptDay[t] === d && exemptHalf[t] === h) inExemption += block.hours;
       if (block.kind === "practical" && block.core && h === 1) {
         practicalAfternoon += block.hours;
       }
@@ -849,7 +947,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
       lane[sj]--;
       if (lane[sj] >= 1) subjectRepeat--;
       if (block.core && h === 1) coreAfternoon -= block.hours;
-      if (h === 0 && pedagogicalDay[su] === d) pedagogicalMiss -= block.hours;
+      if (exemptDay[t] === d && exemptHalf[t] === h) inExemption -= block.hours;
       if (block.kind === "practical" && block.core && h === 1) {
         practicalAfternoon -= block.hours;
       }
@@ -981,7 +1079,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
         }
         if (teacherLoneCount[t] > 0) return true;
         if (block.core && h === 1) return true;
-        if (h === 0 && pedagogicalDay[su] === d) return true;
+        if (exemptDay[t] === d && exemptHalf[t] === h) return true;
         const lane = block.kind === "practical" ? practicalDay : subjectDay;
         if (lane[(se * nSubjects + su) * nDays + d] > 1) return true;
         slot += block.hours;
@@ -1107,7 +1205,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
       sectionLone = 0;
       emptyDays = nSections * nDays;
       coreAfternoon = 0;
-      pedagogicalMiss = 0;
+      inExemption = 0;
       subjectRepeat = 0;
       practicalAfternoon = 0;
       reserveHours = 0;
@@ -1262,7 +1360,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     const violations = validateTimetable(
       { ...input, grid },
       sessions,
-      pedagogicalMornings
+      exemptions
     );
     const hard = violations.filter(v => v.severity === "hard").length;
     const soft = violations.length - hard;
@@ -1273,7 +1371,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
         hard,
         soft,
         unplaced,
-        pedagogicalMornings,
+        pedagogicalExemptions: exemptions,
       };
     }
     if (best.hard === 0 && !best.unplaced.length) break;
@@ -1285,7 +1383,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     hard: 0,
     soft: 0,
     unplaced: [] as SessionBlock[],
-    pedagogicalMornings: [] as GenerateResult["pedagogicalMornings"],
+    pedagogicalExemptions: [] as PedagogicalExemption[],
   };
   const placedHours = outcome.sessions.reduce((sum, s) => sum + s.hours, 0);
 
@@ -1299,7 +1397,7 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
     unplaced: outcome.unplaced,
     assignmentProblems: problems,
     violations: outcome.violations,
-    pedagogicalMornings: outcome.pedagogicalMornings,
+    pedagogicalExemptions: outcome.pedagogicalExemptions,
     stats: { restarts, steps, placedHours, requiredHours },
   };
 }
@@ -1316,11 +1414,12 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
 export function validateTimetable(
   input: TimetableInput,
   sessions: ScheduledSession[],
-  pedagogicalMornings?: Array<{
-    subjectId: string;
-    day: WorkingDay;
-    official?: boolean;
-  }>
+  /**
+   * The rule-9 exemptions that were applied. Omit them — as a screen
+   * re-checking a saved week does — and they are re-derived from the
+   * director's days and the teachers' own choices.
+   */
+  exemptions?: PedagogicalExemption[]
 ): Violation[] {
   const grid = resolveGrid(input.grid);
   const violations: Violation[] = [];
@@ -1752,49 +1851,76 @@ export function validateTimetable(
     }
   }
 
-  // --- rule 9: a free morning per subject, the official one when it has one
-  const officialDays = {
-    ...OFFICIAL_PEDAGOGICAL_DAYS,
-    ...(input.pedagogicalDays ?? {}),
-  };
+  // --- rule 9: each teacher's free half-day on their subject's day ------
+  const appliedExemptions =
+    exemptions ??
+    resolveExemptions(input, mainSubjectPerTeacher(hoursByTeacherSubject(sessions)), {
+      // Nothing decided and nothing to fall back on: the day is reported
+      // as missing below rather than invented here.
+      day: () => grid.days[0],
+      halfDay: () => "morning",
+    });
+  const directorDays = input.pedagogicalDays ?? {};
   const subjectsInPlay = new Set<string>(sessions.map(s => s.subjectId));
-  for (const subjectId of Array.from(subjectsInPlay)) {
-    const morningDays = new Set(
-      sessions
-        .filter(s => s.subjectId === subjectId && s.halfDay === "morning")
-        .map(s => s.day)
+
+  for (const exemption of appliedExemptions) {
+    const teacher = teacherById.get(exemption.teacherId);
+    if (!teacher) continue;
+    const busy = sessions.filter(
+      s =>
+        s.teacherId === exemption.teacherId &&
+        s.day === exemption.day &&
+        s.halfDay === exemption.halfDay
     );
-    const declared = pedagogicalMornings?.find(p => p.subjectId === subjectId);
-    const anySection = sessions.find(s => s.subjectId === subjectId);
-    const label = anySection
-      ? subjectName(anySection.sectionId, subjectId)
-      : subjectId;
-    const freeMorning = grid.days.find(day => !morningDays.has(day));
-    if (!freeMorning || (declared && morningDays.has(declared.day))) {
+    if (busy.length) {
       violations.push({
-        code: "missing_pedagogical_morning",
+        code: "pedagogical_exemption_busy",
         rule: 9,
         severity: "hard",
+        teacherId: teacher.id,
+        subjectId: exemption.subjectId,
+        day: exemption.day,
+        halfDay: exemption.halfDay,
+        messageAr:
+          `${teacher.name}: ${busy.reduce((sum, s) => sum + s.hours, 0)}سا ` +
+          `مبرمجة في نصف يومه البيداغوجي ` +
+          `(${DAY_LABELS_AR[exemption.day]} ${HALF_DAY_LABELS_AR[exemption.halfDay]}).`,
+      });
+    }
+  }
+
+  // The day itself is the director's decision, so a subject left without
+  // one, or moved off the ministerial table, is reported as a note — not
+  // as a defect of the timetable.
+  for (const subjectId of Array.from(subjectsInPlay)) {
+    const anySession = sessions.find(s => s.subjectId === subjectId);
+    const label = anySession
+      ? subjectName(anySession.sectionId, subjectId)
+      : subjectId;
+    const chosen = directorDays[subjectId];
+    const official = OFFICIAL_PEDAGOGICAL_DAYS[subjectId];
+    if (!chosen && !official) {
+      violations.push({
+        code: "pedagogical_day_not_set",
+        rule: 9,
+        severity: "preference",
         subjectId,
-        messageAr: `مادة ${label}: لا يوجد نصف يوم صباحي مُعفى (اليوم البيداغوجي).`,
+        messageAr:
+          `مادة ${label}: لم يُحدَّد لها يوم بيداغوجي — على المدير اختيار ` +
+          `اليوم ليُعمَّم على كل أساتذة المادة.`,
       });
       continue;
     }
-    // The ministerial day itself: missing it is allowed when unavoidable
-    // ("في حالة تعذر ذلك"), so it is reported as a preference.
-    const official = officialDays[subjectId];
-    if (official && morningDays.has(official)) {
+    if (chosen && official && chosen !== official) {
       violations.push({
         code: "pedagogical_day_off_official",
         rule: 9,
         severity: "preference",
         subjectId,
-        day: official,
+        day: chosen,
         messageAr:
-          `مادة ${label}: اليوم البيداغوجي الرسمي (${DAY_LABELS_AR[official]}) ` +
-          `مبرمَج صباحًا؛ الإعفاء تم في ${
-            declared ? DAY_LABELS_AR[declared.day] : DAY_LABELS_AR[freeMorning]
-          } بدلًا منه.`,
+          `مادة ${label}: اليوم البيداغوجي المعتمد ${DAY_LABELS_AR[chosen]} ` +
+          `بقرار المدير، بدل ${DAY_LABELS_AR[official]} في الجدول الوزاري.`,
       });
     }
   }

@@ -34,6 +34,7 @@ import {
   DAY_LABELS_AR,
   RANK_LABELS_AR,
   TEACHER_RANKS,
+  WORKING_DAYS,
   buildWeekGrid,
   halfDaySlots,
   resolveGrid,
@@ -43,6 +44,8 @@ import {
   type Section,
   type Teacher,
   type TeacherRank,
+  type HalfDay,
+  type PedagogicalExemption,
   type Violation,
   type WorkingDay,
 } from "@shared/secondaryTimetable";
@@ -86,11 +89,7 @@ type Outcome = {
   violations: Violation[];
   teacherLoads: TeacherLoadRow[];
   assignmentSheet: AssignmentSheetRow[];
-  pedagogicalMornings?: Array<{
-    subjectId: string;
-    day: WorkingDay;
-    official: boolean;
-  }>;
+  pedagogicalExemptions?: PedagogicalExemption[];
   unplacedCount: number;
   assignmentProblems: string[];
 };
@@ -137,8 +136,19 @@ export default function Timetable() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [viewSection, setViewSection] = useState<string>("");
   const [viewTeacher, setViewTeacher] = useState<string>("");
+  const [viewSubject, setViewSubject] = useState<string>("");
+  // Rule 9: the day the director fixes per subject. It starts from the
+  // ministerial table and applies to every teacher of the subject.
+  const [pedagogicalDays, setPedagogicalDays] = useState<
+    Record<string, WorkingDay>
+  >({});
 
   const streams: StreamTemplate[] = reference.data?.streams ?? [];
+  const officialDays = reference.data?.pedagogicalDays ?? {};
+  /** The day in force for a subject: the director's, else the ministry's. */
+  const dayOf = (subjectId: string): WorkingDay | undefined =>
+    pedagogicalDays[subjectId] ??
+    (officialDays[subjectId] as WorkingDay | undefined);
 
   const subjectsInPlay = useMemo(() => {
     const map = new Map<string, { nameAr: string; hours: number }>();
@@ -173,7 +183,7 @@ export default function Timetable() {
         violations: data.violations as Violation[],
         teacherLoads: data.teacherLoads as TeacherLoadRow[],
         assignmentSheet: data.assignmentSheet as AssignmentSheetRow[],
-        pedagogicalMornings: data.pedagogicalMornings,
+        pedagogicalExemptions: data.pedagogicalExemptions,
         unplacedCount: data.unplaced.length,
         assignmentProblems: data.assignmentProblems.map(p => p.messageAr),
       });
@@ -227,6 +237,7 @@ export default function Timetable() {
         grid?: Partial<GridConfig>;
         sections: Section[];
         teachers: Teacher[];
+        pedagogicalDays?: Record<string, WorkingDay>;
       };
       const loadedSessions = row.sessions as ScheduledSession[];
       setSavedId(row.id);
@@ -236,6 +247,7 @@ export default function Timetable() {
       setGrid(resolveGrid(loadedConfig.grid));
       setSections(loadedConfig.sections ?? []);
       setTeachers(loadedConfig.teachers ?? []);
+      setPedagogicalDays(loadedConfig.pedagogicalDays ?? {});
       setViewSection(loadedConfig.sections?.[0]?.id ?? "");
       setOutcome({
         sessions: loadedSessions,
@@ -252,6 +264,7 @@ export default function Timetable() {
           grid: loadedConfig.grid,
           sections: loadedConfig.sections ?? [],
           teachers: loadedConfig.teachers ?? [],
+          pedagogicalDays: loadedConfig.pedagogicalDays,
         },
         sessions: loadedSessions,
       });
@@ -318,11 +331,18 @@ export default function Timetable() {
       const host = subjectsInPlay.has(target) ? target : subjectId;
       merged.set(host, (merged.get(host) ?? 0) + value.hours);
     });
+    // The host subject stays FIRST in the list: the screen groups a
+    // teacher under subjectIds[0], and their weekly service is the host
+    // subject, not the hour they carry on top of it.
     const carried = new Map<string, string[]>();
     subjectsInPlay.forEach((_value, subjectId) => {
       const target = neighbour[subjectId] ?? subjectId;
       const host = subjectsInPlay.has(target) ? target : subjectId;
-      carried.set(host, [...(carried.get(host) ?? []), subjectId]);
+      const current = carried.get(host) ?? [host];
+      carried.set(
+        host,
+        current.includes(subjectId) ? current : [...current, subjectId]
+      );
     });
     merged.forEach((hours, host) => {
       // 13 of the 14/16 statutory hours: leaving a little room is what
@@ -339,7 +359,56 @@ export default function Timetable() {
     });
     setTeachers(proposals);
     setOutcome(null);
-    toast.success(`تم اقتراح ${proposals.length} أستاذًا — عدّلها كما تشاء.`);
+    toast.success(
+      `تم اقتراح ${proposals.length} أستاذًا — عدّل الأسماء والرتب واختر الفترة المُعفاة لكل أستاذ.`
+    );
+  };
+
+  /**
+   * The director writes how many teachers a subject has; the rows follow.
+   * Growing the count adds numbered rows to rename, shrinking it removes
+   * the last ones — nothing else about the other subjects is touched.
+   */
+  const setTeacherCount = (
+    subjectId: string,
+    subjectNameAr: string,
+    count: number
+  ) => {
+    const wanted = Math.max(0, Math.min(20, Math.floor(count)));
+    setTeachers(current => {
+      const own = current.filter(
+        teacher => teacher.subjectIds[0] === subjectId
+      );
+      const others = current.filter(
+        teacher => teacher.subjectIds[0] !== subjectId
+      );
+      const kept = own.slice(0, wanted);
+      for (let i = own.length; i < wanted; i++) {
+        kept.push({
+          id: `${subjectId}-${i + 1}-${Date.now()}`,
+          name: `${subjectNameAr} ${i + 1}`,
+          rank: "standard",
+          subjectIds: [subjectId],
+        });
+      }
+      // Keep the display order stable: a subject's teachers stay grouped
+      // where they were rather than jumping to the end of the list.
+      const merged: Teacher[] = [];
+      let injected = false;
+      for (const teacher of current) {
+        if (teacher.subjectIds[0] === subjectId) {
+          if (!injected) {
+            merged.push(...kept);
+            injected = true;
+          }
+          continue;
+        }
+        merged.push(teacher);
+      }
+      if (!injected) merged.push(...kept);
+      return merged.length ? merged : others;
+    });
+    setOutcome(null);
   };
 
   const updateTeacher = (id: string, patch: Partial<Teacher>) => {
@@ -656,139 +725,213 @@ export default function Timetable() {
             )}
           </section>
 
-          {/* ---------------- staff ---------------- */}
+          {/* ---------------- staff, subject by subject ---------------- */}
           <section className="flow-card tt-panel tt-no-print">
             <div className="flow-card-title">
-              <h2>3. الأساتذة ورتبهم</h2>
+              <h2>3. المواد: اليوم البيداغوجي وأساتذة كل مادة</h2>
               <Users size={17} />
             </div>
+            <p className="tt-hint">
+              <Info size={13} /> يختار المدير اليوم البيداغوجي لكل مادة فيُعمَّم
+              على كل أساتذتها، ثم يختار كل أستاذ الفترة التي يُعفى فيها من ذلك
+              اليوم — صباحية أو مسائية — فلا تُبرمَج له أي حصة في تلك الفترة.
+            </p>
             <div className="tt-field-row">
               <Button
                 className="gold-button tt-inline-button"
                 disabled={!sections.length}
                 onClick={suggestTeachers}
               >
-                <Wand2 size={14} /> اقتراح قائمة الأساتذة
-              </Button>
-              <Button
-                variant="ghost"
-                className="quiet-button tt-inline-button"
-                disabled={!subjectsInPlay.size}
-                onClick={() => {
-                  const first = Array.from(subjectsInPlay.keys())[0];
-                  setTeachers(current => [
-                    ...current,
-                    {
-                      id: `teacher-${current.length + 1}-${Date.now()}`,
-                      name: "أستاذ جديد",
-                      rank: "standard",
-                      subjectIds: first ? [first] : [],
-                    },
-                  ]);
-                }}
-              >
-                <Plus size={14} /> إضافة أستاذ
+                <Wand2 size={14} /> اقتراح عدد الأساتذة لكل مادة
               </Button>
             </div>
-            {teachers.length === 0 ? (
-              <p className="tt-hint">
-                لا توجد قائمة أساتذة بعد — اقترحها آليًا ثم عدّل الأسماء والرتب.
-              </p>
+            {subjectsInPlay.size === 0 ? (
+              <p className="tt-hint">أضف الأفواج أولًا لتظهر موادها.</p>
             ) : (
-              <table className="tt-table">
-                <thead>
-                  <tr>
-                    <th>الاسم واللقب</th>
-                    <th>الرتبة</th>
-                    <th>المادة (المواد)</th>
-                    <th>ساعات إضافية</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {teachers.map(teacher => (
-                    <tr key={teacher.id}>
-                      <td>
-                        <Input
-                          value={teacher.name}
-                          onChange={e =>
-                            updateTeacher(teacher.id, { name: e.target.value })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <select
-                          className="tt-select"
-                          value={teacher.rank}
-                          onChange={e =>
-                            updateTeacher(teacher.id, {
-                              rank: e.target.value as TeacherRank,
-                            })
-                          }
-                        >
-                          {TEACHER_RANKS.map(rank => (
-                            <option key={rank} value={rank}>
-                              {RANK_LABELS_AR[rank]}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <div className="tt-subject-picker">
-                          {Array.from(subjectsInPlay.entries()).map(
-                            ([subjectId, value]) => (
-                              <label key={subjectId}>
-                                <input
-                                  type="checkbox"
-                                  checked={teacher.subjectIds.includes(
-                                    subjectId
-                                  )}
-                                  onChange={e =>
-                                    updateTeacher(teacher.id, {
-                                      subjectIds: e.target.checked
-                                        ? [...teacher.subjectIds, subjectId]
-                                        : teacher.subjectIds.filter(
-                                            id => id !== subjectId
-                                          ),
-                                    })
-                                  }
-                                />
-                                {value.nameAr}
-                              </label>
-                            )
-                          )}
+              <div className="tt-list">
+                {Array.from(subjectsInPlay.entries()).map(
+                  ([subjectId, subject]) => {
+                    const own = teachers.filter(
+                      teacher => teacher.subjectIds[0] === subjectId
+                    );
+                    const day = dayOf(subjectId);
+                    const official = officialDays[subjectId] as
+                      | WorkingDay
+                      | undefined;
+                    return (
+                      <div className="tt-list-item" key={subjectId}>
+                        <div className="tt-list-head">
+                          <strong>{subject.nameAr}</strong>
+                          <span className="tt-chip">
+                            {subject.hours}سا إجمالًا
+                          </span>
+                          <label className="tt-inline-field">
+                            <span>اليوم البيداغوجي</span>
+                            <select
+                              className="tt-select"
+                              value={day ?? ""}
+                              onChange={e => {
+                                setPedagogicalDays(current => ({
+                                  ...current,
+                                  [subjectId]: e.target.value as WorkingDay,
+                                }));
+                                setOutcome(null);
+                              }}
+                            >
+                              <option value="">— اختر اليوم —</option>
+                              {WORKING_DAYS.map(option => (
+                                <option key={option} value={option}>
+                                  {DAY_LABELS_AR[option]}
+                                  {option === official ? " (الرسمي)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="tt-inline-field">
+                            <span>عدد الأساتذة</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={own.length}
+                              onChange={e =>
+                                setTeacherCount(
+                                  subjectId,
+                                  subject.nameAr,
+                                  Number(e.target.value) || 0
+                                )
+                              }
+                            />
+                          </label>
                         </div>
-                      </td>
-                      <td>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={8}
-                          value={teacher.extraHours ?? 0}
-                          onChange={e =>
-                            updateTeacher(teacher.id, {
-                              extraHours: Number(e.target.value) || 0,
-                            })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <button
-                          className="tt-link-button tt-danger"
-                          onClick={() => {
-                            setTeachers(current =>
-                              current.filter(t => t.id !== teacher.id)
-                            );
-                            setOutcome(null);
-                          }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {own.length > 0 && (
+                          <table className="tt-table">
+                            <thead>
+                              <tr>
+                                <th>الاسم واللقب</th>
+                                <th>الرتبة</th>
+                                <th>الفترة المُعفاة (اليوم البيداغوجي)</th>
+                                <th>ساعات إضافية</th>
+                                <th>مواد أخرى مسندة</th>
+                                <th />
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {own.map(teacher => (
+                                <tr key={teacher.id}>
+                                  <td>
+                                    <Input
+                                      value={teacher.name}
+                                      onChange={e =>
+                                        updateTeacher(teacher.id, {
+                                          name: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </td>
+                                  <td>
+                                    <select
+                                      className="tt-select"
+                                      value={teacher.rank}
+                                      onChange={e =>
+                                        updateTeacher(teacher.id, {
+                                          rank: e.target.value as TeacherRank,
+                                        })
+                                      }
+                                    >
+                                      {TEACHER_RANKS.map(rank => (
+                                        <option key={rank} value={rank}>
+                                          {RANK_LABELS_AR[rank]}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <select
+                                      className="tt-select"
+                                      value={teacher.pedagogicalHalfDay ?? ""}
+                                      onChange={e =>
+                                        updateTeacher(teacher.id, {
+                                          pedagogicalHalfDay: (e.target.value ||
+                                            undefined) as HalfDay | undefined,
+                                        })
+                                      }
+                                    >
+                                      <option value="">
+                                        — يختارها النظام —
+                                      </option>
+                                      <option value="morning">صباحية</option>
+                                      <option value="afternoon">مسائية</option>
+                                    </select>
+                                  </td>
+                                  <td>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      max={8}
+                                      value={teacher.extraHours ?? 0}
+                                      onChange={e =>
+                                        updateTeacher(teacher.id, {
+                                          extraHours:
+                                            Number(e.target.value) || 0,
+                                        })
+                                      }
+                                    />
+                                  </td>
+                                  <td>
+                                    <div className="tt-subject-picker">
+                                      {Array.from(subjectsInPlay.entries())
+                                        .filter(([id]) => id !== subjectId)
+                                        .map(([id, other]) => (
+                                          <label key={id}>
+                                            <input
+                                              type="checkbox"
+                                              checked={teacher.subjectIds.includes(
+                                                id
+                                              )}
+                                              onChange={e =>
+                                                updateTeacher(teacher.id, {
+                                                  subjectIds: e.target.checked
+                                                    ? [
+                                                        ...teacher.subjectIds,
+                                                        id,
+                                                      ]
+                                                    : teacher.subjectIds.filter(
+                                                        value => value !== id
+                                                      ),
+                                                })
+                                              }
+                                            />
+                                            {other.nameAr}
+                                          </label>
+                                        ))}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <button
+                                      className="tt-link-button tt-danger"
+                                      onClick={() => {
+                                        setTeachers(current =>
+                                          current.filter(
+                                            t => t.id !== teacher.id
+                                          )
+                                        );
+                                        setOutcome(null);
+                                      }}
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
+              </div>
             )}
             {reference.data?.pedagogicalDaySourceAr && (
               <p className="tt-hint">
@@ -816,6 +959,13 @@ export default function Timetable() {
                     },
                     sections,
                     teachers,
+                    pedagogicalDays: Object.fromEntries(
+                      Array.from(subjectsInPlay.keys())
+                        .map(subjectId => [subjectId, dayOf(subjectId)])
+                        .filter(([, day]) => Boolean(day)) as Array<
+                        [string, WorkingDay]
+                      >
+                    ),
                   })
                 }
               >
@@ -842,6 +992,13 @@ export default function Timetable() {
                       },
                       sections,
                       teachers,
+                      pedagogicalDays: Object.fromEntries(
+                        Array.from(subjectsInPlay.keys())
+                          .map(subjectId => [subjectId, dayOf(subjectId)])
+                          .filter(([, day]) => Boolean(day)) as Array<
+                          [string, WorkingDay]
+                        >
+                      ),
                     },
                     sessions: outcome.sessions,
                   })
@@ -934,36 +1091,140 @@ export default function Timetable() {
                 )}
               </section>
 
-              {outcome.pedagogicalMornings &&
-                outcome.pedagogicalMornings.length > 0 && (
-                  <section className="flow-card tt-panel">
-                    <div className="flow-card-title">
-                      <h2>اليوم البيداغوجي المعتمد لكل مادة</h2>
-                      <CalendarDays size={17} />
-                    </div>
-                    <div className="tt-day-chips">
-                      {outcome.pedagogicalMornings
-                        .filter(entry => subjectsInPlay.has(entry.subjectId))
-                        .map(entry => (
-                          <span
-                            key={entry.subjectId}
-                            className={
-                              entry.official ? "tt-chip" : "tt-chip tt-chip-bad"
-                            }
-                            title={
-                              entry.official
-                                ? "اليوم الرسمي للمادة"
-                                : "تعذّر اليوم الرسمي — أُعفي صباح آخر"
-                            }
-                          >
-                            {subjectsInPlay.get(entry.subjectId)?.nameAr ??
-                              entry.subjectId}
-                            : {DAY_LABELS_AR[entry.day]} صباحًا
-                          </span>
+              {/* The output a subject's teachers are handed: their
+                  pedagogical day, who is exempt in which half, and each
+                  teacher's own week. */}
+              <section className="flow-card tt-panel">
+                <div className="flow-card-title">
+                  <h2>الجداول حسب المادة</h2>
+                  <select
+                    className="tt-select tt-no-print"
+                    value={viewSubject}
+                    onChange={e => setViewSubject(e.target.value)}
+                  >
+                    <option value="">اختر مادة…</option>
+                    {Array.from(subjectsInPlay.entries()).map(
+                      ([subjectId, subject]) => (
+                        <option key={subjectId} value={subjectId}>
+                          {subject.nameAr}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+                {viewSubject ? (
+                  (() => {
+                    const subject = subjectsInPlay.get(viewSubject);
+                    const day = dayOf(viewSubject);
+                    const subjectTeachers = teachers.filter(teacher =>
+                      teacher.subjectIds.includes(viewSubject)
+                    );
+                    const exemptionOf = (teacherId: string) =>
+                      outcome.pedagogicalExemptions?.find(
+                        entry => entry.teacherId === teacherId
+                      );
+                    return (
+                      <>
+                        <p className="tt-hint">
+                          <CalendarDays size={13} /> {subject?.nameAr}:{" "}
+                          {subject?.hours}سا أسبوعيًا، واليوم البيداغوجي{" "}
+                          {day ? DAY_LABELS_AR[day] : "غير محدد"} لكل أساتذة
+                          المادة ({subjectTeachers.length} أستاذًا).
+                        </p>
+                        <table className="tt-table">
+                          <thead>
+                            <tr>
+                              <th>الاسم واللقب</th>
+                              <th>الرتبة</th>
+                              <th>الحجم الساعي</th>
+                              <th>الأفواج</th>
+                              <th>الفترة المُعفاة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {subjectTeachers.map(teacher => {
+                              const load = outcome.teacherLoads.find(
+                                row => row.teacherId === teacher.id
+                              );
+                              const mine = outcome.sessions.filter(
+                                session =>
+                                  session.teacherId === teacher.id &&
+                                  session.subjectId === viewSubject
+                              );
+                              const labels = Array.from(
+                                new Set(
+                                  mine.map(
+                                    session =>
+                                      sections.find(
+                                        s => s.id === session.sectionId
+                                      )?.label ?? session.sectionId
+                                  )
+                                )
+                              );
+                              const exemption = exemptionOf(teacher.id);
+                              return (
+                                <tr key={teacher.id}>
+                                  <td>{teacher.name}</td>
+                                  <td>{RANK_LABELS_AR[teacher.rank]}</td>
+                                  <td>
+                                    {load?.hours ?? 0}سا / {load?.quota ?? 0}سا
+                                  </td>
+                                  <td>{labels.join(" — ") || "—"}</td>
+                                  <td>
+                                    {exemption
+                                      ? `${DAY_LABELS_AR[exemption.day]} ${
+                                          exemption.halfDay === "morning"
+                                            ? "صباحًا"
+                                            : "مساءً"
+                                        }${exemption.chosen ? "" : " (اختاره النظام)"}`
+                                      : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        {subjectTeachers.map(teacher => (
+                          <WeekTable
+                            key={teacher.id}
+                            title={`${teacher.name} — ${
+                              subject?.nameAr ?? viewSubject
+                            } — ${schoolYear}`}
+                            grid={grid}
+                            sessions={outcome.sessions}
+                            filter={{ teacherId: teacher.id }}
+                            renderCell={session => {
+                              const section = sections.find(
+                                s => s.id === session.sectionId
+                              );
+                              const requirement = section?.requirements.find(
+                                r => r.subjectId === session.subjectId
+                              );
+                              return (
+                                <>
+                                  <strong>
+                                    {section?.label ?? session.sectionId}
+                                  </strong>
+                                  <small>
+                                    {requirement?.nameAr ?? session.subjectId}
+                                    {session.kind === "practical"
+                                      ? " (أ.ت)"
+                                      : ""}
+                                  </small>
+                                </>
+                              );
+                            }}
+                          />
                         ))}
-                    </div>
-                  </section>
+                      </>
+                    );
+                  })()
+                ) : (
+                  <p className="tt-hint">
+                    اختر مادة لعرض يومها البيداغوجي وجداول أساتذتها.
+                  </p>
                 )}
+              </section>
 
               <section className="flow-card tt-panel">
                 <div className="flow-card-title">

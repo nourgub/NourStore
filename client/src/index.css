@@ -806,3 +806,6 @@ a.dashboard-course-row:focus-visible { outline: 2px solid #d4a72c; outline-offse
   .tt-week-title, .tt-legend, .tt-violations li, .tt-rule { color: #000 !important; }
 }
 .tt-day-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tt-inline-field { display: inline-grid; gap: 4px; }
+.tt-inline-field > span { color: #8d887e; font-size: 9px; }
+[data-theme="light"] .tt-inline-field > span { color: #6b665c; }

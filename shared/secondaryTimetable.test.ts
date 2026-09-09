@@ -8,6 +8,7 @@ import {
   hardViolations,
   rankWeeklyQuota,
   requirementBlocks,
+  resolveExemptions,
   slotWindow,
   summarizeTeacherLoads,
   teacherCeiling,
@@ -574,8 +575,8 @@ describe("rule 8: sessions spread over the whole week", () => {
 // Rule 9 — the pedagogical day of each subject
 // ---------------------------------------------------------------------------
 
-describe("rule 9: the pedagogical morning of each subject", () => {
-  it("uses the ministerial day of every subject named in the note", () => {
+describe("rule 9: the pedagogical half-day of each teacher", () => {
+  it("keeps the ministerial day of every subject named in the note as the default", () => {
     expect(OFFICIAL_PEDAGOGICAL_DAYS["history-geography"]).toBe("sunday");
     expect(OFFICIAL_PEDAGOGICAL_DAYS.arabic).toBe("monday");
     expect(OFFICIAL_PEDAGOGICAL_DAYS["islamic-sciences"]).toBe("monday");
@@ -588,43 +589,154 @@ describe("rule 9: the pedagogical morning of each subject", () => {
     expect(OFFICIAL_PEDAGOGICAL_DAYS.economics).toBe("thursday");
   });
 
-  it("flags a subject taught every morning of the week", () => {
-    const input = tinyInput([requirement({ weeklyHours: 10 })]);
-    const violations = validateTimetable(
+  it("gives the director's day to every teacher of the subject, each in their own half", () => {
+    // Two mathematics teachers: the director put the subject on monday and
+    // one teacher takes the morning off, the other the afternoon.
+    const input: TimetableInput = {
+      sections: [
+        {
+          id: "A",
+          label: "قسم أ",
+          level: "1AS",
+          stream: "s",
+          requirements: [requirement({ weeklyHours: 4 })],
+        },
+      ],
+      teachers: [
+        {
+          id: "m1",
+          name: "أستاذ 1",
+          rank: "standard",
+          subjectIds: ["mathematics"],
+          pedagogicalHalfDay: "morning",
+        },
+        {
+          id: "m2",
+          name: "أستاذ 2",
+          rank: "standard",
+          subjectIds: ["mathematics"],
+          pedagogicalHalfDay: "afternoon",
+        },
+      ],
+      pedagogicalDays: { mathematics: "monday" },
+    };
+    const exemptions = resolveExemptions(
       input,
-      (["sunday", "monday", "tuesday", "wednesday", "thursday"] as const).map(
-        day => session({ day })
-      )
+      new Map([
+        ["m1", "mathematics"],
+        ["m2", "mathematics"],
+      ]),
+      { day: () => "sunday", halfDay: () => "morning" }
     );
-    expect(codes(violations)).toContain("missing_pedagogical_morning");
+    expect(exemptions).toEqual([
+      {
+        teacherId: "m1",
+        subjectId: "mathematics",
+        day: "monday",
+        halfDay: "morning",
+        official: false,
+        chosen: true,
+      },
+      {
+        teacherId: "m2",
+        subjectId: "mathematics",
+        day: "monday",
+        halfDay: "afternoon",
+        official: false,
+        chosen: true,
+      },
+    ]);
   });
 
-  it("reports missing the official day as a preference when another morning is free", () => {
-    // Mathematics has thursday as its official pedagogical day; here it is
-    // taught on thursday morning while monday stays free.
+  it("flags a teacher given a session inside their own free half-day", () => {
+    const input: TimetableInput = {
+      sections: [
+        {
+          id: "1AS-A",
+          label: "قسم أ",
+          level: "1AS",
+          stream: "s",
+          requirements: [requirement({ weeklyHours: 2 })],
+        },
+      ],
+      teachers: [
+        {
+          id: "t-mathematics",
+          name: "أستاذ الرياضيات",
+          rank: "standard",
+          subjectIds: ["mathematics"],
+          pedagogicalHalfDay: "morning",
+        },
+      ],
+      pedagogicalDays: { mathematics: "sunday" },
+    };
+    const violations = validateTimetable(input, [session({ day: "sunday" })]);
+    const busy = violations.filter(
+      v => v.code === "pedagogical_exemption_busy"
+    );
+    expect(busy).toHaveLength(1);
+    expect(busy[0].severity).toBe("hard");
+    expect(busy[0].teacherId).toBe("t-mathematics");
+  });
+
+  it("accepts the same session once the teacher's free half-day is the other one", () => {
+    const input: TimetableInput = {
+      sections: [
+        {
+          id: "1AS-A",
+          label: "قسم أ",
+          level: "1AS",
+          stream: "s",
+          requirements: [requirement({ weeklyHours: 2 })],
+        },
+      ],
+      teachers: [
+        {
+          id: "t-mathematics",
+          name: "أستاذ الرياضيات",
+          rank: "standard",
+          subjectIds: ["mathematics"],
+          pedagogicalHalfDay: "afternoon",
+        },
+      ],
+      pedagogicalDays: { mathematics: "sunday" },
+    };
+    const violations = validateTimetable(input, [session({ day: "sunday" })]);
+    expect(codes(violations)).not.toContain("pedagogical_exemption_busy");
+  });
+
+  it("reports the director moving a subject off the ministerial day as a note", () => {
     const violations = validateTimetable(
-      tinyInput([requirement({ weeklyHours: 8 })]),
-      (["sunday", "tuesday", "wednesday", "thursday"] as const).map(day =>
-        session({ day })
-      )
+      {
+        ...tinyInput([requirement({ weeklyHours: 2 })]),
+        pedagogicalDays: { mathematics: "monday" }, // ministry says thursday
+      },
+      [session()]
     );
     const off = violations.filter(
       v => v.code === "pedagogical_day_off_official"
     );
     expect(off).toHaveLength(1);
     expect(off[0].severity).toBe("preference");
-    expect(codes(violations)).not.toContain("missing_pedagogical_morning");
+    expect(off[0].messageAr).toContain("الاثنين");
   });
 
-  it("accepts the official day being kept free", () => {
+  it("asks the director for a day when neither they nor the ministry set one", () => {
     const violations = validateTimetable(
-      tinyInput([requirement({ weeklyHours: 8 })]),
-      (["sunday", "monday", "tuesday", "wednesday"] as const).map(day =>
-        session({ day })
-      )
+      tinyInput([
+        requirement({
+          subjectId: "technology",
+          nameAr: "التكنولوجيا",
+          weeklyHours: 2,
+        }),
+      ]),
+      [session({ subjectId: "technology", teacherId: "t-technology" })]
     );
-    expect(codes(violations)).not.toContain("pedagogical_day_off_official");
-    expect(codes(violations)).not.toContain("missing_pedagogical_morning");
+    const missing = violations.filter(
+      v => v.code === "pedagogical_day_not_set"
+    );
+    expect(missing).toHaveLength(1);
+    expect(missing[0].severity).toBe("preference");
   });
 });
 
@@ -798,22 +910,27 @@ describe("generateTimetable on a real secondary stream", () => {
     }
   });
 
-  it("frees the ministerial pedagogical morning of each subject (rule 9)", () => {
-    for (const { subjectId, day, official } of result.pedagogicalMornings) {
-      const morningOnThatDay = result.sessions.filter(
+  it("frees each teacher's pedagogical half-day on their subject's ministerial day (rule 9)", () => {
+    expect(result.pedagogicalExemptions.length).toBeGreaterThan(0);
+    for (const exemption of result.pedagogicalExemptions) {
+      // Nothing at all is scheduled for that teacher in that half-day.
+      const busy = result.sessions.filter(
         s =>
-          s.subjectId === subjectId && s.day === day && s.halfDay === "morning"
+          s.teacherId === exemption.teacherId &&
+          s.day === exemption.day &&
+          s.halfDay === exemption.halfDay
       );
-      expect(morningOnThatDay).toEqual([]);
-      const expected = OFFICIAL_PEDAGOGICAL_DAYS[subjectId];
-      if (expected) expect(official ? day : expected).toBe(expected);
+      expect(busy).toEqual([]);
+      // And the day is the ministerial one for their main subject.
+      const official = OFFICIAL_PEDAGOGICAL_DAYS[exemption.subjectId];
+      if (official) expect(exemption.day).toBe(official);
     }
-    // The core science subjects of this stream all have an official day.
-    const math = result.pedagogicalMornings.find(
-      p => p.subjectId === "mathematics"
+    const math = result.pedagogicalExemptions.filter(
+      e => e.subjectId === "mathematics"
     );
-    expect(math?.day).toBe("thursday");
-    expect(math?.official).toBe(true);
+    expect(math.length).toBeGreaterThan(0);
+    // One day for the whole subject, whatever the teacher.
+    expect(new Set(math.map(e => e.day))).toEqual(new Set(["thursday"]));
   });
 
   it("never exceeds a teacher's statutory weekly load (rule 1)", () => {
@@ -827,7 +944,7 @@ describe("generateTimetable on a real secondary stream", () => {
     const violations = validateTimetable(
       input,
       result.sessions,
-      result.pedagogicalMornings
+      result.pedagogicalExemptions
     );
     expect(hardViolations(violations)).toEqual([]);
   });

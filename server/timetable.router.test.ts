@@ -171,11 +171,56 @@ describe("timetable generation over the API", () => {
     const result = await caller.timetable.validate({
       config,
       sessions: edited,
-      pedagogicalMornings: generated.pedagogicalMornings,
+      pedagogicalExemptions: generated.pedagogicalExemptions,
     });
     const codes = result.violations.map(v => v.code);
     expect(codes).toContain("late_half_day_start");
     expect(result.violations.some(v => v.severity === "hard")).toBe(true);
+  });
+
+  it("applies the director's pedagogical day and each teacher's own half-day (rule 9)", async () => {
+    const caller = appRouter.createCaller(contextFor("institution"));
+    // The director moves mathematics to monday; one teacher of the subject
+    // keeps the morning free, the next one the afternoon.
+    const teachers = config.teachers.map((teacher, index) => ({
+      ...teacher,
+      pedagogicalHalfDay: (index % 2 === 0 ? "morning" : "afternoon") as
+        | "morning"
+        | "afternoon",
+    }));
+    const result = await caller.timetable.generate({
+      ...config,
+      teachers,
+      pedagogicalDays: { mathematics: "monday" },
+    });
+    expect(result.violations.filter(v => v.severity === "hard")).toEqual([]);
+
+    const mathExemptions = result.pedagogicalExemptions.filter(
+      e => e.subjectId === "mathematics"
+    );
+    expect(mathExemptions.length).toBeGreaterThan(0);
+    // One day for the subject, taken from the director…
+    for (const exemption of mathExemptions) {
+      expect(exemption.day).toBe("monday");
+      expect(exemption.chosen).toBe(true);
+      // …and not a single hour scheduled in the half-day each one kept.
+      expect(
+        result.sessions.filter(
+          s =>
+            s.teacherId === exemption.teacherId &&
+            s.day === exemption.day &&
+            s.halfDay === exemption.halfDay
+        )
+      ).toEqual([]);
+    }
+    // Moving off the ministerial thursday is reported, not hidden.
+    expect(
+      result.violations.some(
+        v =>
+          v.code === "pedagogical_day_off_official" &&
+          v.subjectId === "mathematics"
+      )
+    ).toBe(true);
   });
 
   it("rejects a payload that is not a timetable at all", async () => {

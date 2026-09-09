@@ -282,6 +282,9 @@ const timetableConfigSchema = z.object({
         subjectIds: z.array(z.string().min(1).max(64)).min(1).max(8),
         maxWeeklyHours: z.number().int().min(1).max(24).optional(),
         extraHours: z.number().int().min(0).max(8).optional(),
+        // Rule 9: the half of their subject's pedagogical day this
+        // teacher keeps free, their own choice under the director.
+        pedagogicalHalfDay: z.enum(["morning", "afternoon"]).optional(),
       })
     )
     .min(1)
@@ -2602,12 +2605,15 @@ export const appRouter = router({
         z.object({
           config: timetableConfigSchema,
           sessions: z.array(sessionSchema),
-          pedagogicalMornings: z
+          pedagogicalExemptions: z
             .array(
               z.object({
-                subjectId: z.string(),
+                teacherId: z.string().min(1).max(64),
+                subjectId: z.string().min(1).max(64),
                 day: z.enum(WORKING_DAYS),
-                official: z.boolean().optional(),
+                halfDay: z.enum(["morning", "afternoon"]),
+                official: z.boolean(),
+                chosen: z.boolean(),
               })
             )
             .optional(),
@@ -2620,7 +2626,7 @@ export const appRouter = router({
           violations: validateTimetable(
             config,
             sessions,
-            input.pedagogicalMornings
+            input.pedagogicalExemptions
           ),
           teacherLoads: summarizeTeacherLoads(config, sessions),
           assignmentSheet: buildAssignmentSheet(config, sessions),
