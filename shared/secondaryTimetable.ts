@@ -595,13 +595,15 @@ export function resolveExemptions(
   input.teachers.forEach((teacher, index) => {
     const subjectId = mainSubject.get(teacher.id);
     if (!subjectId) return; // no service, nothing to exempt
-    const chosenDay = directorDays[subjectId] ?? OFFICIAL_PEDAGOGICAL_DAYS[subjectId];
+    const chosenDay =
+      directorDays[subjectId] ?? OFFICIAL_PEDAGOGICAL_DAYS[subjectId];
     const day = chosenDay ?? fallback.day(teacher.id, index);
     out.push({
       teacherId: teacher.id,
       subjectId,
       day,
-      halfDay: teacher.pedagogicalHalfDay ?? fallback.halfDay(teacher.id, index),
+      halfDay:
+        teacher.pedagogicalHalfDay ?? fallback.halfDay(teacher.id, index),
       official: OFFICIAL_PEDAGOGICAL_DAYS[subjectId] === day,
       chosen: teacher.pedagogicalHalfDay != null,
     });
@@ -764,7 +766,10 @@ export function generateTimetable(input: TimetableInput): GenerateResult {
   const teacherSubjectHours = new Map<string, number>();
   for (const block of blocks) {
     const key = `${block.teacherId}::${block.subjectId}`;
-    teacherSubjectHours.set(key, (teacherSubjectHours.get(key) ?? 0) + block.hours);
+    teacherSubjectHours.set(
+      key,
+      (teacherSubjectHours.get(key) ?? 0) + block.hours
+    );
   }
   const mainSubject = mainSubjectPerTeacher(teacherSubjectHours);
 
@@ -1854,12 +1859,16 @@ export function validateTimetable(
   // --- rule 9: each teacher's free half-day on their subject's day ------
   const appliedExemptions =
     exemptions ??
-    resolveExemptions(input, mainSubjectPerTeacher(hoursByTeacherSubject(sessions)), {
-      // Nothing decided and nothing to fall back on: the day is reported
-      // as missing below rather than invented here.
-      day: () => grid.days[0],
-      halfDay: () => "morning",
-    });
+    resolveExemptions(
+      input,
+      mainSubjectPerTeacher(hoursByTeacherSubject(sessions)),
+      {
+        // Nothing decided and nothing to fall back on: the day is reported
+        // as missing below rather than invented here.
+        day: () => grid.days[0],
+        halfDay: () => "morning",
+      }
+    );
   const directorDays = input.pedagogicalDays ?? {};
   const subjectsInPlay = new Set<string>(sessions.map(s => s.subjectId));
 

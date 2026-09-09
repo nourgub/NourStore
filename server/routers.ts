@@ -254,8 +254,14 @@ const timetableConfigSchema = z.object({
   grid: z
     .object({
       days: z.array(z.enum(WORKING_DAYS)).min(1).max(7).optional(),
-      morningStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-      afternoonStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      morningStart: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/)
+        .optional(),
+      afternoonStart: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/)
+        .optional(),
       morningSlots: z.number().int().min(1).max(8).optional(),
       afternoonSlots: z.number().int().min(0).max(8).optional(),
       slotMinutes: z.number().int().min(30).max(120).optional(),
