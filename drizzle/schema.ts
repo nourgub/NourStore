@@ -2,6 +2,7 @@ import {
   bigint,
   index,
   int,
+  longtext,
   mysqlEnum,
   mysqlTable,
   text,
@@ -1170,3 +1171,36 @@ export const googleCalendarConnections = mysqlTable("googleCalendarConnections",
 });
 
 export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
+
+// A secondary-school weekly timetable (جدول التوقيت الأسبوعي للثانوية),
+// stored as the generator's input plus the resulting week.
+//
+// `config` and `sessions` hold JSON, validated on the way in by the zod
+// schemas in server/routers.ts and interpreted by the pure engine in
+// shared/secondaryTimetable.ts. They are deliberately NOT split into
+// relational tables: a timetable is produced, read, printed and replaced as
+// one whole — nothing queries a single session row — and the engine
+// re-derives every rule from the same two documents, so keeping them
+// together is what makes a saved timetable reproducible.
+export const secondaryTimetables = mysqlTable(
+  "secondaryTimetables",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The staff member who owns this timetable (institution or admin). */
+    ownerId: int("ownerId").notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    /** e.g. "2025/2026". */
+    schoolYear: varchar("schoolYear", { length: 16 }).notNull(),
+    status: mysqlEnum("status", ["draft", "published"])
+      .default("draft")
+      .notNull(),
+    /** Generator input: grid, classes with their ministerial loads, staff. */
+    config: longtext("config").notNull(),
+    /** The week itself: one entry per session. */
+    sessions: longtext("sessions").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [index("secondaryTimetables_ownerId_idx").on(table.ownerId)]
+);

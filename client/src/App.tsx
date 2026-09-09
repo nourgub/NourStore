@@ -28,6 +28,7 @@ const Workspace = lazy(() => import("./pages/Workspace"));
 const Search = lazy(() => import("./pages/Search"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
+const Timetable = lazy(() => import("./pages/Timetable"));
 
 // The former LearningFlows.tsx bundled learner-facing flows AND the entire
 // teacher/institution/admin panel into one file, so both ended up in the
@@ -95,6 +96,7 @@ function Router() {
         <Route path="/parent" component={ParentSpace} />
         <Route path="/teacher" component={() => <StaffSpace />} />
         <Route path="/institution" component={InstitutionSpace} />
+        <Route path="/timetable" component={Timetable} />
         <Route path="/admin" component={() => <StaffSpace admin />} />
         <Route path="/search" component={Search} />
         <Route path="/notifications" component={Notifications} />

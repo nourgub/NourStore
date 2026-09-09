@@ -161,7 +161,30 @@ import {
   getErrorLog,
   markErrorResolved,
   getErrorLogSummary,
+  listTimetables,
+  getTimetable,
+  createTimetable,
+  updateTimetable,
+  deleteTimetable,
 } from "./db";
+import {
+  DEFAULT_GRID,
+  OFFICIAL_PEDAGOGICAL_DAYS,
+  PEDAGOGICAL_DAY_SOURCE_AR,
+  RANK_LABELS_AR,
+  TEACHER_RANKS,
+  WORKING_DAYS,
+  buildAssignmentSheet,
+  generateTimetable,
+  summarizeTeacherLoads,
+  validateTimetable,
+  type ScheduledSession,
+  type TimetableInput,
+} from "@shared/secondaryTimetable";
+import {
+  CURRICULUM_TEMPLATE_NOTICE_AR,
+  SECONDARY_STREAM_TEMPLATES,
+} from "@shared/secondaryCurriculum";
 import { ENV } from "./_core/env";
 import { initiateBaridimobCheckout } from "./baridimobProvider";
 import { remindStaleCheckoutSessions } from "./whatsappBot";
@@ -212,6 +235,87 @@ const rateLimit = (
     }
     return opts.next();
   }) as unknown as RateLimitMiddleware;
+
+// ---------------------------------------------------------------------------
+// Secondary timetable input (see shared/secondaryTimetable.ts for the rules)
+// ---------------------------------------------------------------------------
+
+const requirementSchema = z.object({
+  subjectId: z.string().min(1).max(64),
+  nameAr: z.string().min(1).max(120),
+  weeklyHours: z.number().int().min(0).max(20),
+  practicalHours: z.number().int().min(0).max(20).optional(),
+  core: z.boolean().optional(),
+  pe: z.boolean().optional(),
+  maxHoursPerDay: z.number().int().min(1).max(8).optional(),
+});
+
+const timetableConfigSchema = z.object({
+  grid: z
+    .object({
+      days: z.array(z.enum(WORKING_DAYS)).min(1).max(7).optional(),
+      morningStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      afternoonStart: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      morningSlots: z.number().int().min(1).max(8).optional(),
+      afternoonSlots: z.number().int().min(0).max(8).optional(),
+      slotMinutes: z.number().int().min(30).max(120).optional(),
+    })
+    .optional(),
+  sections: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        level: z.string().min(1).max(16),
+        stream: z.string().min(1).max(64),
+        requirements: z.array(requirementSchema).max(24),
+      })
+    )
+    .min(1)
+    .max(60),
+  teachers: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(64),
+        name: z.string().min(1).max(120),
+        rank: z.enum(TEACHER_RANKS),
+        subjectIds: z.array(z.string().min(1).max(64)).min(1).max(8),
+        maxWeeklyHours: z.number().int().min(1).max(24).optional(),
+        extraHours: z.number().int().min(0).max(8).optional(),
+      })
+    )
+    .min(1)
+    .max(300),
+  assignments: z
+    .array(
+      z.object({
+        sectionId: z.string().min(1).max(64),
+        subjectId: z.string().min(1).max(64),
+        teacherId: z.string().min(1).max(64),
+      })
+    )
+    .max(1500)
+    .optional(),
+  pedagogicalDays: z.record(z.string(), z.enum(WORKING_DAYS)).optional(),
+  options: z
+    .object({
+      seed: z.number().int().optional(),
+      maxSteps: z.number().int().min(1000).max(600_000).optional(),
+      maxRestarts: z.number().int().min(1).max(12).optional(),
+    })
+    .optional(),
+});
+
+const sessionSchema = z.object({
+  sectionId: z.string().min(1).max(64),
+  subjectId: z.string().min(1).max(64),
+  teacherId: z.string().min(1).max(64),
+  day: z.enum(WORKING_DAYS),
+  halfDay: z.enum(["morning", "afternoon"]),
+  startSlot: z.number().int().min(0).max(12),
+  hours: z.number().int().min(1).max(6),
+  kind: z.enum(["lecture", "practical", "pe"]),
+});
 
 export const appRouter = router({
   diagnostics: router({
@@ -2448,6 +2552,170 @@ export const appRouter = router({
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "You do not have access to this ticket",
+          });
+        return { ok: true };
+      }),
+  }),
+  timetable: router({
+    // The reference data a timetable is built from: the streams with their
+    // ministerial weekly loads (a template to confirm against the official
+    // decree, never a substitute for it), the pedagogical day fixed per
+    // subject, and the ranks with their statutory quotas.
+    reference: institutionProcedure.query(() => ({
+      streams: SECONDARY_STREAM_TEMPLATES,
+      curriculumNoticeAr: CURRICULUM_TEMPLATE_NOTICE_AR,
+      pedagogicalDays: OFFICIAL_PEDAGOGICAL_DAYS,
+      pedagogicalDaySourceAr: PEDAGOGICAL_DAY_SOURCE_AR,
+      ranks: TEACHER_RANKS.map(rank => ({ rank, labelAr: RANK_LABELS_AR[rank] })),
+      days: WORKING_DAYS,
+      grid: DEFAULT_GRID,
+    })),
+
+    // Generation is pure computation on the input the caller sends — it
+    // touches no database and stores nothing, so a school can try several
+    // configurations before saving one. It is CPU-bound, hence the rate
+    // limit.
+    generate: institutionProcedure
+      .use(rateLimit("timetable-generate", 30, 10 * 60 * 1000))
+      .input(timetableConfigSchema)
+      .mutation(({ input }) => {
+        const result = generateTimetable(input as TimetableInput);
+        return {
+          ...result,
+          teacherLoads: summarizeTeacherLoads(
+            input as TimetableInput,
+            result.sessions
+          ),
+          assignmentSheet: buildAssignmentSheet(
+            input as TimetableInput,
+            result.sessions
+          ),
+        };
+      }),
+
+    // Re-checks a week against the ten rules. The screen calls this after
+    // a manual edit: an administrator always keeps the last word on the
+    // timetable, and this tells them what their change broke.
+    validate: institutionProcedure
+      .use(rateLimit("timetable-validate", 120, 10 * 60 * 1000))
+      .input(
+        z.object({
+          config: timetableConfigSchema,
+          sessions: z.array(sessionSchema),
+          pedagogicalMornings: z
+            .array(
+              z.object({
+                subjectId: z.string(),
+                day: z.enum(WORKING_DAYS),
+                official: z.boolean().optional(),
+              })
+            )
+            .optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const config = input.config as TimetableInput;
+        const sessions = input.sessions as ScheduledSession[];
+        return {
+          violations: validateTimetable(
+            config,
+            sessions,
+            input.pedagogicalMornings
+          ),
+          teacherLoads: summarizeTeacherLoads(config, sessions),
+          assignmentSheet: buildAssignmentSheet(config, sessions),
+        };
+      }),
+
+    list: institutionProcedure.query(({ ctx }) =>
+      listTimetables(ctx.user.id, ctx.user.role === "admin" ? "admin" : "institution")
+    ),
+
+    get: institutionProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        const row = await getTimetable(
+          input.id,
+          ctx.user.id,
+          ctx.user.role === "admin" ? "admin" : "institution"
+        );
+        if (!row)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Timetable not found",
+          });
+        return {
+          id: row.id,
+          name: row.name,
+          schoolYear: row.schoolYear,
+          status: row.status,
+          notes: row.notes,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+          config: JSON.parse(row.config) as unknown,
+          sessions: JSON.parse(row.sessions) as unknown,
+        };
+      }),
+
+    save: institutionProcedure
+      .use(rateLimit("timetable-save", 60, 10 * 60 * 1000))
+      .input(
+        z.object({
+          id: z.number().int().positive().optional(),
+          name: z.string().min(2).max(160),
+          schoolYear: z
+            .string()
+            .regex(/^\d{4}\/\d{4}$/, "schoolYear must look like 2025/2026"),
+          status: z.enum(["draft", "published"]).default("draft"),
+          notes: z.string().max(2000).optional(),
+          config: timetableConfigSchema,
+          sessions: z.array(sessionSchema),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const payload = {
+          name: input.name,
+          schoolYear: input.schoolYear,
+          status: input.status,
+          notes: input.notes,
+          config: JSON.stringify(input.config),
+          sessions: JSON.stringify(input.sessions),
+        };
+        if (input.id) {
+          const ok = await updateTimetable({
+            id: input.id,
+            userId: ctx.user.id,
+            role: ctx.user.role === "admin" ? "admin" : "institution",
+            ...payload,
+          });
+          if (!ok)
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Timetable not found",
+            });
+          return { id: input.id };
+        }
+        const id = await createTimetable({ ownerId: ctx.user.id, ...payload });
+        if (!id)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Could not save the timetable",
+          });
+        return { id };
+      }),
+
+    remove: institutionProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const ok = await deleteTimetable(
+          input.id,
+          ctx.user.id,
+          ctx.user.role === "admin" ? "admin" : "institution"
+        );
+        if (!ok)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Timetable not found",
           });
         return { ok: true };
       }),

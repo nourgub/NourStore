@@ -314,6 +314,25 @@ export function StaffSpace({
             </small>
           </div>
         </div>
+        {(admin || institution) && (
+          <div className="flow-card">
+            <div className="flow-card-icon">
+              <Calendar size={22} />
+            </div>
+            <h2>
+              {lang === "ar" ? "جدول التوقيت — الثانوي" : "Secondary timetable"}
+            </h2>
+            <p>
+              {lang === "ar"
+                ? "إنجاز جدول التوقيت الأسبوعي للأفواج والأساتذة مع احترام الحجم الساعي القانوني، اليوم البيداغوجي، وبرمجة المواد الأساسية صباحًا."
+                : "Build the weekly timetable for classes and teachers, respecting the statutory teaching load, the pedagogical day and morning core subjects."}
+            </p>
+            <Link href="/timetable" className="card-link">
+              {lang === "ar" ? "فتح مُنجز الجدول" : "Open the timetable builder"}
+              <ChevronLeft size={14} />
+            </Link>
+          </div>
+        )}
         {showForm && (
           <div className="flow-card staff-form">
             <div className="flow-card-title">

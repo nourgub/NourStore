@@ -718,3 +718,91 @@ a.dashboard-course-row:focus-visible { outline: 2px solid #d4a72c; outline-offse
 [data-theme="light"] .notification-content h2 { margin: 0; color: #1c1810; font-size: 15px; }
 [data-theme="light"] .notification-content small { color: #737067; font-size: 10px; }
 [data-theme="light"] .notification-content p { margin: 0; color: #5b564b; font-size: 13px; line-height: 1.6; }
+
+/* --- Secondary timetable builder (client/src/pages/Timetable.tsx) ------- */
+.tt-panel { margin-bottom: 18px; }
+.tt-panel h3.tt-subhead { margin: 20px 0 8px; color: #d4a72c; font-size: 11px; font-weight: 500; }
+.tt-field-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.tt-field-row label { display: grid; gap: 6px; min-width: 170px; }
+.tt-field-row label > span { color: #8d887e; font-size: 10px; }
+.tt-inline-button { align-self: end; }
+.tt-select { min-height: 36px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: #141414; padding: 0 10px; color: #ddd7cc; font-size: 12px; }
+.tt-hint { display: flex; align-items: center; gap: 7px; margin: 14px 0 0; color: #8d887e; font-size: 11px; line-height: 1.8; }
+.tt-hint.tt-warning { color: #e2b95c; }
+.tt-hint.tt-good { color: #7ed3a1; }
+.tt-icon-good { color: #7ed3a1; }
+.tt-icon-bad { color: #f28b8b; }
+.tt-list { display: grid; gap: 10px; margin-top: 16px; }
+.tt-list-item { border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: #131313; padding: 12px; }
+.tt-list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.tt-list-head input { max-width: 190px; }
+.tt-list-head strong { color: #ddd7cc; font-size: 12px; font-weight: 500; }
+.tt-chip { border: 1px solid rgba(212,167,44,.35); border-radius: 99px; background: rgba(212,167,44,.1); padding: 3px 10px; color: #f1ce63; font-size: 10px; }
+.tt-chip.tt-chip-bad { border-color: rgba(248,113,113,.45); background: rgba(127,29,29,.15); color: #f1b4b4; }
+.tt-link-button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: #d4a72c; cursor: pointer; font-size: 11px; }
+.tt-link-button.tt-danger { color: #e08a8a; }
+.tt-table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 11px; }
+.tt-table th, .tt-table td { border-top: 1px solid rgba(255,255,255,.08); padding: 7px 9px; color: #cfc9bf; text-align: start; vertical-align: middle; }
+.tt-table thead th { color: #8d887e; font-size: 10px; font-weight: 500; }
+.tt-table input { max-width: 82px; }
+.tt-subject-picker { display: flex; flex-wrap: wrap; gap: 8px; max-width: 420px; }
+.tt-subject-picker label { display: inline-flex; align-items: center; gap: 4px; color: #a9a39a; font-size: 10px; }
+.tt-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.tt-violations { display: grid; gap: 7px; margin: 14px 0 0; padding: 0; list-style: none; }
+.tt-violations li { display: flex; align-items: baseline; gap: 8px; border-inline-start: 2px solid rgba(248,113,113,.5); padding: 6px 10px; color: #f1b4b4; font-size: 11px; line-height: 1.8; }
+.tt-violations.tt-violations-soft li { border-inline-start-color: rgba(212,167,44,.5); color: #ddc27f; }
+.tt-rule { flex: 0 0 auto; color: #8d887e; font-size: 9px; }
+.tt-week { margin-top: 8px; }
+.tt-week-title { margin: 0 0 10px; color: #f4efe5; font-size: 14px; font-weight: 500; }
+.tt-week-scroll { overflow-x: auto; }
+.tt-grid { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+.tt-grid th, .tt-grid td { border: 1px solid rgba(255,255,255,.1); padding: 6px 5px; text-align: center; }
+.tt-grid thead th { background: rgba(212,167,44,.1); color: #f1ce63; font-size: 10px; font-weight: 500; }
+.tt-grid tbody th { background: #131313; color: #8d887e; font-size: 9px; font-weight: 400; }
+.tt-grid tbody th small { display: block; color: #625d56; font-size: 8px; }
+.tt-grid .tt-busy { background: #171717; }
+.tt-grid .tt-busy strong { display: block; color: #ddd7cc; font-size: 10px; font-weight: 500; }
+.tt-grid .tt-busy small { display: block; margin-top: 3px; color: #7f7a72; font-size: 8px; }
+.tt-grid .tt-kind-practical { background: rgba(96,165,250,.09); }
+.tt-grid .tt-kind-pe { background: rgba(126,211,161,.09); }
+.tt-grid .tt-empty { background: #0c0c0c; }
+.tt-grid tr.tt-half-break th, .tt-grid tr.tt-half-break td { border-top: 2px solid rgba(212,167,44,.4); }
+.tt-legend { margin: 9px 0 0; color: #736e66; font-size: 9px; }
+
+[data-theme="light"] .tt-select { border-color: rgba(20,17,10,.15); background: #fff; color: #2a251b; }
+[data-theme="light"] .tt-field-row label > span, [data-theme="light"] .tt-hint { color: #6b665c; }
+[data-theme="light"] .tt-hint.tt-warning { color: #8a6410; }
+[data-theme="light"] .tt-hint.tt-good { color: #1c6b42; }
+[data-theme="light"] .tt-list-item { border-color: rgba(20,17,10,.1); background: #fff; }
+[data-theme="light"] .tt-list-head strong { color: #1c1810; }
+[data-theme="light"] .tt-chip { border-color: rgba(140,105,18,.35); background: rgba(241,206,99,.18); color: #7a5b09; }
+[data-theme="light"] .tt-chip.tt-chip-bad { border-color: rgba(185,28,28,.35); background: rgba(185,28,28,.08); color: #7f1d1d; }
+[data-theme="light"] .tt-link-button { color: #8c6912; }
+[data-theme="light"] .tt-link-button.tt-danger { color: #a12626; }
+[data-theme="light"] .tt-table th, [data-theme="light"] .tt-table td { border-top-color: rgba(20,17,10,.1); color: #3a3529; }
+[data-theme="light"] .tt-table thead th { color: #6b665c; }
+[data-theme="light"] .tt-violations li { color: #7f1d1d; }
+[data-theme="light"] .tt-violations.tt-violations-soft li { color: #7a5b09; }
+[data-theme="light"] .tt-week-title { color: #1c1810; }
+[data-theme="light"] .tt-grid th, [data-theme="light"] .tt-grid td { border-color: rgba(20,17,10,.14); }
+[data-theme="light"] .tt-grid thead th { background: rgba(241,206,99,.22); color: #6d5006; }
+[data-theme="light"] .tt-grid tbody th { background: #f5f2ea; color: #6b665c; }
+[data-theme="light"] .tt-grid tbody th small { color: #918b7f; }
+[data-theme="light"] .tt-grid .tt-busy { background: #fff; }
+[data-theme="light"] .tt-grid .tt-busy strong { color: #1c1810; }
+[data-theme="light"] .tt-grid .tt-busy small { color: #6b665c; }
+[data-theme="light"] .tt-grid .tt-empty { background: #faf8f2; }
+
+/* The timetable is a document a school prints and posts on the wall, so
+   printing drops the app chrome and the editing panels and keeps the
+   grids, in black on white whatever theme the screen is using. */
+@media print {
+  .tt-no-print, .site-header, .tt-actions { display: none !important; }
+  .nourix-app, .catalog-main, .flow-card, .tt-panel { background: #fff !important; color: #000 !important; box-shadow: none !important; }
+  .tt-panel { border: 0 !important; padding: 0 !important; margin: 0 0 14px !important; }
+  .tt-week-scroll { overflow: visible !important; }
+  .tt-grid { min-width: 0 !important; page-break-inside: avoid; }
+  .tt-grid th, .tt-grid td, .tt-table th, .tt-table td { border-color: #000 !important; color: #000 !important; background: #fff !important; }
+  .tt-week-title, .tt-legend, .tt-violations li, .tt-rule { color: #000 !important; }
+}
+.tt-day-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
