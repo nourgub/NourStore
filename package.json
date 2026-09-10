@@ -2,7 +2,8 @@
   "name": "nourix-academy",
   "version": "1.0.0",
   "type": "module",
-  "license": "MIT",
+  "license": "UNLICENSED",
+  "private": true,
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --external:./viteDevServer --bundle --format=esm --outdir=dist && mkdir -p dist/assets/fonts && cp server/assets/fonts/*.ttf dist/assets/fonts/",
