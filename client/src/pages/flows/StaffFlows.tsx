@@ -154,6 +154,7 @@ export function StaffSpace({
   const initialForm = {
     slug: "",
     subject: "",
+    stage: "middle" as "primary" | "middle" | "secondary",
     level: "starter" as
       | "starter"
       | "foundation"
@@ -363,6 +364,19 @@ export function StaffSpace({
                     {option.titleAr} / {option.titleFr} / {option.titleEn}
                   </option>
                 ))}
+              </select>
+              <select
+                value={form.stage}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    stage: e.target.value as typeof form.stage,
+                  })
+                }
+              >
+                <option value="primary">الابتدائي / Primaire / Primary</option>
+                <option value="middle">المتوسط / Moyen / Middle</option>
+                <option value="secondary">الثانوي / Secondaire / Secondary</option>
               </select>
               <select
                 value={form.level}
@@ -664,6 +678,7 @@ export function StaffSpace({
                     setEditForm({
                       slug: course.slug,
                       subject: course.subject,
+                      stage: course.stage,
                       level: course.level,
                       titleAr: course.titleAr,
                       titleFr: course.titleFr,
@@ -835,6 +850,7 @@ export function StaffSpace({
                           descriptionAr: editForm.descriptionAr,
                           descriptionFr: editForm.descriptionFr,
                           descriptionEn: editForm.descriptionEn,
+                          stage: editForm.stage || course.stage,
                           level: editForm.level || course.level,
                           objectivesAr: toLines(editForm.objectivesAr),
                           objectivesFr: toLines(editForm.objectivesFr),

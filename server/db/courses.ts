@@ -256,6 +256,7 @@ export async function createCourse(input: {
   ownerId: number;
   slug: string;
   subject: string;
+  stage: "primary" | "middle" | "secondary";
   level:
     | "starter"
     | "foundation"
@@ -379,6 +380,7 @@ export async function updateManagedCourse(input: {
   descriptionAr: string;
   descriptionFr: string;
   descriptionEn: string;
+  stage: "primary" | "middle" | "secondary";
   level:
     | "starter"
     | "foundation"
@@ -415,6 +417,7 @@ export async function updateManagedCourse(input: {
       descriptionAr: input.descriptionAr,
       descriptionFr: input.descriptionFr,
       descriptionEn: input.descriptionEn,
+      stage: input.stage,
       level: input.level,
       // Only touched when the caller actually sent a value for these —
       // omitting the key (not `null`) so an edit that only changes the

@@ -1439,6 +1439,7 @@ export const appRouter = router({
             .max(160)
             .regex(/^[a-z0-9-]+$/),
           subject: z.string().min(1).max(40),
+          stage: z.enum(["primary", "middle", "secondary"]),
           level: z.enum([
             "starter",
             "foundation",
@@ -1649,6 +1650,7 @@ export const appRouter = router({
           descriptionAr: z.string().min(2),
           descriptionFr: z.string().min(2),
           descriptionEn: z.string().min(2),
+          stage: z.enum(["primary", "middle", "secondary"]),
           level: z.enum([
             "starter",
             "foundation",

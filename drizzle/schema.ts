@@ -170,6 +170,12 @@ export const courses = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     slug: varchar("slug", { length: 160 }).notNull().unique(),
     subject: varchar("subject", { length: 40 }).notNull(),
+    // Algeria's three school stages — orthogonal to `level` (which is a
+    // difficulty tier within a stage, e.g. "foundation" applies equally to
+    // a primary-stage course and a secondary-stage one).
+    stage: mysqlEnum("stage", ["primary", "middle", "secondary"])
+      .default("middle")
+      .notNull(),
     level: mysqlEnum("level", [
       "starter",
       "foundation",
