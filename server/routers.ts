@@ -164,6 +164,7 @@ import {
 } from "./db";
 import { ENV } from "./_core/env";
 import { initiateBaridimobCheckout } from "./baridimobProvider";
+import { initiateSlickpayCheckout } from "./slickpayProvider";
 import { remindStaleCheckoutSessions } from "./whatsappBot";
 
 const roleProcedure = (
@@ -798,7 +799,7 @@ export const appRouter = router({
             .length(3)
             .regex(/^[A-Za-z]{3}$/),
           provider: z
-            .enum(["manual", "baridimob", "whatsapp"])
+            .enum(["manual", "baridimob", "slickpay", "whatsapp"])
             .default("manual"),
           returnUrl: z.string().url().optional(),
           couponCode: z.string().min(2).max(40).optional(),
@@ -876,6 +877,39 @@ export const appRouter = router({
           await recordPaymentAttempt({
             invoiceId: invoice.id,
             provider: "baridimob",
+            providerReference: checkout.providerReference,
+            status: "pending",
+          });
+          return {
+            invoice,
+            providerConfigured: true,
+            redirectUrl: checkout.redirectUrl,
+            message: undefined,
+            couponMessage,
+            appliedCoupon: appliedCoupon?.code,
+          };
+        }
+        if (input.provider === "slickpay") {
+          const checkout = await initiateSlickpayCheckout({
+            invoiceId: invoice.id,
+            amountCents: finalAmountCents,
+            currency: plan.resolvedCurrency,
+            returnUrl: input.returnUrl || "",
+          });
+          if (!checkout.ok) {
+            // Never fakes success: the invoice stays "pending" and the person is told exactly why the redirect isn't available yet.
+            return {
+              invoice,
+              providerConfigured: false,
+              redirectUrl: null,
+              message: checkout.message,
+              couponMessage,
+              appliedCoupon: appliedCoupon?.code,
+            };
+          }
+          await recordPaymentAttempt({
+            invoiceId: invoice.id,
+            provider: "slickpay",
             providerReference: checkout.providerReference,
             status: "pending",
           });

@@ -25,6 +25,7 @@ const labels = {
     back: "الرئيسية",
     payWhatsapp: "ادفع عبر WhatsApp",
     payBaridimob: "ادفع عبر BaridiMob",
+    paySlickpay: "ادفع عبر SlickPay",
     loginFirst: "سجّل الدخول للمتابعة",
     currentPlan: "خطتك الحالية",
     noPlans: "لا توجد خطط منشورة حاليًا.",
@@ -42,6 +43,7 @@ const labels = {
     back: "Accueil",
     payWhatsapp: "Payer via WhatsApp",
     payBaridimob: "Payer avec BaridiMob",
+    paySlickpay: "Payer avec SlickPay",
     loginFirst: "Connectez-vous pour continuer",
     currentPlan: "Votre plan actuel",
     noPlans: "Aucun plan publié pour le moment.",
@@ -59,6 +61,7 @@ const labels = {
     back: "Home",
     payWhatsapp: "Pay via WhatsApp",
     payBaridimob: "Pay with BaridiMob",
+    paySlickpay: "Pay with SlickPay",
     loginFirst: "Sign in to continue",
     currentPlan: "Your current plan",
     noPlans: "No plans have been published yet.",
@@ -193,7 +196,7 @@ export default function Pricing() {
 
   const pay = (
     planId: number,
-    provider: "whatsapp" | "baridimob" | "postal"
+    provider: "whatsapp" | "baridimob" | "slickpay" | "postal"
   ) => {
     if (!isAuthenticated) {
       startLogin();
@@ -400,6 +403,17 @@ export default function Pricing() {
                         onClick={() => pay(plan.id, "baridimob")}
                       >
                         {t.payBaridimob}
+                      </Button>
+                    )}
+                    {isAuthenticated && (
+                      <Button
+                        className="quiet-button"
+                        disabled={
+                          checkout.isPending && payingPlanId === plan.id
+                        }
+                        onClick={() => pay(plan.id, "slickpay")}
+                      >
+                        {t.paySlickpay}
                       </Button>
                     )}
                     {isAuthenticated && (

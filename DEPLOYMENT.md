@@ -121,6 +121,30 @@ les trois variables suivantes ne sont pas renseignées :
   `server/baridimobProvider.test.ts` et un test d'intégration réel contre
   une base MySQL (voir AUDIT.md).
 
+## SlickPay — API publique réelle, sandbox gratuit en libre-service
+
+Contrairement à BaridiMob, SlickPay est un agrégateur de paiement algérien
+avec une **vraie API REST publique**, confirmée directement depuis le code
+source officiel de leur SDK (`@slick-pay-algeria/slickpay-npm`, MIT) —
+aucune donnée inventée. Un compte sandbox gratuit s'obtient sur
+https://slick-pay.com sans agrément commercial préalable.
+
+- `SLICKPAY_PUBLIC_KEY` — la clé publique récupérée depuis le tableau de
+  bord SlickPay (mode sandbox pour tester, production une fois prêt).
+- `SLICKPAY_SANDBOX` — `true` (défaut) pour pointer vers
+  `devapi.slick-pay.com`, `false` pour `prodapi.slick-pay.com`.
+- **Ce qui reste à faire** : le corps exact de la requête
+  `POST merchants/invoices` (montant, nom, e-mail, etc.) n'est documenté
+  nulle part de façon accessible (le site de documentation officiel est une
+  SPA JavaScript sans contenu statique récupérable) — `server/
+  slickpayProvider.ts` implémente tout ce qui est confirmé (URL de base,
+  authentification `Bearer`, endpoint) et s'arrête avant d'inventer ces
+  champs. Un premier appel réel contre le sandbox (une fois
+  `SLICKPAY_PUBLIC_KEY` disponible) confirmera le schéma exact.
+- Même contrainte réglementaire que BaridiMob : DZD uniquement, rejeté
+  côté code indépendamment de l'API réelle — voir
+  `server/slickpayProvider.test.ts`.
+
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 
 Alternative pleinement fonctionnelle à BaridiMob, contrairement à ce dernier

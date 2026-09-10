@@ -23,6 +23,15 @@ export const ENV = {
   baridimobMerchantId: process.env.BARIDIMOB_MERCHANT_ID ?? "",
   baridimobApiKey: process.env.BARIDIMOB_API_KEY ?? "",
   baridimobApiBaseUrl: process.env.BARIDIMOB_API_BASE_URL ?? "",
+  // SlickPay — unlike BaridiMob, this one has a real public REST API
+  // (base URLs and the merchants/invoices endpoint confirmed directly from
+  // slick-pay-algeria's own official SDK source, not guessed) with a free
+  // self-serve sandbox at slick-pay.com — no merchant agreement required
+  // just to get a public_key and start testing. Until this is set, the
+  // SlickPay provider reports itself as unconfigured rather than attempting
+  // a fake charge, same as every other payment provider here.
+  slickpayPublicKey: process.env.SLICKPAY_PUBLIC_KEY ?? "",
+  slickpaySandbox: process.env.SLICKPAY_SANDBOX !== "false",
   // WhatsApp Cloud API (Meta) — unlike BaridiMob, this is a real public API
   // (developers.facebook.com/docs/whatsapp/cloud-api). Still requires a
   // real Meta Business/WhatsApp Business Platform setup: a verified phone
