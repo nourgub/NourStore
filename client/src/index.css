@@ -802,8 +802,17 @@ a.dashboard-course-row:focus-visible { outline: 2px solid #d4a72c; outline-offse
   .tt-panel { border: 0 !important; padding: 0 !important; margin: 0 0 14px !important; }
   .tt-week-scroll { overflow: visible !important; }
   .tt-grid { min-width: 0 !important; page-break-inside: avoid; }
-  .tt-grid th, .tt-grid td, .tt-table th, .tt-table td { border-color: #000 !important; color: #000 !important; background: #fff !important; }
-  .tt-week-title, .tt-legend, .tt-violations li, .tt-rule { color: #000 !important; }
+  .tt-grid th, .tt-grid td, .tt-table th, .tt-table td { border-color: #000 !important; background: #fff !important; }
+  /* Everything printed is black on white: the screen palette is a set of
+     greys and golds that all but vanish on paper, and the cell text sits
+     in its own elements, so the colour has to be forced on them too, not
+     only on the cells around them. */
+  .tt-panel, .tt-panel * { color: #000 !important; }
+  .tt-panel h2, .tt-panel h3, .tt-week-title { font-weight: 600 !important; }
+  .tt-chip { border-color: #000 !important; background: #fff !important; }
+  .tt-violations li { border-inline-start-color: #000 !important; }
+  .tt-grid .tt-kind-practical { background: #ececec !important; }
+  .tt-grid .tt-kind-pe { background: #f4f4f4 !important; }
 }
 .tt-day-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .tt-inline-field { display: inline-grid; gap: 4px; }
