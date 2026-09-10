@@ -63,7 +63,10 @@ npm run dev                   # http://localhost:3000
 | `npm run build` | Production build (client + server bundle) |
 | `npm start` | Run the production build (`npm run build` first) |
 | `npm run check` | TypeScript typecheck, no build output |
-| `npm test` | Run the test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
+| `npm test` | Run the whole test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
+| `npm run test:unit` | Run only the fast, database-free tests — always safe, no infra needed |
+| `npm run test:db` | Run only `server/realDb.e2e.test.ts` against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:all` | Same as `npm test` — both names exist so either convention works |
 | `npm run migrate` | Apply every not-yet-applied migration in `drizzle/*.sql` |
 | `npm run format` | Prettier, writes in place |
 
@@ -80,12 +83,17 @@ migrations — it won't see them.
 
 ### Real-database tests
 
-`server/realDb.e2e.test.ts` and a few other suites need an actual MySQL
-instance — they're skipped (not faked as passing) when `DATABASE_URL` isn't
-set:
+`server/realDb.e2e.test.ts` (19 scenarios: the full login → enroll → lesson →
+quiz → final exam → certificate journey, plus payment-receipt and
+cross-user-isolation edge cases) runs real SQL against a real MySQL
+schema — it's skipped (not faked as passing) when `DATABASE_URL` isn't set,
+and a few smaller suites skip themselves the other way (only when a real
+database *is* present, to avoid double-covering the same behavior). Verified
+to actually pass end-to-end against a local MariaDB 10.11 instance with every
+migration applied, and to clean up every row it creates:
 
 ```bash
-DATABASE_URL="mysql://user:pass@localhost:3306/nourix_academy" npm test
+DATABASE_URL="mysql://user:pass@localhost:3306/nourix_academy" JWT_SECRET=... npm run test:db
 ```
 
 ## Project structure

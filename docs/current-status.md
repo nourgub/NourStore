@@ -8,11 +8,22 @@ frozen historical record and is never updated after the fact.
 
 - `npm run check` (TypeScript): 0 errors
 - `npm run build`: succeeds
-- `npm test` (no `DATABASE_URL`): 230 passed, 19 skipped honestly (the
-  real-database suites — see README's "Real-database tests" section)
-- Deployed and reachable at a real host with a real managed MySQL database
-  as of this project's most recent successful deploy — see `DEPLOYMENT.md`
-  for the current hosting setup
+- `npm run test:unit` (no `DATABASE_URL` needed): 230 passed, 0 skipped
+- `npm run test:db`: 19/19 passed — actually run (not just typechecked)
+  against a local MariaDB 10.11 instance with every migration applied; the
+  full login → enroll → lesson → quiz → final exam → certificate journey,
+  payment-receipt anti-fraud checks, and cross-user isolation all confirmed
+  against real SQL, and the suite cleans up every row it creates. See
+  README's "Real-database tests" section.
+- `server/routers.ts` (was 2500+ lines) and `client/src/pages/flows/
+  StaffFlows.tsx` (was 4800+ lines) are now split into per-domain modules
+  under `server/routers/` and `client/src/pages/flows/staff/` — both down
+  to ~1000 lines or less, verified with a byte-identical production build.
+- The live deployment is currently down: the managed MySQL database (Aiven)
+  backing the last deploy was torn down (likely a free-trial expiry) and
+  hasn't been replaced. Deliberately deferred by the project owner to a
+  later "hosting" stage — see `DEPLOYMENT.md` — while engineering work
+  continues on the code itself.
 
 ## What's genuinely still open
 
@@ -25,10 +36,10 @@ deliberately-scoped-out engineering work:
    a free self-serve signup. Manual WhatsApp payment works today with zero
    setup — see `DEPLOYMENT.md`.
 2. **No lawyer review** of the privacy policy / terms of service text.
-3. **`server/routers.ts` (2500+ lines) and `client/src/pages/flows/
-   StaffFlows.tsx` (4800+ lines)** are large, single files — working and
-   fully tested, but not split into per-domain modules. Deliberately
-   deferred: real, larger, riskier engineering work than a drive-by change.
+3. **No live database.** The previous managed MySQL (Aiven) instance is
+   gone; a replacement (managed provider or the self-hosted
+   `docker-compose.yml` stack) needs a real account/server the project
+   owner controls.
 4. **Performance**: Lighthouse ~66/100 (accessibility is 100/100). The
    main lever is deeper code-splitting of the shared vendor JS bundle — see
    `docs/archive/PHASE_VISUAL_AUDIT.md` for why this wasn't attempted
