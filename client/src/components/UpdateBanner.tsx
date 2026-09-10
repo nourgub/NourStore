@@ -53,7 +53,7 @@ export default function UpdateBanner() {
           disabled={applying}
           onClick={() => {
             setApplying(true);
-            (window as any).__nourixApplyUpdate?.();
+            window.__nourixApplyUpdate?.();
           }}
           style={{
             background: "linear-gradient(145deg, #f1ce63, #8d6116)",

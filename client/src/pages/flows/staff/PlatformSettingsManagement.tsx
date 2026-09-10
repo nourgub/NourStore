@@ -224,7 +224,7 @@ export function BadgesAdminPanel({ lang }: { lang: Lang }) {
 export function SubjectsAdminPanel({ lang }: { lang: Lang }) {
   const subjectsQuery = trpc.admin.subjects.useQuery();
   const [slug, setSlug] = useState("");
-  const [icon, setIcon] = useState("book");
+  const [icon, setIcon] = useState<(typeof SUBJECT_ICON_KEYS)[number]>("book");
   const [titleAr, setTitleAr] = useState("");
   const [titleFr, setTitleFr] = useState("");
   const [titleEn, setTitleEn] = useState("");
@@ -286,7 +286,12 @@ export function SubjectsAdminPanel({ lang }: { lang: Lang }) {
             setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))
           }
         />
-        <select value={icon} onChange={e => setIcon(e.target.value)}>
+        <select
+          value={icon}
+          onChange={e =>
+            setIcon(e.target.value as (typeof SUBJECT_ICON_KEYS)[number])
+          }
+        >
           {iconOptions.map(key => (
             <option key={key} value={key}>
               {key}
@@ -316,7 +321,7 @@ export function SubjectsAdminPanel({ lang }: { lang: Lang }) {
         className="gold-button"
         disabled={!slug || !titleAr || !titleFr || !titleEn || create.isPending}
         onClick={() =>
-          create.mutate({ slug, icon: icon as any, titleAr, titleFr, titleEn })
+          create.mutate({ slug, icon, titleAr, titleFr, titleEn })
         }
       >
         {lang === "ar"

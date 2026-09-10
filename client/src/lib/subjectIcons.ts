@@ -16,7 +16,7 @@ import {
  * lucide-react component. New subjects an admin adds only need to pick one
  * of these keys — no code/UI change needed to support the new subject.
  */
-const SUBJECT_ICONS: Record<string, LucideIcon> = {
+const SUBJECT_ICONS = {
   sigma: Sigma,
   code: Code2,
   flask: FlaskConical,
@@ -26,10 +26,12 @@ const SUBJECT_ICONS: Record<string, LucideIcon> = {
   music: Music,
   palette: Palette,
   book: BookOpen,
-};
+} satisfies Record<string, LucideIcon>;
 
 export function subjectIcon(iconKey: string | undefined | null): LucideIcon {
-  return (iconKey && SUBJECT_ICONS[iconKey]) || BookOpen;
+  return (iconKey && SUBJECT_ICONS[iconKey as keyof typeof SUBJECT_ICONS]) || BookOpen;
 }
 
-export const SUBJECT_ICON_KEYS = Object.keys(SUBJECT_ICONS);
+export const SUBJECT_ICON_KEYS = Object.keys(SUBJECT_ICONS) as Array<
+  keyof typeof SUBJECT_ICONS
+>;

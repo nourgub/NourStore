@@ -134,6 +134,12 @@ createRoot(document.getElementById("root")!).render(
 // instead of silently swapping the app under the person while they're using
 // it. Clicking "update" calls window.__nourixApplyUpdate(), which tells the
 // waiting worker to take over and reloads once it does.
+declare global {
+  interface Window {
+    __nourixApplyUpdate?: () => void;
+  }
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
@@ -159,7 +165,7 @@ if ("serviceWorker" in navigator) {
           });
         });
 
-        (window as any).__nourixApplyUpdate = () => {
+        window.__nourixApplyUpdate = () => {
           if (!registration.waiting) return;
           registration.waiting.postMessage("SKIP_WAITING");
         };

@@ -71,7 +71,7 @@ export default function RoleOnboardingModal() {
   });
 
   // Only ever renders for an authenticated user who genuinely hasn't chosen yet.
-  if (!user || (user as any).roleChosenAt) return null;
+  if (!user || user.roleChosenAt) return null;
 
   const options: {
     role: Role;
