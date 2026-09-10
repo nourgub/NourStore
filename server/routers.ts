@@ -178,148 +178,18 @@ import {
 } from "./_core/procedures";
 import { diagnosticsRouter } from "./routers/diagnostics";
 import { authRouter } from "./routers/auth";
+import { learningRouter } from "./routers/learning";
+import { algorithmLabRouter } from "./routers/algorithmLab";
+import { learnerRouter } from "./routers/learner";
+import { parentRouter } from "./routers/parent";
 
 export const appRouter = router({
   diagnostics: diagnosticsRouter,
   auth: authRouter,
-  learning: router({
-    courses: publicProcedure.query(() => getPublishedCourses()),
-    search: publicProcedure
-      .input(
-        z.object({
-          query: z.string().trim().min(2).max(80),
-          level: z
-            .enum([
-              "starter",
-              "foundation",
-              "intermediate",
-              "advanced",
-              "exam",
-              "professional",
-            ])
-            .optional(),
-          subject: z.string().min(1).max(40).optional(),
-          limit: z.number().int().min(1).max(30).default(10),
-        })
-      )
-      .query(({ input }) => searchLearningContent(input)),
-    course: publicProcedure
-      .input(z.object({ slug: z.string().min(1).max(160) }))
-      .query(({ ctx, input }) =>
-        getCourseWithCurriculum(
-          input.slug,
-          ctx.user ? { id: ctx.user.id, role: ctx.user.role } : null
-        )
-      ),
-    lessonAssets: protectedProcedure
-      .input(z.object({ lessonId: z.number().int().positive() }))
-      .query(({ ctx, input }) => getLessonAssets(input.lessonId, ctx.user.id)),
-    // Full lesson content (video/text/live link/attachments) — gated behind
-    // enrollment + published + (free course or active subscription), and
-    // reports server-enforced sequencing (locked) rather than trusting the client.
-    lesson: protectedProcedure
-      .input(z.object({ lessonId: z.number().int().positive() }))
-      .query(({ ctx, input }) =>
-        getLessonForLearner(input.lessonId, ctx.user.id)
-      ),
-    algorithmExercise: publicProcedure
-      .input(z.object({ slug: z.string().min(1).max(160) }))
-      .query(({ input }) => getAlgorithmExerciseBySlug(input.slug)),
-    algorithmExercises: publicProcedure.query(() =>
-      getPublishedAlgorithmExercises()
-    ),
-    subjects: publicProcedure.query(() => getActiveSubjects()),
-    badges: publicProcedure.query(() => getAllBadges()),
-  }),
-  algorithmLab: router({
-    // The learner's code is actually executed here, server-side, against the
-    // exercise's real test cases (shared/pseudocodeInterpreter.ts) — the
-    // server computes status/passedTests/totalTests itself and never trusts
-    // a client-submitted grade (a client-trusted grade would let anyone
-    // fake a "passed" result via a raw API call, no code required).
-    submitAttempt: protectedProcedure
-      .use(rateLimit("algo-attempt", 30, 60 * 60 * 1000))
-      .input(
-        z.object({
-          exerciseId: z.number().int().positive(),
-          code: z.string().min(1).max(20000),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const exercise = await getAlgorithmExerciseById(input.exerciseId);
-        if (!exercise || exercise.isPublished !== 1) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Exercise not found" });
-        }
-        const graded = gradeAlgorithmAttempt(exercise, input.code);
-        await saveAlgorithmAttempt({
-          exerciseId: input.exerciseId,
-          userId: ctx.user.id,
-          code: input.code,
-          status: graded.status,
-          passedTests: graded.passedTests,
-          totalTests: graded.totalTests,
-          feedbackJson: JSON.stringify(graded.feedback),
-        });
-        return graded;
-      }),
-    myAttempts: protectedProcedure
-      .input(z.object({ exerciseId: z.number().int().positive().optional() }))
-      .query(({ ctx, input }) =>
-        getAlgorithmAttemptsForUser(ctx.user.id, input.exerciseId)
-      ),
-  }),
-  learner: router({
-    createInvite: learnerProcedure
-      .use(rateLimit("parent-invite-create", 5, 60 * 60 * 1000))
-      .mutation(({ ctx }) => createParentInvite(ctx.user.id)),
-    cancelInvite: learnerProcedure
-      .input(z.object({ inviteId: z.number().int().positive() }))
-      .mutation(({ ctx, input }) =>
-        cancelParentInvite({
-          inviteId: input.inviteId,
-          requesterId: ctx.user.id,
-          role: ctx.user.role,
-        })
-      ),
-    myReports: learnerProcedure.query(({ ctx }) =>
-      getReportsForLearner(ctx.user.id)
-    ),
-  }),
-  parent: router({
-    links: parentProcedure.query(({ ctx }) => getParentLinks(ctx.user.id)),
-    dashboard: parentProcedure.query(({ ctx }) =>
-      getParentDashboard(ctx.user.id)
-    ),
-    reports: parentProcedure.query(({ ctx }) => getReportsForParent(ctx.user.id)),
-    createInvite: adminProcedure
-      .input(z.object({ childId: z.number().int().positive() }))
-      .mutation(async ({ input }) => {
-        const invite = await createParentInvite(input.childId);
-        if (!invite)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Child account not found",
-          });
-        return invite;
-      }),
-    // Restricted to role=parent (or admin), matching the brief exactly: any other
-    // authenticated role must not be able to accept a parent invite.
-    acceptInvite: parentProcedure
-      .use(rateLimit("parent-invite-accept", 10, 60 * 60 * 1000))
-      .input(z.object({ code: z.string().min(6).max(32) }))
-      .mutation(({ ctx, input }) =>
-        acceptParentInvite(ctx.user.id, input.code)
-      ),
-    unlink: protectedProcedure
-      .input(z.object({ linkId: z.number().int().positive() }))
-      .mutation(({ ctx, input }) =>
-        unlinkParent({
-          linkId: input.linkId,
-          requesterId: ctx.user.id,
-          role: ctx.user.role,
-        })
-      ),
-  }),
+  learning: learningRouter,
+  algorithmLab: algorithmLabRouter,
+  learner: learnerRouter,
+  parent: parentRouter,
   platform: router({
     whatsapp: publicProcedure.query(async () => {
       const value = await getPlatformSetting("whatsapp_number");
