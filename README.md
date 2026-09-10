@@ -66,6 +66,7 @@ npm run dev                   # http://localhost:3000
 | `npm test` | Run the whole test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
 | `npm run test:unit` | Run only the fast, database-free tests — always safe, no infra needed |
 | `npm run test:db` | Run only `server/realDb.e2e.test.ts` against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:db:repeat [count]` | Run `test:db` `count` times (default 5), stopping at the first failure — checks for flakiness, not just a single pass |
 | `npm run test:all` | Same as `npm test` — both names exist so either convention works |
 | `npm run migrate` | Apply every not-yet-applied migration in `drizzle/*.sql` |
 | `npm run format` | Prettier, writes in place |
@@ -96,18 +97,38 @@ migration applied, and to clean up every row it creates:
 DATABASE_URL="mysql://user:pass@localhost:3306/nourix_academy" JWT_SECRET=... npm run test:db
 ```
 
+**Stability**: `npm run test:unit` never touches a database and is always
+safe to run anywhere. `npm run test:db` only runs `realDb.e2e.test.ts`
+against whatever `DATABASE_URL` points at — never point it at a production
+database. To check for intermittent (timing-dependent) failures rather than
+trusting a single green run, `npm run test:db:repeat [count]` (default 5)
+reruns it that many times and stops at the first failure. An earlier
+hardening pass (see `PRELAUNCH_CHECKLIST.md`) once documented an
+intermittent failure in `feature.contracts.test.ts` when the full suite ran
+in parallel against a real `DATABASE_URL`; 14 repeated attempts to reproduce
+it (documented in `docs/verification-history.md`) found nothing, but that
+isn't proof it can never recur — if you see it, check that file's header
+comment for the two most likely causes.
+
 ## Project structure
 
 ```
 client/src/
   pages/            top-level routed pages
-  pages/flows/       the teacher/admin/institution/parent panels (StaffFlows.tsx,
-                     LearnerFlows.tsx) and their shared Shell/i18n (shared.tsx)
+  pages/flows/       StaffFlows.tsx (StaffSpace/InstitutionSpace — the tab shell and
+                     course-authoring state) and LearnerFlows.tsx (learner/parent
+                     panels), plus their shared Shell/i18n (shared.tsx)
+  pages/flows/staff/ the ~20 admin/teacher sub-panels StaffFlows.tsx composes, one
+                     domain per file (CourseManagement, UserManagement, Billing-
+                     Management, ...) — see staff/ for the full list
   components/        shared UI components
   _core/             auth hook, trpc client setup
   lib/               small focused utilities (language, subject icons, document meta)
 server/
-  routers.ts          the whole tRPC API surface — large, see "Known limitations" below
+  routers.ts          composes appRouter from the 19 domain routers below — ~40 lines
+  routers/            one file per domain (admin, content, teacher, payments, ...),
+                      each exporting a single xRouter; shared procedure builders
+                      (adminProcedure, teacherProcedure, ...) live in _core/procedures.ts
   db/                 one file per domain (courses, subscriptions, quizzes, users, ...)
   _core/              env config, session/cookies, Google OAuth, Express wiring
   *Provider.ts         payment provider integrations (baridimob, slickpay)
@@ -125,13 +146,16 @@ scripts/
   conventionally use email (password reset, notifications) is deliberately
   WhatsApp- or admin-mediated instead. See `adminResetPassword` for the
   account-recovery path.
-- **`server/routers.ts` and `client/src/pages/flows/StaffFlows.tsx` are
-  large, single files** (2500+ and 4800+ lines respectively). They work
-  and are fully tested, but splitting them into per-domain modules is a
-  real, deliberately-deferred piece of maintenance work — large and risky
-  enough that it wasn't attempted as a drive-by change alongside feature
-  work. See `REBRANDING.md` for an unrelated but similarly-scoped example
-  of "here's exactly what's involved" documentation.
+- **`server/routers.ts` and `client/src/pages/flows/StaffFlows.tsx` have
+  been split.** `routers.ts` is now a ~40-line composition file importing
+  19 domain routers from `server/routers/`; `StaffFlows.tsx` is down to
+  ~1000 lines (`StaffSpace`/`InstitutionSpace` — the tab shell and course-
+  authoring state) with its ~20 admin/teacher sub-panels split into
+  `client/src/pages/flows/staff/`. A few other files are still large and
+  single-purpose enough that splitting them wasn't judged worth the risk:
+  `server/db/courses.ts` (~1570 lines), `client/src/pages/Dashboard.tsx`
+  (~1150), `client/src/pages/Home.tsx` (~1000) — see `docs/current-status.md`
+  for the current, up-to-date sizes.
 - **No real payment gateway is live.** BaridiMob and SlickPay both need
   real credentials from their respective providers before they do anything
   beyond reporting themselves honestly as "not configured" — see

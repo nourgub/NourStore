@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/realDb.e2e.test.ts'",
     "test:db": "vitest run server/realDb.e2e.test.ts",
+    "test:db:repeat": "node scripts/test-db-repeat.mjs",
     "test:all": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "migrate": "node scripts/migrate.mjs"
