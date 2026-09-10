@@ -167,53 +167,15 @@ import { ENV } from "./_core/env";
 import { initiateBaridimobCheckout } from "./baridimobProvider";
 import { initiateSlickpayCheckout } from "./slickpayProvider";
 import { remindStaleCheckoutSessions } from "./whatsappBot";
-
-const roleProcedure = (
-  roles: Array<"learner" | "parent" | "teacher" | "institution" | "admin">,
-  message: string
-) =>
-  protectedProcedure.use(({ ctx, next }) => {
-    if (!roles.includes(ctx.user.role))
-      throw new TRPCError({ code: "FORBIDDEN", message });
-    return next();
-  });
-const adminProcedure = roleProcedure(["admin"], "Admin access required");
-const parentProcedure = roleProcedure(
-  ["parent", "admin"],
-  "Parent access required"
-);
-const teacherProcedure = roleProcedure(
-  ["teacher", "admin"],
-  "Teacher access required"
-);
-const institutionProcedure = roleProcedure(
-  ["institution", "admin"],
-  "Institution access required"
-);
-const learnerProcedure = roleProcedure(
-  ["learner", "admin"],
-  "Learner access required"
-);
-
-/** Per-user rate-limit guard, chainable onto any procedure that already has ctx.user (i.e. after protectedProcedure/roleProcedure). */
-type RateLimitMiddleware = Parameters<typeof protectedProcedure.use>[0];
-const rateLimit = (
-  name: string,
-  max: number,
-  windowMs: number
-): RateLimitMiddleware =>
-  (async (opts: {
-    ctx: { user: { id: number } };
-    next: () => unknown;
-  }) => {
-    if (!(await checkRateLimit(`${name}:${opts.ctx.user.id}`, max, windowMs))) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Too many requests, please try again later",
-      });
-    }
-    return opts.next();
-  }) as unknown as RateLimitMiddleware;
+import {
+  roleProcedure,
+  adminProcedure,
+  parentProcedure,
+  teacherProcedure,
+  institutionProcedure,
+  learnerProcedure,
+  rateLimit,
+} from "./_core/procedures";
 
 export const appRouter = router({
   diagnostics: router({
