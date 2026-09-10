@@ -17,7 +17,7 @@
 > `DB_DRIVER` nulle part dans le dépôt ; la couche base de données
 > (`server/db/shared.ts`) ne supporte que MySQL. Toute section plus bas
 > mentionnant `DB_DRIVER=sqlite` doit être ignorée. Voir
-> `PHASE1_STATUS.md` à la racine du projet pour l'état réel et vérifié.
+> `docs/archive/PHASE1_STATUS.md` à la racine du projet pour l'état réel et vérifié.
 
 Le projet WebDev permanent `nourix-academy-permanent` était initialement configuré avec le serveur full-stack, Manus OAuth, la base MySQL/TiDB gérée et le stockage compatible S3 du template. La dernière révision visuelle supprime la rotation des cartes et badges, et impose une typographie droite pour améliorer la lisibilité arabe et latine. Le nom **NouriX Academy** est conservé et la page publique de vérification des certificats reste accessible sans authentification.
 
@@ -241,7 +241,7 @@ créer.
    enregistrées comme déjà appliquées sans ré-exécuter leur SQL — sûr sur
    un déploiement déjà en production) ; et ajout d'une nouvelle migration
    sur une base déjà à jour (seule la nouvelle s'applique). Voir
-   `PHASE4_STATUS.md` et `PRELAUNCH_CHECKLIST.md` pour l'historique
+   `docs/archive/PHASE4_STATUS.md` et `PRELAUNCH_CHECKLIST.md` pour l'historique
    complet de ce correctif.
 
 ## Sauvegarde et restauration réelles de la base de données
@@ -335,7 +335,7 @@ Cloudflare R2, Backblaze B2 — voir les variables `S3_*` dans
 وحتى "ثغرة أمنية حقيقية اكتُشفت وأُصلحت". **لا وجود لأي من هذا في الكود
 الفعلي** — لا `server/db.sqlite.ts`، ولا أي قراءة لـ`DB_DRIVER` في كامل
 المشروع. طبقة قاعدة البيانات تدعم MySQL فقط. حُذف النص الأصلي (كان
-~30 سطرًا). راجع `PHASE1_STATUS.md` لتفاصيل هذا التصحيح الأصلي — كان قد
+~30 سطرًا). راجع `docs/archive/PHASE1_STATUS.md` لتفاصيل هذا التصحيح الأصلي — كان قد
 أُصلح في `AUDIT.md` لكن نُسي هذا القسم المطابق في هذا الملف حتى الآن.
 
 ## Déploiement (historique : dépendait de Manus, maintenant retiré)

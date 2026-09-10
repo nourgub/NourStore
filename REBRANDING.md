@@ -97,9 +97,10 @@ nothing else needs to change):
 
 These are working documents written during development, not something an
 end user or your own customers will ever see:
-`AUDIT.md`, `DEPLOYMENT.md`, `IMPLEMENTATION.md`, `PHASE1_STATUS.md`,
-`PHASE3_STATUS.md`, `PHASE_VISUAL_AUDIT.md`, `PRELAUNCH_CHECKLIST.md`,
-`todo.md`, `template.json`, `.project-config.json`.
+`DEPLOYMENT.md`, `PRELAUNCH_CHECKLIST.md`, `template.json`,
+`.project-config.json`, and everything under `docs/archive/` (`AUDIT.md`,
+`IMPLEMENTATION.md`, `PHASE1_STATUS.md`, `PHASE3_STATUS.md`,
+`PHASE_VISUAL_AUDIT.md`, `todo.md`, and the rest).
 
 You do not need to edit these for the product to work under a new brand —
 they're historical engineering logs describing what was built and why,
