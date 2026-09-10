@@ -1735,6 +1735,7 @@ function AdminUsersPanel({ lang }: { lang: Lang }) {
   const activateUser = trpc.admin.activateUser.useMutation({
     onSuccess: () => users.refetch(),
   });
+  const resetPassword = trpc.admin.resetPassword.useMutation();
   const statusLabel = (status: string) => {
     if (status === "pending")
       return lang === "ar" ? "بانتظار التفعيل" : "Pending activation";
@@ -1814,6 +1815,34 @@ function AdminUsersPanel({ lang }: { lang: Lang }) {
                 }
               >
                 {lang === "ar" ? "إعادة تفعيل" : "Reactivate"}
+              </Button>
+            )}
+            {item.loginMethod === "email" && (
+              <Button
+                className="table-action"
+                disabled={resetPassword.isPending}
+                onClick={() => {
+                  const newPassword = window.prompt(
+                    lang === "ar"
+                      ? "كلمة السر الجديدة لهذا الحساب (8 أحرف على الأقل، حروف وأرقام) — أرسليها للمستخدم عبر واتساب بعد الحفظ"
+                      : "New password for this account (min 8 chars, letters and numbers) — relay it to the user via WhatsApp after saving"
+                  );
+                  if (!newPassword) return;
+                  resetPassword.mutate(
+                    { userId: item.id, newPassword },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          lang === "ar"
+                            ? "تم تغيير كلمة السر — أرسليها الآن للمستخدم."
+                            : "Password changed — relay it to the user now."
+                        ),
+                      onError: error => toast.error(error.message),
+                    }
+                  );
+                }}
+              >
+                {lang === "ar" ? "إعادة تعيين كلمة السر" : "Reset password"}
               </Button>
             )}
           </div>

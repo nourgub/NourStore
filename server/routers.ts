@@ -74,6 +74,7 @@ import {
   getAllUsers,
   toPublicUser,
   updateUserRole,
+  adminResetPassword,
   createManagedUser,
   setAccountStatus,
   getStudentsForTeacher,
@@ -2105,6 +2106,40 @@ export const appRouter = router({
           targetId: input.userId,
           details: { newRole: input.role, succeeded: result },
         });
+        return result;
+      }),
+    // The platform's only account-recovery path — no outbound email
+    // infrastructure exists to power a self-service "reset link" flow (see
+    // adminResetPassword's own comment). An admin sets a new password
+    // directly and relays it to the learner via WhatsApp/the existing
+    // support channel.
+    resetPassword: adminProcedure
+      .use(rateLimit("admin-reset-password", 30, 60 * 60 * 1000))
+      .input(
+        z.object({
+          userId: z.number().int().positive(),
+          newPassword: z.string().min(1).max(200),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const strength = validatePasswordStrength(input.newPassword);
+        if (!strength.ok)
+          throw new TRPCError({ code: "BAD_REQUEST", message: strength.reason });
+        const passwordHash = await hashPassword(input.newPassword);
+        const result = await adminResetPassword(input.userId, passwordHash);
+        await logAdminAction({
+          actorId: ctx.user.id,
+          action: "reset_password",
+          targetType: "user",
+          targetId: input.userId,
+          details: { succeeded: result.ok },
+        });
+        if (!result.ok)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "This account doesn't sign in with a password (not an email/password account).",
+          });
         return result;
       }),
     // Admin-created account — distinct from self-service auth.registerWithEmail.

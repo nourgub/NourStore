@@ -215,6 +215,7 @@ export async function getAllUsers() {
       email: users.email,
       role: users.role,
       accountStatus: users.accountStatus,
+      loginMethod: users.loginMethod,
       createdAt: users.createdAt,
       lastSignedIn: users.lastSignedIn,
     })
@@ -248,6 +249,37 @@ export async function updateUserRole(
   return (result as { affectedRows?: number }).affectedRows
     ? (result as { affectedRows?: number }).affectedRows! > 0
     : false;
+}
+
+/**
+ * The only account-recovery path this platform has: there's no outbound
+ * email infrastructure anywhere in this codebase (every other flow —
+ * payment confirmation, support — is deliberately WhatsApp/admin-mediated
+ * instead), so a self-service "email me a reset link" flow isn't something
+ * that can work today without adding a new external email dependency. An
+ * admin sets a new password directly here and relays it to the learner
+ * through the platform's existing contact channel (WhatsApp) — same
+ * "manual review is the bottleneck, not silently broken" posture already
+ * used for payment approval.
+ */
+export async function adminResetPassword(
+  userId: number,
+  newPasswordHash: string
+): Promise<{ ok: true } | { ok: false; reason: "not_email_account" }> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: "not_email_account" };
+  const rows = await db
+    .select({ loginMethod: users.loginMethod })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (rows[0]?.loginMethod !== "email")
+    return { ok: false, reason: "not_email_account" };
+  await db
+    .update(users)
+    .set({ passwordHash: newPasswordHash })
+    .where(eq(users.id, userId));
+  return { ok: true };
 }
 
 export async function chooseOwnRole(
