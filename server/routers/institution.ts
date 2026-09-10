@@ -7,6 +7,6 @@ export const institutionRouter = router({
     getCoursesForRole(ctx.user.role, ctx.user.id)
   ),
   learnerCount: institutionProcedure.query(({ ctx }) =>
-    getManagedLearnerCount(ctx.user.role)
+    getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
 });

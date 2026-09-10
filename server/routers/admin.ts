@@ -49,7 +49,7 @@ export const adminRouter = router({
   systemStatus: adminProcedure.query(() => getRateLimitStatus()),
   courses: adminProcedure.query(() => getAllCourses()),
   learnerCount: adminProcedure.query(({ ctx }) =>
-    getManagedLearnerCount(ctx.user.role)
+    getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
   placementTests: adminProcedure.query(() => getPlacementTestsForAdmin()),
   createPlacementTest: adminProcedure

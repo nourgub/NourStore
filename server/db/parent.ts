@@ -251,12 +251,15 @@ export async function getParentDashboard(parentId: number) {
 }
 
 export async function getManagedLearnerCount(
-  role: "learner" | "parent" | "teacher" | "institution" | "admin"
+  role: "learner" | "parent" | "teacher" | "institution" | "admin",
+  userId: number
 ) {
   const db = await getDb();
-  if (!db || role !== "admin") return null;
+  if (!db) return null;
   const rows = await db
     .select({ userId: courseEnrollments.userId })
-    .from(courseEnrollments);
+    .from(courseEnrollments)
+    .innerJoin(courses, eq(courses.id, courseEnrollments.courseId))
+    .where(role === "admin" ? undefined : eq(courses.ownerId, userId));
   return new Set(rows.map(row => row.userId)).size;
 }

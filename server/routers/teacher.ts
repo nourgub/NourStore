@@ -19,7 +19,7 @@ export const teacherRouter = router({
     getCoursesForRole(ctx.user.role, ctx.user.id)
   ),
   learnerCount: teacherProcedure.query(({ ctx }) =>
-    getManagedLearnerCount(ctx.user.role)
+    getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
   myStudents: teacherProcedure.query(({ ctx }) =>
     getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "institution" | "admin")
