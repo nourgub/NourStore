@@ -19,6 +19,24 @@ frozen historical record and is never updated after the fact.
   StaffFlows.tsx` (was 4800+ lines) are now split into per-domain modules
   under `server/routers/` and `client/src/pages/flows/staff/` — both down
   to ~1000 lines or less, verified with a byte-identical production build.
+- Security/permissions audit (every `adminProcedure`, ownership isolation
+  for courses/units/lessons/quizzes, student/parent/support/notification/
+  certificate data isolation, file access, sensitive-field leakage, SQL
+  injection, webhook signature verification, rate limiting) found no
+  critical or high-severity issues — the codebase already re-derives
+  ownership from the session on essentially every access path rather than
+  trusting client-supplied IDs.
+- Mobile/RTL review: actually ran the app in a real headless browser
+  (local Chromium, no external service) at 390/600/768/1280px, in
+  Arabic/French/English, logged in as admin/teacher/learner — found and
+  fixed real horizontal-overflow bugs (a filter row, and three compounding
+  causes across the whole admin/teacher dashboard), plus a completely
+  unlocalized 404 page. 0px overflow confirmed on every page/viewport/
+  language combination checked afterward.
+- Dependency/dead-code cleanup: removed 4 npm packages with zero imports
+  anywhere in the repo, an orphaned unrelated-platform debug-collector
+  script that was silently served in every build, and 5 of 9 non-test
+  `any`-typed casts (replaced with real types, not just deleted).
 - The live deployment is currently down: the managed MySQL database (Aiven)
   backing the last deploy was torn down (likely a free-trial expiry) and
   hasn't been replaced. Deliberately deferred by the project owner to a
@@ -40,10 +58,14 @@ deliberately-scoped-out engineering work:
    gone; a replacement (managed provider or the self-hosted
    `docker-compose.yml` stack) needs a real account/server the project
    owner controls.
-4. **Performance**: Lighthouse ~66/100 (accessibility is 100/100). The
-   main lever is deeper code-splitting of the shared vendor JS bundle — see
-   `docs/archive/PHASE_VISUAL_AUDIT.md` for why this wasn't attempted
-   alongside other work.
+4. **Performance**: Lighthouse ~66/100 (accessibility is 100/100). Route-
+   level code splitting, hashed-filename immutable caching, and React
+   Query's staleTime were all already solid on inspection — the main
+   remaining lever is deeper code-splitting of the shared vendor JS bundle
+   itself (~451KB raw / ~139KB gzip, mostly React/ReactDOM/query/trpc/the
+   eagerly-loaded landing page), which needs restructuring what's eagerly
+   vs. lazily loaded on Home.tsx rather than a drive-by change — see
+   `docs/archive/PHASE_VISUAL_AUDIT.md` for earlier context.
 5. **No real Web Push notifications, no external cron trigger wired up
    yet** — both have real, working code paths (`/api/scheduled/*`
    endpoints, in-app notifications) that need an external scheduler or a
