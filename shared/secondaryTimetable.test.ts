@@ -786,6 +786,44 @@ describe("rule 10: the ministerial weekly load per subject", () => {
     expect(codes(violations)).toContain("unknown_subject");
   });
 
+  it("covers the three secondary levels, 2AS included", () => {
+    const levels = new Set(SECONDARY_STREAM_TEMPLATES.map(t => t.level));
+    expect(levels).toEqual(new Set(["1AS", "2AS", "3AS"]));
+    // A school runs all six streams in 2AS as it does in 3AS.
+    const streamsOf = (level: string) =>
+      SECONDARY_STREAM_TEMPLATES.filter(t => t.level === level).map(t =>
+        t.id.replace(/^\dAS-/, "")
+      );
+    expect(new Set(streamsOf("2AS"))).toEqual(new Set(streamsOf("3AS")));
+  });
+
+  it("builds a timetable for every stream of every level", () => {
+    for (const template of SECONDARY_STREAM_TEMPLATES) {
+      const section: Section = {
+        id: template.id,
+        label: template.nameAr,
+        level: template.level,
+        stream: template.id,
+        requirements: template.subjects.map(subject => ({ ...subject })),
+      };
+      const teachers: Teacher[] = template.subjects.map(subject => ({
+        id: subject.subjectId,
+        name: `أستاذ ${subject.nameAr}`,
+        rank: "standard",
+        subjectIds: [subject.subjectId],
+      }));
+      const outcome = generateTimetable({
+        sections: [section],
+        teachers,
+        options: { seed: 3 },
+      });
+      expect(outcome.assignmentProblems).toEqual([]);
+      expect(outcome.unplaced).toEqual([]);
+      expect(hardViolations(outcome.violations)).toEqual([]);
+      expect(outcome.stats.placedHours).toBe(outcome.stats.requiredHours);
+    }
+  });
+
   it("keeps every stream template internally coherent", () => {
     for (const template of SECONDARY_STREAM_TEMPLATES) {
       const total = templateWeeklyTotal(template);

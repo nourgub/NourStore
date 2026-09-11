@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  FileSpreadsheet,
   Info,
   LogIn,
   Plus,
@@ -176,6 +177,23 @@ export default function Timetable() {
   const weekCapacity =
     grid.days.length * (grid.morningSlots + grid.afternoonSlots);
 
+  /** The timetable exactly as the screen has it, in the engine's shape. */
+  const currentConfig = () => ({
+    grid: {
+      morningSlots: grid.morningSlots,
+      afternoonSlots: grid.afternoonSlots,
+      morningStart: grid.morningStart,
+      afternoonStart: grid.afternoonStart,
+    },
+    sections,
+    teachers,
+    pedagogicalDays: Object.fromEntries(
+      Array.from(subjectsInPlay.keys())
+        .map(subjectId => [subjectId, dayOf(subjectId)])
+        .filter(([, day]) => Boolean(day)) as Array<[string, WorkingDay]>
+    ),
+  });
+
   const generate = trpc.timetable.generate.useMutation({
     onSuccess: data => {
       setOutcome({
@@ -227,6 +245,33 @@ export default function Timetable() {
     },
     onError: () => toast.error("تعذر حذف الجدول."),
   });
+
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * The workbook is built on the server from the SAVED timetable, so the
+   * export saves first: otherwise the file a school prints would not be
+   * the week on the screen.
+   */
+  const exportExcel = async () => {
+    if (!outcome) return;
+    setExporting(true);
+    try {
+      const { id } = await save.mutateAsync({
+        id: savedId ?? undefined,
+        name,
+        schoolYear,
+        status,
+        config: currentConfig(),
+        sessions: outcome.sessions,
+      });
+      window.location.href = `/api/timetables/${id}/xlsx`;
+    } catch {
+      toast.error("تعذر تصدير ملف Excel.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const utils = trpc.useUtils();
 
@@ -949,25 +994,7 @@ export default function Timetable() {
                 disabled={
                   !sections.length || !teachers.length || generate.isPending
                 }
-                onClick={() =>
-                  generate.mutate({
-                    grid: {
-                      morningSlots: grid.morningSlots,
-                      afternoonSlots: grid.afternoonSlots,
-                      morningStart: grid.morningStart,
-                      afternoonStart: grid.afternoonStart,
-                    },
-                    sections,
-                    teachers,
-                    pedagogicalDays: Object.fromEntries(
-                      Array.from(subjectsInPlay.keys())
-                        .map(subjectId => [subjectId, dayOf(subjectId)])
-                        .filter(([, day]) => Boolean(day)) as Array<
-                        [string, WorkingDay]
-                      >
-                    ),
-                  })
-                }
+                onClick={() => generate.mutate(currentConfig())}
               >
                 <Wand2 size={15} />
                 {generate.isPending ? "جارٍ الإنجاز…" : "إنجاز الجدول"}
@@ -983,28 +1010,21 @@ export default function Timetable() {
                     name,
                     schoolYear,
                     status,
-                    config: {
-                      grid: {
-                        morningSlots: grid.morningSlots,
-                        afternoonSlots: grid.afternoonSlots,
-                        morningStart: grid.morningStart,
-                        afternoonStart: grid.afternoonStart,
-                      },
-                      sections,
-                      teachers,
-                      pedagogicalDays: Object.fromEntries(
-                        Array.from(subjectsInPlay.keys())
-                          .map(subjectId => [subjectId, dayOf(subjectId)])
-                          .filter(([, day]) => Boolean(day)) as Array<
-                          [string, WorkingDay]
-                        >
-                      ),
-                    },
+                    config: currentConfig(),
                     sessions: outcome.sessions,
                   })
                 }
               >
                 <Save size={15} /> حفظ
+              </Button>
+              <Button
+                variant="ghost"
+                className="quiet-button"
+                disabled={!outcome || exporting}
+                onClick={exportExcel}
+              >
+                <FileSpreadsheet size={15} />
+                {exporting ? "جارٍ التصدير…" : "تصدير Excel"}
               </Button>
               <Button
                 variant="ghost"

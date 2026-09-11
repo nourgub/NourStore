@@ -8,6 +8,7 @@ import { registerGoogleCalendarRoutes } from "./googleCalendar";
 import { registerProtectedFileRoutes } from "../protectedFiles";
 import { registerSitemap } from "../sitemap";
 import { registerCertificateDownload } from "../certificateDownload";
+import { registerTimetableDownload } from "../timetableDownload";
 import { registerPaymentWebhooks } from "../paymentsWebhook";
 import { registerWhatsAppWebhook } from "../whatsappWebhook";
 import { registerScheduledJobRoutes } from "../scheduledJobs";
@@ -77,6 +78,7 @@ async function startServer() {
   registerProtectedFileRoutes(app);
   registerSitemap(app);
   registerCertificateDownload(app);
+  registerTimetableDownload(app);
   registerPaymentWebhooks(app);
   registerWhatsAppWebhook(app);
   registerScheduledJobRoutes(app);
