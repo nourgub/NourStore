@@ -1,5 +1,5 @@
 // Real, reusable static-analysis check — not a one-off audit note. Run it
-// any time server/routers.ts changes:
+// any time a file under server/routers/ changes:
 //
 //   npx tsx scripts/audit-endpoint-ownership.ts
 //
@@ -15,18 +15,42 @@
 // the class of mistake that's easy to introduce by accident (copy a
 // procedure, forget to wire ctx.user through) and easy to catch this way.
 //
+// Scans every file directly under server/routers/ (the actual 19 domain
+// routers) — NOT server/routers.ts itself, which has been a ~40-line
+// composition/barrel file importing those 19 files for a while now and
+// contains no procedure declarations of its own. Scanning only that
+// barrel silently found (and reported success on) zero procedures — a
+// real bug in this script itself, caught while re-verifying it for this
+// pass, not a new regression from this session's own file splits.
+//
 // Exits with a non-zero code and a clear report when it finds anything —
 // safe to wire into CI once this project has one.
 
 import fs from "fs";
 import path from "path";
 
-const ROUTERS_PATH = path.resolve(import.meta.dirname, "../server/routers.ts");
+const ROUTERS_DIR = path.resolve(import.meta.dirname, "../server/routers");
 
-type Finding = { line: number; name: string; kind: string };
+type Finding = { file: string; line: number; name: string; kind: string };
+
+// Matches the start of ANY router-key procedure declaration, regardless of
+// which builder it uses — used only to find where the CURRENT procedure's
+// block ends. Scoping the end boundary to "the next match of the same
+// family" (the original version of this script) undercounts: a file that
+// mixes e.g. one publicProcedure between two protectedProcedures leaves the
+// first protectedProcedure's block running all the way into the second
+// one's body, or — worse, at the end of a family's matches in a file — the
+// arbitrary 40-line fallback can cut a real handler off before it ever
+// reaches its own ctx.user reference, exactly as it did for
+// placement.ts's `submit` (ctx.user.id is used, just past line 40 of that
+// procedure) until this was fixed.
+const ANY_PROCEDURE_START =
+  /^\s+\w+:\s*(protectedProcedure|publicProcedure|adminProcedure|roleProcedure|learnerProcedure|parentProcedure|teacherProcedure|institutionProcedure)\b/;
 
 function scanFamily(
+  file: string,
   lines: string[],
+  allStarts: number[],
   declPattern: RegExp,
   extraFilter?: (groups: RegExpMatchArray) => boolean
 ): { scanned: number; findings: Finding[] } {
@@ -38,17 +62,16 @@ function scanFamily(
   });
 
   const findings: Finding[] = [];
-  starts.forEach((start, idx) => {
+  starts.forEach(start => {
     if (extraFilter && !extraFilter(start.match)) return;
-    const endIndex =
-      idx + 1 < starts.length
-        ? starts[idx + 1].lineIndex
-        : Math.min(start.lineIndex + 40, lines.length);
+    const nextAnyStart = allStarts.find(i => i > start.lineIndex);
+    const endIndex = nextAnyStart ?? lines.length;
     const block = lines.slice(start.lineIndex, endIndex).join("\n");
     const hasIdInput = /\w*[Ii]d:\s*z\.number/.test(block);
     const usesCtxUser = block.includes("ctx.user");
     if (hasIdInput && !usesCtxUser) {
       findings.push({
+        file,
         line: start.lineIndex + 1,
         name: start.name,
         kind: start.match[2],
@@ -59,26 +82,49 @@ function scanFamily(
 }
 
 function main() {
-  const source = fs.readFileSync(ROUTERS_PATH, "utf-8");
-  const lines = source.split("\n");
+  const files = fs
+    .readdirSync(ROUTERS_DIR)
+    .filter(f => f.endsWith(".ts"))
+    .sort();
 
-  const learnerFamily = scanFamily(
-    lines,
-    /^\s+(\w+):\s*(protectedProcedure|learnerProcedure|parentProcedure)\b/
-  );
-  const authoringFamily = scanFamily(
-    lines,
-    /^\s+(\w+):\s*(roleProcedure)\s*\(\s*\[([^\]]+)\]/,
-    m => m[3].includes("teacher") || m[3].includes("institution")
-  );
+  let learnerScanned = 0;
+  let authoringScanned = 0;
+  const allFindings: Finding[] = [];
 
-  const allFindings = [...learnerFamily.findings, ...authoringFamily.findings];
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(ROUTERS_DIR, file), "utf-8");
+    const lines = source.split("\n");
+    const relFile = `server/routers/${file}`;
+    const allStarts: number[] = [];
+    lines.forEach((line, i) => {
+      if (ANY_PROCEDURE_START.test(line)) allStarts.push(i);
+    });
 
+    const learnerFamily = scanFamily(
+      relFile,
+      lines,
+      allStarts,
+      /^\s+(\w+):\s*(protectedProcedure|learnerProcedure|parentProcedure)\b/
+    );
+    const authoringFamily = scanFamily(
+      relFile,
+      lines,
+      allStarts,
+      /^\s+(\w+):\s*(roleProcedure)\s*\(\s*\[([^\]]+)\]/,
+      m => m[3].includes("teacher") || m[3].includes("institution")
+    );
+
+    learnerScanned += learnerFamily.scanned;
+    authoringScanned += authoringFamily.scanned;
+    allFindings.push(...learnerFamily.findings, ...authoringFamily.findings);
+  }
+
+  console.log(`Scanned ${files.length} router files under server/routers/.`);
   console.log(
-    `Scanned ${learnerFamily.scanned} learner-facing procedures (protectedProcedure/learnerProcedure/parentProcedure).`
+    `Scanned ${learnerScanned} learner-facing procedures (protectedProcedure/learnerProcedure/parentProcedure).`
   );
   console.log(
-    `Scanned ${authoringFamily.scanned} teacher/institution-facing roleProcedure procedures.`
+    `Scanned ${authoringScanned} teacher/institution-facing roleProcedure procedures.`
   );
 
   if (allFindings.length === 0) {
@@ -96,7 +142,7 @@ function main() {
       "user's resource just by knowing/guessing its id):\n"
   );
   for (const f of allFindings) {
-    console.error(`  server/routers.ts:${f.line}  ${f.name} (${f.kind})`);
+    console.error(`  ${f.file}:${f.line}  ${f.name} (${f.kind})`);
   }
   process.exit(1);
 }
