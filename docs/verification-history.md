@@ -6,6 +6,46 @@ and `docs/archive/` (frozen historical narrative). Every row here reflects a
 command that was actually executed, not a claim taken on faith. New rows go
 at the top of each table.
 
+## Performance (Phase 4)
+
+Measured with `npx lighthouse` (desktop preset, `--only-categories=performance`)
+against an actual production build (`npm run build && npm start`), Chromium
+pinned via `PLAYWRIGHT_CHROMIUM_PATH`/`CHROME_PATH`. Home page (`/`), no auth.
+
+| Metric | Before | After | What changed |
+|---|---|---|---|
+| Performance score | 0.55 | 0.98 | Google Fonts `<link rel="stylesheet">` made non-render-blocking (`media="print"` + `onload` swap, `client/index.html`) |
+| First Contentful Paint | 12.9 s | 0.8 s | same |
+| Largest Contentful Paint | 12.9 s | 1.0 s | same |
+| Speed Index | 12.9 s | 0.8 s | same |
+| Total Blocking Time | 0 ms | 0 ms | unchanged |
+| Cumulative Layout Shift | 0 | 0 | unchanged |
+| Main JS chunk (`index-*.js`) | 451.23 kB raw / 139.42 kB gzip | same | not touched — see note below |
+| Main CSS (`index-*.css`) | 206.2 kB raw / 33.8 kB gzip | same | not touched |
+| Largest lazy chunk (`StaffFlows-*.js`) | 105.74 kB raw / 25.89 kB gzip | same | not touched |
+
+**Honest caveats**: the "before" 12.9 s figures are inflated by this sandbox's
+own unreliable egress to `fonts.googleapis.com` (confirmed earlier this
+session — see `scripts/browser-smoke-test.ts`'s header comment) — a real
+user's connection to Google Fonts is normally far faster. But the *fix*
+itself is not a sandbox-specific workaround: a render-blocking cross-origin
+stylesheet delays first paint by at least one extra round trip in any
+environment, and the after-numbers were confirmed without blocking that
+request at all (i.e. under the same flaky conditions), which is why the
+score still improved this much even here. Verified after the change: the
+fonts still visually apply (`getComputedStyle(document.body).fontFamily`
+checked directly), zero console errors, `pnpm run check` clean, `npm run
+build` succeeds with identical chunk sizes, 230/230 unit tests pass.
+Bundle sizes were not reduced — on inspection the existing route-level
+`React.lazy()` splitting (see `client/src/App.tsx`) already keeps every
+non-Home page out of the initial chunk, and the one library the original
+prompt specifically warned about (`recharts`) turned out to already be
+absent from every built chunk, because its only consumer
+(`client/src/components/ui/chart.tsx`) isn't imported by any page — a
+dead-code finding, not a bundling one (see the dependency-audit phase).
+No further code-splitting was attempted without a concrete finding to
+justify it, per "don't change what isn't measurably wrong."
+
 ## Core checks
 
 | Check | Command | Environment | Result | Last verified |

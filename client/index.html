@@ -42,10 +42,25 @@
          latency mobile connections this app needs to work well on. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- A plain <link rel="stylesheet"> to a cross-origin host is still
+         render-blocking on its own — measured with Lighthouse against a
+         production build: first paint waited on this one request even
+         though the font files themselves use display=swap. The media="print"
+         swapped to "all" on load is the standard no-JS-framework way to fetch
+         it without blocking the initial render; noscript keeps the fonts
+         working with JS disabled, just blocking in that one case. -->
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
 
     <!-- PWA: works on Android via manifest.webmanifest (Chrome shows a real "Add to Home Screen" / install prompt) -->
     <link rel="manifest" href="/manifest.webmanifest" />

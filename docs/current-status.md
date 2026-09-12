@@ -58,14 +58,29 @@ deliberately-scoped-out engineering work:
    gone; a replacement (managed provider or the self-hosted
    `docker-compose.yml` stack) needs a real account/server the project
    owner controls.
-4. **Performance**: Lighthouse ~66/100 (accessibility is 100/100). Route-
-   level code splitting, hashed-filename immutable caching, and React
-   Query's staleTime were all already solid on inspection — the main
-   remaining lever is deeper code-splitting of the shared vendor JS bundle
-   itself (~451KB raw / ~139KB gzip, mostly React/ReactDOM/query/trpc/the
-   eagerly-loaded landing page), which needs restructuring what's eagerly
-   vs. lazily loaded on Home.tsx rather than a drive-by change — see
-   `docs/archive/PHASE_VISUAL_AUDIT.md` for earlier context.
+4. **Performance**: re-measured 2026-09-12 with Lighthouse (desktop preset)
+   against an actual production build (`npm run build && npm start`), not
+   estimated. Found and fixed one real, measurable issue: the Google Fonts
+   `<link rel="stylesheet">` in `client/index.html` was render-blocking —
+   `display=swap` only makes the *font files* non-blocking, the stylesheet
+   *request itself* still was. Score went from **0.55 → 0.98** (FCP/LCP/SI
+   all ~12.9s → ~0.8-1.0s) after switching it to the standard
+   `media="print" + onload` async-stylesheet pattern (with a `<noscript>`
+   fallback), verified with a before/after Lighthouse run plus a direct
+   check that the fonts still actually apply and no console errors appear.
+   Route-level code splitting, hashed-filename immutable caching, and React
+   Query's staleTime remain solid on inspection. Bundle sizes are unchanged
+   by this fix and match what's tracked in `docs/verification-history.md`
+   (main JS ~451KB raw / ~139KB gzip — mostly React/ReactDOM/query/trpc/the
+   eagerly-loaded landing page, everything else already route-split).
+   `recharts` is a listed dependency but not actually present in any built
+   chunk — its only consumer, `client/src/components/ui/chart.tsx`, is
+   itself unused by any page (see the dependency-audit phase for removal).
+   The earlier "~66/100" figure here could not be reconciled to a specific
+   documented methodology/date, so it's superseded by today's number rather
+   than assumed comparable — see `docs/verification-history.md` for the
+   full before/after and how it was measured. Historical context:
+   `docs/archive/PHASE_VISUAL_AUDIT.md`.
 5. **No real Web Push notifications, no external cron trigger wired up
    yet** — both have real, working code paths (`/api/scheduled/*`
    endpoints, in-app notifications) that need an external scheduler or a
