@@ -141,6 +141,20 @@ describe("full flow: login → enroll → lesson → quiz → exam → certifica
     await expect(learner.progress.certificates()).resolves.toEqual([]);
     await expect(learner.subscriptions.myInvoices()).resolves.toEqual([]);
   });
+
+  it("step 9 — a DB failure mid-operation (no DB here at all) fails an authenticated mutation safely, not with a crash or a lying success", async () => {
+    // support.createTicket is a real write path not exercised anywhere else
+    // in this no-DB suite. createSupportTicket's own getDb() check returns
+    // undefined rather than throwing or fabricating a ticket — this proves
+    // the router surfaces that the same safe way, end to end.
+    const learner = appRouter.createCaller(contextFor("learner"));
+    await expect(
+      learner.support.createTicket({
+        subject: "Test subject",
+        message: "Test message while the database is unavailable.",
+      })
+    ).resolves.toBeUndefined();
+  });
 });
 
 describe("Phase 8 — responsive styling proxy check", () => {
