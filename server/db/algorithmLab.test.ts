@@ -97,7 +97,12 @@ describe("gradeAlgorithmAttempt — hidden test cases", () => {
 });
 
 describe("getAlgorithmExerciseBySlug — hiddenCases never leak to a public caller", () => {
-  it("returns undefined instead of throwing when no database is configured (contract-only mode)", async () => {
-    await expect(getAlgorithmExerciseBySlug("anything")).resolves.toBeUndefined();
+  it("returns null instead of throwing when no database is configured (contract-only mode)", async () => {
+    // null, not undefined: tRPC/React Query forbids a query from ever
+    // resolving to undefined (their internal "not fetched yet" sentinel) —
+    // see the comment on getAlgorithmExerciseBySlug itself, added after a
+    // real browser smoke test caught the console error this produced on
+    // every single Algorithm Lab page visit on a fresh deployment.
+    await expect(getAlgorithmExerciseBySlug("anything")).resolves.toBeNull();
   });
 });

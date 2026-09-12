@@ -114,7 +114,7 @@ describe("full flow: login → enroll → lesson → quiz → exam → certifica
     });
     await expect(
       anon.certificates.verify({ id: "NX-DOES-NOT-EXIST" })
-    ).resolves.toBeUndefined();
+    ).resolves.toBeNull();
     await expect(
       anon.certificates.revoke({ certificateId: "NX-DOES-NOT-EXIST" })
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });

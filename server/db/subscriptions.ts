@@ -102,7 +102,7 @@ export async function setPlanPrice(input: {
 
 export async function getUserSubscription(userId: number) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const rows = await db
     .select({
       subscriptionId: userSubscriptions.id,
@@ -128,8 +128,14 @@ export async function getUserSubscription(userId: number) {
     )
     .orderBy(desc(userSubscriptions.updatedAt))
     .limit(1);
-  return rows.find(
-    row => !row.expiresAt || row.expiresAt.getTime() > Date.now()
+  // tRPC/React Query forbids a query from ever resolving to `undefined` —
+  // a real, reachable bug caught by a full browser smoke test: any learner
+  // with no active subscription (i.e. every brand-new account) hit this
+  // console error on every single dashboard visit, since Array.find()
+  // returns undefined, not null, when nothing matches.
+  return (
+    rows.find(row => !row.expiresAt || row.expiresAt.getTime() > Date.now()) ??
+    null
   );
 }
 

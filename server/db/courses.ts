@@ -1329,15 +1329,23 @@ async function getCourseWithCurriculumMysql(
   slug: string,
   viewer?: { id: number; role: string } | null
 ) {
+  // null, not undefined, on every "nothing to show" path below — this is
+  // wired directly into the public learning.course query, and tRPC/React
+  // Query forbid a query from ever resolving to undefined. Missed by an
+  // earlier browser smoke test (which only ever visited a real, valid,
+  // published course slug) and caught instead by a static audit for this
+  // same class of bug after it was found twice elsewhere — a nonexistent
+  // or unpublished-and-not-owned course slug is a routine real-world case
+  // (a stale link, a typo, a draft shared too early), not an edge case.
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const courseRows = await db
     .select()
     .from(courses)
     .where(eq(courses.slug, slug))
     .limit(1);
   const course = courseRows[0];
-  if (!course) return undefined;
+  if (!course) return null;
   // Published courses are visible to everyone, same as before. An
   // unpublished (draft/archived) course is visible ONLY as a preview to
   // the teacher/institution who owns it or to an admin — never to a
@@ -1345,7 +1353,7 @@ async function getCourseWithCurriculumMysql(
   // who is actually asking.
   const canPreview =
     viewer && (viewer.role === "admin" || viewer.id === course.ownerId);
-  if (course.isPublished !== 1 && !canPreview) return undefined;
+  if (course.isPublished !== 1 && !canPreview) return null;
   const courseUnits = await db
     .select()
     .from(units)

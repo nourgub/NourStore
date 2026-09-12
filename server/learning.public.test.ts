@@ -33,9 +33,11 @@ describe("learning public procedures", () => {
   it("never exposes lesson body/live-link fields on the public course-curriculum contract", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.learning.course({ slug: "does-not-exist" });
-    // No DB in test env => undefined, but the contract shape itself (verified via
-    // the db.ts implementation) never selects `content`/`liveUrl` for this query.
-    expect(result).toBeUndefined();
+    // No DB in test env => null (never undefined — tRPC/React Query forbid
+    // a query from resolving to undefined), but the contract shape itself
+    // (verified via the db.ts implementation) never selects `content`/
+    // `liveUrl` for this query either way.
+    expect(result).toBeNull();
   });
 
   it("requires authentication to read full lesson content (never resolves anonymously)", async () => {

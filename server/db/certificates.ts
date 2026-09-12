@@ -53,8 +53,13 @@ export async function verifyCertificate(certificateId: string) {
 }
 
 async function verifyCertificateMysql(certificateId: string) {
+  // null, not undefined — wired directly into the public certificates.verify
+  // query, and tRPC/React Query forbid a query from ever resolving to
+  // undefined. An invalid/mistyped certificate ID is the routine case for
+  // this specific endpoint (that's the whole point of a verifier), not an
+  // edge case.
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const rows = await db
     .select({
       certificateId: certificates.certificateId,
@@ -73,7 +78,7 @@ async function verifyCertificateMysql(certificateId: string) {
     .leftJoin(courses, eq(courses.id, certificates.courseId))
     .where(eq(certificates.certificateId, certificateId))
     .limit(1);
-  return rows[0];
+  return rows[0] ?? null;
 }
 
 export async function issueCertificate(input: {

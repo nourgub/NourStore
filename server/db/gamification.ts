@@ -248,8 +248,11 @@ export async function checkAndAwardBadges(
 const REFERRAL_REWARD_POINTS = 100;
 
 export async function getOrCreateReferralCode(userId: number) {
+  // null, not undefined — this is wired directly into the protected
+  // progress.referralCode query, and tRPC/React Query forbid a query from
+  // ever resolving to undefined.
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const existing = await db
     .select()
     .from(referralCodes)
@@ -261,12 +264,14 @@ export async function getOrCreateReferralCode(userId: number) {
     .replace(/[^A-Z0-9]/g, "0");
   await db.insert(referralCodes).values({ userId, code });
   return (
-    await db
-      .select()
-      .from(referralCodes)
-      .where(eq(referralCodes.userId, userId))
-      .limit(1)
-  )[0];
+    (
+      await db
+        .select()
+        .from(referralCodes)
+        .where(eq(referralCodes.userId, userId))
+        .limit(1)
+    )[0] ?? null
+  );
 }
 
 export type ReferralRedeemResult =

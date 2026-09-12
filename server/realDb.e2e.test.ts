@@ -778,9 +778,10 @@ describe.skipIf(!HAS_DB)("REAL DB — full learner journey against real MySQL", 
     expect(verified?.status).toBe("active");
     expect(verified?.courseSlug).toBe(courseSlug);
 
-    // A non-existent certificate id must resolve to undefined, never throw
-    // and never falsely confirm.
-    await expect(anon.certificates.verify({ id: "NX-DOES-NOT-EXIST" })).resolves.toBeUndefined();
+    // A non-existent certificate id must resolve to null (never undefined —
+    // tRPC/React Query forbid a query from resolving to undefined), never
+    // throw, and never falsely confirm.
+    await expect(anon.certificates.verify({ id: "NX-DOES-NOT-EXIST" })).resolves.toBeNull();
   });
 
   it("failure case: a revoked certificate immediately fails public verification as revoked, not as valid", async () => {

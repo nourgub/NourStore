@@ -36,9 +36,9 @@ function stripHiddenCases(exercise: AlgorithmExercise): AlgorithmExercise {
 
 export async function getAlgorithmExerciseBySlug(
   slug: string
-): Promise<AlgorithmExercise | undefined> {
+): Promise<AlgorithmExercise | null> {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const result = await db
     .select()
     .from(algorithmExercises)
@@ -49,7 +49,14 @@ export async function getAlgorithmExerciseBySlug(
       )
     )
     .limit(1);
-  return result[0] ? stripHiddenCases(result[0]) : undefined;
+  // tRPC/React Query forbids a query from ever resolving to `undefined`
+  // (it's their internal sentinel for "not fetched yet") — a genuinely
+  // "not found" result must be `null`, not `undefined`. This mattered for
+  // real: the Algorithm Lab page falls back to a hardcoded demo slug when
+  // no exercise is specified, so on a fresh deployment with no exercises
+  // seeded yet, this path is hit on every single visit, not just an edge
+  // case.
+  return result[0] ? stripHiddenCases(result[0]) : null;
 }
 
 export async function getAlgorithmExerciseById(

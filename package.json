@@ -103,6 +103,7 @@
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
     "jsdom": "^30.0.1",
+    "playwright": "^1.63.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",
