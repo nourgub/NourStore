@@ -110,6 +110,43 @@ it (documented in `docs/verification-history.md`) found nothing, but that
 isn't proof it can never recur — if you see it, check that file's header
 comment for the two most likely causes.
 
+### Real-browser smoke test
+
+`scripts/browser-smoke-test.ts` drives an actual Chromium instance (via
+Playwright) across every major page at 4 viewports (390/412/768/1280px) and
+3 languages (AR/FR/EN), as an anonymous visitor and as each of
+learner/teacher/admin — checking for horizontal overflow, browser console
+errors, failed/5xx requests, and that a gated page never leaks real content
+to an unauthenticated visitor. It's a real functional check, not a
+screenshot: it exits non-zero with a specific failure list if anything is
+wrong. Run it against a **production build** (`npm run build && npm start`
+in one terminal), not `npm run dev` — the dev server's unbundled per-module
+requests make every page load dramatically slower and were mistaken for a
+real hang more than once before this was understood.
+
+```bash
+npm run build && npm start   # in one terminal
+DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts   # in another
+```
+
+See the script's own header comment for every env var it reads
+(`SMOKE_TEST_BASE_URL`, `SMOKE_TEST_SKIP_ANON`, `SMOKE_TEST_ROLES`,
+`PLAYWRIGHT_CHROMIUM_PATH`). **`SMOKE_TEST_ROLES` matters in a
+resource-constrained sandbox**: a full anonymous+learner+teacher+admin run
+in one Node process was found to reproducibly freeze the entire process
+after roughly 40 minutes of sustained Chromium work (confirmed with a
+heartbeat log that itself stops ticking during the freeze — the whole event
+loop stalls, not one specific stuck call). A full, reliable run there is two
+invocations instead of one:
+
+```bash
+SMOKE_TEST_ROLES=learner,teacher DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts
+SMOKE_TEST_ROLES=admin SMOKE_TEST_SKIP_ANON=true DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts
+```
+
+Last full run (both invocations): 204/204 checks passed, 0 failures — see
+`docs/verification-history.md` for the date and what it found along the way.
+
 ## Project structure
 
 ```
