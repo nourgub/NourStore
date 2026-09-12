@@ -183,16 +183,23 @@ scripts/
   conventionally use email (password reset, notifications) is deliberately
   WhatsApp- or admin-mediated instead. See `adminResetPassword` for the
   account-recovery path.
-- **`server/routers.ts` and `client/src/pages/flows/StaffFlows.tsx` have
-  been split.** `routers.ts` is now a ~40-line composition file importing
-  19 domain routers from `server/routers/`; `StaffFlows.tsx` is down to
-  ~1000 lines (`StaffSpace`/`InstitutionSpace` — the tab shell and course-
-  authoring state) with its ~20 admin/teacher sub-panels split into
-  `client/src/pages/flows/staff/`. A few other files are still large and
-  single-purpose enough that splitting them wasn't judged worth the risk:
-  `server/db/courses.ts` (~1570 lines), `client/src/pages/Dashboard.tsx`
-  (~1150), `client/src/pages/Home.tsx` (~1000) — see `docs/current-status.md`
-  for the current, up-to-date sizes.
+- **`server/routers.ts`, `client/src/pages/flows/StaffFlows.tsx`,
+  `server/db/{courses,quizzes,subscriptions}.ts`, and
+  `client/src/pages/flows/staff/{CourseManagement,BillingManagement}.tsx`
+  have all been split.** `routers.ts` is a ~40-line composition file
+  importing 19 domain routers from `server/routers/`; `StaffFlows.tsx` is
+  down to ~1000 lines with its ~20 admin/teacher sub-panels split into
+  `client/src/pages/flows/staff/`; `server/db/courses.ts`,
+  `quizzes.ts`, and `subscriptions.ts` are now thin barrel re-exports over
+  domain files (`courses/{catalog,authoring,progress}.ts`, etc.); the two
+  staff-panel files are barrels over their now-independent panel
+  components. Three remaining page components (`Dashboard.tsx`,
+  `Home.tsx`, `CourseDetail.tsx`) had their static translation data moved
+  out into sibling `.i18n.ts` files, but each one's actual JSX render body
+  (~800-1000 lines, driven by 8-15 queries/mutations and many derived
+  local variables) was judged not worth splitting further — see
+  `docs/verification-history.md`'s "Large-file splits" section for the
+  full reasoning and current sizes.
 - **No real payment gateway is live.** BaridiMob and SlickPay both need
   real credentials from their respective providers before they do anything
   beyond reporting themselves honestly as "not configured" — see

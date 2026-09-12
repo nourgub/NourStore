@@ -46,6 +46,36 @@ dead-code finding, not a bundling one (see the dependency-audit phase).
 No further code-splitting was attempted without a concrete finding to
 justify it, per "don't change what isn't measurably wrong."
 
+## Large-file splits (Phase 5)
+
+All 8 files named for this pass, split or explicitly justified. Every
+split was verified with `pnpm run check` + `npm run build` (identical
+chunk sizes/hashes where applicable) + `pnpm run test:unit` after each
+file, plus `test:db` and the 3 payment-provider test files for the two
+files touching payment-adjacent code.
+
+| File | Before | After | Approach |
+|---|---|---|---|
+| `server/db/courses.ts` | 1578 lines | 10-line barrel + `courses/{catalog,authoring,progress}.ts` | independent functions, split by domain |
+| `server/db/quizzes.ts` | 723 lines | 7-line barrel + `quizzes/{reads,authoring,grading}.ts` | same |
+| `server/db/subscriptions.ts` | 643 lines | 9-line barrel + `subscriptions/{plans,user,invoices}.ts` | same; payment-adjacent — verified against the 3 payment-provider test files too, zero logic changed |
+| `client/src/pages/flows/staff/CourseManagement.tsx` | 778 lines | 7-line barrel + `courseManagement/{ContentStructureForm,PlacementAdminPanel}.tsx` | already 2 independent named-export components, moved directly |
+| `client/src/pages/flows/staff/BillingManagement.tsx` | 709 lines | 9-line barrel + 5 files under `billingManagement/` | already 5 independent named-export components, moved directly |
+| `client/src/pages/Dashboard.tsx` | 1152 lines | 1021 lines + `Dashboard.i18n.ts` (132 lines) | pure static data (translations, status-label helpers) extracted; the rest is one component's JSX tree — see note below |
+| `client/src/pages/Home.tsx` | 1013 lines | 800 lines + `Home.i18n.ts` (215 lines) | same pattern |
+| `client/src/pages/CourseDetail.tsx` | 677 lines | 583 lines + `CourseDetail.i18n.ts` (94 lines) | same pattern |
+
+**Why the last three weren't split further**: each is a single component
+function whose body is ~800-1000 lines of JSX driven by 8-15
+`useQuery`/`useMutation` calls and dozens of derived local variables used
+throughout that render tree. Splitting the JSX itself into sub-components
+would mean threading many of those variables as props across each new
+boundary in one large edit — real effort for a real but modest
+readability gain, and much higher regression risk than the courses.ts-
+style split (independent functions with a handful of shared imports,
+verified mechanically). Consistent with the task's own instruction to
+document rather than force a split that isn't clearly worth it.
+
 ## Core checks
 
 | Check | Command | Environment | Result | Last verified |
