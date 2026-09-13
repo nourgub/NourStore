@@ -95,6 +95,35 @@ describe("role permissions", () => {
     }
   });
 
+  it("keeps the reference library behind the teacher gate", async () => {
+    for (const role of ["learner", "parent"] as const) {
+      const caller = appRouter.createCaller(contextFor(role));
+      await expect(caller.teacher.references()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(
+        caller.teacher.updateReference({ id: 1, active: false })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller.teacher.deleteReference({ id: 1 })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+  });
+
+  it("refuses an archive as a reference, one deliberate file at a time", async () => {
+    const caller = appRouter.createCaller(contextFor("teacher"));
+    await expect(
+      caller.teacher.addReference({
+        file: {
+          fileName: "everything.zip",
+          mimeType: "application/zip",
+          dataBase64: "UEsDBA==",
+          sizeBytes: 4,
+        },
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("refuses to grade a paper with neither typed text nor an uploaded file", async () => {
     const caller = appRouter.createCaller(contextFor("teacher"));
     // Input validation, before any API call is made or any money is spent.

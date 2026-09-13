@@ -25,6 +25,7 @@ import {
   lessonPlans,
   paperGrades,
   parentLinks,
+  teacherReferences,
   users,
 } from "../../drizzle/schema";
 import { getDb } from "./shared";
@@ -587,4 +588,164 @@ export async function getPaperGradesForParent(parentId: number) {
       )
     )
     .orderBy(desc(paperGrades.reviewedAt));
+}
+
+// ---------------------------------------------------------------------------
+// The reference library — files attached to every generation automatically
+// ---------------------------------------------------------------------------
+
+/** Which module a reference applies to. "all" means every module. */
+export type ReferenceScope =
+  "all" | "lesson" | "exam" | "solutions" | "grading";
+/** The four modules, as the generation endpoints name them. */
+export type AssistantModule = Exclude<ReferenceScope, "all">;
+
+/**
+ * A cap on how many references one teacher may keep. Each active one is
+ * re-sent on every generation, so this is a cost ceiling as much as a
+ * storage one — and a library nobody curates stops being a reference.
+ */
+export const MAX_REFERENCES_PER_TEACHER = 20;
+
+export async function countReferences(teacherId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: teacherReferences.id })
+    .from(teacherReferences)
+    .where(eq(teacherReferences.teacherId, teacherId));
+  return rows.length;
+}
+
+export async function saveReference(input: {
+  teacherId: number;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey?: string | null;
+  extractedText?: string | null;
+  scope: ReferenceScope;
+}): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(teacherReferences).values({
+    teacherId: input.teacherId,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+    storageKey: input.storageKey ?? null,
+    extractedText: input.extractedText ?? null,
+    scope: input.scope,
+  });
+  return insertedId(result);
+}
+
+/** The library as the teacher sees it — metadata only, never the file bodies. */
+export async function listReferences(teacherId: number, role: TeacherRole) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: teacherReferences.id,
+      fileName: teacherReferences.fileName,
+      mimeType: teacherReferences.mimeType,
+      sizeBytes: teacherReferences.sizeBytes,
+      scope: teacherReferences.scope,
+      active: teacherReferences.active,
+      createdAt: teacherReferences.createdAt,
+      // Enough to show "read as text" vs "sent as a file", without shipping
+      // a megabyte of extracted text into a list view.
+      storedAsFile: isNotNull(teacherReferences.storageKey),
+    })
+    .from(teacherReferences)
+    .where(ownerFilter(teacherReferences.teacherId, teacherId, role))
+    .orderBy(desc(teacherReferences.createdAt));
+}
+
+/**
+ * The rows to attach to one generation: this teacher's own, switched on, and
+ * scoped either to every module or to this one. Deliberately NOT admin-wide —
+ * an admin generating a lesson gets their own references, not every
+ * teacher's, because "admin can read everything" must not turn into "admin's
+ * prompts silently carry someone else's syllabus".
+ */
+export async function getActiveReferences(
+  teacherId: number,
+  module: AssistantModule
+) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(teacherReferences)
+    .where(
+      and(
+        eq(teacherReferences.teacherId, teacherId),
+        eq(teacherReferences.active, true),
+        inArray(teacherReferences.scope, ["all", module])
+      )
+    )
+    .orderBy(desc(teacherReferences.createdAt));
+}
+
+export async function getReference(
+  id: number,
+  teacherId: number,
+  role: TeacherRole
+) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(teacherReferences)
+    .where(
+      role === "admin"
+        ? eq(teacherReferences.id, id)
+        : and(
+            eq(teacherReferences.id, id),
+            eq(teacherReferences.teacherId, teacherId)
+          )
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateReference(input: {
+  id: number;
+  teacherId: number;
+  role: TeacherRole;
+  active?: boolean;
+  scope?: ReferenceScope;
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await getReference(input.id, input.teacherId, input.role);
+  if (!existing) return false;
+  await db
+    .update(teacherReferences)
+    .set({
+      active: input.active ?? existing.active,
+      scope: input.scope ?? existing.scope,
+    })
+    .where(eq(teacherReferences.id, input.id));
+  return true;
+}
+
+/**
+ * Removes the row. The stored object is deliberately left in place: this
+ * codebase has no storage-deletion path anywhere yet (lesson assets behave
+ * the same), and quietly inventing one here — on a provider that might be a
+ * shared bucket — is not a decision to make as a side effect.
+ */
+export async function deleteReference(
+  id: number,
+  teacherId: number,
+  role: TeacherRole
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const existing = await getReference(id, teacherId, role);
+  if (!existing) return false;
+  await db.delete(teacherReferences).where(eq(teacherReferences.id, id));
+  return true;
 }

@@ -18,6 +18,8 @@ import {
   type AttachmentInput,
   type ExtractedAttachment,
 } from "../attachments/extract";
+import { referencesToAttachments } from "../attachments/references";
+import { storagePut } from "../storage";
 import {
   formatSolutionsForExport,
   examSolutionsSchema,
@@ -31,6 +33,14 @@ import {
   type ExportFormat,
 } from "../exports/documentExport";
 import {
+  countReferences,
+  deleteReference,
+  getActiveReferences,
+  listReferences,
+  saveReference,
+  updateReference,
+  MAX_REFERENCES_PER_TEACHER,
+  type AssistantModule,
   deleteExamPaper,
   deleteExamSolutionSet,
   deleteLessonPlan,
@@ -114,6 +124,29 @@ async function readAttachments(
     else usable.push(attachment);
   }
   return { usable, skipped };
+}
+
+/**
+ * Everything one generation should read: the files uploaded with THIS
+ * request, plus the teacher's active reference library for this module. The
+ * references go first, because they are the standing context (the syllabus)
+ * and the per-request files are the specific thing being worked on.
+ */
+async function attachmentsFor(
+  teacherId: number,
+  module: AssistantModule,
+  files: AttachmentInput[] | undefined
+): Promise<{ attachments: ExtractedAttachment[]; skipped: SkippedFile[] }> {
+  const [{ usable, skipped }, references] = await Promise.all([
+    readAttachments(files),
+    getActiveReferences(teacherId, module),
+  ]);
+  const { attachments: referenceAttachments, notices } =
+    await referencesToAttachments(references);
+  return {
+    attachments: [...referenceAttachments, ...usable],
+    skipped: [...notices, ...skipped],
+  };
 }
 
 /** Runs `work` over `items` a few at a time — a whole archive at once would hammer the API. */
@@ -233,8 +266,14 @@ export const teacherRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { files, ...context } = input;
-      const { usable, skipped } = await readAttachments(files);
-      const plan = asMarkdown(await generateMathLessonPlan(context, usable));
+      const { attachments, skipped } = await attachmentsFor(
+        ctx.user.id,
+        "lesson",
+        files
+      );
+      const plan = asMarkdown(
+        await generateMathLessonPlan(context, attachments)
+      );
       const id = await saveLessonPlan({
         teacherId: ctx.user.id,
         ...context,
@@ -282,8 +321,12 @@ export const teacherRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const { files, ...context } = input;
-      const { usable, skipped } = await readAttachments(files);
-      const paper = asMarkdown(await designMathExam(context, usable));
+      const { attachments, skipped } = await attachmentsFor(
+        ctx.user.id,
+        "exam",
+        files
+      );
+      const paper = asMarkdown(await designMathExam(context, attachments));
       const id = await saveExamPaper({
         teacherId: ctx.user.id,
         ...context,
@@ -349,8 +392,15 @@ export const teacherRouter = router({
           )
         );
       }
-      const { usable, skipped } = await readAttachments(input.files);
-      const result = await solveMathExam({ examText: input.examText }, usable);
+      const { attachments, skipped } = await attachmentsFor(
+        ctx.user.id,
+        "solutions",
+        input.files
+      );
+      const result = await solveMathExam(
+        { examText: input.examText },
+        attachments
+      );
       if (!result.ok) throw assistantError(result);
       const id = await saveExamSolutionSet({
         teacherId: ctx.user.id,
@@ -453,11 +503,15 @@ export const teacherRouter = router({
         );
         solutionsJson = set.solutionsJson;
       }
-      const { usable, skipped } = await readAttachments(input.files);
+      const { attachments, skipped } = await attachmentsFor(
+        ctx.user.id,
+        "grading",
+        input.files
+      );
       const report = asMarkdown(
         await gradeStudentPaper(
           { solutionsJson, studentAnswerText: input.studentAnswerText },
-          usable
+          attachments
         )
       );
       if (solutionSetId === null) {
@@ -484,7 +538,12 @@ export const teacherRouter = router({
               // graded — the filenames — instead of an empty column.
               answerText:
                 input.studentAnswerText.trim() ||
-                `[ورقة مرفقة: ${usable.map(file => file.name).join("، ") || "ملف"}]`,
+                `[ورقة مرفقة: ${
+                  attachments
+                    .filter(file => !file.name.startsWith("مرجع: "))
+                    .map(file => file.name)
+                    .join("، ") || "ملف"
+                }]`,
               report: report.markdown,
               model: report.model,
               truncated: report.truncated,
@@ -619,6 +678,108 @@ export const teacherRouter = router({
       return result;
     }),
   // ---------------------------------------------------------------------
+  // The reference library — upload once, used by every generation
+  // ---------------------------------------------------------------------
+  references: teacherProcedure.query(({ ctx }) =>
+    listReferences(ctx.user.id, teacherRole(ctx.user.role))
+  ),
+  addReference: teacherProcedure
+    .use(rateLimit("teacher-add-reference", 60, 60 * 60 * 1000))
+    .input(
+      z.object({
+        file: uploadedFileSchema,
+        scope: z
+          .enum(["all", "lesson", "exam", "solutions", "grading"])
+          .default("all"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if ((await countReferences(ctx.user.id)) >= MAX_REFERENCES_PER_TEACHER) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `بلغت الحد الأقصى (${MAX_REFERENCES_PER_TEACHER} مرجعاً). احذف مرجعاً قبل إضافة آخر.`,
+        });
+      }
+      // One archive would become many references with no obvious names — and
+      // a reference is something the teacher chose deliberately, so it is
+      // one real file at a time.
+      if (input.file.mimeType === "application/zip") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "أضف ملفات المراجع واحداً واحداً، لا داخل أرشيف ZIP.",
+        });
+      }
+      const [extracted] = await extractAttachment(input.file);
+      if (extracted.kind === "unsupported") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: extracted.reason });
+      }
+      // Text formats are unpacked once, here. Images and PDFs keep the file,
+      // because Claude reads those itself and needs the bytes every time.
+      let storageKey: string | null = null;
+      let extractedText: string | null = null;
+      if (extracted.kind === "text") {
+        extractedText = extracted.text;
+      } else {
+        const safeName =
+          input.file.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-180) ||
+          "reference";
+        const stored = await storagePut(
+          `teacher-references/${ctx.user.id}/${safeName}`,
+          Buffer.from(input.file.dataBase64, "base64"),
+          input.file.mimeType
+        );
+        storageKey = stored.key;
+      }
+      const id = await saveReference({
+        teacherId: ctx.user.id,
+        fileName: input.file.fileName.slice(0, 255),
+        mimeType: input.file.mimeType,
+        sizeBytes: input.file.sizeBytes,
+        storageKey,
+        extractedText,
+        scope: input.scope,
+      });
+      if (id === null)
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "قاعدة البيانات غير متصلة — لا يمكن حفظ مرجع دائم. أرفق الملف مع كل طلب بدلاً من ذلك.",
+        });
+      return { id };
+    }),
+  updateReference: teacherProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        active: z.boolean().optional(),
+        scope: z
+          .enum(["all", "lesson", "exam", "solutions", "grading"])
+          .optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const updated = await updateReference({
+        ...input,
+        teacherId: ctx.user.id,
+        role: teacherRole(ctx.user.role),
+      });
+      if (!updated)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      return { ok: true };
+    }),
+  deleteReference: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await deleteReference(
+        input.id,
+        ctx.user.id,
+        teacherRole(ctx.user.role)
+      );
+      if (!deleted)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      return { ok: true };
+    }),
+  // ---------------------------------------------------------------------
   // Exports — "give me the file"
   // ---------------------------------------------------------------------
   // Everything the assistant produced can leave as a real document: Word or
@@ -660,7 +821,9 @@ export const teacherRouter = router({
         // back to the raw text, not throw a 500 at the teacher.
         let questions = null;
         try {
-          const parsed = examSolutionsSchema.safeParse(JSON.parse(row.solutionsJson));
+          const parsed = examSolutionsSchema.safeParse(
+            JSON.parse(row.solutionsJson)
+          );
           if (parsed.success) questions = parsed.data;
         } catch {
           questions = null;

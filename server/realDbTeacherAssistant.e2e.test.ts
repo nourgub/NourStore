@@ -15,7 +15,13 @@ import {
   listExamPapers,
   listLessonPlans,
   listPaperGrades,
+  listReferences,
   markPaperGradeReviewed,
+  deleteReference,
+  getActiveReferences,
+  getReference,
+  saveReference,
+  updateReference,
   savePaperGrade,
   saveExamPaper,
   saveExamSolutionSet,
@@ -31,6 +37,7 @@ import {
   notifications,
   paperGrades,
   parentLinks,
+  teacherReferences,
   users,
   type User,
 } from "../drizzle/schema";
@@ -331,6 +338,68 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
     expect(await getExamSolutionSet(setId!, teacherA.id, "teacher")).toBeNull();
   });
 
+  it("attaches a teacher's own active references, and nobody else's", async () => {
+    const mine = await saveReference({
+      teacherId: teacherA.id,
+      fileName: "syllabus.txt",
+      mimeType: "text/plain",
+      sizeBytes: 40,
+      extractedText: "المنهاج الرسمي: المعادلات، الدوال",
+      scope: "all",
+    });
+    const theirs = await saveReference({
+      teacherId: teacherB.id,
+      fileName: "other-teacher.txt",
+      mimeType: "text/plain",
+      sizeBytes: 20,
+      extractedText: "منهاج أستاذ آخر",
+      scope: "all",
+    });
+    const forLesson = await getActiveReferences(teacherA.id, "lesson");
+    expect(forLesson.map(row => row.id)).toContain(mine);
+    // The whole point of the ownership check: teacher B's syllabus must never
+    // ride along on teacher A's prompt.
+    expect(forLesson.map(row => row.id)).not.toContain(theirs);
+    expect(await getReference(theirs!, teacherA.id, "teacher")).toBeNull();
+    expect(await deleteReference(theirs!, teacherA.id, "teacher")).toBe(false);
+  });
+
+  it("honours the scope and the on/off switch", async () => {
+    const examOnly = await saveReference({
+      teacherId: teacherA.id,
+      fileName: "past-papers.txt",
+      mimeType: "text/plain",
+      sizeBytes: 30,
+      extractedText: "امتحانات سابقة",
+      scope: "exam",
+    });
+    expect(
+      (await getActiveReferences(teacherA.id, "exam")).map(row => row.id)
+    ).toContain(examOnly);
+    // Scoped to exams, so a lesson plan must not carry it.
+    expect(
+      (await getActiveReferences(teacherA.id, "lesson")).map(row => row.id)
+    ).not.toContain(examOnly);
+
+    expect(
+      await updateReference({
+        id: examOnly!,
+        teacherId: teacherA.id,
+        role: "teacher",
+        active: false,
+      })
+    ).toBe(true);
+    expect(
+      (await getActiveReferences(teacherA.id, "exam")).map(row => row.id)
+    ).not.toContain(examOnly);
+    // Switched off, not deleted — still listed, so it can be switched back on.
+    const listed = await listReferences(teacherA.id, "teacher");
+    expect(listed.find(row => row.id === examOnly)?.active).toBe(false);
+
+    expect(await deleteReference(examOnly!, teacherA.id, "teacher")).toBe(true);
+    expect(await getReference(examOnly!, teacherA.id, "teacher")).toBeNull();
+  });
+
   afterAll(async () => {
     if (!HAS_DB) return;
     const db = await mustGetDb();
@@ -342,6 +411,9 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
     ].filter((id): id is number => typeof id === "number");
     if (!userIds.length) return;
     // Fixture cleanup only — never done this way in application code.
+    await db
+      .delete(teacherReferences)
+      .where(inArray(teacherReferences.teacherId, userIds));
     await db.delete(paperGrades).where(inArray(paperGrades.teacherId, userIds));
     await db
       .delete(examSolutionSets)

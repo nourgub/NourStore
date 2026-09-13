@@ -1319,3 +1319,51 @@ export const paperGrades = mysqlTable(
 );
 
 export type PaperGrade = typeof paperGrades.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// The teacher's reference library: files uploaded once and then attached to
+// every generation automatically — the official syllabus, a past paper, the
+// textbook chapter. This is what "the assistant learns from my files" means
+// here in practice: the model READS them on each request. Nothing is trained
+// or fine-tuned, and a reference can be switched off or deleted at any time,
+// which is a promise a trained model could not keep.
+//
+// Two storage shapes, one per row:
+//   - Word/Excel/text are unpacked once at upload and kept as `extractedText`
+//     (re-parsing the same file on every request would be waste).
+//   - Images and PDFs keep the file itself (`storageKey`), because Claude
+//     reads those formats directly and needs the bytes each time.
+// ---------------------------------------------------------------------------
+
+export const teacherReferences = mysqlTable(
+  "teacherReferences",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    fileName: varchar("fileName", { length: 255 }).notNull(),
+    mimeType: varchar("mimeType", { length: 150 }).notNull(),
+    sizeBytes: int("sizeBytes").notNull(),
+    // Set for images/PDFs — the object key in whichever storage provider is
+    // configured (local disk by default). Null when the file was unpacked to
+    // text instead.
+    storageKey: varchar("storageKey", { length: 512 }),
+    extractedText: mediumtext("extractedText"),
+    // Which modules this reference is attached to. "all" is the default; a
+    // teacher who only wants their past papers to shape EXAMS, not lessons,
+    // narrows it here.
+    scope: mysqlEnum("scope", ["all", "lesson", "exam", "solutions", "grading"])
+      .default("all")
+      .notNull(),
+    // Switched off rather than deleted: a reference kept for later without
+    // paying for it on every request.
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherIdx: index("teacherReferences_teacherId_idx").on(table.teacherId),
+  })
+);
+
+export type TeacherReference = typeof teacherReferences.$inferSelect;

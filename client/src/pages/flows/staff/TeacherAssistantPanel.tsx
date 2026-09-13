@@ -362,6 +362,50 @@ const L = {
     fr: "La correction en lot nécessite un barème enregistré (lancez le module 3 d'abord).",
     en: "Batch grading needs a saved grading scale (run module 3 first).",
   },
+  library: {
+    ar: "مكتبة المراجع",
+    fr: "Bibliothèque de références",
+    en: "Reference library",
+  },
+  libraryHint: {
+    ar: "ارفع المنهاج أو امتحاناتك السابقة مرة واحدة، فتُرفَق تلقائياً مع كل توليد. المساعد يقرأها في كل طلب — لا يُدرَّب عليها — ويمكنك تعطيلها أو حذفها متى شئت.",
+    fr: "Téléversez le programme ou vos anciens sujets une fois : ils sont joints automatiquement à chaque génération. L'assistant les lit à chaque requête — il n'est pas entraîné dessus — et vous pouvez les désactiver ou les supprimer à tout moment.",
+    en: "Upload the syllabus or your past papers once and they are attached to every generation. The assistant reads them on each request — it is not trained on them — and you can switch them off or delete them at any time.",
+  },
+  addReference: {
+    ar: "أضف مرجعاً",
+    fr: "Ajouter une référence",
+    en: "Add a reference",
+  },
+  referenceAdded: {
+    ar: "أُضيف المرجع.",
+    fr: "Référence ajoutée.",
+    en: "Reference added.",
+  },
+  noReferences: {
+    ar: "لا مراجع بعد — كل طلب يعتمد على ما ترفقه به فقط.",
+    fr: "Aucune référence — chaque requête n'utilise que ses propres pièces jointes.",
+    en: "No references yet — each request uses only what you attach to it.",
+  },
+  scopeAll: { ar: "كل الوحدات", fr: "Tous les modules", en: "Every module" },
+  scopeLesson: { ar: "الدروس فقط", fr: "Cours seulement", en: "Lessons only" },
+  scopeExam: {
+    ar: "الامتحانات فقط",
+    fr: "Examens seulement",
+    en: "Exams only",
+  },
+  scopeSolutions: {
+    ar: "التصحيح النموذجي فقط",
+    fr: "Corrigés seulement",
+    en: "Model solutions only",
+  },
+  scopeGrading: {
+    ar: "تصحيح الأوراق فقط",
+    fr: "Correction de copies",
+    en: "Paper grading only",
+  },
+  on: { ar: "مفعَّل", fr: "Actif", en: "On" },
+  off: { ar: "معطَّل", fr: "Inactif", en: "Off" },
   batchDone: {
     ar: "تم تصحيح الأوراق كمسودات — راجع كل واحدة واعتمد نقطتها.",
     fr: "Copies corrigées en brouillon — relisez et validez chaque note.",
@@ -372,6 +416,123 @@ const L = {
 function formatDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return date.toLocaleDateString();
+}
+
+const SCOPES = [
+  { id: "all", label: L.scopeAll },
+  { id: "lesson", label: L.scopeLesson },
+  { id: "exam", label: L.scopeExam },
+  { id: "solutions", label: L.scopeSolutions },
+  { id: "grading", label: L.scopeGrading },
+] as const;
+type ReferenceScope = (typeof SCOPES)[number]["id"];
+
+/**
+ * The standing context: files uploaded once and attached to every generation.
+ * Separate from the per-request pickers below on purpose — a syllabus is not
+ * the same kind of thing as the pupil's paper being graded right now.
+ */
+function ReferenceLibrary({ lang }: { lang: Lang }) {
+  const utils = trpc.useUtils();
+  const references = trpc.teacher.references.useQuery();
+  const [scope, setScope] = useState<ReferenceScope>("all");
+  const onError = (error: { message: string }) => toast.error(error.message);
+  const add = trpc.teacher.addReference.useMutation({
+    onSuccess: () => {
+      toast.success(t(L.referenceAdded, lang));
+      utils.teacher.references.invalidate();
+    },
+    onError,
+  });
+  const update = trpc.teacher.updateReference.useMutation({
+    onSuccess: () => utils.teacher.references.invalidate(),
+    onError,
+  });
+  const remove = trpc.teacher.deleteReference.useMutation({
+    onSuccess: () => {
+      toast.success(t(L.deleted, lang));
+      utils.teacher.references.invalidate();
+    },
+    onError,
+  });
+  const scopeLabel = (id: string) =>
+    t(SCOPES.find(entry => entry.id === id)?.label ?? L.scopeAll, lang);
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <span className="section-kicker">{t(L.library, lang)}</span>
+      <p className="quiet-label">{t(L.libraryHint, lang)}</p>
+      <div className="invite-box" style={{ flexWrap: "wrap" }}>
+        <select
+          value={scope}
+          aria-label={t(L.library, lang)}
+          onChange={event => setScope(event.target.value as ReferenceScope)}
+        >
+          {SCOPES.map(entry => (
+            <option key={entry.id} value={entry.id}>
+              {t(entry.label, lang)}
+            </option>
+          ))}
+        </select>
+        <label className="quiet-button" style={{ cursor: "pointer" }}>
+          {t(L.addReference, lang)} <Paperclip size={15} />
+          <input
+            type="file"
+            // One real file at a time: a reference is something the teacher
+            // chose deliberately, and the server refuses archives here.
+            accept={ACCEPTED_FILES.replace(",.zip", "")}
+            style={{ display: "none" }}
+            aria-label={t(L.addReference, lang)}
+            onChange={async event => {
+              const picked = event.target.files?.[0];
+              event.target.value = "";
+              if (!picked) return;
+              const file = await readPickedFile(picked);
+              if (!file) {
+                toast.error(`${t(L.rejectedType, lang)} ${picked.name}`);
+                return;
+              }
+              add.mutate({ file, scope });
+            }}
+          />
+        </label>
+      </div>
+      {references.data?.length ? (
+        references.data.map(row => (
+          <div className="staff-row" key={row.id}>
+            <span>
+              <Paperclip size={17} />
+            </span>
+            <p>
+              <strong>{row.fileName}</strong>
+              <small>
+                {scopeLabel(row.scope)} ·{" "}
+                {Math.max(1, Math.round(row.sizeBytes / 1024))} ك.ب ·{" "}
+                {row.storedAsFile ? "ملف" : "نص"}
+              </small>
+            </p>
+            <Button
+              className="table-action"
+              disabled={update.isPending}
+              onClick={() => update.mutate({ id: row.id, active: !row.active })}
+            >
+              {row.active ? t(L.on, lang) : t(L.off, lang)}
+            </Button>
+            <Button
+              className="table-action"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate({ id: row.id })}
+              aria-label={`${t(L.remove, lang)}: ${row.fileName}`}
+            >
+              <Trash2 size={15} />
+            </Button>
+          </div>
+        ))
+      ) : (
+        <p className="quiet-label">{t(L.noReferences, lang)}</p>
+      )}
+    </div>
+  );
 }
 
 function FilePicker({
@@ -785,7 +946,8 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
         </div>
         <Sparkles size={18} />
       </div>
-      <div className="invite-box" style={{ flexWrap: "wrap" }}>
+      <ReferenceLibrary lang={lang} />
+      <div className="invite-box" style={{ flexWrap: "wrap", marginTop: 14 }}>
         {MODES.map(entry => (
           <Button
             key={entry.id}

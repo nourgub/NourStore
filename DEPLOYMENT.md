@@ -232,9 +232,21 @@ dans `server/prompts/`) :
   déjà éprouvés par les attestations.
 - **Correction en lot** : 8 copies par requête, 4 en parallèle (chaque copie
   est un appel API distinct). Une classe entière se fait en quelques lots.
-- **« Apprendre de mes fichiers » = les lire, pas s'entraîner dessus.** Les
-  fichiers servent de référence pour la requête en cours ; aucun modèle n'est
-  entraîné, et rien n'est conservé comme bibliothèque permanente.
+- **Bibliothèque de références** (`teacherReferences`, migration
+  `0026_add_teacher_reference_library.sql`) : le professeur téléverse une fois
+  le programme ou ses anciens sujets, et ces fichiers sont joints
+  automatiquement à chaque génération. Word/Excel/texte sont convertis une
+  seule fois, à l'ajout, et conservés en base ; images et PDF sont stockés via
+  le fournisseur de stockage configuré (disque local par défaut) et relus à
+  chaque requête, puisque Claude lit ces formats lui-même. Portée réglable par
+  module, activation/désactivation, 20 références par professeur et 8 Mo de
+  fichiers joints par requête — chaque référence active est refacturée à
+  chaque génération.
+- **« Apprendre de mes fichiers » = les lire, pas s'entraîner dessus.** Aucun
+  modèle n'est entraîné : une référence désactivée ou supprimée cesse d'agir
+  immédiatement, ce qu'un modèle entraîné ne pourrait pas promettre. La
+  suppression retire la ligne, pas l'objet stocké — ce dépôt n'a aucun chemin
+  de suppression de stockage (les pièces jointes de cours non plus).
 - **Une note proposée n'est jamais la note de l'élève.** Une copie corrigée
   est stockée en `draft`, visible du seul professeur ; elle ne devient une
   note que lorsqu'il la relit et la saisit lui-même (`reviewPaperGrade`) —

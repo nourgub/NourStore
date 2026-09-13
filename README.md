@@ -46,7 +46,9 @@ Arabic), self-hostable with zero mandatory third-party account.
   errors. The teacher can **upload files into it** — a photographed pupil's
   paper, a scanned exam, the syllabus as PDF/Word/Excel, or a ZIP of a whole
   class's papers — and **take the result out as a file**: Word, PDF, or an
-  Excel marks sheet. Everything it produces is saved under the teacher's own
+  Excel marks sheet. A teacher can also keep a small **reference library** —
+  the syllabus, their past papers — uploaded once and attached automatically
+  to every generation. Everything it produces is saved under the teacher's own
   account
   (with a per-mode history), and a mark only reaches a learner and their
   parents once the teacher has reviewed the draft and typed the mark
@@ -193,6 +195,7 @@ server/
   prompts/             the Arabic pedagogical templates those four send
   db/teacherAssistant.ts  storage for all four, scoped to the owning teacher
   attachments/extract.ts  uploaded file → text, or an image/PDF Claude reads itself
+  attachments/references.ts  the saved reference library → attachments, per request
   exports/documentExport.ts  result → Word / PDF / Excel, laid out right-to-left
 drizzle/
   schema.ts           the full database schema
@@ -217,14 +220,20 @@ scripts/
   out of the report, and a grading scale that reviewed marks depend on
   cannot be deleted.
 - **"Learning from your files" means reading them, not training on them.**
-  Files a teacher uploads are read for that one request — as the syllabus to
-  follow, the past paper to imitate, the pupil's answer to grade. No model is
-  trained or fine-tuned on them, and they are not kept as a permanent
-  reference library: each request carries its own attachments.
-- **Uploaded files are read, not archived.** The text extracted from a Word
-  or Excel file, and the image or PDF itself, go to the API for that request;
-  the saved record keeps the filenames, not the file. Old Office formats
-  (`.doc`, `.xls`) are refused with the fix to apply rather than half-parsed.
+  A reference is read on every request — as the syllabus to follow, the past
+  paper to imitate. No model is trained or fine-tuned, which is also why a
+  reference can be switched off or deleted and stops mattering immediately.
+  The library is capped at 20 files per teacher and 8 MB of stored files per
+  request, because every active reference rides along on every generation.
+- **Files attached to a single request are not archived.** The extracted text
+  or the image/PDF goes to the API for that request; the saved record keeps
+  the filenames, not the bytes. Only reference-library files are stored (via
+  the same storage provider as lesson assets). Old Office formats (`.doc`,
+  `.xls`) are refused with the fix to apply rather than half-parsed.
+- **Deleting a reference removes the row, not the stored object.** This
+  codebase has no storage-deletion path anywhere (lesson assets behave the
+  same); inventing one here, possibly against a shared bucket, is not a
+  decision to make as a side effect.
 - **Batch grading is capped per request** (8 papers, 4 at a time): every
   paper is its own API call, so an uncapped class would outlive the request
   and cost accordingly. A full class is a few runs.
