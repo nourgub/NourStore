@@ -169,6 +169,92 @@ pas une ébauche.
   honnête plutôt qu'un faux succès — vérifié par
   `server/chargilyProvider.test.ts`.
 
+## Assistant du professeur (Claude) — désactivé par défaut
+
+Seul appel à une API d'IA tierce du projet, partagé par quatre modules
+enchaînés (transport commun : `server/claudeClient.ts`, prompts arabes isolés
+dans `server/prompts/`) :
+
+1. **Préparation de cours** (`server/lessonPlanner.ts`) — niveau + titre +
+   durée + acquis préalables → plan de cours complet.
+2. **Conception d'examen** (`server/examDesigner.ts`) — le sujet seul, sans
+   corrigé, barème dont le total est exact.
+3. **Corrigé type et barème** (`server/examSolutions.ts`) — sortie JSON,
+   parsée et validée ici (zod) avant tout usage : un barème incomplet
+   produirait sinon une note fausse sur la copie d'un élève réel. Si le JSON
+   est illisible, le texte est conservé et l'erreur affichée, plutôt que de
+   perdre un corrigé entier.
+4. **Correction d'une copie** (`server/paperGrader.ts`) — compare la démarche
+   au corrigé du module 3, points partiels, erreurs classées.
+
+- `ANTHROPIC_API_KEY` — clé récupérée sur
+  https://console.anthropic.com/settings/keys. **Tant qu'elle est vide, le
+  panneau professeur affiche clairement « non activé » et l'endpoint refuse
+  la requête** — jamais de plan de cours inventé localement (vérifié par
+  `server/lessonPlanner.test.ts`).
+- `ANTHROPIC_MODEL` — surcharge facultative. Vide = `claude-opus-5`
+  (`DEFAULT_LESSON_PLANNER_MODEL`) ; `claude-sonnet-5` est l'option moins
+  chère.
+- Facturation à l'usage : un appel API par cours, par sujet, par corrigé et
+  par copie corrigée. Endpoints réservés aux rôles teacher/admin et limités
+  par professeur (`rateLimit`) : **20/heure** pour les modules 1 à 3,
+  **120/heure** pour la correction de copies (un appel par élève, donc une
+  classe entière d'affilée).
+- **Aucun OCR ici** : le module 4 lit le texte que le professeur colle
+  (saisi, ou issu de son propre outil OCR), pas une photo de copie
+  manuscrite. Sa sortie est explicitement une proposition à relire, pas une
+  note définitive — la phrase du prompt voyage avec la réponse de l'API
+  (`PROVISIONAL_GRADING_NOTICE`) pour qu'aucune interface ne puisse la
+  supprimer discrètement.
+- **Stockage (migration `0025_add_teacher_assistant_storage.sql`)** : plans,
+  sujets, barèmes et copies corrigées sont enregistrés sous le compte du
+  professeur (`lessonPlans`, `examPapers`, `examSolutionSets`,
+  `paperGrades`). Chaque requête est filtrée par `teacherId` (un admin
+  passe outre) — `server/db/teacherAssistant.ts` ne contient aucune lecture
+  non filtrée, vérifié par `server/realDbTeacherAssistant.e2e.test.ts` contre
+  un vrai MySQL. Sans `DATABASE_URL`, l'enregistrement devient un no-op et
+  l'assistant continue de fonctionner : la réponse renvoie `id: null` et
+  l'interface prévient que le résultat n'est pas sauvegardé.
+- **Fichiers en entrée** (`server/attachments/extract.ts`) : images, PDF,
+  Word (.docx), Excel (.xlsx), texte/CSV et ZIP. Les images et les PDF sont
+  transmis tels quels à Claude, qui les lit nativement — c'est ce qui permet
+  de corriger une copie photographiée sans pipeline OCR maison. Word et Excel
+  sont convertis en texte côté serveur ; un ZIP est ouvert (un seul niveau,
+  50 fichiers et 40 Mo décompressés au maximum, taille déclarée vérifiée
+  **avant** décompression : pas de zip bomb). Les anciens formats binaires
+  (.doc, .xls) sont refusés avec la marche à suivre, jamais à moitié
+  interprétés. Chaque fichier passe par le même validateur que les pièces
+  jointes de cours (taille réelle, cohérence extension/MIME, exécutables
+  bloqués, signature binaire).
+- **Fichiers en sortie** (`server/exports/documentExport.ts`) : Word, PDF et
+  un classeur Excel des notes, tous en arabe de droite à gauche — le PDF
+  réutilise la police arabe embarquée et le réglage `features: ["rtla"]`
+  déjà éprouvés par les attestations.
+- **Correction en lot** : 8 copies par requête, 4 en parallèle (chaque copie
+  est un appel API distinct). Une classe entière se fait en quelques lots.
+- **Bibliothèque de références** (`teacherReferences`, migration
+  `0026_add_teacher_reference_library.sql`) : le professeur téléverse une fois
+  le programme ou ses anciens sujets, et ces fichiers sont joints
+  automatiquement à chaque génération. Word/Excel/texte sont convertis une
+  seule fois, à l'ajout, et conservés en base ; images et PDF sont stockés via
+  le fournisseur de stockage configuré (disque local par défaut) et relus à
+  chaque requête, puisque Claude lit ces formats lui-même. Portée réglable par
+  module, activation/désactivation, 20 références par professeur et 8 Mo de
+  fichiers joints par requête — chaque référence active est refacturée à
+  chaque génération.
+- **« Apprendre de mes fichiers » = les lire, pas s'entraîner dessus.** Aucun
+  modèle n'est entraîné : une référence désactivée ou supprimée cesse d'agir
+  immédiatement, ce qu'un modèle entraîné ne pourrait pas promettre. La
+  suppression retire la ligne, pas l'objet stocké — ce dépôt n'a aucun chemin
+  de suppression de stockage (les pièces jointes de cours non plus).
+- **Une note proposée n'est jamais la note de l'élève.** Une copie corrigée
+  est stockée en `draft`, visible du seul professeur ; elle ne devient une
+  note que lorsqu'il la relit et la saisit lui-même (`reviewPaperGrade`) —
+  c'est à ce moment, et pas avant, que l'élève et ses parents liés sont
+  notifiés. Le chiffre proposé n'est jamais extrait automatiquement du
+  rapport, et un barème dont dépendent des notes définitives ne peut pas
+  être supprimé.
+
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 
 Alternative pleinement fonctionnelle à BaridiMob, contrairement à ce dernier

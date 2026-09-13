@@ -82,6 +82,25 @@ export async function s3Get(
   return { key, url };
 }
 
+/**
+ * Reads an object back as bytes (see localReadBytes for why this exists).
+ * Returns null when the object is gone rather than throwing.
+ */
+export async function s3ReadBytes(relKey: string): Promise<Buffer | null> {
+  try {
+    const response = await getClient().send(
+      new GetObjectCommand({ Bucket: ENV.s3Bucket, Key: normalizeKey(relKey) })
+    );
+    const body = response.Body as
+      | { transformToByteArray?: () => Promise<Uint8Array> }
+      | undefined;
+    if (!body?.transformToByteArray) return null;
+    return Buffer.from(await body.transformToByteArray());
+  } catch {
+    return null;
+  }
+}
+
 export async function s3GetSignedUrl(
   relKey: string,
   expiresInSeconds = 3600

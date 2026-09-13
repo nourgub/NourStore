@@ -101,6 +101,12 @@ export default function Dashboard() {
     totalStudySeconds > 0
       ? `${Math.floor(totalStudySeconds / 3600)}h${String(Math.round((totalStudySeconds % 3600) / 60)).padStart(2, "0")}`
       : "—";
+  // Marks a teacher confirmed on a corrected paper (teacher assistant,
+  // module 4). Only reviewed ones are ever returned — a draft AI suggestion
+  // is not a mark, see server/db/teacherAssistant.ts.
+  const paperGradesQuery = trpc.learner.myPaperGrades.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   const createInvite = trpc.learner.createInvite.useMutation();
   const [inviteCode, setInviteCode] = useState("");
   useEffect(() => {
@@ -387,6 +393,40 @@ export default function Dashboard() {
                 </div>
               )}
             </section>
+            {(paperGradesQuery.data ?? []).length > 0 && (
+              <section>
+                <div className="dashboard-section-title">
+                  <h2>
+                    {lang === "ar"
+                      ? "أوراق مصححة"
+                      : lang === "fr"
+                        ? "Copies corrigées"
+                        : "Corrected papers"}
+                  </h2>
+                </div>
+                {(paperGradesQuery.data ?? []).slice(0, 5).map(grade => (
+                  <div className="dashboard-task" key={grade.id}>
+                    <span>
+                      <FileCheck2 size={16} />
+                    </span>
+                    <div>
+                      <strong>
+                        {grade.finalPoints}/{grade.maxPoints}
+                      </strong>
+                      <small>
+                        {grade.teacherNotes ||
+                          (lang === "ar"
+                            ? "راجع ورقتك مع أستاذك."
+                            : lang === "fr"
+                              ? "Revoyez votre copie avec votre enseignant."
+                              : "Review your paper with your teacher.")}
+                      </small>
+                    </div>
+                    <em>{grade.finalPoints}</em>
+                  </div>
+                ))}
+              </section>
+            )}
             <section>
               <div className="dashboard-section-title">
                 <h2>{t.upcoming}</h2>

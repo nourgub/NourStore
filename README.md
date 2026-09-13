@@ -37,6 +37,23 @@ Arabic), self-hostable with zero mandatory third-party account.
 - Gamification (streaks/badges), coupons, and a referral system
 - An "algorithm lab" with real sandboxed code execution and hidden test
   cases
+- A **maths teacher assistant** (Claude) with four chained modules: prepare
+  a lesson (objectives, opening situation, timed breakdown, worked examples,
+  graded exercises, common mistakes), design an exam paper (balanced
+  coverage, varied question types, rising difficulty, exact total), produce
+  the model solution and a per-step grading scale as JSON, and grade one
+  student's paper against that scale with partial credit and classified
+  errors. The teacher can **upload files into it** — a photographed pupil's
+  paper, a scanned exam, the syllabus as PDF/Word/Excel, or a ZIP of a whole
+  class's papers — and **take the result out as a file**: Word, PDF, or an
+  Excel marks sheet. A teacher can also keep a small **reference library** —
+  the syllabus, their past papers — uploaded once and attached automatically
+  to every generation. Everything it produces is saved under the teacher's own
+  account
+  (with a per-mode history), and a mark only reaches a learner and their
+  parents once the teacher has reviewed the draft and typed the mark
+  themselves. This is the one feature that calls a third-party AI API and it
+  stays off until `ANTHROPIC_API_KEY` is set — see "Known limitations" below
 - Installable PWA (offline fallback page, install prompt), `robots.txt`,
   and a dynamic `sitemap.xml` that stays in sync with published courses
 
@@ -65,7 +82,8 @@ npm run dev                   # http://localhost:3000
 | `npm run check` | TypeScript typecheck, no build output |
 | `npm test` | Run the whole test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
 | `npm run test:unit` | Run only the fast, database-free tests — always safe, no infra needed |
-| `npm run test:db` | Run only `server/realDb.e2e.test.ts` against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:db` | Run the real-database suites (`server/realDb*.e2e.test.ts`) against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:db:memory` | Same suites, against a throwaway MySQL this script starts itself — no `DATABASE_URL`, no Docker (needs `libaio1t64` and `libnuma1` on Debian/Ubuntu) |
 | `npm run test:db:repeat [count]` | Run `test:db` `count` times (default 5), stopping at the first failure — checks for flakiness, not just a single pass |
 | `npm run test:all` | Same as `npm test` — both names exist so either convention works |
 | `npm run migrate` | Apply every not-yet-applied migration in `drizzle/*.sql` |
@@ -169,6 +187,16 @@ server/
   db/                 one file per domain (courses, subscriptions, quizzes, users, ...)
   _core/              env config, session/cookies, Google OAuth, Express wiring
   *Provider.ts         payment provider integrations (baridimob, slickpay)
+  claudeClient.ts      the one Claude call the teacher assistant's modules share
+  lessonPlanner.ts     module 1 — lesson preparation
+  examDesigner.ts      module 2 — exam design (the paper only, no solutions)
+  examSolutions.ts     module 3 — model solution + grading scale, parsed JSON
+  paperGrader.ts       module 4 — grades one paper against module 3's scale
+  prompts/             the Arabic pedagogical templates those four send
+  db/teacherAssistant.ts  storage for all four, scoped to the owning teacher
+  attachments/extract.ts  uploaded file → text, or an image/PDF Claude reads itself
+  attachments/references.ts  the saved reference library → attachments, per request
+  exports/documentExport.ts  result → Word / PDF / Excel, laid out right-to-left
 drizzle/
   schema.ts           the full database schema
   *.sql                migrations, applied in filename order by scripts/migrate.mjs
@@ -178,6 +206,37 @@ scripts/
 ```
 
 ## Known limitations (stated honestly, not silently left undocumented)
+
+- **The teacher assistant needs a paid Claude API key, and is the only
+  third-party dependency that costs money per use.** Without
+  `ANTHROPIC_API_KEY` the teacher panel says so plainly and every endpoint
+  refuses — none of them returns a locally invented lesson plan, exam or
+  mark, because a fabricated plan taken into a classroom (or a fabricated
+  mark handed to a student) is worse than none.
+- **An AI-suggested mark is never a learner's mark.** A graded paper is
+  stored as a draft the teacher alone can see; it becomes a real mark only
+  when the teacher reviews it and types the mark, which is what notifies the
+  learner and their linked parents. The suggested figure is never scraped
+  out of the report, and a grading scale that reviewed marks depend on
+  cannot be deleted.
+- **"Learning from your files" means reading them, not training on them.**
+  A reference is read on every request — as the syllabus to follow, the past
+  paper to imitate. No model is trained or fine-tuned, which is also why a
+  reference can be switched off or deleted and stops mattering immediately.
+  The library is capped at 20 files per teacher and 8 MB of stored files per
+  request, because every active reference rides along on every generation.
+- **Files attached to a single request are not archived.** The extracted text
+  or the image/PDF goes to the API for that request; the saved record keeps
+  the filenames, not the bytes. Only reference-library files are stored (via
+  the same storage provider as lesson assets). Old Office formats (`.doc`,
+  `.xls`) are refused with the fix to apply rather than half-parsed.
+- **Deleting a reference removes the row, not the stored object.** This
+  codebase has no storage-deletion path anywhere (lesson assets behave the
+  same); inventing one here, possibly against a shared bucket, is not a
+  decision to make as a side effect.
+- **Batch grading is capped per request** (8 papers, 4 at a time): every
+  paper is its own API call, so an uncapped class would outlive the request
+  and cost accordingly. A full class is a few runs.
 
 - **No outbound email anywhere in this codebase.** Every flow that would
   conventionally use email (password reset, notifications) is deliberately

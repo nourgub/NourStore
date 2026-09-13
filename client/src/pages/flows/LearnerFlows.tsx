@@ -666,6 +666,11 @@ export function ParentSpace() {
   const reportsQuery = trpc.parent.reports.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+  // Marks their teacher confirmed on a corrected paper — reviewed only, same
+  // rule as the learner's own view (server/db/teacherAssistant.ts).
+  const paperGradesQuery = trpc.parent.paperGrades.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   if (!isAuthenticated || !["parent", "admin"].includes(user?.role || ""))
     return <AccessGate title={t.parent} lang={lang} setLang={setLang} />;
   const children = dashboardQuery.data ?? [];
@@ -944,6 +949,47 @@ export function ParentSpace() {
                               lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-US"
                             )}
                           </small>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {(paperGradesQuery.data ?? []).filter(
+                  grade => grade.learnerId === child.childId
+                ).length > 0 && (
+                  <div style={{ marginTop: 18 }}>
+                    <span className="section-kicker">
+                      {lang === "ar"
+                        ? "أوراق مصححة"
+                        : lang === "fr"
+                          ? "Copies corrigées"
+                          : "Corrected papers"}
+                    </span>
+                    {(paperGradesQuery.data ?? [])
+                      .filter(grade => grade.learnerId === child.childId)
+                      .map(grade => (
+                        <div
+                          key={grade.id}
+                          style={{
+                            marginTop: 10,
+                            paddingTop: 10,
+                            borderTop: "1px solid rgba(255,255,255,.08)",
+                          }}
+                        >
+                          <strong style={{ display: "block", fontSize: 12 }}>
+                            {grade.finalPoints}/{grade.maxPoints}
+                          </strong>
+                          {grade.teacherNotes && (
+                            <p className="quiet-label" style={{ margin: "4px 0" }}>
+                              {grade.teacherNotes}
+                            </p>
+                          )}
+                          {grade.reviewedAt && (
+                            <small style={{ color: "#706b63" }}>
+                              {new Date(grade.reviewedAt).toLocaleDateString(
+                                lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-US"
+                              )}
+                            </small>
+                          )}
                         </div>
                       ))}
                   </div>
