@@ -169,6 +169,28 @@ pas une ébauche.
   honnête plutôt qu'un faux succès — vérifié par
   `server/chargilyProvider.test.ts`.
 
+## Assistant de préparation de cours (Claude) — désactivé par défaut
+
+`server/lessonPlanner.ts` est le seul appel à une API d'IA tierce du projet :
+le professeur saisit un niveau, un titre de cours, une durée et (au choix)
+les acquis préalables, et reçoit un plan de cours complet en arabe. Le prompt
+pédagogique lui-même est isolé dans `server/prompts/mathLessonPlan.ts`.
+
+- `ANTHROPIC_API_KEY` — clé récupérée sur
+  https://console.anthropic.com/settings/keys. **Tant qu'elle est vide, le
+  panneau professeur affiche clairement « non activé » et l'endpoint refuse
+  la requête** — jamais de plan de cours inventé localement (vérifié par
+  `server/lessonPlanner.test.ts`).
+- `ANTHROPIC_MODEL` — surcharge facultative. Vide = `claude-opus-5`
+  (`DEFAULT_LESSON_PLANNER_MODEL`) ; `claude-sonnet-5` est l'option moins
+  chère.
+- Facturation à l'usage : un appel API par cours préparé. L'endpoint
+  `teacher.generateLessonPlan` est limité à **20 requêtes par professeur et
+  par heure** (`rateLimit`), et réservé aux rôles teacher/admin.
+- Les plans générés ne sont pas enregistrés en base : le professeur copie le
+  résultat. Les persister serait un changement de schéma, à décider
+  explicitement.
+
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 
 Alternative pleinement fonctionnelle à BaridiMob, contrairement à ce dernier

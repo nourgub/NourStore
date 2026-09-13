@@ -66,6 +66,7 @@ import {
   AlgorithmExerciseAdminPanel,
   SkillsAdminPanel,
 } from "./staff/AlgorithmLabManagement";
+import { LessonPlannerPanel } from "./staff/LessonPlannerPanel";
 import {
   ContentAnalyticsPanel,
   ErrorLogPanel,
@@ -971,6 +972,7 @@ export function StaffSpace({
         {admin && <CreateUserPanel lang={lang} />}
         {admin && <EnrollLearnerPanel lang={lang} />}
         {!institution && <MyStudentsPanel lang={lang} />}
+        {!institution && <LessonPlannerPanel lang={lang} />}
         <ContentStructureForm lang={lang} courses={managedCourses} />
         <QuizBuilder lang={lang} />
         <FinalExamBuilder lang={lang} />

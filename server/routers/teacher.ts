@@ -5,6 +5,11 @@ import { teacherProcedure, rateLimit } from "../_core/procedures";
 import { createMeetEvent } from "../_core/googleCalendar";
 import { isGoogleConfigured } from "../_core/googleAuth";
 import {
+  generateMathLessonPlan,
+  isLessonPlannerConfigured,
+  lessonPlannerModel,
+} from "../lessonPlanner";
+import {
   getCoursesForRole,
   getManagedLearnerCount,
   getStudentsForTeacher,
@@ -78,6 +83,41 @@ export const teacherRouter = router({
       if (!saved)
         throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
       return { ok: true, meetUrl: meetResult.meetUrl };
+    }),
+  // Teacher assistant — maths lesson preparation. Lets the lesson-planner
+  // panel say plainly that the feature is off on a deployment with no
+  // ANTHROPIC_API_KEY set, instead of offering a button that can only fail.
+  lessonPlannerStatus: teacherProcedure.query(() => ({
+    configured: isLessonPlannerConfigured(),
+    model: lessonPlannerModel(),
+  })),
+  // One Claude call per submission — rate-limited per teacher because each
+  // one is a real, paid API request, not a database read.
+  generateLessonPlan: teacherProcedure
+    .use(rateLimit("teacher-generate-lesson-plan", 20, 60 * 60 * 1000))
+    .input(
+      z.object({
+        level: z.string().min(2).max(80),
+        topic: z.string().min(2).max(160),
+        durationMinutes: z.number().int().min(15).max(240).default(60),
+        // Optional on purpose: the prompt tells Claude to ask for missing
+        // context rather than assume it — see server/prompts/mathLessonPlan.ts.
+        priorKnowledge: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const result = await generateMathLessonPlan(input);
+      if (!result.ok) {
+        if (result.reason === "not_configured")
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: result.message,
+          });
+        if (result.reason === "refused")
+          throw new TRPCError({ code: "BAD_REQUEST", message: result.message });
+        throw new TRPCError({ code: "BAD_GATEWAY", message: result.message });
+      }
+      return result;
     }),
   sendReport: teacherProcedure
     .use(rateLimit("teacher-send-report", 60, 60 * 60 * 1000))
