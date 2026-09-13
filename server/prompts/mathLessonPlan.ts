@@ -12,9 +12,10 @@
 //
 // Placeholders are written `{...}` rather than `${...}` on purpose: this file
 // is a template *string*, and fillMathLessonPlanPrompt() is the only thing
-// allowed to substitute into it, so a missing field fails loudly (see the
-// leftover-placeholder check) instead of silently reaching Claude as the
-// literal word "undefined".
+// allowed to substitute into it, so a missing field fails loudly (see
+// fillTemplate) instead of silently reaching Claude as a literal "{...}".
+
+import { fillTemplate } from "./fillTemplate";
 
 export const MATH_LESSON_PLAN_TEMPLATE = `أنت مساعد بيداغوجي متخصص في تدريس الرياضيات.
 
@@ -78,23 +79,12 @@ export const UNSPECIFIED_PRIOR_KNOWLEDGE = "غير محددة";
  * leftover `{...}` would otherwise reach Claude as a literal placeholder and
  * come back as a plausible-looking plan for the wrong level.
  */
-export function fillMathLessonPlanPrompt(
-  context: MathLessonPlanContext
-): string {
-  const priorKnowledge =
-    context.priorKnowledge?.trim() || UNSPECIFIED_PRIOR_KNOWLEDGE;
-  const filled = MATH_LESSON_PLAN_TEMPLATE.replaceAll(
-    "{المستوى}",
-    context.level.trim()
-  )
-    .replaceAll("{العنوان}", context.topic.trim())
-    .replaceAll("{المدة}", String(context.durationMinutes))
-    .replaceAll("{المكتسبات}", priorKnowledge);
-  const leftover = filled.match(/\{[^}\n]+\}/);
-  if (leftover) {
-    throw new Error(
-      `Math lesson prompt still contains an unfilled placeholder: ${leftover[0]}`
-    );
-  }
-  return filled;
+export function fillMathLessonPlanPrompt(context: MathLessonPlanContext): string {
+  return fillTemplate(MATH_LESSON_PLAN_TEMPLATE, {
+    "{المستوى}": context.level.trim(),
+    "{العنوان}": context.topic.trim(),
+    "{المدة}": String(context.durationMinutes),
+    "{المكتسبات}":
+      context.priorKnowledge?.trim() || UNSPECIFIED_PRIOR_KNOWLEDGE,
+  });
 }

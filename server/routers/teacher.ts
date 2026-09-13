@@ -5,10 +5,14 @@ import { teacherProcedure, rateLimit } from "../_core/procedures";
 import { createMeetEvent } from "../_core/googleCalendar";
 import { isGoogleConfigured } from "../_core/googleAuth";
 import {
-  generateMathLessonPlan,
-  isLessonPlannerConfigured,
-  lessonPlannerModel,
-} from "../lessonPlanner";
+  claudeModel,
+  isClaudeConfigured,
+  type ClaudeTextResult,
+} from "../claudeClient";
+import { generateMathLessonPlan } from "../lessonPlanner";
+import { designMathExam } from "../examDesigner";
+import { solveMathExam } from "../examSolutions";
+import { gradeStudentPaper, PROVISIONAL_GRADING_NOTICE } from "../paperGrader";
 import {
   getCoursesForRole,
   getManagedLearnerCount,
@@ -84,15 +88,20 @@ export const teacherRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
       return { ok: true, meetUrl: meetResult.meetUrl };
     }),
-  // Teacher assistant — maths lesson preparation. Lets the lesson-planner
-  // panel say plainly that the feature is off on a deployment with no
-  // ANTHROPIC_API_KEY set, instead of offering a button that can only fail.
-  lessonPlannerStatus: teacherProcedure.query(() => ({
-    configured: isLessonPlannerConfigured(),
-    model: lessonPlannerModel(),
+  // ---------------------------------------------------------------------
+  // Teacher assistant (Claude) — four modules over one shared integration:
+  // lesson preparation, exam design, model solutions, paper grading. Each is
+  // a real, paid API call, so each is rate-limited per teacher; none of them
+  // touches the database.
+  // ---------------------------------------------------------------------
+  // Lets the assistant panel say plainly that the feature is off on a
+  // deployment with no ANTHROPIC_API_KEY set, instead of offering buttons
+  // that can only fail.
+  assistantStatus: teacherProcedure.query(() => ({
+    configured: isClaudeConfigured(),
+    model: claudeModel(),
   })),
-  // One Claude call per submission — rate-limited per teacher because each
-  // one is a real, paid API request, not a database read.
+  // 1 — تحضير الدروس
   generateLessonPlan: teacherProcedure
     .use(rateLimit("teacher-generate-lesson-plan", 20, 60 * 60 * 1000))
     .input(
@@ -105,20 +114,46 @@ export const teacherRouter = router({
         priorKnowledge: z.string().max(2000).optional(),
       })
     )
+    .mutation(async ({ input }) => asMarkdown(await generateMathLessonPlan(input))),
+  // 2 — تصميم الامتحانات (the paper only; solutions are a separate call)
+  generateExam: teacherProcedure
+    .use(rateLimit("teacher-generate-exam", 20, 60 * 60 * 1000))
+    .input(
+      z.object({
+        level: z.string().min(2).max(80),
+        topics: z.array(z.string().min(2).max(120)).min(1).max(12),
+        durationMinutes: z.number().int().min(15).max(300).default(120),
+        totalPoints: z.number().int().min(1).max(100).default(20),
+      })
+    )
+    .mutation(async ({ input }) => asMarkdown(await designMathExam(input))),
+  // 3 — التصحيح النموذجي وسلم التنقيط. Returns the JSON parsed AND raw: when
+  // the reply cannot be read as the agreed shape, the teacher still gets the
+  // text plus the reason, rather than losing a full model solution.
+  generateExamSolutions: teacherProcedure
+    .use(rateLimit("teacher-generate-exam-solutions", 20, 60 * 60 * 1000))
+    .input(z.object({ examText: z.string().min(20).max(20000) }))
     .mutation(async ({ input }) => {
-      const result = await generateMathLessonPlan(input);
-      if (!result.ok) {
-        if (result.reason === "not_configured")
-          throw new TRPCError({
-            code: "PRECONDITION_FAILED",
-            message: result.message,
-          });
-        if (result.reason === "refused")
-          throw new TRPCError({ code: "BAD_REQUEST", message: result.message });
-        throw new TRPCError({ code: "BAD_GATEWAY", message: result.message });
-      }
+      const result = await solveMathExam(input);
+      if (!result.ok) throw assistantError(result);
       return result;
     }),
+  // 4 — تصحيح أوراق التلاميذ, against the module 3 grading scale. Higher
+  // limit than the others: one call per student, i.e. a full class in a
+  // sitting. No OCR here — studentAnswerText is text the teacher supplies.
+  gradeStudentPaper: teacherProcedure
+    .use(rateLimit("teacher-grade-student-paper", 120, 60 * 60 * 1000))
+    .input(
+      z.object({
+        solutionsJson: z.string().min(2).max(60000),
+        studentAnswerText: z.string().min(10).max(20000),
+      })
+    )
+    .mutation(async ({ input }) => ({
+      ...asMarkdown(await gradeStudentPaper(input)),
+      // Travels with the result so no UI can quietly drop the caveat.
+      provisional: PROVISIONAL_GRADING_NOTICE,
+    })),
   sendReport: teacherProcedure
     .use(rateLimit("teacher-send-report", 60, 60 * 60 * 1000))
     .input(
@@ -144,3 +179,31 @@ export const teacherRouter = router({
       return result;
     }),
 });
+
+/**
+ * Maps a Claude failure onto the right tRPC code: a missing key is a
+ * deployment precondition, a refusal is about this specific request, and
+ * anything else is the upstream API failing.
+ */
+function assistantError(
+  result: Extract<ClaudeTextResult, { ok: false }>
+): TRPCError {
+  if (result.reason === "not_configured")
+    return new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: result.message,
+    });
+  if (result.reason === "refused")
+    return new TRPCError({ code: "BAD_REQUEST", message: result.message });
+  return new TRPCError({ code: "BAD_GATEWAY", message: result.message });
+}
+
+/** Shared success shape for the three Markdown-returning modules. */
+function asMarkdown(result: ClaudeTextResult) {
+  if (!result.ok) throw assistantError(result);
+  return {
+    markdown: result.text,
+    model: result.model,
+    truncated: result.truncated,
+  };
+}

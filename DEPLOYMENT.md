@@ -169,12 +169,23 @@ pas une ébauche.
   honnête plutôt qu'un faux succès — vérifié par
   `server/chargilyProvider.test.ts`.
 
-## Assistant de préparation de cours (Claude) — désactivé par défaut
+## Assistant du professeur (Claude) — désactivé par défaut
 
-`server/lessonPlanner.ts` est le seul appel à une API d'IA tierce du projet :
-le professeur saisit un niveau, un titre de cours, une durée et (au choix)
-les acquis préalables, et reçoit un plan de cours complet en arabe. Le prompt
-pédagogique lui-même est isolé dans `server/prompts/mathLessonPlan.ts`.
+Seul appel à une API d'IA tierce du projet, partagé par quatre modules
+enchaînés (transport commun : `server/claudeClient.ts`, prompts arabes isolés
+dans `server/prompts/`) :
+
+1. **Préparation de cours** (`server/lessonPlanner.ts`) — niveau + titre +
+   durée + acquis préalables → plan de cours complet.
+2. **Conception d'examen** (`server/examDesigner.ts`) — le sujet seul, sans
+   corrigé, barème dont le total est exact.
+3. **Corrigé type et barème** (`server/examSolutions.ts`) — sortie JSON,
+   parsée et validée ici (zod) avant tout usage : un barème incomplet
+   produirait sinon une note fausse sur la copie d'un élève réel. Si le JSON
+   est illisible, le texte est conservé et l'erreur affichée, plutôt que de
+   perdre un corrigé entier.
+4. **Correction d'une copie** (`server/paperGrader.ts`) — compare la démarche
+   au corrigé du module 3, points partiels, erreurs classées.
 
 - `ANTHROPIC_API_KEY` — clé récupérée sur
   https://console.anthropic.com/settings/keys. **Tant qu'elle est vide, le
@@ -184,12 +195,20 @@ pédagogique lui-même est isolé dans `server/prompts/mathLessonPlan.ts`.
 - `ANTHROPIC_MODEL` — surcharge facultative. Vide = `claude-opus-5`
   (`DEFAULT_LESSON_PLANNER_MODEL`) ; `claude-sonnet-5` est l'option moins
   chère.
-- Facturation à l'usage : un appel API par cours préparé. L'endpoint
-  `teacher.generateLessonPlan` est limité à **20 requêtes par professeur et
-  par heure** (`rateLimit`), et réservé aux rôles teacher/admin.
-- Les plans générés ne sont pas enregistrés en base : le professeur copie le
-  résultat. Les persister serait un changement de schéma, à décider
-  explicitement.
+- Facturation à l'usage : un appel API par cours, par sujet, par corrigé et
+  par copie corrigée. Endpoints réservés aux rôles teacher/admin et limités
+  par professeur (`rateLimit`) : **20/heure** pour les modules 1 à 3,
+  **120/heure** pour la correction de copies (un appel par élève, donc une
+  classe entière d'affilée).
+- **Aucun OCR ici** : le module 4 lit le texte que le professeur colle
+  (saisi, ou issu de son propre outil OCR), pas une photo de copie
+  manuscrite. Sa sortie est explicitement une proposition à relire, pas une
+  note définitive — la phrase du prompt voyage avec la réponse de l'API
+  (`PROVISIONAL_GRADING_NOTICE`) pour qu'aucune interface ne puisse la
+  supprimer discrètement.
+- Rien n'est enregistré en base : plans, sujets, barèmes et notes vivent dans
+  l'onglet du professeur jusqu'à ce qu'il les copie. Les persister serait un
+  changement de schéma, à décider explicitement.
 
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 

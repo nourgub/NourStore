@@ -37,12 +37,14 @@ Arabic), self-hostable with zero mandatory third-party account.
 - Gamification (streaks/badges), coupons, and a referral system
 - An "algorithm lab" with real sandboxed code execution and hidden test
   cases
-- A teacher assistant for **maths lesson preparation**: a level + topic +
-  lesson length become a full Arabic lesson plan (objectives, opening
-  situation, timed breakdown, two worked examples, four graded exercises,
-  three common mistakes). This is the one feature that calls a third-party
-  AI API (Claude) and it stays off until `ANTHROPIC_API_KEY` is set — see
-  "Known limitations" below
+- A **maths teacher assistant** (Claude) with four chained modules: prepare
+  a lesson (objectives, opening situation, timed breakdown, worked examples,
+  graded exercises, common mistakes), design an exam paper (balanced
+  coverage, varied question types, rising difficulty, exact total), produce
+  the model solution and a per-step grading scale as JSON, and grade one
+  student's paper against that scale with partial credit and classified
+  errors. This is the one feature that calls a third-party AI API and it
+  stays off until `ANTHROPIC_API_KEY` is set — see "Known limitations" below
 - Installable PWA (offline fallback page, install prompt), `robots.txt`,
   and a dynamic `sitemap.xml` that stays in sync with published courses
 
@@ -175,8 +177,12 @@ server/
   db/                 one file per domain (courses, subscriptions, quizzes, users, ...)
   _core/              env config, session/cookies, Google OAuth, Express wiring
   *Provider.ts         payment provider integrations (baridimob, slickpay)
-  lessonPlanner.ts     the teacher maths lesson planner's Claude API call
-  prompts/             the pedagogical prompt templates it sends (Arabic)
+  claudeClient.ts      the one Claude call the teacher assistant's modules share
+  lessonPlanner.ts     module 1 — lesson preparation
+  examDesigner.ts      module 2 — exam design (the paper only, no solutions)
+  examSolutions.ts     module 3 — model solution + grading scale, parsed JSON
+  paperGrader.ts       module 4 — grades one paper against module 3's scale
+  prompts/             the Arabic pedagogical templates those four send
 drizzle/
   schema.ts           the full database schema
   *.sql                migrations, applied in filename order by scripts/migrate.mjs
@@ -187,13 +193,21 @@ scripts/
 
 ## Known limitations (stated honestly, not silently left undocumented)
 
-- **The maths lesson planner needs a paid Claude API key, and is the only
+- **The teacher assistant needs a paid Claude API key, and is the only
   third-party dependency that costs money per use.** Without
-  `ANTHROPIC_API_KEY` the teacher panel says so plainly and the endpoint
-  refuses — it never returns a locally invented "lesson plan", because a
-  fabricated plan taken into a classroom is worse than no plan. Generated
-  plans are also **not stored**: the teacher copies the result out, and
-  re-opening the panel starts from a blank form.
+  `ANTHROPIC_API_KEY` the teacher panel says so plainly and every endpoint
+  refuses — none of them returns a locally invented lesson plan, exam or
+  mark, because a fabricated plan taken into a classroom (or a fabricated
+  mark handed to a student) is worse than none.
+- **Nothing the assistant produces is stored.** Lesson plans, exams, grading
+  scales and marks live in the browser tab until the teacher copies them
+  out; leaving the panel loses them, and no mark is ever written to a
+  learner's record. Persisting them is a schema change, to decide
+  explicitly.
+- **There is no OCR in this codebase.** The paper-grading module reads text
+  the teacher pastes in (typed, or produced by an OCR tool of their own) —
+  it does not read a photo of a handwritten paper. Its output is also
+  explicitly a draft for the teacher to review, not a final mark.
 
 - **No outbound email anywhere in this codebase.** Every flow that would
   conventionally use email (password reset, notifications) is deliberately

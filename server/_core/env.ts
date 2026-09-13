@@ -79,10 +79,12 @@ export const ENV = {
   // Redis can be self-hosted with zero external account, see the `redis`
   // service in docker-compose.yml.
   redisUrl: process.env.REDIS_URL ?? "",
-  // Claude (Anthropic Messages API) — powers the teacher-facing maths lesson
-  // planner (server/lessonPlanner.ts). Unset by default, like every other
-  // optional integration here: without ANTHROPIC_API_KEY the planner reports
-  // itself as unconfigured instead of inventing a lesson plan locally. Get a
+  // Claude (Anthropic Messages API) — powers the four teacher-assistant
+  // modules (lesson preparation, exam design, model solutions + grading
+  // scale, student-paper grading) through server/claudeClient.ts. Unset by
+  // default, like every other optional integration here: without
+  // ANTHROPIC_API_KEY they report themselves as unconfigured instead of
+  // inventing a lesson plan or a mark locally. Get a
   // key from https://console.anthropic.com/settings/keys. ANTHROPIC_MODEL is
   // an optional override — leave it empty to use the planner's own default
   // (see DEFAULT_LESSON_PLANNER_MODEL in server/lessonPlanner.ts).
@@ -188,10 +190,10 @@ export function checkEnv(): EnvCheckResult {
 
   if (ENV.isProduction && !ENV.anthropicApiKey) {
     warnings.push(
-      "ANTHROPIC_API_KEY is not set. The teacher maths lesson planner " +
-        "(Teacher panel → تحضير درس) will refuse to generate anything and " +
-        "say so, rather than returning a made-up lesson plan. Set it to " +
-        "enable the feature."
+      "ANTHROPIC_API_KEY is not set. The teacher assistant (lesson " +
+        "preparation, exam design, model solutions, paper grading) will " +
+        "refuse to generate anything and say so, rather than returning a " +
+        "made-up lesson plan or mark. Set it to enable the feature."
     );
   }
 
