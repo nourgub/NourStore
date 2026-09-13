@@ -43,7 +43,11 @@ Arabic), self-hostable with zero mandatory third-party account.
   coverage, varied question types, rising difficulty, exact total), produce
   the model solution and a per-step grading scale as JSON, and grade one
   student's paper against that scale with partial credit and classified
-  errors. Everything it produces is saved under the teacher's own account
+  errors. The teacher can **upload files into it** — a photographed pupil's
+  paper, a scanned exam, the syllabus as PDF/Word/Excel, or a ZIP of a whole
+  class's papers — and **take the result out as a file**: Word, PDF, or an
+  Excel marks sheet. Everything it produces is saved under the teacher's own
+  account
   (with a per-mode history), and a mark only reaches a learner and their
   parents once the teacher has reviewed the draft and typed the mark
   themselves. This is the one feature that calls a third-party AI API and it
@@ -188,6 +192,8 @@ server/
   paperGrader.ts       module 4 — grades one paper against module 3's scale
   prompts/             the Arabic pedagogical templates those four send
   db/teacherAssistant.ts  storage for all four, scoped to the owning teacher
+  attachments/extract.ts  uploaded file → text, or an image/PDF Claude reads itself
+  exports/documentExport.ts  result → Word / PDF / Excel, laid out right-to-left
 drizzle/
   schema.ts           the full database schema
   *.sql                migrations, applied in filename order by scripts/migrate.mjs
@@ -210,10 +216,18 @@ scripts/
   learner and their linked parents. The suggested figure is never scraped
   out of the report, and a grading scale that reviewed marks depend on
   cannot be deleted.
-- **There is no OCR in this codebase.** The paper-grading module reads text
-  the teacher pastes in (typed, or produced by an OCR tool of their own) —
-  it does not read a photo of a handwritten paper. Its output is also
-  explicitly a draft for the teacher to review, not a final mark.
+- **"Learning from your files" means reading them, not training on them.**
+  Files a teacher uploads are read for that one request — as the syllabus to
+  follow, the past paper to imitate, the pupil's answer to grade. No model is
+  trained or fine-tuned on them, and they are not kept as a permanent
+  reference library: each request carries its own attachments.
+- **Uploaded files are read, not archived.** The text extracted from a Word
+  or Excel file, and the image or PDF itself, go to the API for that request;
+  the saved record keeps the filenames, not the file. Old Office formats
+  (`.doc`, `.xls`) are refused with the fix to apply rather than half-parsed.
+- **Batch grading is capped per request** (8 papers, 4 at a time): every
+  paper is its own API call, so an uncapped class would outlive the request
+  and cost accordingly. A full class is a few runs.
 
 - **No outbound email anywhere in this codebase.** Every flow that would
   conventionally use email (password reset, notifications) is deliberately

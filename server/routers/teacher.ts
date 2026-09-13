@@ -14,6 +14,23 @@ import { designMathExam } from "../examDesigner";
 import { solveMathExam } from "../examSolutions";
 import { gradeStudentPaper, PROVISIONAL_GRADING_NOTICE } from "../paperGrader";
 import {
+  extractAttachment,
+  type AttachmentInput,
+  type ExtractedAttachment,
+} from "../attachments/extract";
+import {
+  formatSolutionsForExport,
+  examSolutionsSchema,
+} from "../examSolutions";
+import {
+  EXPORT_CONTENT_TYPES,
+  safeFileName,
+  toDocx,
+  toMarksXlsx,
+  toPdf,
+  type ExportFormat,
+} from "../exports/documentExport";
+import {
   deleteExamPaper,
   deleteExamSolutionSet,
   deleteLessonPlan,
@@ -43,6 +60,77 @@ import {
   createLearnerReport,
 } from "../db";
 
+// ---------------------------------------------------------------------------
+// Uploaded files
+// ---------------------------------------------------------------------------
+
+/**
+ * One uploaded file. The real checks (size against the decoded bytes,
+ * extension/MIME agreement, blocked executables, magic bytes) run inside
+ * extractAttachment via the same server-side validator the lesson-asset
+ * uploads use — this schema only bounds what is worth parsing at all.
+ */
+const uploadedFileSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().min(3).max(150),
+  // ~15 MB of bytes is ~20 MB of base64.
+  dataBase64: z.string().min(4).max(21_000_000),
+  sizeBytes: z
+    .number()
+    .int()
+    .positive()
+    .max(15 * 1024 * 1024),
+});
+
+/** At most ten files per request; a .zip inside one of them fans out further. */
+const filesSchema = z.array(uploadedFileSchema).max(10).optional();
+
+/**
+ * Papers graded per batch request, and how many run at once. Each paper is a
+ * separate Claude call: too many and the request outlives its HTTP timeout,
+ * too many at once and the API rate-limits the teacher mid-class.
+ */
+const MAX_BATCH_PAPERS = 8;
+const BATCH_CONCURRENCY = 4;
+
+export type SkippedFile = { name: string; reason: string };
+
+/**
+ * Extracts every uploaded file and splits the result: what Claude can
+ * actually read, and what was refused. The refused ones are returned to the
+ * teacher with the reason — never dropped silently, because "I uploaded the
+ * paper and it graded something else" is the worst possible failure here.
+ */
+async function readAttachments(
+  files: AttachmentInput[] | undefined
+): Promise<{ usable: ExtractedAttachment[]; skipped: SkippedFile[] }> {
+  if (!files?.length) return { usable: [], skipped: [] };
+  const extracted = (await Promise.all(files.map(extractAttachment))).flat();
+  const usable: ExtractedAttachment[] = [];
+  const skipped: SkippedFile[] = [];
+  for (const attachment of extracted) {
+    if (attachment.kind === "unsupported")
+      skipped.push({ name: attachment.name, reason: attachment.reason });
+    else usable.push(attachment);
+  }
+  return { usable, skipped };
+}
+
+/** Runs `work` over `items` a few at a time — a whole archive at once would hammer the API. */
+async function inBatches<T, R>(
+  items: T[],
+  size: number,
+  work: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let index = 0; index < items.length; index += size) {
+    results.push(
+      ...(await Promise.all(items.slice(index, index + size).map(work)))
+    );
+  }
+  return results;
+}
+
 export const teacherRouter = router({
   courses: teacherProcedure.query(({ ctx }) =>
     getCoursesForRole(ctx.user.role, ctx.user.id)
@@ -51,7 +139,10 @@ export const teacherRouter = router({
     getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
   myStudents: teacherProcedure.query(({ ctx }) =>
-    getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "institution" | "admin")
+    getStudentsForTeacher(
+      ctx.user.id,
+      ctx.user.role as "teacher" | "institution" | "admin"
+    )
   ),
   googleCalendarStatus: teacherProcedure.query(async ({ ctx }) => ({
     ...(await getGoogleCalendarStatus(ctx.user.id)),
@@ -135,18 +226,23 @@ export const teacherRouter = router({
         // Optional on purpose: the prompt tells Claude to ask for missing
         // context rather than assume it — see server/prompts/mathLessonPlan.ts.
         priorKnowledge: z.string().max(2000).optional(),
+        // The syllabus, an earlier lesson, a textbook page — read as the
+        // reference this plan must follow.
+        files: filesSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const plan = asMarkdown(await generateMathLessonPlan(input));
+      const { files, ...context } = input;
+      const { usable, skipped } = await readAttachments(files);
+      const plan = asMarkdown(await generateMathLessonPlan(context, usable));
       const id = await saveLessonPlan({
         teacherId: ctx.user.id,
-        ...input,
+        ...context,
         content: plan.markdown,
         model: plan.model,
         truncated: plan.truncated,
       });
-      return { id, ...plan };
+      return { id, ...plan, skippedFiles: skipped };
     }),
   lessonPlans: teacherProcedure.query(({ ctx }) =>
     listLessonPlans(ctx.user.id, teacherRole(ctx.user.role))
@@ -166,7 +262,8 @@ export const teacherRouter = router({
         ctx.user.id,
         teacherRole(ctx.user.role)
       );
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      if (!deleted)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
       return { ok: true };
     }),
   // 2 — تصميم الامتحانات (the paper only; solutions are a separate call)
@@ -178,18 +275,23 @@ export const teacherRouter = router({
         topics: z.array(z.string().min(2).max(120)).min(1).max(12),
         durationMinutes: z.number().int().min(15).max(300).default(120),
         totalPoints: z.number().int().min(1).max(100).default(20),
+        // Past papers of the teacher's own, or the syllabus: the new paper
+        // is meant to come out looking like theirs.
+        files: filesSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const paper = asMarkdown(await designMathExam(input));
+      const { files, ...context } = input;
+      const { usable, skipped } = await readAttachments(files);
+      const paper = asMarkdown(await designMathExam(context, usable));
       const id = await saveExamPaper({
         teacherId: ctx.user.id,
-        ...input,
+        ...context,
         content: paper.markdown,
         model: paper.model,
         truncated: paper.truncated,
       });
-      return { id, ...paper };
+      return { id, ...paper, skippedFiles: skipped };
     }),
   examPapers: teacherProcedure.query(({ ctx }) =>
     listExamPapers(ctx.user.id, teacherRole(ctx.user.role))
@@ -197,7 +299,9 @@ export const teacherRouter = router({
   examPaper: teacherProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) =>
-      mustExist(await getExamPaper(input.id, ctx.user.id, teacherRole(ctx.user.role)))
+      mustExist(
+        await getExamPaper(input.id, ctx.user.id, teacherRole(ctx.user.role))
+      )
     ),
   deleteExamPaper: teacherProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -207,7 +311,8 @@ export const teacherRouter = router({
         ctx.user.id,
         teacherRole(ctx.user.role)
       );
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      if (!deleted)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
       return { ok: true };
     }),
   // 3 — التصحيح النموذجي وسلم التنقيط. Returns the JSON parsed AND raw: when
@@ -217,12 +322,22 @@ export const teacherRouter = router({
   generateExamSolutions: teacherProcedure
     .use(rateLimit("teacher-generate-exam-solutions", 20, 60 * 60 * 1000))
     .input(
-      z.object({
-        examText: z.string().min(20).max(20000),
-        // Set when the text came from a paper generated here, so the two
-        // stay linked in the teacher's history.
-        examPaperId: z.number().int().positive().optional(),
-      })
+      z
+        .object({
+          // May be empty when the paper itself is uploaded (a scan, a PDF, a
+          // Word file) — the refine below is what keeps "neither" out.
+          examText: z.string().max(20000).default(""),
+          // Set when the text came from a paper generated here, so the two
+          // stay linked in the teacher's history.
+          examPaperId: z.number().int().positive().optional(),
+          files: filesSchema,
+        })
+        .refine(
+          input => input.examText.trim().length >= 20 || input.files?.length,
+          {
+            message: "Provide the exam text, or upload the paper as a file",
+          }
+        )
     )
     .mutation(async ({ ctx, input }) => {
       if (input.examPaperId !== undefined) {
@@ -234,7 +349,8 @@ export const teacherRouter = router({
           )
         );
       }
-      const result = await solveMathExam({ examText: input.examText });
+      const { usable, skipped } = await readAttachments(input.files);
+      const result = await solveMathExam({ examText: input.examText }, usable);
       if (!result.ok) throw assistantError(result);
       const id = await saveExamSolutionSet({
         teacherId: ctx.user.id,
@@ -247,7 +363,7 @@ export const teacherRouter = router({
         model: result.model,
         truncated: result.truncated,
       });
-      return { id, ...result };
+      return { id, ...result, skippedFiles: skipped };
     }),
   examSolutionSets: teacherProcedure.query(({ ctx }) =>
     listExamSolutionSets(ctx.user.id, teacherRole(ctx.user.role))
@@ -256,7 +372,11 @@ export const teacherRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) =>
       mustExist(
-        await getExamSolutionSet(input.id, ctx.user.id, teacherRole(ctx.user.role))
+        await getExamSolutionSet(
+          input.id,
+          ctx.user.id,
+          teacherRole(ctx.user.role)
+        )
       )
     ),
   deleteExamSolutionSet: teacherProcedure
@@ -290,22 +410,35 @@ export const teacherRouter = router({
           solutionSetId: z.number().int().positive().optional(),
           // …or one the teacher pasted in (their own, or from elsewhere).
           solutionsJson: z.string().min(2).max(60000).optional(),
-          studentAnswerText: z.string().min(10).max(20000),
+          // May be empty when the pupil's paper is uploaded instead of typed.
+          studentAnswerText: z.string().max(20000).default(""),
           // Attaches the mark to a real account, which is what later lets the
           // learner and their parents see it — checked against the teacher's
           // own roster below.
           learnerId: z.number().int().positive().optional(),
           studentLabel: z.string().min(1).max(160).optional(),
           maxPoints: z.number().int().min(1).max(100).optional(),
+          // The paper itself: a photo, a scan, a PDF. Claude reads these
+          // natively — this is the whole of the "OCR" story.
+          files: filesSchema,
         })
         .refine(input => input.solutionSetId || input.solutionsJson, {
           message: "Provide either solutionSetId or solutionsJson",
         })
+        .refine(
+          input =>
+            input.studentAnswerText.trim().length >= 10 || input.files?.length,
+          { message: "Provide the pupil's answer as text, or upload the paper" }
+        )
     )
     .mutation(async ({ ctx, input }) => {
       const role = teacherRole(ctx.user.role);
       if (input.learnerId !== undefined) {
-        const owns = await teacherOwnsLearner(ctx.user.id, role, input.learnerId);
+        const owns = await teacherOwnsLearner(
+          ctx.user.id,
+          role,
+          input.learnerId
+        );
         if (!owns)
           throw new TRPCError({
             code: "FORBIDDEN",
@@ -320,11 +453,12 @@ export const teacherRouter = router({
         );
         solutionsJson = set.solutionsJson;
       }
+      const { usable, skipped } = await readAttachments(input.files);
       const report = asMarkdown(
-        await gradeStudentPaper({
-          solutionsJson,
-          studentAnswerText: input.studentAnswerText,
-        })
+        await gradeStudentPaper(
+          { solutionsJson, studentAnswerText: input.studentAnswerText },
+          usable
+        )
       );
       if (solutionSetId === null) {
         // A pasted scale is stored as a solution set of its own before the
@@ -346,7 +480,11 @@ export const teacherRouter = router({
               solutionSetId,
               learnerId: input.learnerId ?? null,
               studentLabel: input.studentLabel ?? null,
-              answerText: input.studentAnswerText,
+              // When the answer was a file, the record keeps what was
+              // graded — the filenames — instead of an empty column.
+              answerText:
+                input.studentAnswerText.trim() ||
+                `[ورقة مرفقة: ${usable.map(file => file.name).join("، ") || "ملف"}]`,
               report: report.markdown,
               model: report.model,
               truncated: report.truncated,
@@ -356,8 +494,71 @@ export const teacherRouter = router({
         id,
         solutionSetId,
         ...report,
+        skippedFiles: skipped,
         // Travels with the result so no UI can quietly drop the caveat.
         provisional: PROVISIONAL_GRADING_NOTICE,
+      };
+    }),
+  // A whole set of papers at once: one archive (or several files) in, one
+  // graded draft per pupil out, each named after its file. Capped at
+  // MAX_BATCH_PAPERS per call — every paper is its own Claude call, so an
+  // uncapped class would both cost a lot and outlast any HTTP timeout.
+  gradeStudentPapersBatch: teacherProcedure
+    .use(rateLimit("teacher-grade-batch", 20, 60 * 60 * 1000))
+    .input(
+      z.object({
+        solutionSetId: z.number().int().positive(),
+        files: z.array(uploadedFileSchema).min(1).max(10),
+        maxPoints: z.number().int().min(1).max(100).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const role = teacherRole(ctx.user.role);
+      const set = mustExist(
+        await getExamSolutionSet(input.solutionSetId, ctx.user.id, role)
+      );
+      const { usable, skipped } = await readAttachments(input.files);
+      const papers = usable.slice(0, MAX_BATCH_PAPERS);
+      const overflow = usable.slice(MAX_BATCH_PAPERS);
+      const graded = await inBatches(papers, BATCH_CONCURRENCY, async paper => {
+        const result = await gradeStudentPaper(
+          { solutionsJson: set.solutionsJson, studentAnswerText: "" },
+          [paper]
+        );
+        if (!result.ok)
+          return {
+            name: paper.name,
+            ok: false as const,
+            error: result.message,
+          };
+        const id = await savePaperGrade({
+          teacherId: ctx.user.id,
+          solutionSetId: input.solutionSetId,
+          studentLabel: paper.name.slice(0, 160),
+          answerText: `[ورقة مرفقة: ${paper.name}]`,
+          report: result.text,
+          model: result.model,
+          truncated: result.truncated,
+          maxPoints: input.maxPoints ?? null,
+        });
+        return {
+          name: paper.name,
+          ok: true as const,
+          id,
+          markdown: result.text,
+          truncated: result.truncated,
+        };
+      });
+      return {
+        graded,
+        provisional: PROVISIONAL_GRADING_NOTICE,
+        skippedFiles: [
+          ...skipped,
+          ...overflow.map(file => ({
+            name: file.name,
+            reason: `تجاوز حدّ ${MAX_BATCH_PAPERS} أوراق في الطلب الواحد — أعد رفعه في دفعة تالية.`,
+          })),
+        ],
       };
     }),
   paperGrades: teacherProcedure
@@ -374,7 +575,9 @@ export const teacherRouter = router({
   paperGrade: teacherProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) =>
-      mustExist(await getPaperGrade(input.id, ctx.user.id, teacherRole(ctx.user.role)))
+      mustExist(
+        await getPaperGrade(input.id, ctx.user.id, teacherRole(ctx.user.role))
+      )
     ),
   deletePaperGrade: teacherProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -384,7 +587,8 @@ export const teacherRouter = router({
         ctx.user.id,
         teacherRole(ctx.user.role)
       );
-      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      if (!deleted)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
       return { ok: true };
     }),
   // The only way a mark becomes real: the teacher types it, and only then is
@@ -413,6 +617,119 @@ export const teacherRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
       }
       return result;
+    }),
+  // ---------------------------------------------------------------------
+  // Exports — "give me the file"
+  // ---------------------------------------------------------------------
+  // Everything the assistant produced can leave as a real document: Word or
+  // PDF for a plan/paper/solution/report, and an Excel marks sheet for a
+  // whole set of corrected papers. Arabic is laid out right-to-left in all
+  // three (see server/exports/documentExport.ts).
+  exportDocument: teacherProcedure
+    .use(rateLimit("teacher-export-document", 200, 60 * 60 * 1000))
+    .input(
+      z.object({
+        kind: z.enum([
+          "lessonPlan",
+          "examPaper",
+          "examSolutions",
+          "paperGrade",
+        ]),
+        id: z.number().int().positive(),
+        format: z.enum(["docx", "pdf"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const role = teacherRole(ctx.user.role);
+      let title: string;
+      let body: string;
+      if (input.kind === "lessonPlan") {
+        const row = mustExist(await getLessonPlan(input.id, ctx.user.id, role));
+        title = `تحضير درس: ${row.topic} — ${row.level}`;
+        body = row.content;
+      } else if (input.kind === "examPaper") {
+        const row = mustExist(await getExamPaper(input.id, ctx.user.id, role));
+        title = `امتحان: ${row.level} (${row.totalPoints} نقطة)`;
+        body = row.content;
+      } else if (input.kind === "examSolutions") {
+        const row = mustExist(
+          await getExamSolutionSet(input.id, ctx.user.id, role)
+        );
+        // The stored JSON may be the unparsable kind that module 3
+        // deliberately keeps rather than discards — exporting it must fall
+        // back to the raw text, not throw a 500 at the teacher.
+        let questions = null;
+        try {
+          const parsed = examSolutionsSchema.safeParse(JSON.parse(row.solutionsJson));
+          if (parsed.success) questions = parsed.data;
+        } catch {
+          questions = null;
+        }
+        title = "التصحيح النموذجي وسلم التنقيط";
+        body = formatSolutionsForExport(questions, row.solutionsJson);
+      } else {
+        const row = mustExist(await getPaperGrade(input.id, ctx.user.id, role));
+        const mark =
+          row.status === "reviewed" && row.finalPoints !== null
+            ? `${row.finalPoints}/${row.maxPoints ?? "?"}`
+            : "مسودة (لم تُعتمد بعد)";
+        title = `ورقة ${row.studentLabel ?? `#${row.id}`} — ${mark}`;
+        // The draft caveat is part of the document, not just the screen: a
+        // printed report must not read as a final mark either.
+        body =
+          row.status === "reviewed"
+            ? row.report
+            : `${PROVISIONAL_GRADING_NOTICE}\n\n${row.report}`;
+      }
+      const buffer =
+        input.format === "docx"
+          ? await toDocx(title, body)
+          : await toPdf(title, body);
+      return {
+        fileName: safeFileName(title, input.format),
+        contentType: EXPORT_CONTENT_TYPES[input.format],
+        dataBase64: buffer.toString("base64"),
+      };
+    }),
+  // The class marks sheet: every paper graded against one scale, or every
+  // paper this teacher has graded. Unreviewed rows carry no number — they are
+  // listed as drafts, so a spreadsheet cannot pass a suggestion off as a mark.
+  exportClassMarks: teacherProcedure
+    .use(rateLimit("teacher-export-marks", 100, 60 * 60 * 1000))
+    .input(
+      z
+        .object({ solutionSetId: z.number().int().positive().optional() })
+        .optional()
+    )
+    .mutation(async ({ ctx, input }) => {
+      const role = teacherRole(ctx.user.role);
+      if (input?.solutionSetId !== undefined) {
+        mustExist(
+          await getExamSolutionSet(input.solutionSetId, ctx.user.id, role)
+        );
+      }
+      const rows = await listPaperGrades(ctx.user.id, role, {
+        solutionSetId: input?.solutionSetId,
+        limit: 500,
+      });
+      const buffer = await toMarksXlsx(
+        "نتائج القسم",
+        rows.map(row => ({
+          student: row.learnerName || row.studentLabel || `#${row.id}`,
+          finalPoints: row.status === "reviewed" ? row.finalPoints : null,
+          maxPoints: row.maxPoints,
+          status: row.status === "reviewed" ? "معتمدة" : "مسودة",
+          notes: null,
+          date: row.reviewedAt ?? row.createdAt,
+        }))
+      );
+      const format: ExportFormat = "xlsx";
+      return {
+        fileName: safeFileName("نتائج القسم", format),
+        contentType: EXPORT_CONTENT_TYPES[format],
+        dataBase64: buffer.toString("base64"),
+        rowCount: rows.length,
+      };
     }),
   sendReport: teacherProcedure
     .use(rateLimit("teacher-send-report", 60, 60 * 60 * 1000))

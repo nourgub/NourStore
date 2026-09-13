@@ -48,6 +48,13 @@ export const MATH_EXAM_SOLUTIONS_TEMPLATE = `أنت خبير تصحيح رياض
 export const MATH_EXAM_SOLUTIONS_TRIGGER =
   "أنتج التصحيح النموذجي وسلم التنقيط الآن، وأرجع مصفوفة JSON فقط دون أي نص خارجها.";
 
+/**
+ * Substituted for the exam text when the paper itself was uploaded (a scan, a
+ * PDF, a Word file) instead of typed. The template still gets a sentence in
+ * the slot it expects, and the attachment carries the real questions.
+ */
+export const EXAM_IN_ATTACHMENT = "نص الامتحان في الملف المرفق أعلاه.";
+
 export type MathExamSolutionsContext = {
   /** The full exam text, question by question — module 2's output, or the teacher's own paper. */
   examText: string;

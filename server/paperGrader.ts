@@ -12,7 +12,9 @@
 // Prompt: server/prompts/mathPaperGrading.ts. Transport: server/claudeClient.ts.
 
 import { askClaude, type ClaudeTextResult } from "./claudeClient";
+import type { ExtractedAttachment } from "./attachments/extract";
 import {
+  ANSWER_IN_ATTACHMENT,
   fillMathPaperGradingPrompt,
   MATH_PAPER_GRADING_TRIGGER,
   type MathPaperGradingContext,
@@ -24,12 +26,28 @@ import {
 export const PROVISIONAL_GRADING_NOTICE =
   "هذا التصحيح اقتراح أولي يخضع لمراجعة الأستاذ، وليس نهائياً";
 
+// The pupil's paper is usually a photograph or a scan. Claude reads images
+// and PDFs itself, so this is the whole of the "OCR" story — and the prompt's
+// existing rule still governs it: an unreadable passage is declared
+// unreadable, never guessed at.
+const GRADING_ATTACHMENT_NOTE =
+  "ورقة التلميذ في المرفقات أعلاه (صورة أو PDF أو ملف). اقرأها بنفسك، وإن كان جزء منها غير واضح فصرّح بذلك ولا تخمّن ما فيه.";
+
 /** Grades one student paper against a grading scale from module 3. */
 export function gradeStudentPaper(
-  context: MathPaperGradingContext
+  context: MathPaperGradingContext,
+  attachments: ExtractedAttachment[] = []
 ): Promise<ClaudeTextResult> {
   return askClaude({
-    system: fillMathPaperGradingPrompt(context),
-    user: MATH_PAPER_GRADING_TRIGGER,
+    system: fillMathPaperGradingPrompt({
+      solutionsJson: context.solutionsJson,
+      studentAnswerText:
+        context.studentAnswerText.trim() ||
+        (attachments.length ? ANSWER_IN_ATTACHMENT : ""),
+    }),
+    user: attachments.length
+      ? `${GRADING_ATTACHMENT_NOTE}\n\n${MATH_PAPER_GRADING_TRIGGER}`
+      : MATH_PAPER_GRADING_TRIGGER,
+    attachments,
   });
 }

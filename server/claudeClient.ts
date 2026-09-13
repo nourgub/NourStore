@@ -1,7 +1,7 @@
 // Shared transport for the teacher assistant's four Claude calls (lesson
 // preparation, exam design, model solutions, paper grading). The pedagogy
 // lives in server/prompts/*; this file only knows how to send a system
-// prompt and hand back text.
+// prompt — plus whatever files the teacher attached — and hand back text.
 //
 // Same rule as every other optional integration in this codebase (payments,
 // S3, WhatsApp): with no ANTHROPIC_API_KEY set, this reports itself as
@@ -12,6 +12,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { ENV } from "./_core/env";
+import type { ExtractedAttachment } from "./attachments/extract";
 
 /** Used unless ANTHROPIC_MODEL overrides it. */
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
@@ -72,9 +73,53 @@ function getClient(): Anthropic {
  * maps onto a tRPC error, exactly like server/chargilyProvider.ts does for
  * payments.
  */
+/**
+ * Turns extracted attachments into content blocks. Images and PDFs go as
+ * real image/document blocks — the API reads those itself, which is what
+ * lets a photographed pupil's paper be graded. Everything else was already
+ * unpacked to text upstream and is labelled with its filename so the model
+ * can refer to "the file the teacher called X". Unsupported entries are
+ * dropped here and reported to the teacher by the caller, never silently
+ * passed off as if they had been read.
+ */
+function attachmentBlocks(
+  attachments: ExtractedAttachment[]
+): Anthropic.Beta.BetaContentBlockParam[] {
+  const blocks: Anthropic.Beta.BetaContentBlockParam[] = [];
+  for (const attachment of attachments) {
+    if (attachment.kind === "image") {
+      blocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: attachment.mediaType,
+          data: attachment.dataBase64,
+        },
+      });
+    } else if (attachment.kind === "pdf") {
+      blocks.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: attachment.dataBase64,
+        },
+      });
+    } else if (attachment.kind === "text") {
+      blocks.push({
+        type: "text",
+        text: `--- ملف مرفق: ${attachment.name} ---\n${attachment.text}`,
+      });
+    }
+  }
+  return blocks;
+}
+
 export async function askClaude(input: {
   system: string;
   user: string;
+  /** Files the teacher uploaded, already extracted by server/attachments/extract.ts. */
+  attachments?: ExtractedAttachment[];
   maxTokens?: number;
 }): Promise<ClaudeTextResult> {
   if (!isClaudeConfigured()) {
@@ -95,7 +140,17 @@ export async function askClaude(input: {
       model: claudeModel(),
       max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
       system: input.system,
-      messages: [{ role: "user", content: input.user }],
+      messages: [
+        {
+          role: "user",
+          // Attachments before the instruction: the documents are what the
+          // instruction refers to, and that is the order the API expects.
+          content: [
+            ...attachmentBlocks(input.attachments ?? []),
+            { type: "text", text: input.user },
+          ],
+        },
+      ],
     });
     if (response.stop_reason === "refusal") {
       return {

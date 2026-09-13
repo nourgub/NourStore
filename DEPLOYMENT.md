@@ -215,6 +215,26 @@ dans `server/prompts/`) :
   un vrai MySQL. Sans `DATABASE_URL`, l'enregistrement devient un no-op et
   l'assistant continue de fonctionner : la réponse renvoie `id: null` et
   l'interface prévient que le résultat n'est pas sauvegardé.
+- **Fichiers en entrée** (`server/attachments/extract.ts`) : images, PDF,
+  Word (.docx), Excel (.xlsx), texte/CSV et ZIP. Les images et les PDF sont
+  transmis tels quels à Claude, qui les lit nativement — c'est ce qui permet
+  de corriger une copie photographiée sans pipeline OCR maison. Word et Excel
+  sont convertis en texte côté serveur ; un ZIP est ouvert (un seul niveau,
+  50 fichiers et 40 Mo décompressés au maximum, taille déclarée vérifiée
+  **avant** décompression : pas de zip bomb). Les anciens formats binaires
+  (.doc, .xls) sont refusés avec la marche à suivre, jamais à moitié
+  interprétés. Chaque fichier passe par le même validateur que les pièces
+  jointes de cours (taille réelle, cohérence extension/MIME, exécutables
+  bloqués, signature binaire).
+- **Fichiers en sortie** (`server/exports/documentExport.ts`) : Word, PDF et
+  un classeur Excel des notes, tous en arabe de droite à gauche — le PDF
+  réutilise la police arabe embarquée et le réglage `features: ["rtla"]`
+  déjà éprouvés par les attestations.
+- **Correction en lot** : 8 copies par requête, 4 en parallèle (chaque copie
+  est un appel API distinct). Une classe entière se fait en quelques lots.
+- **« Apprendre de mes fichiers » = les lire, pas s'entraîner dessus.** Les
+  fichiers servent de référence pour la requête en cours ; aucun modèle n'est
+  entraîné, et rien n'est conservé comme bibliothèque permanente.
 - **Une note proposée n'est jamais la note de l'élève.** Une copie corrigée
   est stockée en `draft`, visible du seul professeur ; elle ne devient une
   note que lorsqu'il la relit et la saisit lui-même (`reviewPaperGrade`) —

@@ -44,6 +44,9 @@ export const MATH_PAPER_GRADING_TEMPLATE = `أنت مصحّح رياضيات آ�
 export const MATH_PAPER_GRADING_TRIGGER =
   "صحّح ورقة التلميذ الآن وفق التعليمات أعلاه.";
 
+/** Substituted for the answer text when the pupil's paper was uploaded instead of typed. */
+export const ANSWER_IN_ATTACHMENT = "إجابة التلميذ في الملف المرفق أعلاه.";
+
 export type MathPaperGradingContext = {
   /** Module 3's JSON, exactly as it will be reasoned over — see server/examSolutions.ts. */
   solutionsJson: string;

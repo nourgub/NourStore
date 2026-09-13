@@ -11,7 +11,9 @@
 
 import { z } from "zod";
 import { askClaude, type ClaudeTextResult } from "./claudeClient";
+import type { ExtractedAttachment } from "./attachments/extract";
 import {
+  EXAM_IN_ATTACHMENT,
   fillMathExamSolutionsPrompt,
   MATH_EXAM_SOLUTIONS_TRIGGER,
   type MathExamSolutionsContext,
@@ -77,13 +79,27 @@ export function sumGradingScale(questions: ExamQuestionSolution[]): number {
   );
 }
 
+// The paper itself may be the attachment — a scanned exam, or a Word file —
+// in which case the text field carries only what the teacher typed (often
+// nothing beyond a title).
+const SOLUTIONS_ATTACHMENT_NOTE =
+  "نص الامتحان قد يكون في المرفقات أعلاه (صورة أو PDF أو ملف Word). اقرأ الأسئلة منها، ولا تفترض أسئلة غير موجودة فيها.";
+
 /** Produces the model solution and grading scale for one exam paper. */
 export async function solveMathExam(
-  context: MathExamSolutionsContext
+  context: MathExamSolutionsContext,
+  attachments: ExtractedAttachment[] = []
 ): Promise<ExamSolutionsResult> {
   const result = await askClaude({
-    system: fillMathExamSolutionsPrompt(context),
-    user: MATH_EXAM_SOLUTIONS_TRIGGER,
+    system: fillMathExamSolutionsPrompt({
+      examText:
+        context.examText.trim() ||
+        (attachments.length ? EXAM_IN_ATTACHMENT : ""),
+    }),
+    user: attachments.length
+      ? `${SOLUTIONS_ATTACHMENT_NOTE}\n\n${MATH_EXAM_SOLUTIONS_TRIGGER}`
+      : MATH_EXAM_SOLUTIONS_TRIGGER,
+    attachments,
   });
   if (!result.ok) return result;
 
@@ -113,4 +129,39 @@ export async function solveMathExam(
     model: result.model,
     truncated: result.truncated,
   };
+}
+
+/**
+ * Renders a parsed grading scale as something a human reads — the shape a
+ * Word/PDF export needs. Falls back to the raw JSON when it could not be
+ * parsed, so an export never silently loses content it could not format.
+ */
+export function formatSolutionsForExport(
+  questions: ExamQuestionSolution[] | null,
+  rawJson: string
+): string {
+  if (!questions || !questions.length) return rawJson;
+  const blocks = questions.map(question => {
+    const lines = [
+      `## السؤال ${question["رقم_السؤال"]}`,
+      "### الحل",
+      question["الحل"],
+      "### سلم التنقيط",
+      ...question["سلم_التنقيط"].map(
+        step => `- ${step["الخطوة"]} (${step["النقاط"]})`
+      ),
+    ];
+    if (question["حلول_بديلة"]?.trim()) {
+      lines.push("### حلول بديلة", question["حلول_بديلة"].trim());
+    }
+    if (question["أخطاء_متوقعة"]?.length) {
+      lines.push(
+        "### أخطاء متوقعة",
+        ...question["أخطاء_متوقعة"].map(mistake => `- ${mistake}`)
+      );
+    }
+    return lines.join("\n");
+  });
+  const total = sumGradingScale(questions);
+  return `${blocks.join("\n\n")}\n\n## مجموع نقاط السلم\n${total}`;
 }

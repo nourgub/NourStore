@@ -68,6 +68,51 @@ describe("role permissions", () => {
     });
   });
 
+  it("rejects non-teacher roles from uploading files into the assistant or exporting from it", async () => {
+    for (const role of ["learner", "parent"] as const) {
+      const caller = appRouter.createCaller(contextFor(role));
+      await expect(
+        caller.teacher.generateLessonPlan({
+          level: "3AS",
+          topic: "النهايات",
+          durationMinutes: 60,
+          files: [
+            {
+              fileName: "syllabus.pdf",
+              mimeType: "application/pdf",
+              dataBase64: "JVBERi0=",
+              sizeBytes: 6,
+            },
+          ],
+        })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller.teacher.exportDocument({ kind: "lessonPlan", id: 1, format: "pdf" })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.teacher.exportClassMarks({})).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+    }
+  });
+
+  it("refuses to grade a paper with neither typed text nor an uploaded file", async () => {
+    const caller = appRouter.createCaller(contextFor("teacher"));
+    // Input validation, before any API call is made or any money is spent.
+    await expect(
+      caller.teacher.gradeStudentPaper({
+        solutionsJson: "[]",
+        studentAnswerText: "",
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("refuses to produce a model solution from neither text nor a file", async () => {
+    const caller = appRouter.createCaller(contextFor("teacher"));
+    await expect(
+      caller.teacher.generateExamSolutions({ examText: "قصير" })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("refuses to grade a paper with neither a saved scale nor a pasted one", async () => {
     const caller = appRouter.createCaller(contextFor("teacher"));
     // Input validation, before any API call is made or any money is spent.

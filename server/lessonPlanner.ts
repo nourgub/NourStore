@@ -11,18 +11,32 @@
 // live in server/claudeClient.ts.
 
 import { askClaude, type ClaudeTextResult } from "./claudeClient";
+import type { ExtractedAttachment } from "./attachments/extract";
 import {
   fillMathLessonPlanPrompt,
   MATH_LESSON_PLAN_TRIGGER,
   type MathLessonPlanContext,
 } from "./prompts/mathLessonPlan";
 
+/**
+ * What the teacher's uploaded files mean for this module: they are the
+ * reference the plan must follow — the official syllabus, an earlier lesson
+ * of theirs, the textbook page. This is the honest version of "learn from my
+ * files": the model reads them for this request, it is not trained on them.
+ */
+const LESSON_ATTACHMENT_NOTE =
+  "المرفقات أعلاه من الأستاذ (المنهاج، أو درس سابق، أو صفحة من الكتاب). اعتمدها مرجعاً: التزم بمحتواها ومصطلحاتها وأسلوب عرضها، ولا تخرج عمّا فيها إن كانت تغطي الموضوع.";
+
 /** Generates one Arabic maths lesson plan (Markdown, six `##` sections). */
 export function generateMathLessonPlan(
-  context: MathLessonPlanContext
+  context: MathLessonPlanContext,
+  attachments: ExtractedAttachment[] = []
 ): Promise<ClaudeTextResult> {
   return askClaude({
     system: fillMathLessonPlanPrompt(context),
-    user: MATH_LESSON_PLAN_TRIGGER,
+    user: attachments.length
+      ? `${LESSON_ATTACHMENT_NOTE}\n\n${MATH_LESSON_PLAN_TRIGGER}`
+      : MATH_LESSON_PLAN_TRIGGER,
+    attachments,
   });
 }

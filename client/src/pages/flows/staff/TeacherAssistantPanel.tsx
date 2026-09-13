@@ -22,10 +22,13 @@ import {
   ArrowLeftRight,
   ClipboardCheck,
   Copy,
+  Download,
   FileCheck2,
   FilePenLine,
+  Paperclip,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +36,78 @@ import { trpc } from "@/lib/trpc";
 import { type Lang } from "../shared";
 
 type Mode = "lesson" | "exam" | "solutions" | "grading";
+type PickedFile = {
+  fileName: string;
+  mimeType: string;
+  dataBase64: string;
+  sizeBytes: number;
+};
+type SkippedFile = { name: string; reason: string };
+
+// What the server will accept (server/attachments/extract.ts). A .zip is
+// opened server-side, so one archive can carry a whole class's papers.
+const ACCEPTED_FILES =
+  ".pdf,.png,.jpg,.jpeg,.webp,.docx,.xlsx,.csv,.txt,.md,.zip";
+
+// The browser's own file.type is unreliable (empty for .md, wrong for .docx on
+// some systems), and the server cross-checks the extension against the MIME
+// type — so the extension is what decides here.
+const MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv: "text/csv",
+  txt: "text/plain",
+  md: "text/markdown",
+  markdown: "text/markdown",
+  zip: "application/zip",
+};
+
+function base64OfBytes(bytes: Uint8Array): string {
+  // Chunked: String.fromCharCode(...bytes) blows the call stack on a file of
+  // any real size.
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let index = 0; index < bytes.length; index += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(index, index + CHUNK))
+    );
+  }
+  return btoa(binary);
+}
+
+async function readPickedFile(file: File): Promise<PickedFile | null> {
+  const extension = file.name.toLowerCase().split(".").pop() ?? "";
+  const mimeType = MIME_BY_EXTENSION[extension];
+  if (!mimeType) return null;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return {
+    fileName: file.name,
+    mimeType,
+    dataBase64: base64OfBytes(bytes),
+    sizeBytes: bytes.byteLength,
+  };
+}
+
+function downloadBase64(fileName: string, contentType: string, base64: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1)
+    bytes[index] = binary.charCodeAt(index);
+  const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
 type Trilingual = { ar: string; fr: string; en: string };
 type TextResult = { id: number | null; markdown: string; truncated: boolean };
 
@@ -237,11 +312,146 @@ const L = {
     en: "Mark confirmed, student notified.",
   },
   deleted: { ar: "تم الحذف.", fr: "Supprimé.", en: "Deleted." },
+  attach: { ar: "إرفاق ملفات", fr: "Joindre des fichiers", en: "Attach files" },
+  attachHint: {
+    lesson: {
+      ar: "أرفق المنهاج أو درساً سابقاً أو صفحة من الكتاب (PDF، صورة، Word، Excel، ZIP) ليعتمدها المساعد مرجعاً.",
+      fr: "Joignez le programme, un ancien cours ou une page du manuel (PDF, image, Word, Excel, ZIP) : l'assistant s'en servira comme référence.",
+      en: "Attach the syllabus, an earlier lesson or a textbook page (PDF, image, Word, Excel, ZIP) — the assistant follows them as reference.",
+    },
+    exam: {
+      ar: "أرفق امتحانات سابقة لك أو المنهاج، ليخرج الامتحان بأسلوبك ومستواك.",
+      fr: "Joignez vos anciens sujets ou le programme, pour un examen à votre style et à votre niveau.",
+      en: "Attach your own past papers or the syllabus, so the exam comes out in your style and at your level.",
+    },
+    solutions: {
+      ar: "أو أرفق ورقة الامتحان نفسها (صورة، PDF، Word) بدل لصق نصها.",
+      fr: "Ou joignez le sujet lui-même (image, PDF, Word) au lieu d'en coller le texte.",
+      en: "Or attach the paper itself (image, PDF, Word) instead of pasting its text.",
+    },
+    grading: {
+      ar: "صوّر ورقة التلميذ وأرفقها (أو PDF) — يقرأها المساعد بنفسه. وملف ZIP فيه أوراق عدة يُصحَّح دفعة واحدة.",
+      fr: "Photographiez la copie et joignez-la (ou un PDF) — l'assistant la lit. Un ZIP de plusieurs copies se corrige en lot.",
+      en: "Photograph the pupil's paper and attach it (or a PDF) — the assistant reads it. A ZIP of several papers is graded as a batch.",
+    },
+  } satisfies Record<Mode, Trilingual>,
+  rejectedType: {
+    ar: "صيغة غير مقبولة، تم تجاهل الملف:",
+    fr: "Format non accepté, fichier ignoré :",
+    en: "Unsupported format, file ignored:",
+  },
+  skippedTitle: {
+    ar: "ملفات لم تُقرأ",
+    fr: "Fichiers non lus",
+    en: "Files that were not read",
+  },
+  exportWord: { ar: "تنزيل Word", fr: "Télécharger Word", en: "Download Word" },
+  exportPdf: { ar: "تنزيل PDF", fr: "Télécharger PDF", en: "Download PDF" },
+  exportMarks: {
+    ar: "تنزيل كشف النقاط (Excel)",
+    fr: "Télécharger les notes (Excel)",
+    en: "Download marks sheet (Excel)",
+  },
+  batch: {
+    ar: "صحّح كل الأوراق المرفقة",
+    fr: "Corriger toutes les copies jointes",
+    en: "Grade every attached paper",
+  },
+  batchNeedsScale: {
+    ar: "التصحيح بالجملة يحتاج سلم تنقيط محفوظاً (شغّل الوحدة 3 أولاً أو افتح سلماً من المحفوظات).",
+    fr: "La correction en lot nécessite un barème enregistré (lancez le module 3 d'abord).",
+    en: "Batch grading needs a saved grading scale (run module 3 first).",
+  },
+  batchDone: {
+    ar: "تم تصحيح الأوراق كمسودات — راجع كل واحدة واعتمد نقطتها.",
+    fr: "Copies corrigées en brouillon — relisez et validez chaque note.",
+    en: "Papers graded as drafts — review each and confirm its mark.",
+  },
 } as const;
 
 function formatDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
   return date.toLocaleDateString();
+}
+
+function FilePicker({
+  lang,
+  mode,
+  files,
+  setFiles,
+}: {
+  lang: Lang;
+  mode: Mode;
+  files: PickedFile[];
+  setFiles: (files: PickedFile[]) => void;
+}) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <p className="quiet-label">{t(L.attachHint[mode], lang)}</p>
+      <div className="invite-box" style={{ flexWrap: "wrap" }}>
+        <label className="quiet-button" style={{ cursor: "pointer" }}>
+          {t(L.attach, lang)} <Paperclip size={15} />
+          <input
+            type="file"
+            multiple
+            accept={ACCEPTED_FILES}
+            style={{ display: "none" }}
+            aria-label={t(L.attach, lang)}
+            onChange={async event => {
+              const picked = Array.from(event.target.files ?? []);
+              // Reset first: without this, picking the same file twice in a
+              // row fires no change event at all.
+              event.target.value = "";
+              const read = await Promise.all(picked.map(readPickedFile));
+              const rejected = picked.filter(
+                (_, index) => read[index] === null
+              );
+              if (rejected.length)
+                toast.error(
+                  `${t(L.rejectedType, lang)} ${rejected.map(file => file.name).join("، ")}`
+                );
+              setFiles([
+                ...files,
+                ...read.filter((file): file is PickedFile => file !== null),
+              ]);
+            }}
+          />
+        </label>
+        {files.map(file => (
+          <Button
+            key={file.fileName + file.sizeBytes}
+            className="quiet-button"
+            onClick={() => setFiles(files.filter(other => other !== file))}
+            aria-label={`${t(L.remove, lang)}: ${file.fileName}`}
+          >
+            {file.fileName} ({Math.max(1, Math.round(file.sizeBytes / 1024))}{" "}
+            ك.ب)
+            <X size={14} />
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SkippedNotice({
+  lang,
+  skipped,
+}: {
+  lang: Lang;
+  skipped: SkippedFile[];
+}) {
+  if (!skipped.length) return null;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <span className="section-kicker">{t(L.skippedTitle, lang)}</span>
+      {skipped.map(file => (
+        <p className="quiet-label" key={file.name + file.reason}>
+          {file.name}: {file.reason}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 function HistoryList({
@@ -339,6 +549,13 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
   const status = trpc.teacher.assistantStatus.useQuery();
   const utils = trpc.useUtils();
   const [mode, setMode] = useState<Mode>("lesson");
+  // Attachments are per mode, so switching tabs mid-session does not send a
+  // pupil's paper along with a lesson-plan request.
+  const [lessonFiles, setLessonFiles] = useState<PickedFile[]>([]);
+  const [examFiles, setExamFiles] = useState<PickedFile[]>([]);
+  const [solutionFiles, setSolutionFiles] = useState<PickedFile[]>([]);
+  const [gradingFiles, setGradingFiles] = useState<PickedFile[]>([]);
+  const [skipped, setSkipped] = useState<SkippedFile[]>([]);
 
   // Module 1
   const [level, setLevel] = useState("");
@@ -409,6 +626,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
   const lessonPlan = trpc.teacher.generateLessonPlan.useMutation({
     onSuccess: result => {
       setLessonResult(result);
+      setSkipped(result.skippedFiles ?? []);
       utils.teacher.lessonPlans.invalidate();
     },
     onError,
@@ -416,6 +634,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
   const exam = trpc.teacher.generateExam.useMutation({
     onSuccess: result => {
       setExamResult(result);
+      setSkipped(result.skippedFiles ?? []);
       utils.teacher.examPapers.invalidate();
     },
     onError,
@@ -423,6 +642,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
   const solutions = trpc.teacher.generateExamSolutions.useMutation({
     onSuccess: result => {
       setSolutionsResult(result);
+      setSkipped(result.skippedFiles ?? []);
       utils.teacher.examSolutionSets.invalidate();
     },
     onError,
@@ -430,6 +650,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
   const grading = trpc.teacher.gradeStudentPaper.useMutation({
     onSuccess: result => {
       setGradingResult(result);
+      setSkipped(result.skippedFiles ?? []);
       setSolutionSetId(result.solutionSetId);
       utils.teacher.paperGrades.invalidate();
       utils.teacher.examSolutionSets.invalidate();
@@ -445,6 +666,53 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
     },
     onError,
   });
+  const exportDocument = trpc.teacher.exportDocument.useMutation({
+    onSuccess: file =>
+      downloadBase64(file.fileName, file.contentType, file.dataBase64),
+    onError,
+  });
+  const exportMarks = trpc.teacher.exportClassMarks.useMutation({
+    onSuccess: file =>
+      downloadBase64(file.fileName, file.contentType, file.dataBase64),
+    onError,
+  });
+  const batchGrade = trpc.teacher.gradeStudentPapersBatch.useMutation({
+    onSuccess: result => {
+      setSkipped(result.skippedFiles ?? []);
+      toast.success(t(L.batchDone, lang));
+      setGradingFiles([]);
+      utils.teacher.paperGrades.invalidate();
+    },
+    onError,
+  });
+  /** Word/PDF buttons for one saved row — hidden when the row was not saved. */
+  const ExportButtons = ({
+    kind,
+    id,
+  }: {
+    kind: "lessonPlan" | "examPaper" | "examSolutions" | "paperGrade";
+    id: number | null;
+  }) =>
+    id === null ? null : (
+      <>
+        <Button
+          className="quiet-button"
+          disabled={exportDocument.isPending}
+          onClick={() => exportDocument.mutate({ kind, id, format: "docx" })}
+        >
+          {t(L.exportWord, lang)}
+          <Download size={15} />
+        </Button>
+        <Button
+          className="quiet-button"
+          disabled={exportDocument.isPending}
+          onClick={() => exportDocument.mutate({ kind, id, format: "pdf" })}
+        >
+          {t(L.exportPdf, lang)}
+          <Download size={15} />
+        </Button>
+      </>
+    );
   const removeLesson = trpc.teacher.deleteLessonPlan.useMutation({
     onError,
     onSuccess: () => {
@@ -478,7 +746,8 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
     lessonPlan.isPending ||
     exam.isPending ||
     solutions.isPending ||
-    grading.isPending;
+    grading.isPending ||
+    batchGrade.isPending;
   const runLabel = busy ? t(L.working, lang) : t(L.run, lang);
   const asInt = (value: string) => {
     const parsed = Number(value);
@@ -563,6 +832,12 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             onChange={e => setPriorKnowledge(e.target.value)}
           />
           <p className="quiet-label">{t(L.priorHint, lang)}</p>
+          <FilePicker
+            lang={lang}
+            mode="lesson"
+            files={lessonFiles}
+            setFiles={setLessonFiles}
+          />
           <Button
             className="gold-button"
             style={{ marginTop: 10 }}
@@ -579,19 +854,23 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                 topic: topic.trim(),
                 durationMinutes: asInt(lessonDuration),
                 priorKnowledge: priorKnowledge.trim() || undefined,
+                files: lessonFiles.length ? lessonFiles : undefined,
               })
             }
           >
             {runLabel}
             <FilePenLine size={15} />
           </Button>
+          <SkippedNotice lang={lang} skipped={skipped} />
           {lessonResult && (
             <ResultBox
               lang={lang}
               value={lessonResult.markdown}
               truncated={lessonResult.truncated}
               saved={lessonResult.id !== null}
-            />
+            >
+              <ExportButtons kind="lessonPlan" id={lessonResult.id} />
+            </ResultBox>
           )}
           <HistoryList
             lang={lang}
@@ -652,6 +931,12 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             value={topics}
             onChange={e => setTopics(e.target.value)}
           />
+          <FilePicker
+            lang={lang}
+            mode="exam"
+            files={examFiles}
+            setFiles={setExamFiles}
+          />
           <Button
             className="gold-button"
             style={{ marginTop: 10 }}
@@ -669,12 +954,14 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                 topics: topicList,
                 durationMinutes: asInt(examDuration),
                 totalPoints: asInt(totalPoints),
+                files: examFiles.length ? examFiles : undefined,
               })
             }
           >
             {runLabel}
             <ClipboardCheck size={15} />
           </Button>
+          <SkippedNotice lang={lang} skipped={skipped} />
           {examResult && (
             <ResultBox
               lang={lang}
@@ -693,6 +980,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                 {t(L.useForSolutions, lang)}
                 <ArrowLeftRight size={15} />
               </Button>
+              <ExportButtons kind="examPaper" id={examResult.id} />
             </ResultBox>
           )}
           <HistoryList
@@ -733,20 +1021,30 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
               setExamPaperId(null);
             }}
           />
+          <FilePicker
+            lang={lang}
+            mode="solutions"
+            files={solutionFiles}
+            setFiles={setSolutionFiles}
+          />
           <Button
             className="gold-button"
             style={{ marginTop: 10 }}
-            disabled={busy || examText.trim().length < 20}
+            disabled={
+              busy || (examText.trim().length < 20 && !solutionFiles.length)
+            }
             onClick={() =>
               solutions.mutate({
                 examText: examText.trim(),
                 examPaperId: examPaperId ?? undefined,
+                files: solutionFiles.length ? solutionFiles : undefined,
               })
             }
           >
             {runLabel}
             <FileCheck2 size={15} />
           </Button>
+          <SkippedNotice lang={lang} skipped={skipped} />
           {solutionsResult && (
             <>
               {solutionsResult.parseError && (
@@ -776,6 +1074,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                   {t(L.useForGrading, lang)}
                   <ArrowLeftRight size={15} />
                 </Button>
+                <ExportButtons kind="examSolutions" id={solutionsResult.id} />
               </ResultBox>
             </>
           )}
@@ -837,6 +1136,12 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             onChange={e => setStudentAnswerText(e.target.value)}
           />
           <p className="quiet-label">{t(L.studentAnswerHint, lang)}</p>
+          <FilePicker
+            lang={lang}
+            mode="grading"
+            files={gradingFiles}
+            setFiles={setGradingFiles}
+          />
           <div className="admin-form-grid">
             <select
               value={learnerId}
@@ -872,7 +1177,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             disabled={
               busy ||
               (solutionSetId === null && solutionsJson.trim().length < 2) ||
-              studentAnswerText.trim().length < 10
+              (studentAnswerText.trim().length < 10 && !gradingFiles.length)
             }
             onClick={() =>
               grading.mutate({
@@ -880,6 +1185,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                 solutionsJson:
                   solutionSetId === null ? solutionsJson.trim() : undefined,
                 studentAnswerText: studentAnswerText.trim(),
+                files: gradingFiles.length ? gradingFiles : undefined,
                 learnerId: learnerId ? Number(learnerId) : undefined,
                 studentLabel: studentLabel.trim() || undefined,
                 maxPoints: asInt(maxPoints) || undefined,
@@ -889,6 +1195,48 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             {runLabel}
             <ClipboardCheck size={15} />
           </Button>
+          <div
+            className="invite-box"
+            style={{ marginTop: 10, flexWrap: "wrap" }}
+          >
+            <Button
+              className="quiet-button"
+              disabled={busy || !gradingFiles.length}
+              title={
+                solutionSetId === null ? t(L.batchNeedsScale, lang) : undefined
+              }
+              onClick={() => {
+                // Batch grading saves one draft per paper against a stored
+                // scale, so it needs a saved one — a pasted scale has no row
+                // for the grades to reference.
+                if (solutionSetId === null) {
+                  toast.error(t(L.batchNeedsScale, lang));
+                  return;
+                }
+                batchGrade.mutate({
+                  solutionSetId,
+                  files: gradingFiles,
+                  maxPoints: asInt(maxPoints) || undefined,
+                });
+              }}
+            >
+              {t(L.batch, lang)}
+              <ClipboardCheck size={15} />
+            </Button>
+            <Button
+              className="quiet-button"
+              disabled={exportMarks.isPending}
+              onClick={() =>
+                exportMarks.mutate(
+                  solutionSetId === null ? {} : { solutionSetId }
+                )
+              }
+            >
+              {t(L.exportMarks, lang)}
+              <Download size={15} />
+            </Button>
+          </div>
+          <SkippedNotice lang={lang} skipped={skipped} />
           {gradingResult && (
             <>
               <p className="quiet-label" style={{ marginTop: 10 }}>
@@ -899,7 +1247,9 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                 value={gradingResult.markdown}
                 truncated={gradingResult.truncated}
                 saved={gradingResult.id !== null}
-              />
+              >
+                <ExportButtons kind="paperGrade" id={gradingResult.id} />
+              </ResultBox>
               {gradingResult.id !== null && (
                 <div style={{ marginTop: 14 }}>
                   <span className="section-kicker">
