@@ -12,6 +12,83 @@ import { setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 
+// The server's own tRPC error messages (server/routers/auth.ts,
+// server/_core/emailAuth.ts) are fixed English strings — never localized
+// server-side, since that's a presentation concern. Mapped here to real,
+// understandable copy in each UI language rather than shown raw; anything
+// not recognized (a network error, an unexpected message) falls back to a
+// single generic, still-understandable line instead of leaking English
+// backend text into an Arabic/French interface.
+const KNOWN_AUTH_ERRORS: Array<{ match: RegExp; text: Record<Lang, string> }> = [
+  {
+    match: /too many attempts/i,
+    text: {
+      ar: "محاولات كثيرة جدًا. حاول مرة أخرى بعد قليل.",
+      fr: "Trop de tentatives. Réessayez dans quelques instants.",
+      en: "Too many attempts. Please try again shortly.",
+    },
+  },
+  {
+    match: /must be at least \d+ characters/i,
+    text: {
+      ar: "كلمة المرور قصيرة جدًا — يجب ألا تقل عن 8 أحرف.",
+      fr: "Le mot de passe est trop court — 8 caractères minimum.",
+      en: "Password is too short — at least 8 characters.",
+    },
+  },
+  {
+    match: /must contain both letters and numbers/i,
+    text: {
+      ar: "يجب أن تحتوي كلمة المرور على حروف وأرقام معًا.",
+      fr: "Le mot de passe doit contenir des lettres et des chiffres.",
+      en: "Password must contain both letters and numbers.",
+    },
+  },
+  {
+    match: /account with this email already exists/i,
+    text: {
+      ar: "يوجد حساب مسجّل بهذا البريد الإلكتروني بالفعل. جرّب تسجيل الدخول بدلًا من ذلك.",
+      fr: "Un compte existe déjà avec cet e-mail. Essayez de vous connecter à la place.",
+      en: "An account with this email already exists. Try logging in instead.",
+    },
+  },
+  {
+    match: /invalid email or password/i,
+    text: {
+      ar: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+      fr: "E-mail ou mot de passe incorrect.",
+      en: "Invalid email or password.",
+    },
+  },
+  {
+    match: /pending activation/i,
+    text: {
+      ar: "حسابك بانتظار التفعيل من طرف الإدارة.",
+      fr: "Votre compte est en attente d'activation par un administrateur.",
+      en: "Your account is pending activation by an administrator.",
+    },
+  },
+  {
+    match: /account has been suspended/i,
+    text: {
+      ar: "تم تعليق هذا الحساب. تواصل مع الدعم لمزيد من المعلومات.",
+      fr: "Ce compte a été suspendu. Contactez le support pour plus d'informations.",
+      en: "This account has been suspended. Contact support for more information.",
+    },
+  },
+];
+
+const GENERIC_AUTH_ERROR: Record<Lang, string> = {
+  ar: "حدث خطأ غير متوقع. حاول مرة أخرى.",
+  fr: "Une erreur inattendue s'est produite. Réessayez.",
+  en: "Something unexpected went wrong. Please try again.",
+};
+
+function localizeAuthError(message: string, lang: Lang): string {
+  const found = KNOWN_AUTH_ERRORS.find(entry => entry.match.test(message));
+  return found ? found.text[lang] : GENERIC_AUTH_ERROR[lang];
+}
+
 const copy = {
   ar: {
     loginTitle: "مرحبًا بك في Nourix Academy",
@@ -262,7 +339,9 @@ export default function AuthPage({
               </small>
             )}
             {formError && (
-              <small style={{ color: "#e08a8a" }}>{formError}</small>
+              <small style={{ color: "#e08a8a" }} role="alert">
+                {localizeAuthError(formError, lang)}
+              </small>
             )}
             <Button
               className="quiet-button"

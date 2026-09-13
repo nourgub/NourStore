@@ -1,31 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { subjectIcon } from "@/lib/subjectIcons";
 import {
   ArrowUpLeft,
   BookOpen,
   Check,
   ChevronDown,
-  Code2,
   Eye,
   FileCheck2,
   Globe2,
   GraduationCap,
-  LayoutDashboard,
   Menu,
-  Play,
   Sparkles,
   Target,
   Users,
   X,
 } from "lucide-react";
-import { ForwardArrow, BackArrow } from "@/components/DirectionalArrow";
-import { toast } from "sonner";
+import { ForwardArrow } from "@/components/DirectionalArrow";
 import { setStoredLanguage } from "@/lib/language";
-import { type Lang, translations, features, scrollToId } from "./Home.i18n";
+import {
+  type Lang,
+  translations,
+  features,
+  audienceCards,
+  scrollToId,
+} from "./Home.i18n";
+
+const LEVEL_LABEL: Record<string, Record<Lang, string>> = {
+  starter: { ar: "تمهيدي", fr: "Débutant", en: "Starter" },
+  foundation: { ar: "تأسيسي", fr: "Fondations", en: "Foundation" },
+  intermediate: { ar: "متوسط", fr: "Intermédiaire", en: "Intermediate" },
+  advanced: { ar: "متقدم", fr: "Avancé", en: "Advanced" },
+  exam: { ar: "بكالوريا", fr: "Bac", en: "Baccalaureate" },
+  professional: { ar: "احترافي", fr: "Professionnel", en: "Professional" },
+};
 
 export default function Home() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -35,12 +46,8 @@ export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: whatsappNumber } = trpc.platform.whatsapp.useQuery();
   const { data: socialLinks } = trpc.platform.socialLinks.useQuery();
-  // Same check as the login/register page and the teacher panel's Google
-  // Calendar link: without it, "Start learning" always calls startLogin()
-  // (Google OAuth) even on a deployment with no Google credentials set,
-  // landing a visitor on /api/auth/google/login's raw 501 text response
-  // instead of ever reaching the working email/password sign-up form.
-  const { data: authConfig } = trpc.auth.config.useQuery();
+  const coursesQuery = trpc.learning.courses.useQuery();
+  const subjectsQuery = trpc.learning.subjects.useQuery();
   const [langOpen, setLangOpen] = useState(false);
 
   // Captures ?ref=CODE on first visit (before the person even signs in) and
@@ -64,6 +71,7 @@ export default function Home() {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const navLinks = useMemo(
     () => [
+      { label: copy.navHome, id: "top" },
       { label: copy.navCourses, id: "paths" },
       { label: copy.navHow, id: "method" },
       { label: copy.navForParents, id: "parents" },
@@ -77,17 +85,57 @@ export default function Home() {
     setLangOpen(false);
   };
 
+  // Always sends a new visitor to the real registration page — which
+  // itself offers both Google (when configured) and email/password — so
+  // this button never skips straight into Google OAuth for a deployment
+  // where that happens to be enabled, hiding the email/password option a
+  // visitor without a Google account would need. An already-authenticated
+  // visitor still goes straight to their dashboard.
   const handleStart = () => {
-    if (isAuthenticated) {
-      window.location.href = "/dashboard";
-      return;
-    }
-    if (authConfig?.googleEnabled) {
-      startLogin();
-    } else {
-      window.location.href = "/register";
-    }
+    window.location.href = isAuthenticated ? "/dashboard" : "/register";
   };
+
+  // Real, published courses grouped by subject — never fabricated. Each
+  // group's card shows a real course count and the real levels on offer;
+  // if there are no published courses at all, a single honest empty state
+  // replaces the whole grid (see coursesEmptyTitle/-Hint below) rather than
+  // a blank or confusing "no courses" line.
+  const subjectGroups = useMemo(() => {
+    const list = coursesQuery.data ?? [];
+    const bySlug = new Map<
+      string,
+      { slug: string; count: number; levels: Set<string> }
+    >();
+    for (const course of list) {
+      const entry = bySlug.get(course.subject) ?? {
+        slug: course.subject,
+        count: 0,
+        levels: new Set<string>(),
+      };
+      entry.count += 1;
+      entry.levels.add(course.level);
+      bySlug.set(course.subject, entry);
+    }
+    const subjectMeta = new Map(
+      (subjectsQuery.data ?? []).map(s => [s.slug, s])
+    );
+    return Array.from(bySlug.values()).map(entry => {
+      const meta = subjectMeta.get(entry.slug);
+      const title =
+        lang === "ar"
+          ? meta?.titleAr
+          : lang === "fr"
+            ? meta?.titleFr
+            : meta?.titleEn;
+      return {
+        slug: entry.slug,
+        title: title || entry.slug,
+        icon: subjectIcon(meta?.icon),
+        count: entry.count,
+        levels: Array.from(entry.levels),
+      };
+    });
+  }, [coursesQuery.data, subjectsQuery.data, lang]);
 
   return (
     <div
@@ -121,25 +169,31 @@ export default function Home() {
             <button className="nav-link" onClick={() => scrollToId("footer")}>
               {copy.navAbout}
             </button>
+            <a className="nav-link" href="/support">
+              {copy.navSupport}
+            </a>
           </nav>
 
-          <div className="hidden items-center gap-3 sm:flex">
+          <div className="hidden items-center gap-3 lg:flex">
             <ThemeToggle lang={lang} />
             <div className="language-wrap">
               <button
                 className="language-button"
                 onClick={() => setLangOpen(open => !open)}
                 aria-expanded={langOpen}
+                aria-haspopup="true"
+                aria-label="Change language"
               >
                 <Globe2 size={16} />
                 <span>{lang.toUpperCase()}</span>
                 <ChevronDown size={14} />
               </button>
               {langOpen && (
-                <div className="language-menu">
+                <div className="language-menu" role="menu">
                   {(["ar", "fr", "en"] as Lang[]).map(option => (
                     <button
                       key={option}
+                      role="menuitem"
                       className={option === lang ? "active" : ""}
                       onClick={() => changeLanguage(option)}
                     >
@@ -158,22 +212,15 @@ export default function Home() {
                 variant="ghost"
                 className="header-ghost"
                 onClick={() => {
-                  window.location.href = isAuthenticated
-                    ? "/workspace"
-                    : "/login";
+                  window.location.href = "/workspace";
                 }}
               >
                 {user?.name || copy.login}
               </Button>
             ) : (
-              <button
-                className="login-button"
-                onClick={() => {
-                  window.location.href = "/login";
-                }}
-              >
+              <a className="login-button" href="/login">
                 {copy.login}
-              </button>
+              </a>
             )}
             <Button className="gold-button header-cta" onClick={handleStart}>
               {copy.start}
@@ -181,13 +228,28 @@ export default function Home() {
             </Button>
           </div>
 
-          <button
-            className="mobile-menu-button lg:hidden"
-            onClick={() => setMobileOpen(open => !open)}
-            aria-label="Menu"
-          >
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          <div className="flex items-center gap-2 lg:hidden">
+            {/* Visible before the menu opens, per the requirement that
+                registration never be hidden behind the hamburger alone. */}
+            {!isAuthenticated && (
+              <Button
+                className="gold-button header-cta-mobile"
+                onClick={handleStart}
+              >
+                {copy.start}
+              </Button>
+            )}
+            <button
+              className="mobile-menu-button"
+              onClick={() => setMobileOpen(open => !open)}
+              aria-label={
+                lang === "ar" ? "القائمة" : lang === "fr" ? "Menu" : "Menu"
+              }
+              aria-expanded={mobileOpen}
+            >
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
         {mobileOpen && (
           <div className="mobile-menu lg:hidden">
@@ -210,6 +272,8 @@ export default function Home() {
             >
               {copy.navAbout}
             </button>
+            <a href="/support">{copy.navSupport}</a>
+            <a href="/login">{copy.login}</a>
             <div className="mobile-language-row" aria-label="Language selector">
               {(["ar", "fr", "en"] as Lang[]).map(option => (
                 <button
@@ -257,15 +321,16 @@ export default function Home() {
                   <ForwardArrow dir={dir} size={18} />
                 </Button>
                 <button
-                  className="text-action"
-                  onClick={() => scrollToId("method")}
+                  className="quiet-button hero-secondary"
+                  onClick={() => scrollToId("paths")}
                 >
-                  <span className="play-icon">
-                    <Play size={14} fill="currentColor" />
-                  </span>
-                  {copy.live}
+                  {copy.exploreCourses}
                 </button>
               </div>
+              <p className="hero-reassurance">
+                <Sparkles size={14} />
+                {copy.reassurance}
+              </p>
               <div className="placement-note">
                 <span className="placement-icon">
                   <Sparkles size={15} />
@@ -442,6 +507,41 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="audience" className="section-pad audience-section">
+          <div className="container">
+            <div className="section-heading">
+              <div>
+                <div className="section-kicker">{copy.audienceKicker}</div>
+                <h2>{copy.audienceTitle}</h2>
+              </div>
+            </div>
+            <div className="audience-grid">
+              {audienceCards.map(card => {
+                const Icon = card.icon;
+                const title =
+                  copy[`audience${card.key}Title` as keyof typeof copy];
+                const desc =
+                  copy[`audience${card.key}Desc` as keyof typeof copy];
+                const cta =
+                  copy[`audience${card.key}Cta` as keyof typeof copy];
+                return (
+                  <article className={`audience-card tone-${card.tone}`} key={card.key}>
+                    <div className={`audience-icon ${card.tone}`}>
+                      <Icon size={22} />
+                    </div>
+                    <h3>{title as string}</h3>
+                    <p>{desc as string}</p>
+                    <a className="card-link" href={card.href}>
+                      {cta as string}
+                      <ForwardArrow dir={dir} size={16} />
+                    </a>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         <section id="paths" className="section-pad paths-section">
           <div className="container">
             <div className="section-heading">
@@ -451,78 +551,60 @@ export default function Home() {
               </div>
               <p>{copy.learningPathsHint}</p>
             </div>
-            <div className="path-grid">
-              <article className="path-card math-card">
-                <div className="path-number">01</div>
-                <div className="path-icon math-icon-large">∑</div>
-                <h3>{copy.math}</h3>
-                <p>{copy.mathDesc}</p>
-                <div className="path-tags">
-                  <span>
-                    {lang === "ar"
-                      ? "تمارين"
-                      : lang === "fr"
-                        ? "Exercices"
-                        : "Practice"}
-                  </span>
-                  <span>
-                    {lang === "ar"
-                      ? "مراجعة"
-                      : lang === "fr"
-                        ? "Révision"
-                        : "Review"}
-                  </span>
-                  <span>
-                    {lang === "ar"
-                      ? "اختبارات"
-                      : lang === "fr"
-                        ? "Quiz"
-                        : "Quizzes"}
-                  </span>
-                </div>
-                <button
-                  className="card-link"
-                  onClick={() => {
-                    window.location.href = "/courses?subject=math";
-                  }}
-                >
-                  {copy.explorePath}
+            {coursesQuery.isLoading ? (
+              <div className="empty-state" role="status">
+                <BookOpen size={22} />
+                <p>
+                  {lang === "ar"
+                    ? "جارٍ التحميل…"
+                    : lang === "fr"
+                      ? "Chargement…"
+                      : "Loading…"}
+                </p>
+              </div>
+            ) : subjectGroups.length === 0 ? (
+              <div className="empty-state courses-empty-state">
+                <Sparkles size={24} />
+                <p className="empty-title">{copy.coursesEmptyTitle}</p>
+                <p>{copy.coursesEmptyHint}</p>
+                <Button className="gold-button" onClick={handleStart}>
+                  {copy.coursesEmptyCta}
                   <ForwardArrow dir={dir} size={16} />
-                </button>
-              </article>
-              <article className="path-card computing-card">
-                <div className="path-number">02</div>
-                <div className="path-icon code-icon-large">&lt;/&gt;</div>
-                <h3>{copy.computing}</h3>
-                <p>{copy.computingDesc}</p>
-                <div className="path-tags">
-                  <span>
-                    {lang === "ar"
-                      ? "خوارزميات"
-                      : lang === "fr"
-                        ? "Algorithmes"
-                        : "Algorithms"}
-                  </span>
-                  <span>Python</span>
-                  <span>
-                    {lang === "ar"
-                      ? "مشاريع"
-                      : lang === "fr"
-                        ? "Projets"
-                        : "Projects"}
-                  </span>
-                </div>
-                <button
-                  className="card-link"
-                  onClick={() => {
-                    window.location.href = "/courses?subject=computing";
-                  }}
-                >
-                  {copy.explorePath}
-                  <ForwardArrow dir={dir} size={16} />
-                </button>
-              </article>
-            </div>
+                </Button>
+              </div>
+            ) : (
+              <div className="path-grid">
+                {subjectGroups.map((group, index) => {
+                  const Icon = group.icon;
+                  return (
+                    <article className="path-card" key={group.slug}>
+                      <div className="path-number">
+                        {String(index + 1).padStart(2, "0")}
+                      </div>
+                      <div className="path-icon">
+                        <Icon size={26} />
+                      </div>
+                      <h3>{group.title}</h3>
+                      <p>{copy.coursesAvailable(group.count)}</p>
+                      <div className="path-tags">
+                        {group.levels.map(level => (
+                          <span key={level}>
+                            {LEVEL_LABEL[level]?.[lang] ?? level}
+                          </span>
+                        ))}
+                      </div>
+                      <a
+                        className="card-link"
+                        href={`/courses?subject=${encodeURIComponent(group.slug)}`}
+                      >
+                        {copy.explorePath}
+                        <ForwardArrow dir={dir} size={16} />
+                      </a>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -539,13 +621,20 @@ export default function Home() {
               {features.map((feature, index) => {
                 const Icon = feature.icon;
                 const title =
-                  copy[feature.key as "stepOne" | "stepTwo" | "stepThree"];
+                  copy[
+                    feature.key as
+                      | "stepOne"
+                      | "stepTwo"
+                      | "stepThree"
+                      | "stepFour"
+                  ];
                 const desc =
                   copy[
                     `${feature.key}Desc` as
                       | "stepOneDesc"
                       | "stepTwoDesc"
                       | "stepThreeDesc"
+                      | "stepFourDesc"
                   ];
                 return (
                   <div className="method-card" key={feature.key}>
@@ -558,6 +647,12 @@ export default function Home() {
                   </div>
                 );
               })}
+            </div>
+            <div className="method-cta">
+              <Button className="gold-button" onClick={handleStart}>
+                {copy.start}
+                <ForwardArrow dir={dir} size={16} />
+              </Button>
             </div>
           </div>
         </section>
@@ -719,6 +814,17 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        <section className="section-pad final-cta-section">
+          <div className="container final-cta-inner">
+            <h2>{copy.finalCtaTitle}</h2>
+            <p>{copy.finalCtaHint}</p>
+            <Button className="gold-button hero-primary" onClick={handleStart}>
+              {copy.start}
+              <ForwardArrow dir={dir} size={18} />
+            </Button>
+          </div>
+        </section>
       </main>
 
       <footer id="footer" className="site-footer">
@@ -765,13 +871,7 @@ export default function Home() {
                 Facebook
               </a>
             )}
-            <a href="/support">
-              {lang === "ar"
-                ? "الدعم الفني"
-                : lang === "fr"
-                  ? "Support"
-                  : "Support"}
-            </a>
+            <a href="/support">{copy.navSupport}</a>
           </div>
           <div className="footer-lang">
             <span>
