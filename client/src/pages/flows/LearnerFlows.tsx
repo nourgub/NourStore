@@ -25,13 +25,22 @@ import {
   SigmaIcon,
 } from "./shared";
 
+const PLACEMENT_LEVEL_LABEL: Record<string, Record<Lang, string>> = {
+  starter: { ar: "A1", fr: "A1", en: "A1" },
+  foundation: { ar: "A2", fr: "A2", en: "A2" },
+  intermediate: { ar: "B1", fr: "B1", en: "B1" },
+  advanced: { ar: "B2", fr: "B2", en: "B2" },
+};
+
 export function PlacementTest() {
   const { lang, setLang } = useFlowLanguage();
+  const { isAuthenticated } = useAuth();
   const t = courseLabels[lang];
   const placement = trpc.placement.current.useQuery();
   const submitAttempt = trpc.placement.submit.useMutation();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [done, setDone] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const items = placement.data?.questions ?? [];
   const getPrompt = (q: (typeof items)[number]) =>
     lang === "ar" ? q.promptAr : lang === "fr" ? q.promptFr : q.promptEn;
@@ -43,18 +52,29 @@ export function PlacementTest() {
     }
   };
   // Grading happens server-side: the browser never sees the answer key, only the score returned after submission.
+  // Submission itself requires a real session (server-side protectedProcedure) — an anonymous
+  // visitor is told so explicitly here rather than clicking "submit" and getting nothing back.
   const finish = () => {
     if (!placement.data?.test) return;
+    if (!isAuthenticated) {
+      setSubmitError(true);
+      return;
+    }
+    setSubmitError(false);
     submitAttempt.mutate(
       { testId: placement.data.test.id, answersJson: JSON.stringify(answers) },
       { onSuccess: () => setDone(true) }
     );
   };
   const resultScore = submitAttempt.data?.score ?? 0;
+  const recommendedLevel = submitAttempt.data?.recommendedLevel;
+  const recommendedLevelLabel = recommendedLevel
+    ? (PLACEMENT_LEVEL_LABEL[recommendedLevel]?.[lang] ?? recommendedLevel)
+    : null;
   return (
     <Shell
       title={t.placement}
-      kicker="OPTIONAL / BAC PATH"
+      kicker="OPTIONAL / PLACEMENT TEST"
       lang={lang}
       setLang={setLang}
     >
@@ -82,9 +102,7 @@ export function PlacementTest() {
             </p>
             <Button
               className="gold-button"
-              onClick={() =>
-                (window.location.href = "/courses?subject=computing")
-              }
+              onClick={() => (window.location.href = "/courses")}
             >
               {t.startZero}
               <ArrowLeft size={15} />
@@ -96,6 +114,18 @@ export function PlacementTest() {
               <strong>{resultScore}%</strong>
               <span>{t.score}</span>
             </div>
+            {recommendedLevelLabel && (
+              <div className="flow-result">
+                <strong>{recommendedLevelLabel}</strong>
+                <span>
+                  {lang === "ar"
+                    ? "مستواك المقترح"
+                    : lang === "fr"
+                      ? "Niveau recommandé"
+                      : "Recommended level"}
+                </span>
+              </div>
+            )}
             <p>
               {lang === "ar"
                 ? "تم حفظ نتيجتك. يمكنك البدء من المسار المقترح أو اختيار البدء من الصفر."
@@ -144,6 +174,15 @@ export function PlacementTest() {
                 </div>
               ))}
             </div>
+            {submitError && (
+              <p role="alert" style={{ color: "#e08a8a", fontSize: 13 }}>
+                {lang === "ar"
+                  ? "أنشئ حسابًا أو سجّل الدخول أولًا لعرض نتيجتك."
+                  : lang === "fr"
+                    ? "Créez un compte ou connectez-vous d'abord pour voir votre résultat."
+                    : "Create an account or log in first to see your result."}
+              </p>
+            )}
             <Button
               className="gold-button"
               disabled={
@@ -157,9 +196,7 @@ export function PlacementTest() {
             </Button>
             <Button
               className="quiet-button"
-              onClick={() =>
-                (window.location.href = "/courses?subject=computing")
-              }
+              onClick={() => (window.location.href = "/courses")}
             >
               {t.startZero}
             </Button>

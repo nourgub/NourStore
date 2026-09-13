@@ -11,32 +11,32 @@ const copy = {
   ar: {
     title: "من أنت؟",
     hint: "اختر نوع حسابك لنُظهر لك اللوحة والأدوات المناسبة — يمكن لاحقًا لإدارة المنصة تعديل هذا إن احتجت.",
-    learner: "أستاذ متربص",
-    learnerDesc: "أحضّر لامتحان الترسيم: أتابع دورات تكوينية وأخوض اختبارات وأحصل على شهادات.",
-    teacher: "أستاذ مُكوِّن",
-    teacherDesc: "أنشئ دورات ومذكرات واختبارات تكوينية وأتابع الأساتذة المتربصين.",
+    learner: "متعلم اللغة الألمانية",
+    learnerDesc: "أتابع دروسًا ومستويات، وأحضّر للامتحان الدولي، وأحصل على شهادات.",
+    teacher: "أستاذ/مدرّس اللغة الألمانية",
+    teacherDesc: "أنشئ الدروس والاختبارات، وأتابع تقدم المتعلمين الذين أدرّسهم.",
     confirm: "تأكيد الاختيار",
   },
   fr: {
     title: "Qui êtes-vous ?",
     hint: "Choisissez votre type de compte pour afficher le tableau de bord adapté — l’administration pourra le modifier plus tard si besoin.",
-    learner: "Enseignant stagiaire",
+    learner: "Apprenant d'allemand",
     learnerDesc:
-      "Je me prépare à la titularisation : je suis des formations, passe des évaluations et obtiens des certificats.",
-    teacher: "Enseignant formateur",
+      "Je suis des leçons et des niveaux, je me prépare à l'examen international, et j'obtiens des certificats.",
+    teacher: "Professeur d'allemand",
     teacherDesc:
-      "Je crée des formations, des fiches de préparation et des évaluations, et j’accompagne des enseignants stagiaires.",
+      "Je crée des leçons et des évaluations, et je suis la progression des apprenants que j'enseigne.",
     confirm: "Confirmer le choix",
   },
   en: {
     title: "Who are you?",
     hint: "Choose your account type to see the right dashboard and tools — the administration can change this later if needed.",
-    learner: "Trainee teacher",
+    learner: "German language learner",
     learnerDesc:
-      "I'm preparing for tenure confirmation: I follow training modules, take assessments, and earn certificates.",
-    teacher: "Mentor teacher",
+      "I follow lessons and levels, prepare for the international exam, and earn certificates.",
+    teacher: "German language teacher",
     teacherDesc:
-      "I create training modules, lesson-plan templates, and assessments, and mentor trainee teachers.",
+      "I create lessons and assessments, and track the progress of the learners I teach.",
     confirm: "Confirm choice",
   },
 } as const;

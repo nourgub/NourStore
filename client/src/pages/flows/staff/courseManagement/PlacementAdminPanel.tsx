@@ -7,11 +7,12 @@ import { type Lang } from "../../shared";
 
 export function PlacementAdminPanel({ lang }: { lang: Lang }) {
   const tests = trpc.admin.placementTests.useQuery();
+  const subjectsForTest = trpc.learning.subjects.useQuery();
   const [test, setTest] = useState({
     titleAr: "",
     titleFr: "",
     titleEn: "",
-    subject: "combined" as "math" | "computing" | "combined",
+    subject: "combined",
   });
   const [question, setQuestion] = useState({
     testId: "",
@@ -49,10 +50,10 @@ export function PlacementAdminPanel({ lang }: { lang: Lang }) {
           <span className="section-kicker">NOURIX / CONTENT AUTHORING</span>
           <h2>
             {lang === "ar"
-              ? "اختبار مستوى البكالوريا"
+              ? "اختبار تحديد المستوى"
               : lang === "fr"
-                ? "Test de niveau Bac"
-                : "Baccalaureate placement test"}
+                ? "Test de niveau"
+                : "Level placement test"}
           </h2>
         </div>
         <ClipboardCheck size={18} />
@@ -85,13 +86,20 @@ export function PlacementAdminPanel({ lang }: { lang: Lang }) {
         />
         <select
           value={test.subject}
-          onChange={e =>
-            setTest({ ...test, subject: e.target.value as typeof test.subject })
-          }
+          onChange={e => setTest({ ...test, subject: e.target.value })}
         >
-          <option value="combined">رياضيات + إعلام آلي</option>
-          <option value="math">رياضيات</option>
-          <option value="computing">إعلام آلي</option>
+          <option value="combined">
+            {lang === "ar"
+              ? "شامل (كل المحاور)"
+              : lang === "fr"
+                ? "Combiné (tous les axes)"
+                : "Combined (all tracks)"}
+          </option>
+          {(subjectsForTest.data ?? []).map(subject => (
+            <option key={subject.slug} value={subject.slug}>
+              {subject.titleAr}
+            </option>
+          ))}
         </select>
         <Button
           className="gold-button"

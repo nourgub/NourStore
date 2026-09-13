@@ -20,6 +20,9 @@ import {
   referralCodes,
   notifications,
   pointsLedger,
+  placementTests,
+  placementQuestions,
+  placementAttempts,
   type User,
 } from "../drizzle/schema";
 
@@ -90,8 +93,7 @@ async function createFixtureCourse(
   const slug = `sec-course-${RUN}-${Math.random().toString(36).slice(2, 8)}`;
   const result = await teacherCaller.content.createCourse({
     slug,
-    subject: "math",
-    stage: "middle",
+    subject: "grammar",
     level: "foundation",
     titleAr: "دورة اختبار أمني",
     titleFr: "Cours de test sécurité",
@@ -181,7 +183,6 @@ describe.skipIf(!HAS_DB)("Phase 6 — additional security scenarios against real
       descriptionAr: "وصف",
       descriptionFr: "Description",
       descriptionEn: "Description",
-      stage: "middle",
       level: "foundation",
     });
 
@@ -420,6 +421,147 @@ describe.skipIf(!HAS_DB)(
         "قبول 999999999"
       );
       expect(handled).toBe(true);
+    });
+  }
+);
+
+describe.skipIf(!HAS_DB)(
+  "Electronic level-placement test: submit -> real score + recommended level, shown immediately",
+  () => {
+    const createdTestIds: number[] = [];
+    const createdUserIds: number[] = [];
+
+    afterAll(async () => {
+      const db = await mustGetDb();
+      if (createdTestIds.length) {
+        await db
+          .delete(placementAttempts)
+          .where(inArray(placementAttempts.testId, createdTestIds));
+        await db
+          .delete(placementQuestions)
+          .where(inArray(placementQuestions.testId, createdTestIds));
+        await db
+          .delete(placementTests)
+          .where(inArray(placementTests.id, createdTestIds));
+      }
+      if (createdUserIds.length) {
+        await db.delete(users).where(inArray(users.id, createdUserIds));
+      }
+    });
+
+    // The app only ever resolves "the current test" as
+    // `WHERE isPublished = 1 LIMIT 1` with no ordering (see
+    // getPlacementTestWithQuestions/getPlacementTestForPublic) — it was
+    // never designed to have more than one published test at once. Every
+    // fixture test here unpublishes ANY currently-published row first (not
+    // just ones this suite created — a stray one could be left over from
+    // manual testing) so "the current test" is unambiguously the one just
+    // created.
+    async function createPublishedTest(label: string) {
+      const db = await mustGetDb();
+      await db
+        .update(placementTests)
+        .set({ isPublished: 0 })
+        .where(eq(placementTests.isPublished, 1));
+      const [testResult] = await db.insert(placementTests).values({
+        subject: "combined",
+        titleAr: `اختبار ${label}`,
+        titleFr: `Test ${label}`,
+        titleEn: `Test ${label}`,
+        isPublished: 1,
+      });
+      const testId = (testResult as { insertId: number }).insertId;
+      createdTestIds.push(testId);
+      // 5 questions, each with a real known-correct answer, so a specific
+      // score (and therefore a specific recommendedLevel) can be asserted.
+      for (let i = 0; i < 5; i++) {
+        await db.insert(placementQuestions).values({
+          testId,
+          promptAr: `سؤال ${i + 1}`,
+          promptFr: `Question ${i + 1}`,
+          promptEn: `Question ${i + 1}`,
+          optionsJson: JSON.stringify(["A", "B", "C"]),
+          answerKey: "A",
+          skill: "grammar",
+          difficulty: "starter",
+          orderIndex: i,
+        });
+      }
+      return testId;
+    }
+
+    it("scores a real submission server-side and immediately returns score + recommendedLevel — never trusting a client-supplied score", async () => {
+      const testId = await createPublishedTest(`score-${RUN}`);
+      const learner = await createFixtureUser(
+        "learner",
+        `placement-learner-${RUN}`
+      );
+      createdUserIds.push(learner.id);
+      const caller = appRouter.createCaller(ctxFor(learner));
+
+      // All 5 answers correct -> 100% -> "advanced".
+      const allCorrect: Record<string, string> = {};
+      for (let i = 0; i < 5; i++) allCorrect[String(i)] = "A";
+      const result = await caller.placement.submit({
+        testId,
+        answersJson: JSON.stringify(allCorrect),
+      });
+      expect(result.score).toBe(100);
+      expect(result.correct).toBe(5);
+      expect(result.total).toBe(5);
+      expect(result.recommendedLevel).toBe("advanced");
+
+      const db = await mustGetDb();
+      const rows = await db
+        .select()
+        .from(placementAttempts)
+        .where(
+          and(
+            eq(placementAttempts.testId, testId),
+            eq(placementAttempts.userId, learner.id)
+          )
+        );
+      expect(rows.length).toBe(1);
+      expect(rows[0].score).toBe(100);
+      expect(rows[0].recommendedLevel).toBe("advanced");
+    });
+
+    it("a lower real score maps to a lower recommended level, not always 'advanced'", async () => {
+      const testId = await createPublishedTest(`lowscore-${RUN}`);
+      const learner = await createFixtureUser(
+        "learner",
+        `placement-lowscore-${RUN}`
+      );
+      createdUserIds.push(learner.id);
+      const caller = appRouter.createCaller(ctxFor(learner));
+
+      // Only the first answer correct -> 20% -> "starter".
+      const mostlyWrong = { "0": "A", "1": "B", "2": "B", "3": "B", "4": "B" };
+      const result = await caller.placement.submit({
+        testId,
+        answersJson: JSON.stringify(mostlyWrong),
+      });
+      expect(result.score).toBe(20);
+      expect(result.recommendedLevel).toBe("starter");
+    });
+
+    it("rejects an unauthenticated submission outright — an anonymous visitor can never get a real score", async () => {
+      const testId = await createPublishedTest(`anon-${RUN}`);
+      const anon = appRouter.createCaller(ctxFor(null));
+      await expect(
+        anon.placement.submit({ testId, answersJson: "{}" })
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("the public 'current' query returns the real published test's real questions, without ever exposing answerKey", async () => {
+      await createPublishedTest(`public-${RUN}`);
+      const anon = appRouter.createCaller(ctxFor(null));
+      const current = await anon.placement.current();
+      expect(current.test).toBeTruthy();
+      expect(current.questions.length).toBeGreaterThan(0);
+      for (const q of current.questions) {
+        expect(q).not.toHaveProperty("answerKey");
+      }
     });
   }
 );

@@ -166,7 +166,7 @@ describe("role permissions", () => {
       await expect(
         caller.admin.createSkill({
           slug: "algebra-basics",
-          subject: "math",
+          subject: "grammar",
           titleAr: "أ",
           titleFr: "a",
           titleEn: "a",
@@ -244,7 +244,7 @@ describe("role permissions", () => {
 
       await db.insert(courses).values({
         slug: `role-upload-course-${RUN}`,
-        subject: "math",
+        subject: "grammar",
         level: "foundation",
         titleAr: "دورة اختبار",
         titleFr: "Cours de test",

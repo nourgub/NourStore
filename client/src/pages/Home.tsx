@@ -29,12 +29,12 @@ import {
 } from "./Home.i18n";
 
 const LEVEL_LABEL: Record<string, Record<Lang, string>> = {
-  starter: { ar: "تمهيدي", fr: "Débutant", en: "Starter" },
-  foundation: { ar: "تأسيسي", fr: "Fondations", en: "Foundation" },
-  intermediate: { ar: "متوسط", fr: "Intermédiaire", en: "Intermediate" },
-  advanced: { ar: "متقدم", fr: "Avancé", en: "Advanced" },
-  exam: { ar: "بكالوريا", fr: "Bac", en: "Baccalaureate" },
-  professional: { ar: "احترافي", fr: "Professionnel", en: "Professional" },
+  starter: { ar: "A1", fr: "A1", en: "A1" },
+  foundation: { ar: "A2", fr: "A2", en: "A2" },
+  intermediate: { ar: "B1", fr: "B1", en: "B1" },
+  advanced: { ar: "B2", fr: "B2", en: "B2" },
+  exam: { ar: "C1 · تحضير الامتحان", fr: "C1 · prépa. examen", en: "C1 · exam prep" },
+  professional: { ar: "C2", fr: "C2", en: "C2" },
 };
 
 export default function Home() {
@@ -409,14 +409,14 @@ export default function Home() {
                 </div>
                 <div className="visual-courses">
                   <div className="visual-course">
-                    <span className="course-icon math-icon">✎</span>
+                    <span className="course-icon math-icon">Ä</span>
                     <div>
                       <strong>
                         {lang === "ar"
-                          ? "تحضير المذكرات"
+                          ? "القواعد"
                           : lang === "fr"
-                            ? "Préparation des fiches"
-                            : "Lesson-plan prep"}
+                            ? "Grammaire"
+                            : "Grammar"}
                       </strong>
                       <small>
                         {lang === "ar"
@@ -433,10 +433,10 @@ export default function Home() {
                     <div>
                       <strong>
                         {lang === "ar"
-                          ? "التشريع المدرسي"
+                          ? "التحضير للامتحان الدولي"
                           : lang === "fr"
-                            ? "Législation scolaire"
-                            : "School legislation"}
+                            ? "Préparation à l'examen"
+                            : "Exam preparation"}
                       </strong>
                       <small>
                         {lang === "ar"
@@ -453,10 +453,10 @@ export default function Home() {
                   <div>
                     <span className="tiny-avatar" />
                     {lang === "ar"
-                      ? "متابعة الأستاذ المكوِّن"
+                      ? "متابعة الأستاذ"
                       : lang === "fr"
-                        ? "Suivi du formateur"
-                        : "Mentor feedback"}
+                        ? "Suivi du professeur"
+                        : "Teacher feedback"}
                   </div>
                   <span className="gold-check">
                     <Check size={13} />
