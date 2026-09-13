@@ -154,7 +154,7 @@ export const authRouter = router({
   // "admin" is intentionally not an option here — see chooseOwnRole in db.ts.
   chooseRole: protectedProcedure
     .use(rateLimit("choose-role", 5, 60 * 60 * 1000))
-    .input(z.object({ role: z.enum(["learner", "teacher", "institution"]) }))
+    .input(z.object({ role: z.enum(["learner", "teacher"]) }))
     .mutation(async ({ ctx, input }) => {
       const result = await chooseOwnRole(ctx.user.id, input.role);
       if (!result.ok)

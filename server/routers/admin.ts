@@ -20,9 +20,6 @@ import {
   createManagedUser,
   setAccountStatus,
   enrollInCourse,
-  getAllAlgorithmExercises,
-  createAlgorithmExercise,
-  setAlgorithmExercisePublished,
   createSkill,
   getAllSubjects,
   createSubject,
@@ -132,13 +129,7 @@ export const adminRouter = router({
     .input(
       z.object({
         userId: z.number().int().positive(),
-        role: z.enum([
-          "learner",
-          "parent",
-          "teacher",
-          "institution",
-          "admin",
-        ]),
+        role: z.enum(["learner", "teacher", "admin"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -284,35 +275,6 @@ export const adminRouter = router({
       });
       return result;
     }),
-  algorithmExercises: adminProcedure.query(() => getAllAlgorithmExercises()),
-  createAlgorithmExercise: adminProcedure
-    .input(
-      z.object({
-        slug: z
-          .string()
-          .min(2)
-          .max(160)
-          .regex(/^[a-z0-9-]+$/),
-        difficulty: z.enum(["starter", "easy", "medium", "hard"]),
-        titleAr: z.string().min(2).max(255),
-        titleFr: z.string().min(2).max(255),
-        titleEn: z.string().min(2).max(255),
-        statementAr: z.string().min(2),
-        statementFr: z.string().min(2),
-        statementEn: z.string().min(2),
-        starterCode: z.string().min(1).max(10000),
-        testCasesJson: z.string().min(2).max(20000),
-        hintsJson: z.string().max(10000).optional(),
-      })
-    )
-    .mutation(({ input }) => createAlgorithmExercise(input)),
-  publishAlgorithmExercise: adminProcedure
-    .input(
-      z.object({ id: z.number().int().positive(), published: z.boolean() })
-    )
-    .mutation(({ input }) =>
-      setAlgorithmExercisePublished(input.id, input.published)
-    ),
   createSkill: adminProcedure
     .input(
       z.object({

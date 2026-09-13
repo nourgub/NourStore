@@ -21,7 +21,6 @@ const labels = {
     title: "مكتبة التعلم",
     hint: "اختر مسارك، وتقدم بخطوة واضحة كل يوم.",
     all: "كل المسارات",
-    allStages: "كل الأطوار",
     search: "ابحث عن دورة أو مهارة...",
     units: "وحدات",
     empty: "لا توجد دورات منشورة حاليًا.",
@@ -29,12 +28,6 @@ const labels = {
     retry: "إعادة المحاولة",
     start: "ابدأ الدورة",
     home: "الرئيسية",
-    lab: "مختبر الخوارزميات",
-    stage: {
-      primary: "الابتدائي",
-      middle: "المتوسط",
-      secondary: "الثانوي",
-    },
     level: {
       starter: "تمهيدي",
       foundation: "تأسيسي",
@@ -48,7 +41,6 @@ const labels = {
     title: "Bibliothèque d’apprentissage",
     hint: "Choisissez votre parcours et avancez avec clarté.",
     all: "Tous les parcours",
-    allStages: "Tous les niveaux scolaires",
     search: "Rechercher un cours ou une compétence…",
     units: "unités",
     empty: "Aucun cours publié pour le moment.",
@@ -57,12 +49,6 @@ const labels = {
     retry: "Réessayer",
     start: "Commencer",
     home: "Accueil",
-    lab: "Laboratoire",
-    stage: {
-      primary: "Primaire",
-      middle: "Moyen",
-      secondary: "Secondaire",
-    },
     level: {
       starter: "Débutant",
       foundation: "Fondations",
@@ -76,7 +62,6 @@ const labels = {
     title: "Learning library",
     hint: "Choose your path and make one clear step each day.",
     all: "All paths",
-    allStages: "All school stages",
     search: "Search for a course or skill…",
     units: "units",
     empty: "No courses have been published yet.",
@@ -84,12 +69,6 @@ const labels = {
     retry: "Try again",
     start: "Start course",
     home: "Home",
-    lab: "Algorithm lab",
-    stage: {
-      primary: "Primary",
-      middle: "Middle",
-      secondary: "Secondary",
-    },
     level: {
       starter: "Starter",
       foundation: "Foundation",
@@ -113,9 +92,6 @@ export default function CourseCatalog() {
   const [subject, setSubject] = useState<string>(
     () => new URLSearchParams(search).get("subject") || "all"
   );
-  const [stage, setStage] = useState<string>(
-    () => new URLSearchParams(search).get("stage") || "all"
-  );
   const [query, setQuery] = useState("");
   const t = labels[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -138,11 +114,10 @@ export default function CourseCatalog() {
           ].toLowerCase();
         return (
           (subject === "all" || course.subject === subject) &&
-          (stage === "all" || course.stage === stage) &&
           (!query || name.includes(query.toLowerCase()))
         );
       }),
-    [coursesQuery.data, lang, query, subject, stage]
+    [coursesQuery.data, lang, query, subject]
   );
   const changeLang = (next: Lang) => {
     setLang(next);
@@ -169,9 +144,6 @@ export default function CourseCatalog() {
           <div className="catalog-header-actions">
             <Link href="/" className="catalog-home-link">
               {t.home}
-            </Link>
-            <Link href="/lab" className="catalog-home-link">
-              {t.lab}
             </Link>
             <Link href="/search" className="catalog-home-link">
               <Search size={14} />
@@ -204,23 +176,6 @@ export default function CourseCatalog() {
               <strong>{filtered.length}</strong>
               <span>{t.all}</span>
             </div>
-          </div>
-          <div className="catalog-tabs" style={{ marginBottom: 10 }}>
-            <button
-              className={stage === "all" ? "active" : ""}
-              onClick={() => setStage("all")}
-            >
-              {t.allStages}
-            </button>
-            {(["primary", "middle", "secondary"] as const).map(option => (
-              <button
-                key={option}
-                className={stage === option ? "active" : ""}
-                onClick={() => setStage(option)}
-              >
-                {t.stage[option]}
-              </button>
-            ))}
           </div>
           <div className="catalog-toolbar">
             <div className="catalog-tabs">
@@ -306,7 +261,7 @@ export default function CourseCatalog() {
                         <Icon size={22} />
                       </div>
                       <span className="level-badge">
-                        {t.stage[course.stage]} · {t.level[course.level]}
+                        {t.level[course.level]}
                       </span>
                     </div>
                     <h2>{title}</h2>

@@ -17,17 +17,10 @@ describe("learning public procedures", () => {
     expect(Array.isArray(courses)).toBe(true);
   });
 
-  it("rejects an empty algorithm exercise slug", async () => {
-    const caller = appRouter.createCaller(createPublicContext());
-    await expect(
-      caller.learning.algorithmExercise({ slug: "" })
-    ).rejects.toThrow();
-  });
-
   it("returns a bounded public search contract", async () => {
     const caller = appRouter.createCaller(createPublicContext());
     const result = await caller.learning.search({ query: "math", limit: 10 });
-    expect(result).toEqual({ courses: [], lessons: [], exercises: [] });
+    expect(result).toEqual({ courses: [], lessons: [] });
   });
 
   it("never exposes lesson body/live-link fields on the public course-curriculum contract", async () => {
@@ -82,19 +75,6 @@ it("never exposes answerKey/explanation fields on the public placement contract"
     expect(question).not.toHaveProperty("answerKey");
     expect(question).not.toHaveProperty("explanationAr");
   }
-});
-
-it("requires authentication to submit an algorithm-lab attempt", async () => {
-  const caller = appRouter.createCaller(createPublicContext());
-  await expect(
-    caller.algorithmLab.submitAttempt({
-      exerciseId: 1,
-      code: "x",
-      status: "passed",
-      passedTests: 1,
-      totalTests: 1,
-    })
-  ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 });
 
 it("resolves a currency-aware plan list without throwing (empty array with no database)", async () => {

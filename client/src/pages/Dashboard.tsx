@@ -7,7 +7,6 @@ import {
   BookOpen,
   CheckCircle2,
   Clock3,
-  Code2,
   FileCheck2,
   Globe2,
   LogIn,
@@ -101,8 +100,6 @@ export default function Dashboard() {
     totalStudySeconds > 0
       ? `${Math.floor(totalStudySeconds / 3600)}h${String(Math.round((totalStudySeconds % 3600) / 60)).padStart(2, "0")}`
       : "—";
-  const createInvite = trpc.learner.createInvite.useMutation();
-  const [inviteCode, setInviteCode] = useState("");
   useEffect(() => {
     if (isAuthenticated && user && user.role !== "learner")
       window.location.href = "/workspace";
@@ -142,9 +139,6 @@ export default function Dashboard() {
           <div className="catalog-header-actions">
             <Link href="/courses" className="catalog-home-link">
               {t.courses}
-            </Link>
-            <Link href="/lab" className="catalog-home-link">
-              {t.lab}
             </Link>
             <ThemeToggle lang={lang} />
             <div className="catalog-lang">
@@ -951,71 +945,11 @@ export default function Dashboard() {
             </div>
           </section>
           <div className="dashboard-bottom-links">
-            <Link href="/lab">
-              <Code2 size={15} />
-              {t.lab}
-            </Link>
             <Link href="/notifications">{t.notifications}</Link>
             <Link href="/verify/certificate">{t.certificates}</Link>
-            <Link href="/parent">
-              <UsersIcon />
-              {t.parent}
-            </Link>
-          </div>
-          <div className="learner-invite-card">
-            <div>
-              <span className="section-kicker">NOURIX / FAMILY LINK</span>
-              <strong>
-                {lang === "ar"
-                  ? "اربط حساب وليك"
-                  : lang === "fr"
-                    ? "Lier votre parent"
-                    : "Link your parent"}
-              </strong>
-              <small>
-                {inviteCode ||
-                  (lang === "ar"
-                    ? "أنشئ رمزًا آمنًا لمشاركته مع وليك"
-                    : lang === "fr"
-                      ? "Générez un code à partager"
-                      : "Generate a secure code to share")}
-              </small>
-            </div>
-            <Button
-              className="quiet-button"
-              disabled={createInvite.isPending}
-              onClick={() =>
-                createInvite.mutate(undefined, {
-                  onSuccess: data => setInviteCode(data?.code || ""),
-                })
-              }
-            >
-              {lang === "ar"
-                ? "إنشاء رمز"
-                : lang === "fr"
-                  ? "Créer un code"
-                  : "Create code"}
-            </Button>
           </div>
         </div>
       </main>
     </div>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
   );
 }

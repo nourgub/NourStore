@@ -85,7 +85,7 @@ export async function getAllSupportTickets(
 export async function getTicketMessages(input: {
   ticketId: number;
   requesterId: number;
-  role: "learner" | "parent" | "teacher" | "institution" | "admin";
+  role: "learner" | "teacher" | "admin";
 }) {
   const db = await getDb();
   if (!db) return null;
@@ -116,7 +116,7 @@ export async function getTicketMessages(input: {
 export async function addSupportTicketMessage(input: {
   ticketId: number;
   senderId: number;
-  role: "learner" | "parent" | "teacher" | "institution" | "admin";
+  role: "learner" | "teacher" | "admin";
   message: string;
 }) {
   const db = await getDb();

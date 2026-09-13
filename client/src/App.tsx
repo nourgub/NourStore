@@ -16,7 +16,6 @@ import Home from "./pages/Home";
 // common first page and shouldn't show a loading flash.
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CourseCatalog = lazy(() => import("./pages/CourseCatalog"));
-const AlgorithmLab = lazy(() => import("./pages/AlgorithmLab"));
 const CourseDetail = lazy(() => import("./pages/CourseDetail"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Legal = lazy(() => import("./pages/Legal"));
@@ -30,10 +29,10 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 
 // The former LearningFlows.tsx bundled learner-facing flows AND the entire
-// teacher/institution/admin panel into one file, so both ended up in the
-// SAME chunk — a learner taking a quiz downloaded the whole admin panel's
-// code too. Split into two independent modules (client/src/pages/flows/)
-// so each is fetched only by the visitors who actually need it.
+// teacher/admin panel into one file, so both ended up in the SAME chunk — a
+// learner taking a quiz downloaded the whole admin panel's code too. Split
+// into two independent modules (client/src/pages/flows/) so each is
+// fetched only by the visitors who actually need it.
 const PlacementTest = lazy(() =>
   import("./pages/flows/LearnerFlows").then((m) => ({
     default: m.PlacementTest,
@@ -45,18 +44,8 @@ const UnitQuiz = lazy(() =>
 const FinalExam = lazy(() =>
   import("./pages/flows/LearnerFlows").then((m) => ({ default: m.FinalExam }))
 );
-const ParentSpace = lazy(() =>
-  import("./pages/flows/LearnerFlows").then((m) => ({
-    default: m.ParentSpace,
-  }))
-);
 const StaffSpace = lazy(() =>
   import("./pages/flows/StaffFlows").then((m) => ({ default: m.StaffSpace }))
-);
-const InstitutionSpace = lazy(() =>
-  import("./pages/flows/StaffFlows").then((m) => ({
-    default: m.InstitutionSpace,
-  }))
 );
 
 function RouteFallback() {
@@ -92,9 +81,7 @@ function Router() {
         <Route path="/quiz/:unitId" component={UnitQuiz} />
         <Route path="/quiz" component={UnitQuiz} />
         <Route path="/exam/:courseId" component={FinalExam} />
-        <Route path="/parent" component={ParentSpace} />
         <Route path="/teacher" component={() => <StaffSpace />} />
-        <Route path="/institution" component={InstitutionSpace} />
         <Route path="/admin" component={() => <StaffSpace admin />} />
         <Route path="/search" component={Search} />
         <Route path="/notifications" component={Notifications} />
@@ -110,8 +97,6 @@ function Router() {
         <Route path="/support" component={Support} />
         <Route path="/lesson/:lessonId" component={LessonViewer} />
         <Route path="/courses" component={CourseCatalog} />
-        <Route path="/lab/:slug" component={AlgorithmLab} />
-        <Route path="/lab" component={AlgorithmLab} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

@@ -14,11 +14,7 @@ export default function Workspace() {
         ? "/admin"
         : user.role === "teacher"
           ? "/teacher"
-          : user.role === "institution"
-            ? "/institution"
-            : user.role === "parent"
-              ? "/parent"
-              : "/dashboard";
+          : "/dashboard";
     window.location.href = destination;
   }, [loading, user]);
   return (

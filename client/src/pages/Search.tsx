@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ForwardArrow, BackArrow } from "@/components/DirectionalArrow";
 import {
   BookOpen,
-  Code2,
   Globe2,
   Search as SearchIcon,
 } from "lucide-react";
@@ -17,34 +16,31 @@ type Lang = "ar" | "fr" | "en";
 const copy = {
   ar: {
     title: "البحث في NouriX",
-    hint: "ابحث في الدورات والدروس والتمارين المنشورة.",
+    hint: "ابحث في الدورات والدروس المنشورة.",
     placeholder: "اكتب كلمتين على الأقل…",
     all: "كل المحتوى",
     courses: "الدورات",
     lessons: "الدروس",
-    exercises: "التمارين",
     noResults: "لا توجد نتائج منشورة لهذا البحث.",
     back: "العودة إلى المكتبة",
   },
   fr: {
     title: "Rechercher dans NouriX",
-    hint: "Trouvez des cours, leçons et exercices publiés.",
+    hint: "Trouvez des cours et leçons publiés.",
     placeholder: "Écrivez au moins deux caractères…",
     all: "Tout le contenu",
     courses: "Cours",
     lessons: "Leçons",
-    exercises: "Exercices",
     noResults: "Aucun résultat publié pour cette recherche.",
     back: "Retour à la bibliothèque",
   },
   en: {
     title: "Search NouriX",
-    hint: "Find published courses, lessons, and exercises.",
+    hint: "Find published courses and lessons.",
     placeholder: "Type at least two characters…",
     all: "All content",
     courses: "Courses",
     lessons: "Lessons",
-    exercises: "Exercises",
     noResults: "No published results for this search.",
     back: "Back to library",
   },
@@ -229,30 +225,9 @@ export default function Search() {
                   </div>
                 </section>
               )}
-              {results.data && results.data.exercises.length > 0 && (
-                <section>
-                  <h2 className="section-kicker">
-                    <Code2 size={15} />
-                    {t.exercises}
-                  </h2>
-                  <div className="search-simple-list">
-                    {results.data.exercises.map(exercise => (
-                      <Link
-                        href={`/lab?exercise=${exercise.slug}`}
-                        className="search-result-row"
-                        key={exercise.id}
-                      >
-                        <span>{titleFor(exercise)}</span>
-                        <small>{exercise.difficulty}</small>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              )}
               {results.data &&
                 !results.data.courses.length &&
-                !results.data.lessons.length &&
-                !results.data.exercises.length && (
+                !results.data.lessons.length && (
                   <div className="empty-state">
                     <p>{t.noResults}</p>
                   </div>

@@ -32,7 +32,7 @@ import {
 
 export const contentRouter = router({
   createFinalExam: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -45,22 +45,22 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       createManagedFinalExam({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   // Manual grading queue for open/code answers — never auto-graded by the system.
   pendingReviews: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   ).query(({ ctx }) =>
     getPendingReviewAnswers(
-      ctx.user.role as "teacher" | "institution" | "admin",
+      ctx.user.role as "teacher" | "admin",
       ctx.user.id
     )
   ),
   gradeAnswer: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -72,26 +72,26 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       gradeQuizAnswer({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
-  // Aggregate quiz/exam performance + per-skill difficulty, scoped to what this teacher/institution actually owns (admin sees everything). No individual learner identities are exposed.
+  // Aggregate quiz/exam performance + per-skill difficulty, scoped to what this teacher actually owns (admin sees everything). No individual learner identities are exposed.
   analytics: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   ).query(({ ctx }) =>
     getContentAnalytics(
-      ctx.user.role as "teacher" | "institution" | "admin",
+      ctx.user.role as "teacher" | "admin",
       ctx.user.id
     )
   ),
   skills: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   ).query(() => getAllSkills()),
   createCourse: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -102,7 +102,6 @@ export const contentRouter = router({
           .max(160)
           .regex(/^[a-z0-9-]+$/),
         subject: z.string().min(1).max(40),
-        stage: z.enum(["primary", "middle", "secondary"]),
         level: z.enum([
           "starter",
           "foundation",
@@ -145,7 +144,7 @@ export const contentRouter = router({
       return result;
     }),
   createUnit: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -163,12 +162,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       createUnit({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   createLesson: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -188,36 +187,36 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       createLesson({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   curriculum: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ courseId: z.number().int().positive() }))
     .query(({ ctx, input }) =>
       getManagedCurriculum(
         input.courseId,
-        ctx.user.role as "teacher" | "institution" | "admin",
+        ctx.user.role as "teacher" | "admin",
         ctx.user.id
       )
     ),
   quiz: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ unitId: z.number().int().positive() }))
     .query(({ ctx, input }) =>
       getManagedQuiz(
         input.unitId,
-        ctx.user.role as "teacher" | "institution" | "admin",
+        ctx.user.role as "teacher" | "admin",
         ctx.user.id
       )
     ),
   createQuiz: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -230,12 +229,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       createManagedQuiz({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   createQuizQuestion: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -257,12 +256,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       createManagedQuizQuestion({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   updateQuizQuestion: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -284,24 +283,24 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       updateManagedQuizQuestion({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   deleteQuizQuestion: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(({ ctx, input }) =>
       deleteManagedQuizQuestion({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   updateCourse: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -313,7 +312,6 @@ export const contentRouter = router({
         descriptionAr: z.string().min(2),
         descriptionFr: z.string().min(2),
         descriptionEn: z.string().min(2),
-        stage: z.enum(["primary", "middle", "secondary"]),
         level: z.enum([
           "starter",
           "foundation",
@@ -336,19 +334,19 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       updateManagedCourse({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   deleteCourse: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const result = await deleteManagedCourse({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       });
       if (!result.ok) {
@@ -372,14 +370,14 @@ export const contentRouter = router({
       return result;
     }),
   deleteUnit: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const result = await deleteManagedUnit({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       });
       if (!result.ok) {
@@ -403,14 +401,14 @@ export const contentRouter = router({
       return result;
     }),
   deleteLesson: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const result = await deleteManagedLesson({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       });
       if (!result.ok) {
@@ -434,7 +432,7 @@ export const contentRouter = router({
       return result;
     }),
   updateUnit: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -448,12 +446,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       updateManagedUnit({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   reorderUnit: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -465,12 +463,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       reorderManagedUnit({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   reorderLesson: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -482,12 +480,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       reorderManagedLesson({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   updateLesson: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .input(
@@ -504,12 +502,12 @@ export const contentRouter = router({
     .mutation(({ ctx, input }) =>
       updateManagedLesson({
         ...input,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
       })
     ),
   uploadAsset: roleProcedure(
-    ["teacher", "institution", "admin"],
+    ["teacher", "admin"],
     "Content authoring access required"
   )
     .use(rateLimit("lesson-upload", 30, 60 * 60 * 1000))
@@ -549,7 +547,7 @@ export const contentRouter = router({
       const result = await uploadLessonAsset({
         ...input,
         uploaderId: ctx.user.id,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
       });
       if ("ok" in result && result.ok === false) {
         if (result.reason === "not_found")

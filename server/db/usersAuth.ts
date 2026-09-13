@@ -271,7 +271,7 @@ export async function getAdminUserIds(): Promise<number[]> {
 
 export async function updateUserRole(
   userId: number,
-  role: "learner" | "parent" | "teacher" | "institution" | "admin"
+  role: "learner" | "teacher" | "admin"
 ) {
   const db = await getDb();
   if (!db) return false;
@@ -320,7 +320,7 @@ export async function adminResetPassword(
 
 export async function chooseOwnRole(
   userId: number,
-  role: "learner" | "teacher" | "institution"
+  role: "learner" | "teacher"
 ): Promise<{ ok: true } | { ok: false; reason: "already_chosen" }> {
   const db = await getDb();
   if (!db) return { ok: false, reason: "already_chosen" };

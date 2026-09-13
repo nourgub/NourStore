@@ -8,7 +8,6 @@ import {
 } from "drizzle-orm";
 import {
   Course,
-  algorithmExercises,
   courseEnrollments,
   courses,
   lessonAssets,
@@ -38,8 +37,7 @@ export async function searchLearningContent(input: {
 }) {
   const db = await getDb();
   const query = input.query.trim();
-  if (!db || query.length < 2)
-    return { courses: [], lessons: [], exercises: [] };
+  if (!db || query.length < 2) return { courses: [], lessons: [] };
   const pattern = `%${query.slice(0, 80)}%`;
   const courseFilters = [
     eq(courses.isPublished, 1),
@@ -102,29 +100,7 @@ export async function searchLearningContent(input: {
     )
     .orderBy(desc(lessons.createdAt))
     .limit(input.limit);
-  const exerciseRows = await db
-    .select({
-      id: algorithmExercises.id,
-      slug: algorithmExercises.slug,
-      difficulty: algorithmExercises.difficulty,
-      titleAr: algorithmExercises.titleAr,
-      titleFr: algorithmExercises.titleFr,
-      titleEn: algorithmExercises.titleEn,
-    })
-    .from(algorithmExercises)
-    .where(
-      and(
-        eq(algorithmExercises.isPublished, 1),
-        or(
-          like(algorithmExercises.titleAr, pattern),
-          like(algorithmExercises.titleFr, pattern),
-          like(algorithmExercises.titleEn, pattern)
-        )
-      )
-    )
-    .orderBy(desc(algorithmExercises.createdAt))
-    .limit(input.limit);
-  return { courses: courseRows, lessons: lessonRows, exercises: exerciseRows };
+  return { courses: courseRows, lessons: lessonRows };
 }
 
 export async function getAllCourses() {
@@ -134,14 +110,14 @@ export async function getAllCourses() {
 }
 
 export async function getCoursesForRole(
-  role: "learner" | "parent" | "teacher" | "institution" | "admin",
+  role: "learner" | "teacher" | "admin",
   userId: number
 ) {
   const db = await getDb();
   if (!db) return [];
   if (role === "admin")
     return db.select().from(courses).orderBy(desc(courses.updatedAt));
-  if (role === "teacher" || role === "institution") {
+  if (role === "teacher") {
     return db
       .select()
       .from(courses)

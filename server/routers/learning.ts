@@ -6,8 +6,6 @@ import {
   getCourseWithCurriculum,
   getLessonAssets,
   getLessonForLearner,
-  getAlgorithmExerciseBySlug,
-  getPublishedAlgorithmExercises,
   getActiveSubjects,
   getAllBadges,
 } from "../db";
@@ -52,12 +50,6 @@ export const learningRouter = router({
     .query(({ ctx, input }) =>
       getLessonForLearner(input.lessonId, ctx.user.id)
     ),
-  algorithmExercise: publicProcedure
-    .input(z.object({ slug: z.string().min(1).max(160) }))
-    .query(({ input }) => getAlgorithmExerciseBySlug(input.slug)),
-  algorithmExercises: publicProcedure.query(() =>
-    getPublishedAlgorithmExercises()
-  ),
   subjects: publicProcedure.query(() => getActiveSubjects()),
   badges: publicProcedure.query(() => getAllBadges()),
 });

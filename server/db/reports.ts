@@ -8,12 +8,10 @@ import {
   courseEnrollments,
   courses,
   learnerReports,
-  parentLinks,
   quizAttempts,
   users,
 } from "../../drizzle/schema";
 import { getDb } from "./shared";
-import { createNotification } from "./notifications";
 
 /**
  * A teacher's own student roster: every distinct learner enrolled in a
@@ -24,7 +22,7 @@ import { createNotification } from "./notifications";
  */
 export async function getStudentsForTeacher(
   teacherId: number,
-  role: "teacher" | "institution" | "admin"
+  role: "teacher" | "admin"
 ) {
   const db = await getDb();
   if (!db) return [];
@@ -74,21 +72,19 @@ export async function getStudentsForTeacher(
 }
 
 export type CreateReportResult =
-  | { ok: true; id: number; parentsNotified: number }
+  | { ok: true; id: number }
   | { ok: false; reason: "not_found" };
 
 /**
- * A teacher's written report on one of their own students. Ownership is
- * verified the same way as every other teacher-authoring endpoint in this
- * codebase (courses.ownerId, admin bypasses) — a teacher can only report on
- * a learner genuinely enrolled in one of their own courses. Every active
- * parent linked to the learner (parentLinks) gets an in-app notification;
- * the report itself is then visible on that parent's dashboard via
- * getReportsForParent.
+ * A mentor/teacher's written feedback on one of their own trainees.
+ * Ownership is verified the same way as every other teacher-authoring
+ * endpoint in this codebase (courses.ownerId, admin bypasses) — a teacher
+ * can only report on a learner genuinely enrolled in one of their own
+ * courses. Visible to the trainee themselves via getReportsForLearner.
  */
 export async function createLearnerReport(input: {
   teacherId: number;
-  role: "teacher" | "institution" | "admin";
+  role: "teacher" | "admin";
   learnerId: number;
   courseId?: number;
   level: string;
@@ -119,53 +115,10 @@ export async function createLearnerReport(input: {
     title: input.title,
     notes: input.notes,
   });
-  const reportId = (insertResult as { insertId: number }).insertId;
-
-  const parents = await db
-    .select({ parentId: parentLinks.parentId })
-    .from(parentLinks)
-    .where(
-      and(eq(parentLinks.childId, input.learnerId), eq(parentLinks.status, "active"))
-    );
-  for (const parent of parents) {
-    await createNotification({
-      userId: parent.parentId,
-      type: "learner_report",
-      title: `تقرير جديد: ${input.title}`,
-      body: input.notes,
-    });
-  }
-  return { ok: true, id: reportId, parentsNotified: parents.length };
+  return { ok: true, id: (insertResult as { insertId: number }).insertId };
 }
 
-/** Every report for every child linked (actively) to this parent. */
-export async function getReportsForParent(parentId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  const links = await db
-    .select({ childId: parentLinks.childId })
-    .from(parentLinks)
-    .where(and(eq(parentLinks.parentId, parentId), eq(parentLinks.status, "active")));
-  const childIds = links.map(l => l.childId);
-  if (!childIds.length) return [];
-  return db
-    .select({
-      id: learnerReports.id,
-      learnerId: learnerReports.learnerId,
-      learnerName: users.name,
-      level: learnerReports.level,
-      title: learnerReports.title,
-      notes: learnerReports.notes,
-      createdAt: learnerReports.createdAt,
-      courseId: learnerReports.courseId,
-    })
-    .from(learnerReports)
-    .innerJoin(users, eq(users.id, learnerReports.learnerId))
-    .where(inArray(learnerReports.learnerId, childIds))
-    .orderBy(desc(learnerReports.createdAt));
-}
-
-/** A learner's own reports — same data a linked parent sees, scoped to self. */
+/** A learner's own reports — written feedback from a teacher/mentor. */
 export async function getReportsForLearner(learnerId: number) {
   const db = await getDb();
   if (!db) return [];
@@ -181,4 +134,21 @@ export async function getReportsForLearner(learnerId: number) {
     .from(learnerReports)
     .where(eq(learnerReports.learnerId, learnerId))
     .orderBy(desc(learnerReports.createdAt));
+}
+
+/** Distinct learners enrolled in courses owned by this teacher (or, for an
+ * admin, platform-wide) — used for the admin/teacher "managed learners"
+ * count shown in their dashboard. */
+export async function getManagedLearnerCount(
+  role: "learner" | "teacher" | "admin",
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({ userId: courseEnrollments.userId })
+    .from(courseEnrollments)
+    .innerJoin(courses, eq(courses.id, courseEnrollments.courseId))
+    .where(role === "admin" ? undefined : eq(courses.ownerId, userId));
+  return new Set(rows.map(row => row.userId)).size;
 }

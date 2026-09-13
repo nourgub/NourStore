@@ -22,7 +22,7 @@ export const teacherRouter = router({
     getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
   myStudents: teacherProcedure.query(({ ctx }) =>
-    getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "institution" | "admin")
+    getStudentsForTeacher(ctx.user.id, ctx.user.role as "teacher" | "admin")
   ),
   googleCalendarStatus: teacherProcedure.query(async ({ ctx }) => ({
     ...(await getGoogleCalendarStatus(ctx.user.id)),
@@ -70,7 +70,7 @@ export const teacherRouter = router({
       }
       const saved = await setLessonLiveSession({
         id: input.lessonId,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         userId: ctx.user.id,
         liveUrl: meetResult.meetUrl,
         liveStartsAt: new Date(input.startsAt).getTime(),
@@ -93,7 +93,7 @@ export const teacherRouter = router({
     .mutation(async ({ ctx, input }) => {
       const result = await createLearnerReport({
         teacherId: ctx.user.id,
-        role: ctx.user.role as "teacher" | "institution" | "admin",
+        role: ctx.user.role as "teacher" | "admin",
         ...input,
       });
       if (!result.ok)

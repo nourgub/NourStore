@@ -145,7 +145,7 @@ export async function getRecommendedReviewLessons(userId: number) {
 }
 
 export async function getContentAnalytics(
-  role: "teacher" | "institution" | "admin",
+  role: "teacher" | "admin",
   userId: number
 ) {
   const db = await getDb();

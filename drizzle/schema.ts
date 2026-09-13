@@ -20,20 +20,19 @@ export const users = mysqlTable("users", {
   // (server/_core/emailAuth.ts) — null for Google OAuth accounts. Format: "scrypt:<salt-hex>:<hash-hex>", never a plain
   // password, never a reversible encoding.
   passwordHash: varchar("passwordHash", { length: 200 }),
-  role: mysqlEnum("role", [
-    "learner",
-    "parent",
-    "teacher",
-    "institution",
-    "admin",
-  ])
+  // Nourix is now single-audience: math teachers preparing for "الترسيم".
+  // "learner" = a trainee teacher consuming training content; "teacher" =
+  // a mentor/content author who authors مذكرات/دروس/تكوين. "parent" and
+  // "institution" (K-12-era roles) have been removed along with every
+  // table/route/page that existed only for them.
+  role: mysqlEnum("role", ["learner", "teacher", "admin"])
     .default("learner")
     .notNull(),
   // Set once, the first time a new visitor chooses their account category
-  // (learner / teacher / institution) — see auth.chooseRole. Null means
-  // they haven't chosen yet, which is what triggers the onboarding prompt.
-  // "admin" is never selectable here — it is only ever granted via
-  // OWNER_OPEN_ID bootstrap or an existing admin's manual promotion.
+  // (learner / teacher) — see auth.chooseRole. Null means they haven't
+  // chosen yet, which is what triggers the onboarding prompt. "admin" is
+  // never selectable here — it is only ever granted via OWNER_OPEN_ID
+  // bootstrap or an existing admin's manual promotion.
   roleChosenAt: timestamp("roleChosenAt"),
   // Gates login for every non-owner account — both ones an admin creates
   // directly (see createManagedUser) and self-registered ones (see
@@ -170,13 +169,12 @@ export const courses = mysqlTable(
   {
     id: int("id").autoincrement().primaryKey(),
     slug: varchar("slug", { length: 160 }).notNull().unique(),
+    // References a `subjects` row — one of the six training categories
+    // (تحضير مذكرات / شرح دروس / تشريع / علم النفس / تكوين / نماذج امتحانات)
+    // now that Nourix is single-audience (math teachers under "الترسيم").
+    // `stage` (Algeria's K-12 primary/middle/secondary) was removed — it
+    // has no meaning for teacher-training content.
     subject: varchar("subject", { length: 40 }).notNull(),
-    // Algeria's three school stages — orthogonal to `level` (which is a
-    // difficulty tier within a stage, e.g. "foundation" applies equally to
-    // a primary-stage course and a secondary-stage one).
-    stage: mysqlEnum("stage", ["primary", "middle", "secondary"])
-      .default("middle")
-      .notNull(),
     level: mysqlEnum("level", [
       "starter",
       "foundation",
@@ -428,78 +426,6 @@ export const quizAttemptAnswers = mysqlTable(
   })
 );
 
-export const parentLinks = mysqlTable(
-  "parentLinks",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    parentId: int("parentId")
-      .notNull()
-      .references(() => users.id),
-    childId: int("childId")
-      .notNull()
-      .references(() => users.id),
-    status: mysqlEnum("status", ["pending", "active", "revoked"])
-      .default("pending")
-      .notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  },
-  table => ({
-    parentChildUnique: uniqueIndex("parentLinks_parent_child_unique").on(
-      table.parentId,
-      table.childId
-    ),
-    childIdx: index("parentLinks_childId_idx").on(table.childId),
-  })
-);
-
-export const algorithmExercises = mysqlTable("algorithmExercises", {
-  id: int("id").autoincrement().primaryKey(),
-  slug: varchar("slug", { length: 160 }).notNull().unique(),
-  difficulty: mysqlEnum("difficulty", ["starter", "easy", "medium", "hard"])
-    .default("starter")
-    .notNull(),
-  titleAr: varchar("titleAr", { length: 255 }).notNull(),
-  titleFr: varchar("titleFr", { length: 255 }).notNull(),
-  titleEn: varchar("titleEn", { length: 255 }).notNull(),
-  statementAr: text("statementAr").notNull(),
-  statementFr: text("statementFr").notNull(),
-  statementEn: text("statementEn").notNull(),
-  starterCode: text("starterCode").notNull(),
-  testCasesJson: text("testCasesJson").notNull(),
-  hintsJson: text("hintsJson"),
-  isPublished: int("isPublished").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export const algorithmAttempts = mysqlTable(
-  "algorithmAttempts",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    exerciseId: int("exerciseId")
-      .notNull()
-      .references(() => algorithmExercises.id),
-    userId: int("userId")
-      .notNull()
-      .references(() => users.id),
-    code: text("code").notNull(),
-    status: mysqlEnum("status", [
-      "passed",
-      "failed",
-      "syntax_error",
-      "timeout",
-    ]).notNull(),
-    passedTests: int("passedTests").default(0).notNull(),
-    totalTests: int("totalTests").default(0).notNull(),
-    feedbackJson: text("feedbackJson"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => ({
-    exerciseIdx: index("algorithmAttempts_exerciseId_idx").on(table.exerciseId),
-    userIdx: index("algorithmAttempts_userId_idx").on(table.userId),
-  })
-);
-
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Course = typeof courses.$inferSelect;
@@ -511,8 +437,6 @@ export type LessonAsset = typeof lessonAssets.$inferSelect;
 export type Quiz = typeof unitQuizzes.$inferSelect;
 export type QuizQuestion = typeof quizQuestions.$inferSelect;
 export type QuizAttempt = typeof quizAttempts.$inferSelect;
-export type AlgorithmExercise = typeof algorithmExercises.$inferSelect;
-export type AlgorithmAttempt = typeof algorithmAttempts.$inferSelect;
 
 export const courseEnrollments = mysqlTable(
   "courseEnrollments",
@@ -623,24 +547,6 @@ export const placementAttempts = mysqlTable(
   },
   table => ({
     userIdx: index("placementAttempts_userId_idx").on(table.userId),
-  })
-);
-
-export const parentInviteCodes = mysqlTable(
-  "parentInviteCodes",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    childId: int("childId")
-      .notNull()
-      .references(() => users.id),
-    code: varchar("code", { length: 32 }).notNull().unique(),
-    expiresAt: timestamp("expiresAt").notNull(),
-    usedAt: timestamp("usedAt"),
-    canceledAt: timestamp("canceledAt"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  table => ({
-    childIdx: index("parentInviteCodes_childId_idx").on(table.childId),
   })
 );
 

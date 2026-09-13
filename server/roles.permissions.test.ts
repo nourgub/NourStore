@@ -17,9 +17,7 @@ import type { User } from "../drizzle/schema";
 const HAS_DB = !!process.env.DATABASE_URL;
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-function contextFor(
-  role: "learner" | "parent" | "teacher" | "institution" | "admin"
-): TrpcContext {
+function contextFor(role: "learner" | "teacher" | "admin"): TrpcContext {
   return {
     user: {
       id: 10,
@@ -38,37 +36,6 @@ function contextFor(
 }
 
 describe("role permissions", () => {
-  it("rejects learner access to parent links", async () => {
-    const caller = appRouter.createCaller(contextFor("learner"));
-    await expect(caller.parent.links()).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-  });
-
-  it("rejects non-parent roles from accepting a parent invite (learner, teacher, institution)", async () => {
-    for (const role of ["learner", "teacher", "institution"] as const) {
-      const caller = appRouter.createCaller(contextFor(role));
-      await expect(
-        caller.parent.acceptInvite({ code: "ABC12345" })
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    }
-  });
-
-  it("allows parent (and admin) roles to attempt accepting a parent invite", async () => {
-    for (const role of ["parent", "admin"] as const) {
-      const caller = appRouter.createCaller(contextFor(role));
-      // No DB in the test environment, so this resolves to false (invalid code) rather than throwing FORBIDDEN.
-      await expect(
-        caller.parent.acceptInvite({ code: "ABC12345" })
-      ).resolves.toBe(false);
-    }
-  });
-
-  it("allows parent access to parent links", async () => {
-    const caller = appRouter.createCaller(contextFor("parent"));
-    await expect(caller.parent.links()).resolves.toEqual([]);
-  });
-
   it("rejects teacher access to admin course publishing", async () => {
     const caller = appRouter.createCaller(contextFor("teacher"));
     await expect(
@@ -90,31 +57,8 @@ describe("role permissions", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("rejects non-admin access to algorithm-exercise authoring", async () => {
-    for (const role of ["learner", "teacher", "institution"] as const) {
-      const caller = appRouter.createCaller(contextFor(role));
-      await expect(caller.admin.algorithmExercises()).rejects.toMatchObject({
-        code: "FORBIDDEN",
-      });
-      await expect(
-        caller.admin.createAlgorithmExercise({
-          slug: "test-ex",
-          difficulty: "starter",
-          titleAr: "أ",
-          titleFr: "a",
-          titleEn: "a",
-          statementAr: "أ",
-          statementFr: "a",
-          statementEn: "a",
-          starterCode: "x",
-          testCasesJson: "{}",
-        })
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
-    }
-  });
-
   it("rejects non-admin access to plan pricing and manual subscription assignment", async () => {
-    for (const role of ["learner", "teacher", "parent"] as const) {
+    for (const role of ["learner", "teacher"] as const) {
       const caller = appRouter.createCaller(contextFor(role));
       await expect(
         caller.subscriptions.setPlanPrice({
@@ -135,7 +79,7 @@ describe("role permissions", () => {
   });
 
   it("rejects non-admin access to payment receipt review and RIB configuration", async () => {
-    for (const role of ["learner", "teacher", "parent"] as const) {
+    for (const role of ["learner", "teacher"] as const) {
       const caller = appRouter.createCaller(contextFor(role));
       await expect(
         caller.platform.pendingPaymentReceipts()
@@ -157,12 +101,7 @@ describe("role permissions", () => {
   });
 
   it("rejects non-admin access to revenue analytics", async () => {
-    for (const role of [
-      "learner",
-      "teacher",
-      "parent",
-      "institution",
-    ] as const) {
+    for (const role of ["learner", "teacher"] as const) {
       const caller = appRouter.createCaller(contextFor(role));
       await expect(caller.admin.revenueAnalytics()).rejects.toMatchObject({
         code: "FORBIDDEN",
@@ -216,7 +155,7 @@ describe("role permissions", () => {
   });
 
   it("rejects non-admin access to certificate revoke/reissue and skill creation", async () => {
-    for (const role of ["learner", "teacher", "parent"] as const) {
+    for (const role of ["learner", "teacher"] as const) {
       const caller = appRouter.createCaller(contextFor(role));
       await expect(
         caller.certificates.revoke({ certificateId: "NX-TEST" })
@@ -371,11 +310,6 @@ describe("role permissions", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("allows institution access to institution courses", async () => {
-    const caller = appRouter.createCaller(contextFor("institution"));
-    await expect(caller.institution.courses()).resolves.toEqual([]);
-  });
-
   it("protects subscription management and WhatsApp settings for admins", async () => {
     const teacher = appRouter.createCaller(contextFor("teacher"));
     await expect(teacher.subscriptions.members()).rejects.toMatchObject({
@@ -497,9 +431,6 @@ describe("role permissions", () => {
     // Zod input validation must reject "admin" outright, before any business logic even runs.
     await expect(
       learner.auth.chooseRole({ role: "admin" as any })
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(
-      learner.auth.chooseRole({ role: "parent" as any })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
