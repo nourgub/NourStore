@@ -2,11 +2,15 @@ import {
   Atom,
   BookOpen,
   Brain,
+  ClipboardCheck,
   Code2,
+  FileText,
   FlaskConical,
+  GraduationCap,
   Globe2,
   Music,
   Palette,
+  Scale,
   Sigma,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +30,10 @@ const SUBJECT_ICONS = {
   music: Music,
   palette: Palette,
   book: BookOpen,
+  "file-text": FileText,
+  scale: Scale,
+  "graduation-cap": GraduationCap,
+  "clipboard-check": ClipboardCheck,
 } satisfies Record<string, LucideIcon>;
 
 export function subjectIcon(iconKey: string | undefined | null): LucideIcon {

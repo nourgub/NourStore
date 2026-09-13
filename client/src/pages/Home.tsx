@@ -9,7 +9,6 @@ import {
   BookOpen,
   Check,
   ChevronDown,
-  Eye,
   FileCheck2,
   Globe2,
   GraduationCap,
@@ -74,7 +73,6 @@ export default function Home() {
       { label: copy.navHome, id: "top" },
       { label: copy.navCourses, id: "paths" },
       { label: copy.navHow, id: "method" },
-      { label: copy.navForParents, id: "parents" },
     ],
     [copy]
   );
@@ -331,18 +329,9 @@ export default function Home() {
                 <Sparkles size={14} />
                 {copy.reassurance}
               </p>
-              <div className="placement-note">
-                <span className="placement-icon">
-                  <Sparkles size={15} />
-                </span>
-                <div>
-                  <strong>{copy.placement}</strong>
-                  <small>{copy.placementHint}</small>
-                </div>
-              </div>
               <div className="hero-stats">
                 <div>
-                  <strong>2</strong>
+                  <strong>6</strong>
                   <span>{copy.subjects}</span>
                 </div>
                 <div>
@@ -420,29 +409,41 @@ export default function Home() {
                 </div>
                 <div className="visual-courses">
                   <div className="visual-course">
-                    <span className="course-icon math-icon">∑</span>
+                    <span className="course-icon math-icon">✎</span>
                     <div>
-                      <strong>{copy.math}</strong>
+                      <strong>
+                        {lang === "ar"
+                          ? "تحضير المذكرات"
+                          : lang === "fr"
+                            ? "Préparation des fiches"
+                            : "Lesson-plan prep"}
+                      </strong>
                       <small>
                         {lang === "ar"
-                          ? "الجبر • الوحدة 2"
+                          ? "الوحدة 2"
                           : lang === "fr"
-                            ? "Algèbre • Unité 2"
-                            : "Algebra • Unit 2"}
+                            ? "Unité 2"
+                            : "Unit 2"}
                       </small>
                     </div>
                     <span className="course-progress">—</span>
                   </div>
                   <div className="visual-course">
-                    <span className="course-icon code-icon">&lt;/&gt;</span>
+                    <span className="course-icon code-icon">§</span>
                     <div>
-                      <strong>{copy.computing}</strong>
+                      <strong>
+                        {lang === "ar"
+                          ? "التشريع المدرسي"
+                          : lang === "fr"
+                            ? "Législation scolaire"
+                            : "School legislation"}
+                      </strong>
                       <small>
                         {lang === "ar"
-                          ? "الخوارزميات • الوحدة 1"
+                          ? "الوحدة 1"
                           : lang === "fr"
-                            ? "Algorithmes • Unité 1"
-                            : "Algorithms • Unit 1"}
+                            ? "Unité 1"
+                            : "Unit 1"}
                       </small>
                     </div>
                     <span className="course-progress">—</span>
@@ -452,10 +453,10 @@ export default function Home() {
                   <div>
                     <span className="tiny-avatar" />
                     {lang === "ar"
-                      ? "متابعة الأستاذ"
+                      ? "متابعة الأستاذ المكوِّن"
                       : lang === "fr"
-                        ? "Suivi enseignant"
-                        : "Teacher feedback"}
+                        ? "Suivi du formateur"
+                        : "Mentor feedback"}
                   </div>
                   <span className="gold-check">
                     <Check size={13} />
@@ -657,164 +658,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="parents" className="section-pad parent-section">
-          <div className="container parent-grid">
-            <div className="parent-visual">
-              <div className="parent-orb" />
-              <div className="parent-card">
-                <div className="parent-card-head">
-                  <span className="tiny-avatar parent-avatar" />
-                  <div>
-                    <strong>
-                      {lang === "ar"
-                        ? "معاينة تقرير الولي"
-                        : lang === "fr"
-                          ? "Aperçu du rapport parent"
-                          : "Parent report preview"}
-                    </strong>
-                    <small>
-                      {lang === "ar"
-                        ? "هذا الأسبوع"
-                        : lang === "fr"
-                          ? "Cette semaine"
-                          : "This week"}
-                    </small>
-                  </div>
-                  <span className="report-good">
-                    <Check size={14} />
-                  </span>
-                </div>
-                <div className="report-score">
-                  <div>
-                    <small>{copy.math}</small>
-                    <strong>—</strong>
-                  </div>
-                  <div>
-                    <small>{copy.computing}</small>
-                    <strong>—</strong>
-                  </div>
-                </div>
-                <div className="report-line">
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <div className="report-message">
-                  <Sparkles size={14} />
-                  {lang === "ar"
-                    ? "ستظهر البيانات بعد ربط حساب الطالب"
-                    : lang === "fr"
-                      ? "Les données apparaîtront après la liaison"
-                      : "Data appears after a learner is linked"}
-                </div>
-              </div>
-              <div className="parent-mini parent-mini-one">
-                <Eye size={15} />
-                {lang === "ar"
-                  ? "متابعة واضحة"
-                  : lang === "fr"
-                    ? "Suivi clair"
-                    : "Clear follow-up"}
-              </div>
-              <div className="parent-mini parent-mini-two">
-                <FileCheck2 size={15} />
-                {lang === "ar"
-                  ? "تقرير جاهز"
-                  : lang === "fr"
-                    ? "Rapport prêt"
-                    : "Report ready"}
-              </div>
-            </div>
-            <div className="parent-copy">
-              <div className="section-kicker">03 / {copy.navForParents}</div>
-              <h2>{copy.parentTitle}</h2>
-              <p>{copy.parentDesc}</p>
-              <div className="parent-points">
-                {copy.parentPoints.map(point => (
-                  <div key={point}>
-                    <span>
-                      <Check size={13} />
-                    </span>
-                    {point}
-                  </div>
-                ))}
-              </div>
-              <Button
-                className="outline-gold"
-                onClick={() => {
-                  window.location.href = "/parent";
-                }}
-              >
-                {copy.parentCta}
-                <ForwardArrow dir={dir} size={16} />
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        <section id="lab" className="section-pad lab-section">
-          <div className="container">
-            <div className="lab-panel">
-              <div className="lab-copy">
-                <div className="section-kicker">04 / Nourix Lab</div>
-                <h2>{copy.labTitle}</h2>
-                <p>{copy.labDesc}</p>
-                <Button
-                  className="gold-button"
-                  onClick={() => {
-                    window.location.href = "/lab";
-                  }}
-                >
-                  {copy.tryLab}
-                  <ForwardArrow dir={dir} size={16} />
-                </Button>
-              </div>
-              <div className="code-window">
-                <div className="code-window-bar">
-                  <span />
-                  <span />
-                  <span />
-                  <small>algorithm.nx</small>
-                  <span className="code-status">
-                    <Check size={12} />
-                    {lang === "ar"
-                      ? "معاينة"
-                      : lang === "fr"
-                        ? "Aperçu"
-                        : "Preview"}
-                  </span>
-                </div>
-                <pre>
-                  <code>
-                    <i>ALGORITHM</i> <b>SumTwoNumbers</b>
-                    {"\n"}
-                    <i>VAR</i>
-                    {"\n  a, b, sum : INTEGER\n"}
-                    <i>BEGIN</i>
-                    {"\n  READ(a)\n  READ(b)\n  sum ← a + b\n  WRITE(sum)\n"}
-                    <i>END</i>
-                  </code>
-                </pre>
-                <div className="code-result">
-                  <Check size={14} />
-                  <span>
-                    {lang === "ar"
-                      ? "مثال توضيحي"
-                      : lang === "fr"
-                        ? "Exemple illustratif"
-                        : "Illustrative example"}
-                  </span>
-                  <strong>—</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section className="section-pad final-cta-section">
           <div className="container final-cta-inner">
             <h2>{copy.finalCtaTitle}</h2>
@@ -845,9 +688,6 @@ export default function Home() {
               {copy.navCourses}
             </button>
             <button onClick={() => scrollToId("method")}>{copy.navHow}</button>
-            <button onClick={() => scrollToId("parents")}>
-              {copy.navForParents}
-            </button>
             {whatsappNumber && (
               <a
                 href={`https://wa.me/${whatsappNumber}`}
