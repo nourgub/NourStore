@@ -545,12 +545,26 @@ describe.skipIf(!HAS_DB)(
       expect(result.recommendedLevel).toBe("starter");
     });
 
-    it("rejects an unauthenticated submission outright — an anonymous visitor can never get a real score", async () => {
+    it("an anonymous visitor gets a real computed score — the test is a free lead-magnet, not gated behind login — but nothing is persisted since there's no user to attach it to", async () => {
       const testId = await createPublishedTest(`anon-${RUN}`);
       const anon = appRouter.createCaller(ctxFor(null));
-      await expect(
-        anon.placement.submit({ testId, answersJson: "{}" })
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+
+      // All 5 answers correct -> 100% -> "advanced", same scoring as a logged-in user.
+      const allCorrect: Record<string, string> = {};
+      for (let i = 0; i < 5; i++) allCorrect[String(i)] = "A";
+      const result = await anon.placement.submit({
+        testId,
+        answersJson: JSON.stringify(allCorrect),
+      });
+      expect(result.score).toBe(100);
+      expect(result.recommendedLevel).toBe("advanced");
+
+      const db = await mustGetDb();
+      const rows = await db
+        .select()
+        .from(placementAttempts)
+        .where(eq(placementAttempts.testId, testId));
+      expect(rows.length).toBe(0);
     });
 
     it("the public 'current' query returns the real published test's real questions, without ever exposing answerKey", async () => {

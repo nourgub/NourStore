@@ -32,6 +32,32 @@ const PLACEMENT_LEVEL_LABEL: Record<string, Record<Lang, string>> = {
   advanced: { ar: "B2", fr: "B2", en: "B2" },
 };
 
+// A short, encouraging line shown right alongside the result, keyed by the
+// same recommendedLevel the score maps to — content provided directly by
+// Nourix Academy for each level.
+const PLACEMENT_LEVEL_MESSAGE: Record<string, Record<Lang, string>> = {
+  starter: {
+    ar: "أنت بطل، لا أريد منك إحباطًا — سجّل معنا والباقي علينا.",
+    fr: "Tu es un champion, je ne veux pas que tu te décourages — inscris-toi avec nous, et on s'occupe du reste.",
+    en: "You're a champion, I don't want you discouraged — sign up with us, and we'll handle the rest.",
+  },
+  foundation: {
+    ar: "أنت بطل وستتعلم بسهولة — سجّل معنا والباقي علينا.",
+    fr: "Tu es un champion et tu vas apprendre facilement — inscris-toi avec nous, et on s'occupe du reste.",
+    en: "You're a champion and you'll learn with ease — sign up with us, and we'll handle the rest.",
+  },
+  intermediate: {
+    ar: "ممتاز، أنت بطل وقريب جدًا من التمكّن من اللغة.",
+    fr: "Excellent, tu es un champion et tout proche de maîtriser la langue.",
+    en: "Excellent, you're a champion and very close to mastering the language.",
+  },
+  advanced: {
+    ar: "ممتاز يا بطل الأبطال، أنت في درجة القمة مثل المتكلمين الأصليين.",
+    fr: "Excellent, champion des champions, tu es au sommet, comme un locuteur natif.",
+    en: "Excellent, champion of champions — you're at the top, like a native speaker.",
+  },
+};
+
 export function PlacementTest() {
   const { lang, setLang } = useFlowLanguage();
   const { isAuthenticated } = useAuth();
@@ -40,7 +66,6 @@ export function PlacementTest() {
   const submitAttempt = trpc.placement.submit.useMutation();
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [done, setDone] = useState(false);
-  const [submitError, setSubmitError] = useState(false);
   const items = placement.data?.questions ?? [];
   const getPrompt = (q: (typeof items)[number]) =>
     lang === "ar" ? q.promptAr : lang === "fr" ? q.promptFr : q.promptEn;
@@ -51,16 +76,12 @@ export function PlacementTest() {
       return [];
     }
   };
-  // Grading happens server-side: the browser never sees the answer key, only the score returned after submission.
-  // Submission itself requires a real session (server-side protectedProcedure) — an anonymous
-  // visitor is told so explicitly here rather than clicking "submit" and getting nothing back.
+  // Grading happens server-side: the browser never sees the answer key, only
+  // the score returned after submission. The test is a free lead-magnet —
+  // it works and shows a real result for an anonymous visitor too; only the
+  // registration prompt below the result differs by auth state.
   const finish = () => {
     if (!placement.data?.test) return;
-    if (!isAuthenticated) {
-      setSubmitError(true);
-      return;
-    }
-    setSubmitError(false);
     submitAttempt.mutate(
       { testId: placement.data.test.id, answersJson: JSON.stringify(answers) },
       { onSuccess: () => setDone(true) }
@@ -70,6 +91,9 @@ export function PlacementTest() {
   const recommendedLevel = submitAttempt.data?.recommendedLevel;
   const recommendedLevelLabel = recommendedLevel
     ? (PLACEMENT_LEVEL_LABEL[recommendedLevel]?.[lang] ?? recommendedLevel)
+    : null;
+  const recommendedLevelMessage = recommendedLevel
+    ? PLACEMENT_LEVEL_MESSAGE[recommendedLevel]?.[lang]
     : null;
   return (
     <Shell
@@ -126,13 +150,41 @@ export function PlacementTest() {
                 </span>
               </div>
             )}
-            <p>
-              {lang === "ar"
-                ? "تم حفظ نتيجتك. يمكنك البدء من المسار المقترح أو اختيار البدء من الصفر."
-                : "Your result was saved. Continue with the suggested path or start from zero."}
-            </p>
+            {recommendedLevelMessage && (
+              <p style={{ fontWeight: 600 }}>{recommendedLevelMessage}</p>
+            )}
+            {isAuthenticated ? (
+              <p>
+                {lang === "ar"
+                  ? "تم حفظ نتيجتك. يمكنك البدء من المسار المقترح أو اختيار البدء من الصفر."
+                  : lang === "fr"
+                    ? "Votre résultat a été enregistré. Continuez sur le parcours recommandé ou repartez de zéro."
+                    : "Your result was saved. Continue with the suggested path or start from zero."}
+              </p>
+            ) : (
+              <>
+                <p>
+                  {lang === "ar"
+                    ? "أنشئ حسابًا مجانًا الآن لحفظ نتيجتك والانطلاق من المستوى المناسب لك."
+                    : lang === "fr"
+                      ? "Créez un compte gratuit dès maintenant pour enregistrer votre résultat et démarrer au bon niveau."
+                      : "Create a free account now to save your result and start at the right level."}
+                </p>
+                <Button
+                  className="gold-button"
+                  onClick={() => (window.location.href = "/register")}
+                >
+                  {lang === "ar"
+                    ? "سجّل معنا مجانًا"
+                    : lang === "fr"
+                      ? "Inscription gratuite"
+                      : "Register for free"}
+                  <ArrowLeft size={15} />
+                </Button>
+              </>
+            )}
             <Button
-              className="gold-button"
+              className="quiet-button"
               onClick={() => {
                 setDone(false);
                 setAnswers({});
@@ -174,13 +226,13 @@ export function PlacementTest() {
                 </div>
               ))}
             </div>
-            {submitError && (
+            {submitAttempt.isError && (
               <p role="alert" style={{ color: "#e08a8a", fontSize: 13 }}>
                 {lang === "ar"
-                  ? "أنشئ حسابًا أو سجّل الدخول أولًا لعرض نتيجتك."
+                  ? "تعذر إرسال إجاباتك. حاول مرة أخرى."
                   : lang === "fr"
-                    ? "Créez un compte ou connectez-vous d'abord pour voir votre résultat."
-                    : "Create an account or log in first to see your result."}
+                    ? "Impossible d'envoyer vos réponses. Réessayez."
+                    : "Couldn't submit your answers. Please try again."}
               </p>
             )}
             <Button

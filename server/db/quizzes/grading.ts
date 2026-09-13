@@ -170,7 +170,7 @@ async function submitQuizAttemptMysql(input: {
 export async function gradeQuizAnswer(input: {
   attemptAnswerId: number;
   isCorrect: boolean;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
 }) {
   const db = await getDb();

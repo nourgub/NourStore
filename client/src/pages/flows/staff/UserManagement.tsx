@@ -70,7 +70,6 @@ export function AdminUsersPanel({ lang }: { lang: Lang }) {
               }
             >
               <option value="learner">learner</option>
-              <option value="parent">parent</option>
               <option value="teacher">teacher</option>
               <option value="institution">institution</option>
               <option value="admin">admin</option>

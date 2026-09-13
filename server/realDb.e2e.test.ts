@@ -79,7 +79,10 @@ async function getUserRow(openId: string): Promise<User> {
   return rows[0];
 }
 
-async function setRole(openId: string, role: "teacher" | "admin") {
+async function setRole(
+  openId: string,
+  role: "teacher" | "institution" | "admin"
+) {
   const db = await mustGetDb();
   await db.update(users).set({ role }).where(eq(users.openId, openId));
 }
@@ -904,3 +907,99 @@ describe.skipIf(!HAS_DB)("REAL DB — full learner journey against real MySQL", 
     }
   }, 30000);
 });
+
+describe.skipIf(!HAS_DB)(
+  "REAL DB — institution (language-center manager) role + registration-time role choice",
+  () => {
+    const institutionOpenId = emailOpenId(`institution-role-${RUN}@nourix.test`);
+    const teacherOpenId = emailOpenId(`institution-teacher-${RUN}@nourix.test`);
+    const courseSlug = `institution-real-db-course-${RUN}`;
+    let institution: User;
+    let teacher: User;
+    let courseId: number;
+
+    afterAll(async () => {
+      const db = await mustGetDb();
+      if (courseId) await db.delete(courses).where(eq(courses.id, courseId));
+      await db.execute("SET FOREIGN_KEY_CHECKS=0");
+      try {
+        for (const openId of [institutionOpenId, teacherOpenId]) {
+          await db.delete(users).where(eq(users.openId, openId));
+        }
+      } finally {
+        await db.execute("SET FOREIGN_KEY_CHECKS=1");
+      }
+    }, 30000);
+
+    it("registerWithEmail persists the caller's chosen role (learner/teacher/institution), never admin, and marks it already chosen", async () => {
+      const anon = appRouter.createCaller(ctxFor(null));
+      const email = `institution-register-${RUN}@nourix.test`;
+      const result = await anon.auth.registerWithEmail({
+        email,
+        password: "Fixture-Pass-123",
+        name: "Fixture Institution",
+        role: "institution",
+      });
+      expect(result.ok).toBe(true);
+      const row = await getUserRow(emailOpenId(email));
+      expect(row.role).toBe("institution");
+      expect(row.roleChosenAt).not.toBeNull();
+      // Cleanup — this row is separate from the institution/teacher pair used below.
+      const db = await mustGetDb();
+      await db.delete(users).where(eq(users.id, row.id));
+    });
+
+    it("an institution account can author its own courses and see them via institution.courses/learnerCount, scoped like a teacher's own", async () => {
+      for (const [openId, email] of [
+        [institutionOpenId, `institution-role-${RUN}@nourix.test`],
+        [teacherOpenId, `institution-teacher-${RUN}@nourix.test`],
+      ] as const) {
+        const passwordHash = await hashPassword("Fixture-Pass-123");
+        const created = await createEmailUser({
+          openId,
+          email,
+          name: "Fixture",
+          passwordHash,
+        });
+        if (!created.ok) throw new Error(`Failed to create fixture user ${email}`);
+      }
+      await setRole(institutionOpenId, "institution");
+      await setRole(teacherOpenId, "teacher");
+      institution = await getUserRow(institutionOpenId);
+      teacher = await getUserRow(teacherOpenId);
+
+      const institutionCaller = appRouter.createCaller(ctxFor(institution));
+      const courseResult = await institutionCaller.content.createCourse({
+        slug: courseSlug,
+        subject: "grammar",
+        level: "foundation",
+        titleAr: "دورة المؤسسة",
+        titleFr: "Cours de l'établissement",
+        titleEn: "Institution course",
+        descriptionAr: "دورة لأغراض الاختبار الآلي فقط",
+        descriptionFr: "Cours à des fins de test automatisé uniquement",
+        descriptionEn: "Course for automated testing purposes only",
+      });
+      expect(courseResult.ok).toBe(true);
+      const db = await mustGetDb();
+      const courseRows = await db
+        .select({ id: courses.id })
+        .from(courses)
+        .where(eq(courses.slug, courseSlug))
+        .limit(1);
+      if (!courseRows[0]) throw new Error("Fixture institution course was not created");
+      courseId = courseRows[0].id;
+
+      const ownCourses = await institutionCaller.institution.courses();
+      expect(ownCourses.map(c => c.id)).toContain(courseId);
+
+      // A teacher's own course list must never include the institution's course.
+      const teacherCaller = appRouter.createCaller(ctxFor(teacher));
+      const teacherCourses = await teacherCaller.teacher.courses();
+      expect(teacherCourses.map(c => c.id)).not.toContain(courseId);
+
+      const learnerCount = await institutionCaller.institution.learnerCount();
+      expect(learnerCount).toBe(0);
+    });
+  }
+);

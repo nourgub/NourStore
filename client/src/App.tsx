@@ -47,6 +47,11 @@ const FinalExam = lazy(() =>
 const StaffSpace = lazy(() =>
   import("./pages/flows/StaffFlows").then((m) => ({ default: m.StaffSpace }))
 );
+const InstitutionSpace = lazy(() =>
+  import("./pages/flows/StaffFlows").then((m) => ({
+    default: m.InstitutionSpace,
+  }))
+);
 
 function RouteFallback() {
   return (
@@ -82,6 +87,7 @@ function Router() {
         <Route path="/quiz" component={UnitQuiz} />
         <Route path="/exam/:courseId" component={FinalExam} />
         <Route path="/teacher" component={() => <StaffSpace />} />
+        <Route path="/institution" component={InstitutionSpace} />
         <Route path="/admin" component={() => <StaffSpace admin />} />
         <Route path="/search" component={Search} />
         <Route path="/notifications" component={Notifications} />

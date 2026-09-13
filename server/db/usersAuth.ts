@@ -107,6 +107,11 @@ export async function createEmailUser(input: {
   email: string;
   name: string;
   passwordHash: string;
+  // The registration form's own account-type choice (learner / teacher /
+  // institution manager). "admin" can never come through here — see
+  // registerWithEmail's z.enum in routers/auth.ts, which never offers it.
+  // Defaults to "learner" when omitted (e.g. an older client build).
+  role?: "learner" | "teacher" | "institution";
 }): Promise<EmailRegisterResult> {
   const db = await getDb();
   if (!db) return { ok: false, reason: "email_taken" };
@@ -117,6 +122,7 @@ export async function createEmailUser(input: {
     .limit(1);
   if (existing.length) return { ok: false, reason: "email_taken" };
   const isOwner = input.openId === ENV.ownerOpenId;
+  const chosenRole = input.role ?? "learner";
   const [result] = await db
     .insert(users)
     .values({
@@ -125,8 +131,11 @@ export async function createEmailUser(input: {
       name: input.name,
       loginMethod: "email",
       passwordHash: input.passwordHash,
-      role: isOwner ? "admin" : "learner",
-      roleChosenAt: isOwner ? new Date() : undefined,
+      role: isOwner ? "admin" : chosenRole,
+      // A role picked explicitly at registration counts as "chosen" — the
+      // post-login RoleOnboardingModal only ever shows for accounts where
+      // this is still null (e.g. registered before this field existed).
+      roleChosenAt: isOwner || input.role ? new Date() : undefined,
       accountStatus: isOwner ? "active" : "pending",
       lastSignedIn: new Date(),
     });
@@ -173,7 +182,7 @@ export async function getEmailUserPasswordHash(openId: string) {
   return rows[0] ?? null;
 }
 
-export type ManagedUserRole = "learner" | "teacher" | "admin";
+export type ManagedUserRole = "learner" | "teacher" | "institution" | "admin";
 
 export type CreateManagedUserResult =
   | { ok: true; userId: number }
@@ -271,7 +280,7 @@ export async function getAdminUserIds(): Promise<number[]> {
 
 export async function updateUserRole(
   userId: number,
-  role: "learner" | "teacher" | "admin"
+  role: "learner" | "teacher" | "institution" | "admin"
 ) {
   const db = await getDb();
   if (!db) return false;
@@ -320,7 +329,7 @@ export async function adminResetPassword(
 
 export async function chooseOwnRole(
   userId: number,
-  role: "learner" | "teacher"
+  role: "learner" | "teacher" | "institution"
 ): Promise<{ ok: true } | { ok: false; reason: "already_chosen" }> {
   const db = await getDb();
   if (!db) return { ok: false, reason: "already_chosen" };

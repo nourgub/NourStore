@@ -168,7 +168,7 @@ export async function countQuizAttempts(quizId: number, userId: number) {
 
 
 export async function getPendingReviewAnswers(
-  role: "teacher" | "admin",
+  role: "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();

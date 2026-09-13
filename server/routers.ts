@@ -12,6 +12,7 @@ import { certificatesRouter } from "./routers/certificates";
 import { quizzesRouter } from "./routers/quizzes";
 import { contentRouter } from "./routers/content";
 import { teacherRouter } from "./routers/teacher";
+import { institutionRouter } from "./routers/institution";
 import { adminRouter } from "./routers/admin";
 import { supportRouter } from "./routers/support";
 
@@ -29,6 +30,7 @@ export const appRouter = router({
   quizzes: quizzesRouter,
   content: contentRouter,
   teacher: teacherRouter,
+  institution: institutionRouter,
   admin: adminRouter,
   support: supportRouter,
 });

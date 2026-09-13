@@ -15,7 +15,7 @@ import { createNotification } from "../notifications";
 
 export async function createUnit(input: {
   courseId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   orderIndex: number;
   titleAr: string;
@@ -39,7 +39,7 @@ export async function createUnit(input: {
 
 export async function createLesson(input: {
   unitId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   orderIndex: number;
   titleAr: string;
@@ -162,7 +162,7 @@ export async function createCourse(input: {
 
 export async function getManagedCurriculum(
   courseId: number,
-  role: "teacher" | "admin",
+  role: "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();
@@ -199,7 +199,7 @@ export async function getManagedCurriculum(
 
 function ownerWhere(
   courseId: number,
-  role: "teacher" | "admin",
+  role: "teacher" | "institution" | "admin",
   userId: number
 ) {
   return role === "admin"
@@ -209,7 +209,7 @@ function ownerWhere(
 
 export async function updateManagedCourse(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   titleAr: string;
   titleFr: string;
@@ -292,7 +292,7 @@ export async function updateManagedCourse(input: {
 
 export async function deleteManagedCourse(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
 }): Promise<
   { ok: true } | { ok: false; reason: "not_found" | "has_learner_data" }
@@ -335,7 +335,7 @@ export async function deleteManagedCourse(input: {
 
 export async function deleteManagedUnit(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
 }): Promise<
   { ok: true } | { ok: false; reason: "not_found" | "has_learner_data" }
@@ -379,7 +379,7 @@ export async function deleteManagedUnit(input: {
 export async function uploadLessonAsset(input: {
   lessonId: number;
   uploaderId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   fileName: string;
   mimeType: string;
   sizeBytes: number;
@@ -444,7 +444,7 @@ export async function uploadLessonAsset(input: {
 
 export async function reorderManagedUnit(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   direction: "up" | "down";
 }): Promise<{ ok: true } | { ok: false; reason: "not_found" | "edge" }> {
@@ -490,7 +490,7 @@ export async function reorderManagedUnit(input: {
 
 export async function reorderManagedLesson(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   direction: "up" | "down";
 }): Promise<{ ok: true } | { ok: false; reason: "not_found" | "edge" }> {
@@ -537,7 +537,7 @@ export async function reorderManagedLesson(input: {
 
 export async function updateManagedUnit(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   titleAr: string;
   titleFr: string;
@@ -570,7 +570,7 @@ export async function updateManagedUnit(input: {
 
 export async function updateManagedLesson(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   titleAr: string;
   titleFr: string;
@@ -620,7 +620,7 @@ export async function updateManagedLesson(input: {
  */
 export async function setLessonLiveSession(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   liveUrl: string;
   liveStartsAt: number;
@@ -653,7 +653,7 @@ export async function setLessonLiveSession(input: {
 
 export async function deleteManagedLesson(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
 }): Promise<
   { ok: true } | { ok: false; reason: "not_found" | "has_learner_data" }

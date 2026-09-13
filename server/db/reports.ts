@@ -22,7 +22,7 @@ import { getDb } from "./shared";
  */
 export async function getStudentsForTeacher(
   teacherId: number,
-  role: "teacher" | "admin"
+  role: "teacher" | "institution" | "admin"
 ) {
   const db = await getDb();
   if (!db) return [];
@@ -84,7 +84,7 @@ export type CreateReportResult =
  */
 export async function createLearnerReport(input: {
   teacherId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   learnerId: number;
   courseId?: number;
   level: string;
@@ -140,7 +140,7 @@ export async function getReportsForLearner(learnerId: number) {
  * admin, platform-wide) — used for the admin/teacher "managed learners"
  * count shown in their dashboard. */
 export async function getManagedLearnerCount(
-  role: "learner" | "teacher" | "admin",
+  role: "learner" | "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();

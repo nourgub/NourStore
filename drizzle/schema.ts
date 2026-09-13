@@ -20,12 +20,13 @@ export const users = mysqlTable("users", {
   // (server/_core/emailAuth.ts) — null for Google OAuth accounts. Format: "scrypt:<salt-hex>:<hash-hex>", never a plain
   // password, never a reversible encoding.
   passwordHash: varchar("passwordHash", { length: 200 }),
-  // Nourix is now single-audience: math teachers preparing for "الترسيم".
-  // "learner" = a trainee teacher consuming training content; "teacher" =
-  // a mentor/content author who authors مذكرات/دروس/تكوين. "parent" and
-  // "institution" (K-12-era roles) have been removed along with every
-  // table/route/page that existed only for them.
-  role: mysqlEnum("role", ["learner", "teacher", "admin"])
+  // Nourix Academy: a German-language learning platform. "learner" = a
+  // language learner; "teacher" = a language teacher/instructor;
+  // "institution" = a language-center manager overseeing a group of
+  // teachers/learners (courses + learner counts only — no platform-wide
+  // revenue/analytics access and no ability to change other users'
+  // roles, unlike "admin"). "parent" (a K-12-era role) stays removed.
+  role: mysqlEnum("role", ["learner", "teacher", "institution", "admin"])
     .default("learner")
     .notNull(),
   // Set once, the first time a new visitor chooses their account category

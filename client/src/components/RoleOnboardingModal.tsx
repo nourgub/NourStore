@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { GraduationCap, UserRound } from "lucide-react";
+import { GraduationCap, UserRound, Building2 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 
 type Lang = "ar" | "fr" | "en";
-type Role = "learner" | "teacher";
+type Role = "learner" | "teacher" | "institution";
 
 const copy = {
   ar: {
@@ -15,6 +15,9 @@ const copy = {
     learnerDesc: "أتابع دروسًا ومستويات، وأحضّر للامتحان الدولي، وأحصل على شهادات.",
     teacher: "أستاذ/مدرّس اللغة الألمانية",
     teacherDesc: "أنشئ الدروس والاختبارات، وأتابع تقدم المتعلمين الذين أدرّسهم.",
+    institution: "مدير مؤسسة / مركز تعليم لغة",
+    institutionDesc:
+      "أشرف على مجموعة من الأساتذة والمتعلمين داخل مؤسستي، وأتابع دوراتهم وأعدادهم.",
     confirm: "تأكيد الاختيار",
   },
   fr: {
@@ -26,6 +29,9 @@ const copy = {
     teacher: "Professeur d'allemand",
     teacherDesc:
       "Je crée des leçons et des évaluations, et je suis la progression des apprenants que j'enseigne.",
+    institution: "Responsable d'établissement / centre de langue",
+    institutionDesc:
+      "Je supervise un groupe de professeurs et d'apprenants au sein de mon établissement, et je suis leurs cours et effectifs.",
     confirm: "Confirmer le choix",
   },
   en: {
@@ -37,18 +43,22 @@ const copy = {
     teacher: "German language teacher",
     teacherDesc:
       "I create lessons and assessments, and track the progress of the learners I teach.",
+    institution: "Institution / language-center manager",
+    institutionDesc:
+      "I oversee a group of teachers and learners within my institution, and track their courses and headcount.",
     confirm: "Confirm choice",
   },
 } as const;
 
 /**
  * Shown exactly once per account, right after a brand-new visitor's first
- * login — while `user.roleChosenAt` is still null. Offers only two
- * categories (learner / teacher); "admin" is never a selectable option
- * here, since letting any visitor grant themselves the platform's
- * superuser role would be a severe privilege-escalation hole. Admin is
- * only ever granted via the OWNER_OPEN_ID bootstrap or an existing admin's
- * manual promotion (StaffSpace → user management).
+ * login — while `user.roleChosenAt` is still null (an account that already
+ * picked its role on the registration form never sees this). "admin" is
+ * never a selectable option here, since letting any visitor grant
+ * themselves the platform's superuser role would be a severe
+ * privilege-escalation hole. Admin is only ever granted via the
+ * OWNER_OPEN_ID bootstrap or an existing admin's manual promotion
+ * (StaffSpace → user management).
  */
 export default function RoleOnboardingModal() {
   const { user, refresh } = useAuth();
@@ -79,6 +89,12 @@ export default function RoleOnboardingModal() {
       desc: t.learnerDesc,
     },
     { role: "teacher", icon: UserRound, title: t.teacher, desc: t.teacherDesc },
+    {
+      role: "institution",
+      icon: Building2,
+      title: t.institution,
+      desc: t.institutionDesc,
+    },
   ];
 
   return (

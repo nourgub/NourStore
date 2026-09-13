@@ -17,7 +17,9 @@ import type { User } from "../drizzle/schema";
 const HAS_DB = !!process.env.DATABASE_URL;
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-function contextFor(role: "learner" | "teacher" | "admin"): TrpcContext {
+function contextFor(
+  role: "learner" | "teacher" | "institution" | "admin"
+): TrpcContext {
   return {
     user: {
       id: 10,
@@ -443,6 +445,78 @@ describe("role permissions", () => {
     await expect(
       caller.auth.chooseRole({ role: "teacher" })
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("gates the institution (language-center manager) space: teachers and learners can't reach it, but institution/admin can", async () => {
+    const teacher = appRouter.createCaller(contextFor("teacher"));
+    await expect(teacher.institution.courses()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(teacher.institution.learnerCount()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    const learner = appRouter.createCaller(contextFor("learner"));
+    await expect(learner.institution.courses()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    const institution = appRouter.createCaller(contextFor("institution"));
+    await expect(institution.institution.courses()).resolves.toEqual([]);
+    await expect(institution.institution.learnerCount()).resolves.toBeNull();
+
+    const admin = appRouter.createCaller(contextFor("admin"));
+    await expect(admin.institution.courses()).resolves.toEqual([]);
+  });
+
+  it("lets an institution (language-center manager) account reach the same course-authoring endpoints as a teacher, unlike a plain learner", async () => {
+    const institution = appRouter.createCaller(contextFor("institution"));
+    // No DATABASE_URL in this run — createCourse/analytics reach real DB
+    // logic and fail for DB-unavailability reasons (not FORBIDDEN), which is
+    // exactly what proves the institution role gets past roleProcedure here.
+    const createError = await institution.content
+      .createCourse({
+        slug: `role-institution-${RUN}`,
+        subject: "grammar",
+        level: "starter",
+        titleAr: "دورة",
+        titleFr: "cours",
+        titleEn: "course",
+        descriptionAr: "وصف",
+        descriptionFr: "description",
+        descriptionEn: "description",
+      })
+      .catch(e => e);
+    expect(createError?.code).not.toBe("FORBIDDEN");
+    const analyticsError = await institution.content
+      .analytics()
+      .catch(e => e);
+    expect(analyticsError?.code).not.toBe("FORBIDDEN");
+    const learner = appRouter.createCaller(contextFor("learner"));
+    await expect(
+      learner.content.createCourse({
+        slug: `role-learner-${RUN}`,
+        subject: "grammar",
+        level: "starter",
+        titleAr: "أ",
+        titleFr: "a",
+        titleEn: "a",
+        descriptionAr: "أ",
+        descriptionFr: "a",
+        descriptionEn: "a",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("accepts 'institution' as a valid chooseRole input (unlike 'admin', which zod rejects outright)", async () => {
+    const learner = appRouter.createCaller(contextFor("learner"));
+    // Whatever chooseOwnRole itself decides (it needs a real DB to check
+    // roleChosenAt), it must never be rejected for BAD_REQUEST input
+    // validation the way "admin" is — that's the only thing this test
+    // is checking: "institution" is a legitimate zod-level choice.
+    const error = await learner.auth
+      .chooseRole({ role: "institution" })
+      .catch(e => e);
+    expect(error?.code).not.toBe("BAD_REQUEST");
   });
 
   it("rejects non-admin access to the audit log", async () => {

@@ -7,7 +7,7 @@ import { protectedProcedure } from "./trpc";
 import { checkRateLimit } from "../rateLimit";
 
 export const roleProcedure = (
-  roles: Array<"learner" | "teacher" | "admin">,
+  roles: Array<"learner" | "teacher" | "institution" | "admin">,
   message: string
 ) =>
   protectedProcedure.use(({ ctx, next }) => {
@@ -20,6 +20,10 @@ export const adminProcedure = roleProcedure(["admin"], "Admin access required");
 export const teacherProcedure = roleProcedure(
   ["teacher", "admin"],
   "Teacher access required"
+);
+export const institutionProcedure = roleProcedure(
+  ["institution", "admin"],
+  "Institution access required"
 );
 
 /** Per-user rate-limit guard, chainable onto any procedure that already has ctx.user (i.e. after protectedProcedure/roleProcedure). */

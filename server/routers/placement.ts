@@ -1,7 +1,7 @@
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { rateLimit } from "../_core/procedures";
+import { checkRateLimit } from "../rateLimit";
 import {
   getPlacementTestForPublic,
   getPlacementTestWithQuestions,
@@ -10,8 +10,13 @@ import {
 
 export const placementRouter = router({
   current: publicProcedure.query(() => getPlacementTestForPublic()),
-  submit: protectedProcedure
-    .use(rateLimit("placement-submit", 10, 60 * 60 * 1000))
+  // A free lead-magnet: an anonymous visitor can take and see the result of
+  // the placement test with no account at all — the registration prompt is
+  // shown alongside the result instead of gating the test itself. The
+  // attempt is only persisted to the DB (savePlacementAttempt) when a real
+  // logged-in user takes it; an anonymous score is computed and returned
+  // but never stored, since there's no userId to attach it to.
+  submit: publicProcedure
     .input(
       z.object({
         testId: z.number().int().positive(),
@@ -19,6 +24,14 @@ export const placementRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const rateLimitKey = ctx.user
+        ? `placement-submit:${ctx.user.id}`
+        : `placement-submit-ip:${ctx.req.ip || "unknown"}`;
+      if (!(await checkRateLimit(rateLimitKey, 10, 60 * 60 * 1000)))
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts, please try again later",
+        });
       // score/recommendedLevel are always computed server-side from the answerKey-bearing
       // copy; the client is never trusted to report its own score.
       const data = await getPlacementTestWithQuestions();
@@ -50,13 +63,15 @@ export const placementRouter = router({
             : score >= 40
               ? "foundation"
               : "starter";
-      await savePlacementAttempt({
-        userId: ctx.user.id,
-        testId: input.testId,
-        score,
-        recommendedLevel,
-        answersJson: JSON.stringify(answers),
-      });
+      if (ctx.user) {
+        await savePlacementAttempt({
+          userId: ctx.user.id,
+          testId: input.testId,
+          score,
+          recommendedLevel,
+          answersJson: JSON.stringify(answers),
+        });
+      }
       return {
         score,
         recommendedLevel,

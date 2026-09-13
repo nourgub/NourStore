@@ -84,28 +84,37 @@ import {
 
 export function StaffSpace({
   admin = false,
+  institution = false,
 }: {
   admin?: boolean;
+  institution?: boolean;
 }) {
   const { lang, setLang } = useFlowLanguage();
   const { user, isAuthenticated } = useAuth();
   const t = courseLabels[lang];
   const teacherCourses = trpc.teacher.courses.useQuery(undefined, {
-    enabled: isAuthenticated && !admin,
+    enabled: isAuthenticated && !admin && !institution,
   });
   const adminCourses = trpc.admin.courses.useQuery(undefined, {
     enabled: isAuthenticated && admin,
   });
+  const institutionCourses = trpc.institution.courses.useQuery(undefined, {
+    enabled: isAuthenticated && institution,
+  });
   const teacherLearnerCount = trpc.teacher.learnerCount.useQuery(undefined, {
-    enabled: isAuthenticated && !admin,
+    enabled: isAuthenticated && !admin && !institution,
   });
   const adminLearnerCount = trpc.admin.learnerCount.useQuery(undefined, {
     enabled: isAuthenticated && admin,
+  });
+  const institutionLearnerCount = trpc.institution.learnerCount.useQuery(undefined, {
+    enabled: isAuthenticated && institution,
   });
   const createCourse = trpc.content.createCourse.useMutation({
     onSuccess: () => {
       teacherCourses.refetch();
       adminCourses.refetch();
+      institutionCourses.refetch();
       setShowForm(false);
       setForm(initialForm);
     },
@@ -136,6 +145,7 @@ export function StaffSpace({
     onSuccess: () => {
       teacherCourses.refetch();
       adminCourses.refetch();
+      institutionCourses.refetch();
       setEditingCourseId(null);
     },
     onError: () => {
@@ -148,6 +158,7 @@ export function StaffSpace({
     onSuccess: () => {
       teacherCourses.refetch();
       adminCourses.refetch();
+      institutionCourses.refetch();
     },
     onError: error => {
       toast.error(
@@ -197,13 +208,20 @@ export function StaffSpace({
   const [editForm, setEditForm] = useState(initialForm);
   const managedCourses = admin
     ? (adminCourses.data ?? [])
-    : (teacherCourses.data ?? []);
-  const learnerCount = admin ? adminLearnerCount.data : teacherLearnerCount.data;
-  const spaceTitle = admin ? t.admin : t.teacher;
+    : institution
+      ? (institutionCourses.data ?? [])
+      : (teacherCourses.data ?? []);
+  const learnerCount = admin
+    ? adminLearnerCount.data
+    : institution
+      ? institutionLearnerCount.data
+      : teacherLearnerCount.data;
+  const spaceTitle = admin ? t.admin : institution ? t.institution : t.teacher;
   const allowed =
     isAuthenticated &&
     ((admin && user?.role === "admin") ||
-      (!admin && ["teacher", "admin"].includes(user?.role || "")));
+      (institution && ["institution", "admin"].includes(user?.role || "")) ||
+      (!admin && !institution && ["teacher", "admin"].includes(user?.role || "")));
   if (!allowed)
     return <AccessGate title={spaceTitle} lang={lang} setLang={setLang} />;
   const label = (course: (typeof managedCourses)[number]) =>
@@ -225,7 +243,13 @@ export function StaffSpace({
   return (
     <Shell
       title={spaceTitle}
-      kicker={admin ? "NOURIX / CONTROL" : "NOURIX / TEACHING"}
+      kicker={
+        admin
+          ? "NOURIX / CONTROL"
+          : institution
+            ? "NOURIX / INSTITUTION"
+            : "NOURIX / TEACHING"
+      }
       lang={lang}
       setLang={setLang}
     >
@@ -239,18 +263,30 @@ export function StaffSpace({
               ? lang === "ar"
                 ? "إدارة Nourix Academy"
                 : "Nourix Academy control"
-              : lang === "ar"
-                ? "مساحة بناء التعلم"
-                : "Build the learning experience"}
+              : institution
+                ? lang === "ar"
+                  ? "إدارة مركز تعليم اللغة"
+                  : lang === "fr"
+                    ? "Gérez votre centre de langue"
+                    : "Manage your language center"
+                : lang === "ar"
+                  ? "مساحة بناء التعلم"
+                  : "Build the learning experience"}
           </h2>
           <p>
             {admin
               ? lang === "ar"
                 ? "إدارة الحسابات، المحتوى، الصلاحيات والنشر من مكان واحد."
                 : "Manage accounts, content, permissions and publishing in one place."
-              : lang === "ar"
-                ? "أنشئ وحدات واضحة، اختبارات عادلة، وتغذية راجعة تساعد الطالب على التقدم."
-                : "Create clear units, fair quizzes and feedback that helps learners progress."}
+              : institution
+                ? lang === "ar"
+                  ? "تابع دورات وأساتذة ومتعلمي مؤسستك في لوحة واحدة."
+                  : lang === "fr"
+                    ? "Suivez les cours, professeurs et apprenants de votre établissement en un seul endroit."
+                    : "Follow your institution's courses, teachers and learners in one place."
+                : lang === "ar"
+                  ? "أنشئ وحدات واضحة، اختبارات عادلة، وتغذية راجعة تساعد الطالب على التقدم."
+                  : "Create clear units, fair quizzes and feedback that helps learners progress."}
           </p>
           <Button
             className="gold-button"
@@ -260,7 +296,7 @@ export function StaffSpace({
               ? lang === "ar"
                 ? "إغلاق"
                 : "Close"
-              : admin
+              : admin || institution
                 ? t.manage
                 : lang === "ar"
                   ? "إنشاء دورة"
@@ -550,7 +586,15 @@ export function StaffSpace({
         <div className="flow-card staff-table">
           <div className="flow-card-title">
             <h2>
-              {lang === "ar" ? "المحتوى الأخير" : "Recent content"}
+              {institution
+                ? lang === "ar"
+                  ? "الدورات والبرامج"
+                  : lang === "fr"
+                    ? "Cours et programmes"
+                    : "Courses & programs"
+                : lang === "ar"
+                  ? "المحتوى الأخير"
+                  : "Recent content"}
             </h2>
             <ShieldCheck size={17} />
           </div>
@@ -845,7 +889,7 @@ export function StaffSpace({
         {admin && <AdminUsersPanel lang={lang} />}
         {admin && <CreateUserPanel lang={lang} />}
         {admin && <EnrollLearnerPanel lang={lang} />}
-        <MyStudentsPanel lang={lang} />
+        {!institution && <MyStudentsPanel lang={lang} />}
         <ContentStructureForm lang={lang} courses={managedCourses} />
         <QuizBuilder lang={lang} />
         <FinalExamBuilder lang={lang} />
@@ -866,4 +910,8 @@ export function StaffSpace({
       </div>
     </Shell>
   );
+}
+
+export function InstitutionSpace() {
+  return <StaffSpace institution />;
 }

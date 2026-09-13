@@ -11,7 +11,7 @@ import { createNotification } from "../notifications";
 
 export async function ownedQuiz(
   quizId: number,
-  role: "teacher" | "admin",
+  role: "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();
@@ -53,7 +53,7 @@ export async function ownedQuiz(
 
 export async function getManagedQuiz(
   unitId: number,
-  role: "teacher" | "admin",
+  role: "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();
@@ -90,7 +90,7 @@ export async function getManagedQuiz(
 
 export async function createManagedQuiz(input: {
   unitId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   passScore: number;
   maxAttempts: number;
@@ -145,7 +145,7 @@ export async function createManagedQuiz(input: {
 
 export async function createManagedFinalExam(input: {
   courseId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   passScore: number;
   maxAttempts: number;
@@ -188,7 +188,7 @@ export async function createManagedFinalExam(input: {
 
 export async function createManagedQuizQuestion(input: {
   quizId: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   questionType: "choice" | "true_false" | "open" | "code";
   promptAr: string;
@@ -211,7 +211,7 @@ export async function createManagedQuizQuestion(input: {
 
 export async function updateManagedQuizQuestion(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
   questionType: "choice" | "true_false" | "open" | "code";
   promptAr: string;
@@ -258,7 +258,7 @@ export async function updateManagedQuizQuestion(input: {
 
 export async function deleteManagedQuizQuestion(input: {
   id: number;
-  role: "teacher" | "admin";
+  role: "teacher" | "institution" | "admin";
   userId: number;
 }) {
   const db = await getDb();

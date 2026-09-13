@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { ForwardArrow } from "@/components/DirectionalArrow";
-import { Globe2, LogIn, ShieldCheck, UserPlus } from "lucide-react";
+import {
+  Globe2,
+  LogIn,
+  ShieldCheck,
+  UserPlus,
+  GraduationCap,
+  UserRound,
+  Building2,
+  ClipboardCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Input } from "@/components/ui/input";
@@ -111,6 +120,13 @@ const copy = {
     submitRegister: "إنشاء حساب بالبريد الإلكتروني",
     pendingApproval:
       "تم إنشاء حسابك بنجاح ✅ هو الآن بانتظار موافقة الإدارة، وستتمكن من تسجيل الدخول فور تفعيله.",
+    roleLabel: "أنا…",
+    roleLearner: "متعلم اللغة الألمانية",
+    roleTeacher: "أستاذ/مدرّس اللغة الألمانية",
+    roleInstitution: "مدير مؤسسة / مركز تعليم لغة",
+    freeAssessment: "احجز تحديد مستواك مجانًا",
+    freeAssessmentHint:
+      "اختبار إلكتروني قصير يحدد مستواك في اللغة الألمانية فورًا، دون الحاجة لحساب.",
   },
   fr: {
     loginTitle: "Bienvenue sur Nourix Academy",
@@ -134,6 +150,13 @@ const copy = {
     submitRegister: "Créer un compte par e-mail",
     pendingApproval:
       "Votre compte a été créé avec succès ✅ Il est maintenant en attente d'approbation par l'administration ; vous pourrez vous connecter dès son activation.",
+    roleLabel: "Je suis…",
+    roleLearner: "Apprenant d'allemand",
+    roleTeacher: "Professeur d'allemand",
+    roleInstitution: "Responsable d'établissement / centre de langue",
+    freeAssessment: "Réservez votre test de niveau gratuit",
+    freeAssessmentHint:
+      "Un court test en ligne qui détermine votre niveau d'allemand immédiatement, sans compte requis.",
   },
   en: {
     loginTitle: "Welcome to Nourix Academy",
@@ -157,6 +180,13 @@ const copy = {
     submitRegister: "Create account with email",
     pendingApproval:
       "Your account was created successfully ✅ It is now awaiting approval by an administrator, and you'll be able to log in as soon as it's activated.",
+    roleLabel: "I am…",
+    roleTeacher: "German language teacher",
+    roleLearner: "German language learner",
+    roleInstitution: "Institution / language-center manager",
+    freeAssessment: "Book your free level assessment",
+    freeAssessmentHint:
+      "A short online test that determines your German level instantly, no account needed.",
   },
 } as const;
 
@@ -187,6 +217,9 @@ export default function AuthPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [accountRole, setAccountRole] = useState<
+    "learner" | "teacher" | "institution"
+  >("learner");
   const [formError, setFormError] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState(false);
   const registerMutation = trpc.auth.registerWithEmail.useMutation({
@@ -210,7 +243,8 @@ export default function AuthPage({
   const submitting = registerMutation.isPending || loginMutation.isPending;
   const submitEmailForm = () => {
     setFormError(null);
-    if (register) registerMutation.mutate({ email, password, name });
+    if (register)
+      registerMutation.mutate({ email, password, name, role: accountRole });
     else loginMutation.mutate({ email, password });
   };
   // Without this check, the Google button below always renders and always
@@ -306,6 +340,33 @@ export default function AuthPage({
             </>
           )}
 
+          {register && !pendingApproval && (
+            <Link
+              href="/placement"
+              className="auth-security"
+              style={{
+                display: "flex",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "rgba(241,206,99,.08)",
+                border: "1px solid rgba(241,206,99,.25)",
+                marginBottom: 14,
+                textDecoration: "none",
+              }}
+            >
+              <ClipboardCheck size={16} />
+              <span>
+                <strong style={{ display: "block", fontSize: 13 }}>
+                  {t.freeAssessment}
+                </strong>
+                <small style={{ fontSize: 11, opacity: 0.75 }}>
+                  {t.freeAssessmentHint}
+                </small>
+              </span>
+            </Link>
+          )}
+
           {pendingApproval ? (
             <div
               role="status"
@@ -335,6 +396,46 @@ export default function AuthPage({
                     value={name}
                     onChange={e => setName(e.target.value)}
                   />
+                </div>
+              )}
+              {register && (
+                <div style={{ display: "grid", gap: 4 }}>
+                  <span className="quiet-label">{t.roleLabel}</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(
+                      [
+                        { role: "learner" as const, icon: GraduationCap, label: t.roleLearner },
+                        { role: "teacher" as const, icon: UserRound, label: t.roleTeacher },
+                        { role: "institution" as const, icon: Building2, label: t.roleInstitution },
+                      ]
+                    ).map(({ role, icon: Icon, label }) => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => setAccountRole(role)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 12px",
+                          borderRadius: 9,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          border:
+                            accountRole === role
+                              ? "1px solid #f1ce63"
+                              : "1px solid rgba(255,255,255,.12)",
+                          background:
+                            accountRole === role
+                              ? "rgba(241,206,99,.1)"
+                              : "transparent",
+                        }}
+                      >
+                        <Icon size={14} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               <div style={{ display: "grid", gap: 4 }}>

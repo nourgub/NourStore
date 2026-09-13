@@ -14,7 +14,9 @@ export default function Workspace() {
         ? "/admin"
         : user.role === "teacher"
           ? "/teacher"
-          : "/dashboard";
+          : user.role === "institution"
+            ? "/institution"
+            : "/dashboard";
     window.location.href = destination;
   }, [loading, user]);
   return (

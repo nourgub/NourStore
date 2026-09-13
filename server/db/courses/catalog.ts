@@ -110,14 +110,14 @@ export async function getAllCourses() {
 }
 
 export async function getCoursesForRole(
-  role: "learner" | "teacher" | "admin",
+  role: "learner" | "teacher" | "institution" | "admin",
   userId: number
 ) {
   const db = await getDb();
   if (!db) return [];
   if (role === "admin")
     return db.select().from(courses).orderBy(desc(courses.updatedAt));
-  if (role === "teacher") {
+  if (role === "teacher" || role === "institution") {
     return db
       .select()
       .from(courses)

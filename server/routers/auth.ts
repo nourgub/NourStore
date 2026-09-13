@@ -41,6 +41,10 @@ export const authRouter = router({
         email: z.string().email().max(320),
         password: z.string().min(1).max(200),
         name: z.string().min(2).max(100),
+        // "admin" is intentionally never an option here — see createEmailUser
+        // in db.ts. Optional/defaulted to "learner" so an older client build
+        // that doesn't send it still registers exactly as before.
+        role: z.enum(["learner", "teacher", "institution"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -84,6 +88,7 @@ export const authRouter = router({
         email: input.email.trim().toLowerCase(),
         name: input.name,
         passwordHash,
+        role: input.role,
       });
       if (!result.ok)
         throw new TRPCError({
@@ -150,11 +155,12 @@ export const authRouter = router({
       });
       return { ok: true };
     }),
-  // A visitor's one-time choice of account category at onboarding.
+  // A visitor's one-time choice of account category at onboarding — the
+  // fallback for an account that didn't already pick a role at registration.
   // "admin" is intentionally not an option here — see chooseOwnRole in db.ts.
   chooseRole: protectedProcedure
     .use(rateLimit("choose-role", 5, 60 * 60 * 1000))
-    .input(z.object({ role: z.enum(["learner", "teacher"]) }))
+    .input(z.object({ role: z.enum(["learner", "teacher", "institution"]) }))
     .mutation(async ({ ctx, input }) => {
       const result = await chooseOwnRole(ctx.user.id, input.role);
       if (!result.ok)
