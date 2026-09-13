@@ -28,6 +28,8 @@ import {
   getStaleCheckoutSessionsForReminder,
   markSessionReminded,
   createNotification,
+  getUserBasicInfo,
+  setAccountStatus,
 } from "./db";
 
 // WhatsApp's own "image" message type already constrains what Meta will
@@ -252,4 +254,91 @@ export async function remindStaleCheckoutSessions(
     remindedCount += 1;
   }
   return { remindedCount };
+}
+
+// ---------------------------------------------------------------------------
+// Admin approval of new learner/teacher registrations via WhatsApp — an
+// additional channel alongside the existing admin-panel "Activate" button
+// (client/src/pages/flows/staff/UserManagement.tsx), never a replacement for
+// it. The admin sets their own WhatsApp number once (platform.setAdminApprovalWhatsapp,
+// stored as digits-only under the "admin_approval_whatsapp_number" platform
+// setting, deliberately separate from "whatsapp_number" — the public support
+// contact number shown in the footer, which must never double as an
+// authorization channel). Every new self-registered account starts "pending"
+// (see createEmailUser) and stays unusable until either channel approves it.
+// ---------------------------------------------------------------------------
+
+const digitsOnly = (value: string): string => value.replace(/[^0-9]/g, "");
+
+async function isAuthorizedAdminNumber(fromPhone: string): Promise<boolean> {
+  const adminNumber = await getPlatformSetting("admin_approval_whatsapp_number");
+  if (!adminNumber) return false;
+  const normalizedAdmin = digitsOnly(adminNumber);
+  if (!normalizedAdmin) return false;
+  return digitsOnly(fromPhone) === normalizedAdmin;
+}
+
+/**
+ * Notifies the configured admin WhatsApp number about a new pending
+ * registration and how to approve/reject it. A no-op (never throws) when no
+ * admin number has been configured yet — the admin panel's pending-users
+ * list still shows the account either way.
+ */
+export async function notifyAdminOfPendingRegistration(user: {
+  id: number;
+  name: string;
+  email: string;
+}): Promise<void> {
+  const adminNumber = await getPlatformSetting("admin_approval_whatsapp_number");
+  if (!adminNumber) return;
+  await sendWhatsAppText(
+    adminNumber,
+    `حساب جديد بانتظار الموافقة 🆕\nالاسم: ${user.name}\nالبريد: ${user.email}\nالمعرف: ${user.id}\n\nللموافقة أرسل: قبول ${user.id}\nللرفض أرسل: رفض ${user.id}`
+  );
+}
+
+const APPROVE_COMMAND = /^(?:قبول|approve)\s+(\d+)$/i;
+const REJECT_COMMAND = /^(?:رفض|reject)\s+(\d+)$/i;
+
+/**
+ * Handles an inbound WhatsApp text that might be an admin approve/reject
+ * command for a pending registration. Returns true when it consumed the
+ * message (caller should not also run it through the payment-bot flow in
+ * handleWhatsAppInboundMessage), false otherwise — including when the text
+ * matches the command shape but the sender isn't the configured admin
+ * number, so a non-admin sender falls through to the normal fallback reply
+ * instead of getting any hint that "قبول <id>" is a recognized format.
+ */
+export async function handleWhatsAppAdminCommand(
+  from: string,
+  text: string
+): Promise<boolean> {
+  const approveMatch = text.trim().match(APPROVE_COMMAND);
+  const rejectMatch = text.trim().match(REJECT_COMMAND);
+  const match = approveMatch ?? rejectMatch;
+  if (!match) return false;
+  if (!(await isAuthorizedAdminNumber(from))) return false;
+
+  const userId = Number(match[1]);
+  const user = await getUserBasicInfo(userId);
+  if (!user) {
+    await sendWhatsAppText(from, `لم يتم العثور على مستخدم بالمعرف ${userId}.`);
+    return true;
+  }
+  const approve = Boolean(approveMatch);
+  await setAccountStatus(userId, approve ? "active" : "suspended");
+  await createNotification({
+    userId,
+    type: approve ? "account_approved" : "account_rejected",
+    title: approve
+      ? "notifications.accountApproved"
+      : "notifications.accountRejected",
+    body: "",
+  });
+  const label = `${user.name || "?"} (${user.email || "?"})`;
+  await sendWhatsAppText(
+    from,
+    approve ? `تم تفعيل حساب ${label} ✅` : `تم رفض حساب ${label}.`
+  );
+  return true;
 }

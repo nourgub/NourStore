@@ -17,6 +17,11 @@ export function WhatsAppAdminPanel({ lang }: { lang: Lang }) {
   const saveSocial = trpc.platform.setSocialLinks.useMutation({
     onSuccess: () => social.refetch(),
   });
+  const approvalCurrent = trpc.platform.adminApprovalWhatsapp.useQuery();
+  const [approvalNumber, setApprovalNumber] = useState("");
+  const saveApprovalNumber = trpc.platform.setAdminApprovalWhatsapp.useMutation({
+    onSuccess: () => approvalCurrent.refetch(),
+  });
   return (
     <div className="flow-card staff-form">
       <div className="flow-card-title">
@@ -107,6 +112,53 @@ export function WhatsAppAdminPanel({ lang }: { lang: Lang }) {
           {social.data.facebook && <>· Facebook: {social.data.facebook}</>}
         </small>
       )}
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,.1)" }}>
+        <h3 style={{ fontSize: 15, marginBottom: 6 }}>
+          {lang === "ar"
+            ? "رقم واتساب المسؤول (للموافقة على الحسابات الجديدة)"
+            : lang === "fr"
+              ? "Numéro WhatsApp de l'administrateur (approbation des comptes)"
+              : "Admin's WhatsApp number (account approval)"}
+        </h3>
+        <p className="quiet-label">
+          {lang === "ar"
+            ? "رقمك الشخصي على واتساب. عند تسجيل متعلم أو أستاذ جديد ستصلك رسالة، ويمكنك الرد بـ «قبول [المعرف]» أو «رفض [المعرف]» لتفعيل الحساب أو رفضه — إضافة لزر «تفعيل» في لوحة المستخدمين أدناه."
+            : lang === "fr"
+              ? "Votre numéro WhatsApp personnel. Vous recevrez un message à chaque nouvelle inscription et pourrez répondre par « قبول [id] » ou « رفض [id] » pour approuver ou rejeter le compte — en plus du bouton « Activer » dans la gestion des utilisateurs ci-dessous."
+              : "Your personal WhatsApp number. You'll get a message on every new registration and can reply with \"قبول [id]\" or \"رفض [id]\" to approve or reject the account — in addition to the \"Activate\" button in user management below."}
+        </p>
+        <div className="invite-box">
+          <Input
+            type="tel"
+            placeholder="+213 5xx xx xx xx"
+            aria-label="+213 5xx xx xx xx"
+            value={approvalNumber}
+            onChange={e => setApprovalNumber(e.target.value)}
+          />
+          <Button
+            className="gold-button"
+            disabled={
+              approvalNumber.replace(/[^0-9]/g, "").length < 8 ||
+              saveApprovalNumber.isPending
+            }
+            onClick={() => saveApprovalNumber.mutate({ number: approvalNumber })}
+          >
+            {lang === "ar"
+              ? "حفظ الرقم"
+              : lang === "fr"
+                ? "Enregistrer"
+                : "Save number"}
+            <Check size={15} />
+          </Button>
+        </div>
+        {approvalCurrent.data && (
+          <small className="form-success">
+            {lang === "ar"
+              ? `الرقم المحفوظ: +${approvalCurrent.data}`
+              : `Saved number: +${approvalCurrent.data}`}
+          </small>
+        )}
+      </div>
     </div>
   );
 }

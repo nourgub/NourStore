@@ -109,6 +109,8 @@ const copy = {
     passwordHint: "8 أحرف على الأقل، تحتوي حروفًا وأرقامًا",
     submitLogin: "دخول بالبريد الإلكتروني",
     submitRegister: "إنشاء حساب بالبريد الإلكتروني",
+    pendingApproval:
+      "تم إنشاء حسابك بنجاح ✅ هو الآن بانتظار موافقة الإدارة، وستتمكن من تسجيل الدخول فور تفعيله.",
   },
   fr: {
     loginTitle: "Bienvenue sur Nourix Academy",
@@ -130,6 +132,8 @@ const copy = {
     passwordHint: "8 caractères minimum, lettres et chiffres",
     submitLogin: "Connexion par e-mail",
     submitRegister: "Créer un compte par e-mail",
+    pendingApproval:
+      "Votre compte a été créé avec succès ✅ Il est maintenant en attente d'approbation par l'administration ; vous pourrez vous connecter dès son activation.",
   },
   en: {
     loginTitle: "Welcome to Nourix Academy",
@@ -151,6 +155,8 @@ const copy = {
     passwordHint: "At least 8 characters, letters and numbers",
     submitLogin: "Log in with email",
     submitRegister: "Create account with email",
+    pendingApproval:
+      "Your account was created successfully ✅ It is now awaiting approval by an administrator, and you'll be able to log in as soon as it's activated.",
   },
 } as const;
 
@@ -182,8 +188,13 @@ export default function AuthPage({
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const registerMutation = trpc.auth.registerWithEmail.useMutation({
-    onSuccess: () => {
+    onSuccess: data => {
+      if (data.pending) {
+        setPendingApproval(true);
+        return;
+      }
       refresh();
       window.location.href = "/workspace";
     },
@@ -295,64 +306,82 @@ export default function AuthPage({
             </>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {register && (
+          {pendingApproval ? (
+            <div
+              role="status"
+              style={{
+                display: "grid",
+                gap: 4,
+                padding: "14px 16px",
+                borderRadius: 10,
+                background: "rgba(90,168,120,.12)",
+                border: "1px solid rgba(90,168,120,.35)",
+              }}
+            >
+              <small style={{ color: "#8fcf9f", lineHeight: 1.6 }}>
+                {t.pendingApproval}
+              </small>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {register && (
+                <div style={{ display: "grid", gap: 4 }}>
+                  <label htmlFor="auth-name" className="quiet-label">
+                    {t.name}
+                  </label>
+                  <Input
+                    id="auth-name"
+                    placeholder={t.name}
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                  />
+                </div>
+              )}
               <div style={{ display: "grid", gap: 4 }}>
-                <label htmlFor="auth-name" className="quiet-label">
-                  {t.name}
+                <label htmlFor="auth-email" className="quiet-label">
+                  {t.email}
                 </label>
                 <Input
-                  id="auth-name"
-                  placeholder={t.name}
-                  value={name}
-                  onChange={e => setName(e.target.value)}
+                  id="auth-email"
+                  type="email"
+                  placeholder={t.email}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
                 />
               </div>
-            )}
-            <div style={{ display: "grid", gap: 4 }}>
-              <label htmlFor="auth-email" className="quiet-label">
-                {t.email}
-              </label>
-              <Input
-                id="auth-email"
-                type="email"
-                placeholder={t.email}
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-              />
+              <div style={{ display: "grid", gap: 4 }}>
+                <label htmlFor="auth-password" className="quiet-label">
+                  {t.password}
+                </label>
+                <Input
+                  id="auth-password"
+                  type="password"
+                  placeholder={t.password}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+              </div>
+              {register && (
+                <small style={{ opacity: 0.55, fontSize: 11 }}>
+                  {t.passwordHint}
+                </small>
+              )}
+              {formError && (
+                <small style={{ color: "#e08a8a" }} role="alert">
+                  {localizeAuthError(formError, lang)}
+                </small>
+              )}
+              <Button
+                className="quiet-button"
+                disabled={
+                  submitting || !email || !password || (register && !name)
+                }
+                onClick={submitEmailForm}
+              >
+                {register ? t.submitRegister : t.submitLogin}
+              </Button>
             </div>
-            <div style={{ display: "grid", gap: 4 }}>
-              <label htmlFor="auth-password" className="quiet-label">
-                {t.password}
-              </label>
-              <Input
-                id="auth-password"
-                type="password"
-                placeholder={t.password}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-              />
-            </div>
-            {register && (
-              <small style={{ opacity: 0.55, fontSize: 11 }}>
-                {t.passwordHint}
-              </small>
-            )}
-            {formError && (
-              <small style={{ color: "#e08a8a" }} role="alert">
-                {localizeAuthError(formError, lang)}
-              </small>
-            )}
-            <Button
-              className="quiet-button"
-              disabled={
-                submitting || !email || !password || (register && !name)
-              }
-              onClick={submitEmailForm}
-            >
-              {register ? t.submitRegister : t.submitLogin}
-            </Button>
-          </div>
+          )}
 
           <div className="auth-switch">
             {register ? t.already : t.new}{" "}

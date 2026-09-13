@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { ENV } from "./_core/env";
 import {
   handleWhatsAppInboundMessage,
+  handleWhatsAppAdminCommand,
   isWhatsAppBotConfigured,
 } from "./whatsappBot";
 
@@ -97,12 +98,18 @@ export function registerWhatsAppWebhook(app: Express) {
           const messages = change.value?.messages ?? [];
           for (const message of messages) {
             if (message.type === "text" && message.text?.body) {
-              await handleWhatsAppInboundMessage({
-                type: "text",
-                from: message.from,
-                text: message.text.body,
-                messageId: message.id,
-              });
+              const handledAsAdminCommand = await handleWhatsAppAdminCommand(
+                message.from,
+                message.text.body
+              );
+              if (!handledAsAdminCommand) {
+                await handleWhatsAppInboundMessage({
+                  type: "text",
+                  from: message.from,
+                  text: message.text.body,
+                  messageId: message.id,
+                });
+              }
             } else if (message.type === "image" && message.image?.id) {
               await handleWhatsAppInboundMessage({
                 type: "image",

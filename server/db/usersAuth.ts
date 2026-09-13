@@ -89,9 +89,19 @@ export async function getUserByOpenId(openId: string) {
 }
 
 export type EmailRegisterResult =
-  | { ok: true; openId: string }
+  | { ok: true; openId: string; userId: number; pending: boolean }
   | { ok: false; reason: "email_taken" };
 
+/**
+ * Self-service signup starts "pending" (same gate as createManagedUser)
+ * until an admin approves it — either the "Activate" button in the admin
+ * panel, or a WhatsApp reply from the configured admin number (see
+ * whatsappBot.ts notifyAdminOfPendingRegistration / handleWhatsAppAdminCommand).
+ * The bootstrap owner is the one exception: mirrors upsertUser's
+ * OWNER_OPEN_ID bootstrap (used by the Google OAuth path) — without this, a
+ * deployment running AUTH_PROVIDER=email has no way at all to grant its
+ * first admin except a direct database edit.
+ */
 export async function createEmailUser(input: {
   openId: string;
   email: string;
@@ -106,12 +116,8 @@ export async function createEmailUser(input: {
     .where(eq(users.openId, input.openId))
     .limit(1);
   if (existing.length) return { ok: false, reason: "email_taken" };
-  // Mirrors upsertUser's OWNER_OPEN_ID bootstrap (used by the Google OAuth
-  // path) — without this, a deployment running AUTH_PROVIDER=email has no
-  // way at all to grant its first admin except a direct database edit,
-  // since self-service signup otherwise always creates "learner".
   const isOwner = input.openId === ENV.ownerOpenId;
-  await db
+  const [result] = await db
     .insert(users)
     .values({
       openId: input.openId,
@@ -121,9 +127,39 @@ export async function createEmailUser(input: {
       passwordHash: input.passwordHash,
       role: isOwner ? "admin" : "learner",
       roleChosenAt: isOwner ? new Date() : undefined,
+      accountStatus: isOwner ? "active" : "pending",
       lastSignedIn: new Date(),
     });
-  return { ok: true, openId: input.openId };
+  return {
+    ok: true,
+    openId: input.openId,
+    userId: (result as { insertId: number }).insertId,
+    pending: !isOwner,
+  };
+}
+
+/** Minimal lookup used by the admin WhatsApp-approval command handler to
+ * confirm a userId is real and to compose a human-readable confirmation
+ * reply — never returns passwordHash. */
+export async function getUserBasicInfo(userId: number): Promise<{
+  id: number;
+  name: string | null;
+  email: string | null;
+  accountStatus: "active" | "pending" | "suspended";
+} | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      accountStatus: users.accountStatus,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getEmailUserPasswordHash(openId: string) {

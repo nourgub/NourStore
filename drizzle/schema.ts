@@ -35,12 +35,13 @@ export const users = mysqlTable("users", {
   // "admin" is never selectable here — it is only ever granted via
   // OWNER_OPEN_ID bootstrap or an existing admin's manual promotion.
   roleChosenAt: timestamp("roleChosenAt"),
-  // Gates login for accounts an admin creates directly (see
-  // createManagedUser in server/db/usersAuth.ts) — held "pending" until an
-  // admin confirms payment and flips it to "active" (admin.activateUser).
-  // Self-registered accounts (auth.registerWithEmail) are always "active"
-  // immediately, unaffected by this — role is unknown at that point (see
-  // auth.chooseRole), so there is nothing yet to gate.
+  // Gates login for every non-owner account — both ones an admin creates
+  // directly (see createManagedUser) and self-registered ones (see
+  // createEmailUser) — held "pending" until an admin approves it, either
+  // via the admin panel's "Activate" button (admin.activateUser) or a
+  // WhatsApp reply from the configured admin number (see whatsappBot.ts).
+  // The bootstrap owner (OWNER_OPEN_ID) is the only account that starts
+  // "active" immediately.
   accountStatus: mysqlEnum("accountStatus", ["active", "pending", "suspended"])
     .default("active")
     .notNull(),

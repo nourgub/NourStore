@@ -34,6 +34,32 @@ export const platformRouter = router({
         input.number.replace(/[^0-9]/g, "")
       )
     ),
+  // The admin's own WhatsApp number, authorized to approve/reject pending
+  // learner/teacher registrations by replying "قبول <id>" / "رفض <id>" (see
+  // whatsappBot.ts). Deliberately a separate setting from `whatsapp_number`
+  // above (the public support contact shown in the footer) — that number
+  // must never double as an approval-authorization channel. Admin-only,
+  // unlike the public `whatsapp` query above.
+  adminApprovalWhatsapp: roleProcedure(
+    ["admin"],
+    "Admin access required"
+  ).query(async () => (await getPlatformSetting("admin_approval_whatsapp_number")) || ""),
+  setAdminApprovalWhatsapp: roleProcedure(["admin"], "Admin access required")
+    .input(
+      z.object({
+        number: z
+          .string()
+          .min(8)
+          .max(32)
+          .regex(/^\+?[0-9 ()-]+$/),
+      })
+    )
+    .mutation(({ input }) =>
+      setPlatformSetting(
+        "admin_approval_whatsapp_number",
+        input.number.replace(/[^0-9]/g, "")
+      )
+    ),
   socialLinks: publicProcedure.query(async () => ({
     instagram: (await getPlatformSetting("social_instagram_url")) || null,
     facebook: (await getPlatformSetting("social_facebook_url")) || null,

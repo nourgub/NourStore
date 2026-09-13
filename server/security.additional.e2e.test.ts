@@ -6,6 +6,8 @@ import { getDb } from "./db/shared";
 import { createEmailUser } from "./db/usersAuth";
 import { hashPassword, emailOpenId } from "./_core/emailAuth";
 import { issueCertificate } from "./db/certificates";
+import { getPlatformSetting, setPlatformSetting } from "./db/platformSettings";
+import { handleWhatsAppAdminCommand } from "./whatsappBot";
 import {
   users,
   courses,
@@ -302,3 +304,122 @@ describe.skipIf(!HAS_DB)("Phase 6 — additional security scenarios against real
     expect(rows.length).toBe(1);
   });
 });
+
+describe.skipIf(!HAS_DB)(
+  "WhatsApp admin approval of self-registered pending accounts",
+  () => {
+    const ADMIN_SETTING_KEY = "admin_approval_whatsapp_number";
+    const AUTHORIZED_ADMIN_NUMBER = "213555000111";
+    let originalAdminNumber: string | null = null;
+    const createdIds: number[] = [];
+
+    async function registerPending(label: string) {
+      const email = `${label}-${RUN}@nourix.test`;
+      const openId = emailOpenId(email);
+      const anon = appRouter.createCaller(ctxFor(null));
+      const result = await anon.auth.registerWithEmail({
+        email,
+        password: "Pending-Pass-123",
+        name: label,
+      });
+      const db = await mustGetDb();
+      const row = (
+        await db.select().from(users).where(eq(users.openId, openId)).limit(1)
+      )[0] as User;
+      createdIds.push(row.id);
+      return { result, openId, email, userId: row.id };
+    }
+
+    afterAll(async () => {
+      const db = await mustGetDb();
+      if (createdIds.length) {
+        await db.delete(notifications).where(inArray(notifications.userId, createdIds));
+        await db.delete(users).where(inArray(users.id, createdIds));
+      }
+      // Restore whatever admin-approval number (if any) existed before this
+      // suite ran, rather than leaving a test fixture number in a shared
+      // platformSettings row.
+      await setPlatformSetting(ADMIN_SETTING_KEY, originalAdminNumber ?? "");
+    });
+
+    it("blocks login immediately after self-registration, then unblocks it once the configured admin number sends 'قبول <id>'", async () => {
+      originalAdminNumber = await getPlatformSetting(ADMIN_SETTING_KEY);
+      await setPlatformSetting(ADMIN_SETTING_KEY, AUTHORIZED_ADMIN_NUMBER);
+
+      const { result, email, userId } = await registerPending("wa-approve-flow");
+      expect(result).toEqual({ ok: true, pending: true });
+
+      const anonLogin = appRouter.createCaller(ctxFor(null));
+      await expect(
+        anonLogin.auth.loginWithEmail({ email, password: "Pending-Pass-123" })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+      const handled = await handleWhatsAppAdminCommand(
+        AUTHORIZED_ADMIN_NUMBER,
+        `قبول ${userId}`
+      );
+      expect(handled).toBe(true);
+
+      const db = await mustGetDb();
+      const row = (
+        await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1)
+      )[0];
+      expect(row.accountStatus).toBe("active");
+
+      await expect(
+        appRouter
+          .createCaller(ctxFor(null))
+          .auth.loginWithEmail({ email, password: "Pending-Pass-123" })
+      ).resolves.toMatchObject({ ok: true });
+    });
+
+    it("ignores 'قبول <id>' from any number other than the configured admin number — the account stays pending", async () => {
+      await setPlatformSetting(ADMIN_SETTING_KEY, AUTHORIZED_ADMIN_NUMBER);
+      const { userId } = await registerPending("wa-unauthorized-sender");
+
+      const handled = await handleWhatsAppAdminCommand(
+        "213699999999",
+        `قبول ${userId}`
+      );
+      expect(handled).toBe(false);
+
+      const db = await mustGetDb();
+      const row = (
+        await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1)
+      )[0];
+      expect(row.accountStatus).toBe("pending");
+    });
+
+    it("'رفض <id>' from the authorized admin number suspends the account instead of activating it", async () => {
+      await setPlatformSetting(ADMIN_SETTING_KEY, AUTHORIZED_ADMIN_NUMBER);
+      const { email, userId } = await registerPending("wa-reject-flow");
+
+      const handled = await handleWhatsAppAdminCommand(
+        AUTHORIZED_ADMIN_NUMBER,
+        `رفض ${userId}`
+      );
+      expect(handled).toBe(true);
+
+      const db = await mustGetDb();
+      const row = (
+        await db.select({ accountStatus: users.accountStatus }).from(users).where(eq(users.id, userId)).limit(1)
+      )[0];
+      expect(row.accountStatus).toBe("suspended");
+
+      await expect(
+        appRouter
+          .createCaller(ctxFor(null))
+          .auth.loginWithEmail({ email, password: "Pending-Pass-123" })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    it("a command referencing a non-existent user id is handled gracefully (no throw) and touches no real account", async () => {
+      await setPlatformSetting(ADMIN_SETTING_KEY, AUTHORIZED_ADMIN_NUMBER);
+      const handled = await handleWhatsAppAdminCommand(
+        AUTHORIZED_ADMIN_NUMBER,
+        "قبول 999999999"
+      );
+      expect(handled).toBe(true);
+    });
+  }
+);

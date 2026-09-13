@@ -20,6 +20,7 @@ import {
   chooseOwnRole,
 } from "../db";
 import { rateLimit } from "../_core/procedures";
+import { notifyAdminOfPendingRegistration } from "../whatsappBot";
 
 export const authRouter = router({
   me: publicProcedure.query(opts => (opts.ctx.user ? toPublicUser(opts.ctx.user) : null)),
@@ -89,6 +90,17 @@ export const authRouter = router({
           code: "CONFLICT",
           message: "An account with this email already exists",
         });
+      if (result.pending) {
+        // No session cookie — a pending account cannot use the platform yet.
+        // Best-effort: a missing/misconfigured WhatsApp admin number must
+        // never fail registration itself, so this never throws.
+        await notifyAdminOfPendingRegistration({
+          id: result.userId,
+          name: input.name,
+          email: input.email,
+        }).catch(() => {});
+        return { ok: true, pending: true };
+      }
       const sessionToken = await createSessionToken(openId, {
         name: input.name,
       });
@@ -96,7 +108,7 @@ export const authRouter = router({
         ...getSessionCookieOptions(ctx.req),
         maxAge: ONE_YEAR_MS,
       });
-      return { ok: true };
+      return { ok: true, pending: false };
     }),
   loginWithEmail: publicProcedure
     .input(
