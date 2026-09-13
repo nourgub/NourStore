@@ -30,6 +30,11 @@ import {
   markRefundResult,
   getInvoiceByProviderReference,
 } from "./db";
+import {
+  isChargilyConfigured,
+  verifyChargilySignature,
+  type ChargilyWebhookEvent,
+} from "./chargilyProvider";
 
 type WebhookEvent =
   | { type: "payment.succeeded"; invoiceId: number; providerReference: string }
@@ -66,10 +71,78 @@ function verifySignature(
   }
 }
 
+/**
+ * Chargily's real webhook: header "signature", HMAC-SHA256 of the raw body
+ * keyed by the same secret key used for outbound requests (see
+ * chargilyProvider.ts) — a different scheme from the generic provider-
+ * neutral stub below, so it's handled as its own branch before falling
+ * through to that stub for any other/future provider.
+ */
+async function handleChargilyWebhook(req: Request, res: Response) {
+  if (!isChargilyConfigured()) {
+    res
+      .status(501)
+      .json({ error: "Chargily is not configured on this deployment." });
+    return;
+  }
+  const signature = req.header("signature");
+  const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+  if (!verifyChargilySignature(rawBody, signature)) {
+    res.status(401).json({ error: "Invalid webhook signature." });
+    return;
+  }
+  const event = req.body as ChargilyWebhookEvent;
+  try {
+    const invoice = await getInvoiceByProviderReference(
+      "chargily",
+      event.data.id
+    );
+    if (!invoice) {
+      // A checkout id Chargily is telling us about but that was never
+      // recorded here — log and acknowledge rather than error, so Chargily
+      // doesn't keep retrying a webhook this deployment can never resolve.
+      console.warn(
+        `[chargily webhook] no invoice found for checkout ${event.data.id}`
+      );
+      res.status(200).json({ received: true });
+      return;
+    }
+    switch (event.type) {
+      case "checkout.paid":
+        await markInvoicePaid({
+          invoiceId: invoice.id,
+          provider: "chargily",
+          providerReference: event.data.id,
+        });
+        break;
+      case "checkout.failed":
+      case "checkout.canceled":
+        await markInvoiceFailed({
+          invoiceId: invoice.id,
+          provider: "chargily",
+          providerReference: event.data.id,
+        });
+        break;
+      default:
+        // An event type this deployment doesn't act on yet (Chargily also
+        // sends non-checkout events) — acknowledged, not an error.
+        break;
+    }
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error("[chargily webhook] handler error", error);
+    res.status(500).json({ error: "Webhook processing failed." });
+  }
+}
+
 export function registerPaymentWebhooks(app: Express) {
   app.post(
     "/api/webhooks/payments/:provider",
     async (req: Request, res: Response) => {
+      if (req.params.provider === "chargily") {
+        await handleChargilyWebhook(req, res);
+        return;
+      }
       if (!ENV.paymentProvider || !ENV.paymentWebhookSecret) {
         // Fails closed and says so explicitly — no provider is configured yet.
         res

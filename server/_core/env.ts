@@ -32,6 +32,15 @@ export const ENV = {
   // a fake charge, same as every other payment provider here.
   slickpayPublicKey: process.env.SLICKPAY_PUBLIC_KEY ?? "",
   slickpaySandbox: process.env.SLICKPAY_SANDBOX !== "false",
+  // Chargily Pay — a real, fully-documented public REST API (confirmed
+  // directly from https://dev.chargily.com/pay-v2/api-reference, not
+  // guessed) with a free sandbox: get a secret key from
+  // https://pay.chargily.com/dashboard/developers-corner (test keys start
+  // "test_sk_"). Until CHARGILY_SECRET_KEY is set, the Chargily provider
+  // reports itself as unconfigured rather than attempting a fake charge,
+  // same as every other payment provider here.
+  chargilySecretKey: process.env.CHARGILY_SECRET_KEY ?? "",
+  chargilySandbox: process.env.CHARGILY_SANDBOX !== "false",
   // WhatsApp Cloud API (Meta) — unlike BaridiMob, this is a real public API
   // (developers.facebook.com/docs/whatsapp/cloud-api). Still requires a
   // real Meta Business/WhatsApp Business Platform setup: a verified phone

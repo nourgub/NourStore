@@ -5,6 +5,7 @@ import { rateLimit } from "../_core/procedures";
 import { ENV } from "../_core/env";
 import { initiateBaridimobCheckout } from "../baridimobProvider";
 import { initiateSlickpayCheckout } from "../slickpayProvider";
+import { initiateChargilyCheckout } from "../chargilyProvider";
 import {
   getSubscriptionPlans,
   validateCoupon,
@@ -30,7 +31,7 @@ export const paymentsRouter = router({
           .length(3)
           .regex(/^[A-Za-z]{3}$/),
         provider: z
-          .enum(["manual", "baridimob", "slickpay", "whatsapp"])
+          .enum(["manual", "baridimob", "slickpay", "chargily", "whatsapp"])
           .default("manual"),
         returnUrl: z.string().url().optional(),
         couponCode: z.string().min(2).max(40).optional(),
@@ -141,6 +142,39 @@ export const paymentsRouter = router({
         await recordPaymentAttempt({
           invoiceId: invoice.id,
           provider: "slickpay",
+          providerReference: checkout.providerReference,
+          status: "pending",
+        });
+        return {
+          invoice,
+          providerConfigured: true,
+          redirectUrl: checkout.redirectUrl,
+          message: undefined,
+          couponMessage,
+          appliedCoupon: appliedCoupon?.code,
+        };
+      }
+      if (input.provider === "chargily") {
+        const checkout = await initiateChargilyCheckout({
+          invoiceId: invoice.id,
+          amountCents: finalAmountCents,
+          currency: plan.resolvedCurrency,
+          returnUrl: input.returnUrl || "",
+        });
+        if (!checkout.ok) {
+          // Never fakes success: the invoice stays "pending" and the person is told exactly why the redirect isn't available yet.
+          return {
+            invoice,
+            providerConfigured: false,
+            redirectUrl: null,
+            message: checkout.message,
+            couponMessage,
+            appliedCoupon: appliedCoupon?.code,
+          };
+        }
+        await recordPaymentAttempt({
+          invoiceId: invoice.id,
+          provider: "chargily",
           providerReference: checkout.providerReference,
           status: "pending",
         });
