@@ -38,6 +38,46 @@ function contextFor(
 }
 
 describe("role permissions", () => {
+  it("rejects non-teacher roles from reaching the teacher assistant's stored material", async () => {
+    // Lesson plans, exam papers, grading scales and marks are a teacher's own
+    // material — a learner or parent must not reach any of it, stored or not.
+    for (const role of ["learner", "parent"] as const) {
+      const caller = appRouter.createCaller(contextFor(role));
+      await expect(caller.teacher.lessonPlans()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(caller.teacher.examPapers()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(caller.teacher.examSolutionSets()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(caller.teacher.paperGrades()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(
+        caller.teacher.reviewPaperGrade({ id: 1, finalPoints: 20, maxPoints: 20 })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+  });
+
+  it("rejects a learner asking for another learner's marks by asking as a parent", async () => {
+    const caller = appRouter.createCaller(contextFor("learner"));
+    await expect(caller.parent.paperGrades()).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+  });
+
+  it("refuses to grade a paper with neither a saved scale nor a pasted one", async () => {
+    const caller = appRouter.createCaller(contextFor("teacher"));
+    // Input validation, before any API call is made or any money is spent.
+    await expect(
+      caller.teacher.gradeStudentPaper({
+        studentAnswerText: "المميز يساوي 25",
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
   it("rejects learner access to parent links", async () => {
     const caller = appRouter.createCaller(contextFor("learner"));
     await expect(caller.parent.links()).rejects.toMatchObject({

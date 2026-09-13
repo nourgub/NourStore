@@ -206,9 +206,22 @@ dans `server/prompts/`) :
   note définitive — la phrase du prompt voyage avec la réponse de l'API
   (`PROVISIONAL_GRADING_NOTICE`) pour qu'aucune interface ne puisse la
   supprimer discrètement.
-- Rien n'est enregistré en base : plans, sujets, barèmes et notes vivent dans
-  l'onglet du professeur jusqu'à ce qu'il les copie. Les persister serait un
-  changement de schéma, à décider explicitement.
+- **Stockage (migration `0025_add_teacher_assistant_storage.sql`)** : plans,
+  sujets, barèmes et copies corrigées sont enregistrés sous le compte du
+  professeur (`lessonPlans`, `examPapers`, `examSolutionSets`,
+  `paperGrades`). Chaque requête est filtrée par `teacherId` (un admin
+  passe outre) — `server/db/teacherAssistant.ts` ne contient aucune lecture
+  non filtrée, vérifié par `server/realDbTeacherAssistant.e2e.test.ts` contre
+  un vrai MySQL. Sans `DATABASE_URL`, l'enregistrement devient un no-op et
+  l'assistant continue de fonctionner : la réponse renvoie `id: null` et
+  l'interface prévient que le résultat n'est pas sauvegardé.
+- **Une note proposée n'est jamais la note de l'élève.** Une copie corrigée
+  est stockée en `draft`, visible du seul professeur ; elle ne devient une
+  note que lorsqu'il la relit et la saisit lui-même (`reviewPaperGrade`) —
+  c'est à ce moment, et pas avant, que l'élève et ses parents liés sont
+  notifiés. Le chiffre proposé n'est jamais extrait automatiquement du
+  rapport, et un barème dont dépendent des notes définitives ne peut pas
+  être supprimé.
 
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 

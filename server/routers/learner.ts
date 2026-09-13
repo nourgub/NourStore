@@ -5,6 +5,7 @@ import {
   createParentInvite,
   cancelParentInvite,
   getReportsForLearner,
+  getPaperGradesForLearner,
 } from "../db";
 
 export const learnerRouter = router({
@@ -22,5 +23,11 @@ export const learnerRouter = router({
     ),
   myReports: learnerProcedure.query(({ ctx }) =>
     getReportsForLearner(ctx.user.id)
+  ),
+  // Marks from the teacher assistant's paper grading — reviewed ones only:
+  // a draft AI suggestion is never a learner's mark (see
+  // server/db/teacherAssistant.ts, markPaperGradeReviewed).
+  myPaperGrades: learnerProcedure.query(({ ctx }) =>
+    getPaperGradesForLearner(ctx.user.id)
   ),
 });

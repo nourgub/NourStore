@@ -1,7 +1,9 @@
 import {
   bigint,
+  boolean,
   index,
   int,
+  mediumtext,
   mysqlEnum,
   mysqlTable,
   text,
@@ -1176,3 +1178,144 @@ export const googleCalendarConnections = mysqlTable("googleCalendarConnections",
 });
 
 export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Teacher assistant (Claude) — what the four modules produce, kept so a
+// teacher does not lose a lesson plan, an exam or a correction session when
+// they close the tab. Every row belongs to exactly one teacher (teacherId)
+// and is only ever readable by that teacher or an admin — see
+// server/db/teacherAssistant.ts, which scopes every query by owner.
+//
+// The generated bodies are MEDIUMTEXT, not TEXT: a full model solution with a
+// per-step grading scale for a whole paper runs well past TEXT's 64 KB once
+// Arabic is counted at ~2 bytes per character, and MySQL would silently
+// truncate it.
+// ---------------------------------------------------------------------------
+
+export const lessonPlans = mysqlTable(
+  "lessonPlans",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    level: varchar("level", { length: 80 }).notNull(),
+    topic: varchar("topic", { length: 160 }).notNull(),
+    durationMinutes: int("durationMinutes").notNull(),
+    priorKnowledge: text("priorKnowledge"),
+    content: mediumtext("content").notNull(),
+    model: varchar("model", { length: 64 }).notNull(),
+    // The generation hit max_tokens — the plan is incomplete, and says so
+    // wherever it is shown, instead of looking like a finished one.
+    truncated: boolean("truncated").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherIdx: index("lessonPlans_teacherId_idx").on(table.teacherId),
+  })
+);
+
+export type LessonPlan = typeof lessonPlans.$inferSelect;
+
+export const examPapers = mysqlTable(
+  "examPapers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    level: varchar("level", { length: 80 }).notNull(),
+    // The requested units, newline-separated exactly as the teacher entered
+    // them — stored as written so a saved paper can be regenerated with the
+    // same input, not normalised into an id nobody chose.
+    topics: text("topics").notNull(),
+    durationMinutes: int("durationMinutes").notNull(),
+    totalPoints: int("totalPoints").notNull(),
+    content: mediumtext("content").notNull(),
+    model: varchar("model", { length: 64 }).notNull(),
+    truncated: boolean("truncated").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherIdx: index("examPapers_teacherId_idx").on(table.teacherId),
+  })
+);
+
+export type ExamPaper = typeof examPapers.$inferSelect;
+
+// One model solution + grading scale, for one paper. examPaperId is set when
+// it was produced from a saved paper and null when the teacher pasted their
+// own exam text, so both routes are first-class.
+export const examSolutionSets = mysqlTable(
+  "examSolutionSets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    examPaperId: int("examPaperId").references(() => examPapers.id),
+    examText: mediumtext("examText").notNull(),
+    // The JSON as returned. Stored even when it could not be parsed, with
+    // parseError saying why — losing a full model solution to a stray
+    // character would be worse than storing text a human has to fix.
+    solutionsJson: mediumtext("solutionsJson").notNull(),
+    parseError: text("parseError"),
+    questionCount: int("questionCount"),
+    // Sum of the grading scale's own steps, so a teacher can see at a glance
+    // whether it adds up to the paper's total.
+    scaleTotalPoints: int("scaleTotalPoints"),
+    model: varchar("model", { length: 64 }).notNull(),
+    truncated: boolean("truncated").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherIdx: index("examSolutionSets_teacherId_idx").on(table.teacherId),
+    paperIdx: index("examSolutionSets_examPaperId_idx").on(table.examPaperId),
+  })
+);
+
+export type ExamSolutionSet = typeof examSolutionSets.$inferSelect;
+
+// One student's paper, graded against a solution set. Rows start as "draft":
+// the AI report is a suggestion, and finalPoints stays null until a teacher
+// reviews it and commits a mark. Only then is anything shown to the learner
+// or their parents — see markPaperGradeReviewed.
+export const paperGrades = mysqlTable(
+  "paperGrades",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    solutionSetId: int("solutionSetId")
+      .notNull()
+      .references(() => examSolutionSets.id),
+    // Set when the paper belongs to a learner with an account on the
+    // platform; null for a paper graded off a paper roster.
+    learnerId: int("learnerId").references(() => users.id),
+    // Free-text name for a student without an account (or a seat number).
+    studentLabel: varchar("studentLabel", { length: 160 }),
+    answerText: mediumtext("answerText").notNull(),
+    report: mediumtext("report").notNull(),
+    model: varchar("model", { length: 64 }).notNull(),
+    truncated: boolean("truncated").default(false).notNull(),
+    status: mysqlEnum("status", ["draft", "reviewed"])
+      .default("draft")
+      .notNull(),
+    // The teacher's own mark, entered at review time. Deliberately NOT
+    // scraped out of the AI report: the mark a student receives is the one a
+    // human typed.
+    finalPoints: int("finalPoints"),
+    maxPoints: int("maxPoints"),
+    teacherNotes: text("teacherNotes"),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherIdx: index("paperGrades_teacherId_idx").on(table.teacherId),
+    learnerIdx: index("paperGrades_learnerId_idx").on(table.learnerId),
+    solutionSetIdx: index("paperGrades_solutionSetId_idx").on(table.solutionSetId),
+  })
+);
+
+export type PaperGrade = typeof paperGrades.$inferSelect;

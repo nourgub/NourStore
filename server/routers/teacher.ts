@@ -14,6 +14,26 @@ import { designMathExam } from "../examDesigner";
 import { solveMathExam } from "../examSolutions";
 import { gradeStudentPaper, PROVISIONAL_GRADING_NOTICE } from "../paperGrader";
 import {
+  deleteExamPaper,
+  deleteExamSolutionSet,
+  deleteLessonPlan,
+  deletePaperGrade,
+  getExamPaper,
+  getExamSolutionSet,
+  getLessonPlan,
+  getPaperGrade,
+  listExamPapers,
+  listExamSolutionSets,
+  listLessonPlans,
+  listPaperGrades,
+  markPaperGradeReviewed,
+  savePaperGrade,
+  saveExamPaper,
+  saveExamSolutionSet,
+  saveLessonPlan,
+  teacherOwnsLearner,
+} from "../db";
+import {
   getCoursesForRole,
   getManagedLearnerCount,
   getStudentsForTeacher,
@@ -101,7 +121,10 @@ export const teacherRouter = router({
     configured: isClaudeConfigured(),
     model: claudeModel(),
   })),
-  // 1 — تحضير الدروس
+  // 1 — تحضير الدروس. The generated plan is saved as it is produced, so
+  // closing the tab does not lose it; on a deployment with no DATABASE_URL
+  // the save is a no-op and `id` comes back null rather than failing the
+  // whole request.
   generateLessonPlan: teacherProcedure
     .use(rateLimit("teacher-generate-lesson-plan", 20, 60 * 60 * 1000))
     .input(
@@ -114,7 +137,38 @@ export const teacherRouter = router({
         priorKnowledge: z.string().max(2000).optional(),
       })
     )
-    .mutation(async ({ input }) => asMarkdown(await generateMathLessonPlan(input))),
+    .mutation(async ({ ctx, input }) => {
+      const plan = asMarkdown(await generateMathLessonPlan(input));
+      const id = await saveLessonPlan({
+        teacherId: ctx.user.id,
+        ...input,
+        content: plan.markdown,
+        model: plan.model,
+        truncated: plan.truncated,
+      });
+      return { id, ...plan };
+    }),
+  lessonPlans: teacherProcedure.query(({ ctx }) =>
+    listLessonPlans(ctx.user.id, teacherRole(ctx.user.role))
+  ),
+  lessonPlan: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) =>
+      mustExist(
+        await getLessonPlan(input.id, ctx.user.id, teacherRole(ctx.user.role))
+      )
+    ),
+  deleteLessonPlan: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await deleteLessonPlan(
+        input.id,
+        ctx.user.id,
+        teacherRole(ctx.user.role)
+      );
+      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      return { ok: true };
+    }),
   // 2 — تصميم الامتحانات (the paper only; solutions are a separate call)
   generateExam: teacherProcedure
     .use(rateLimit("teacher-generate-exam", 20, 60 * 60 * 1000))
@@ -126,16 +180,102 @@ export const teacherRouter = router({
         totalPoints: z.number().int().min(1).max(100).default(20),
       })
     )
-    .mutation(async ({ input }) => asMarkdown(await designMathExam(input))),
+    .mutation(async ({ ctx, input }) => {
+      const paper = asMarkdown(await designMathExam(input));
+      const id = await saveExamPaper({
+        teacherId: ctx.user.id,
+        ...input,
+        content: paper.markdown,
+        model: paper.model,
+        truncated: paper.truncated,
+      });
+      return { id, ...paper };
+    }),
+  examPapers: teacherProcedure.query(({ ctx }) =>
+    listExamPapers(ctx.user.id, teacherRole(ctx.user.role))
+  ),
+  examPaper: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) =>
+      mustExist(await getExamPaper(input.id, ctx.user.id, teacherRole(ctx.user.role)))
+    ),
+  deleteExamPaper: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await deleteExamPaper(
+        input.id,
+        ctx.user.id,
+        teacherRole(ctx.user.role)
+      );
+      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      return { ok: true };
+    }),
   // 3 — التصحيح النموذجي وسلم التنقيط. Returns the JSON parsed AND raw: when
   // the reply cannot be read as the agreed shape, the teacher still gets the
-  // text plus the reason, rather than losing a full model solution.
+  // text plus the reason, rather than losing a full model solution — and the
+  // row is saved either way, so a fixable JSON is not thrown away.
   generateExamSolutions: teacherProcedure
     .use(rateLimit("teacher-generate-exam-solutions", 20, 60 * 60 * 1000))
-    .input(z.object({ examText: z.string().min(20).max(20000) }))
-    .mutation(async ({ input }) => {
-      const result = await solveMathExam(input);
+    .input(
+      z.object({
+        examText: z.string().min(20).max(20000),
+        // Set when the text came from a paper generated here, so the two
+        // stay linked in the teacher's history.
+        examPaperId: z.number().int().positive().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.examPaperId !== undefined) {
+        mustExist(
+          await getExamPaper(
+            input.examPaperId,
+            ctx.user.id,
+            teacherRole(ctx.user.role)
+          )
+        );
+      }
+      const result = await solveMathExam({ examText: input.examText });
       if (!result.ok) throw assistantError(result);
+      const id = await saveExamSolutionSet({
+        teacherId: ctx.user.id,
+        examPaperId: input.examPaperId ?? null,
+        examText: input.examText,
+        solutionsJson: result.json,
+        parseError: result.parseError,
+        questionCount: result.questions?.length ?? null,
+        scaleTotalPoints: result.totalPoints,
+        model: result.model,
+        truncated: result.truncated,
+      });
+      return { id, ...result };
+    }),
+  examSolutionSets: teacherProcedure.query(({ ctx }) =>
+    listExamSolutionSets(ctx.user.id, teacherRole(ctx.user.role))
+  ),
+  examSolutionSet: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) =>
+      mustExist(
+        await getExamSolutionSet(input.id, ctx.user.id, teacherRole(ctx.user.role))
+      )
+    ),
+  deleteExamSolutionSet: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await deleteExamSolutionSet(
+        input.id,
+        ctx.user.id,
+        teacherRole(ctx.user.role)
+      );
+      if (!result.ok) {
+        if (result.reason === "has_reviewed_grades")
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "لا يمكن حذف سلم تنقيط استُعمل في نقاط نهائية سُلّمت للتلاميذ. احذف تلك النقاط أولاً إن كنت متأكداً.",
+          });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      }
       return result;
     }),
   // 4 — تصحيح أوراق التلاميذ, against the module 3 grading scale. Higher
@@ -144,16 +284,136 @@ export const teacherRouter = router({
   gradeStudentPaper: teacherProcedure
     .use(rateLimit("teacher-grade-student-paper", 120, 60 * 60 * 1000))
     .input(
+      z
+        .object({
+          // Either a saved grading scale…
+          solutionSetId: z.number().int().positive().optional(),
+          // …or one the teacher pasted in (their own, or from elsewhere).
+          solutionsJson: z.string().min(2).max(60000).optional(),
+          studentAnswerText: z.string().min(10).max(20000),
+          // Attaches the mark to a real account, which is what later lets the
+          // learner and their parents see it — checked against the teacher's
+          // own roster below.
+          learnerId: z.number().int().positive().optional(),
+          studentLabel: z.string().min(1).max(160).optional(),
+          maxPoints: z.number().int().min(1).max(100).optional(),
+        })
+        .refine(input => input.solutionSetId || input.solutionsJson, {
+          message: "Provide either solutionSetId or solutionsJson",
+        })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const role = teacherRole(ctx.user.role);
+      if (input.learnerId !== undefined) {
+        const owns = await teacherOwnsLearner(ctx.user.id, role, input.learnerId);
+        if (!owns)
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Student not found in one of your own courses",
+          });
+      }
+      let solutionSetId = input.solutionSetId ?? null;
+      let solutionsJson = input.solutionsJson ?? "";
+      if (solutionSetId !== null) {
+        const set = mustExist(
+          await getExamSolutionSet(solutionSetId, ctx.user.id, role)
+        );
+        solutionsJson = set.solutionsJson;
+      }
+      const report = asMarkdown(
+        await gradeStudentPaper({
+          solutionsJson,
+          studentAnswerText: input.studentAnswerText,
+        })
+      );
+      if (solutionSetId === null) {
+        // A pasted scale is stored as a solution set of its own before the
+        // grade references it: a mark must always keep a record of what it
+        // was graded against, which is the evidence behind it.
+        solutionSetId = await saveExamSolutionSet({
+          teacherId: ctx.user.id,
+          examText: "",
+          solutionsJson,
+          model: report.model,
+          truncated: false,
+        });
+      }
+      const id =
+        solutionSetId === null
+          ? null
+          : await savePaperGrade({
+              teacherId: ctx.user.id,
+              solutionSetId,
+              learnerId: input.learnerId ?? null,
+              studentLabel: input.studentLabel ?? null,
+              answerText: input.studentAnswerText,
+              report: report.markdown,
+              model: report.model,
+              truncated: report.truncated,
+              maxPoints: input.maxPoints ?? null,
+            });
+      return {
+        id,
+        solutionSetId,
+        ...report,
+        // Travels with the result so no UI can quietly drop the caveat.
+        provisional: PROVISIONAL_GRADING_NOTICE,
+      };
+    }),
+  paperGrades: teacherProcedure
+    .input(
+      z
+        .object({ solutionSetId: z.number().int().positive().optional() })
+        .optional()
+    )
+    .query(({ ctx, input }) =>
+      listPaperGrades(ctx.user.id, teacherRole(ctx.user.role), {
+        solutionSetId: input?.solutionSetId,
+      })
+    ),
+  paperGrade: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) =>
+      mustExist(await getPaperGrade(input.id, ctx.user.id, teacherRole(ctx.user.role)))
+    ),
+  deletePaperGrade: teacherProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await deletePaperGrade(
+        input.id,
+        ctx.user.id,
+        teacherRole(ctx.user.role)
+      );
+      if (!deleted) throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      return { ok: true };
+    }),
+  // The only way a mark becomes real: the teacher types it, and only then is
+  // the learner (and every actively-linked parent) notified.
+  reviewPaperGrade: teacherProcedure
+    .input(
       z.object({
-        solutionsJson: z.string().min(2).max(60000),
-        studentAnswerText: z.string().min(10).max(20000),
+        id: z.number().int().positive(),
+        finalPoints: z.number().int().min(0).max(100),
+        maxPoints: z.number().int().min(1).max(100),
+        teacherNotes: z.string().max(2000).optional(),
       })
     )
-    .mutation(async ({ input }) => ({
-      ...asMarkdown(await gradeStudentPaper(input)),
-      // Travels with the result so no UI can quietly drop the caveat.
-      provisional: PROVISIONAL_GRADING_NOTICE,
-    })),
+    .mutation(async ({ ctx, input }) => {
+      const result = await markPaperGradeReviewed({
+        ...input,
+        teacherId: ctx.user.id,
+        role: teacherRole(ctx.user.role),
+      });
+      if (!result.ok) {
+        if (result.reason === "invalid_mark")
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "النقطة يجب أن تكون بين 0 والنقطة القصوى.",
+          });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      }
+      return result;
+    }),
   sendReport: teacherProcedure
     .use(rateLimit("teacher-send-report", 60, 60 * 60 * 1000))
     .input(
@@ -206,4 +466,20 @@ function asMarkdown(result: ClaudeTextResult) {
     model: result.model,
     truncated: result.truncated,
   };
+}
+
+/** Narrows ctx.user.role to the three roles the teacher endpoints allow through. */
+function teacherRole(role: string) {
+  return role as "teacher" | "institution" | "admin";
+}
+
+/**
+ * Turns "no row, or not yours" into a 404 — deliberately the same answer for
+ * both, so an id that belongs to another teacher is indistinguishable from
+ * one that does not exist.
+ */
+function mustExist<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+  return value;
 }
