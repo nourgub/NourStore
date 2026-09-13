@@ -145,6 +145,30 @@ https://slick-pay.com sans agrément commercial préalable.
   côté code indépendamment de l'API réelle — voir
   `server/slickpayProvider.test.ts`.
 
+## Chargily Pay — API publique réelle, entièrement confirmée et implémentée
+
+Contrairement à SlickPay, la documentation officielle de Chargily
+(https://dev.chargily.com/pay-v2/api-reference) est entièrement
+accessible et confirme tous les détails nécessaires — `server/
+chargilyProvider.ts` contient donc une implémentation réelle et complète,
+pas une ébauche.
+
+- `CHARGILY_SECRET_KEY` — clé secrète récupérée sur
+  https://pay.chargily.com/dashboard/developers-corner (les clés de test
+  commencent par `test_sk_`).
+- `CHARGILY_SANDBOX` — `true` (défaut) pour `pay.chargily.net/test/api/v2`,
+  `false` pour `pay.chargily.net/api/v2` une fois une clé réelle (non
+  `test_sk_`) en place.
+- Le webhook (`checkout.paid` / `checkout.failed` / `checkout.canceled`)
+  est déjà câblé dans `server/paymentsWebhook.ts`, avec vérification réelle
+  de la signature HMAC-SHA256 (en-tête `signature`, même clé secrète).
+- Même contrainte réglementaire que BaridiMob/SlickPay : DZD uniquement.
+  Chargily supporte aussi USD/EUR nativement, mais ce serait un choix de
+  politique commerciale délibéré à faire explicitement, pas un défaut ici.
+- Tant que `CHARGILY_SECRET_KEY` est vide, `/pricing` affiche un message
+  honnête plutôt qu'un faux succès — vérifié par
+  `server/chargilyProvider.test.ts`.
+
 ## Paiement manuel via WhatsApp (bot + vérification humaine)
 
 Alternative pleinement fonctionnelle à BaridiMob, contrairement à ce dernier
