@@ -27,8 +27,11 @@ import {
   saveExamSolutionSet,
   saveLessonPlan,
   teacherOwnsLearner,
+  recordAssistantUsage,
+  getAssistantUsageSummary,
 } from "./db/teacherAssistant";
 import {
+  assistantUsage,
   courseEnrollments,
   courses,
   examPapers,
@@ -266,7 +269,15 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
       teacherNotes: "منهجية سليمة، انتبه للحساب.",
     });
     // The learner and the one actively-linked parent are both notified.
-    expect(reviewed).toEqual({ ok: true, notified: 2 });
+    expect(reviewed.ok).toBe(true);
+    expect(reviewed).toMatchObject({ ok: true, notified: 2 });
+    // The pre-review state travels back so the router can write an audit
+    // record of what the assistant proposed against what the teacher set.
+    if (reviewed.ok) {
+      expect(reviewed.previous.alreadyReviewed).toBe(false);
+      expect(reviewed.previous.finalPoints).toBeNull();
+      expect(reviewed.previous.learnerId).toBe(learner.id);
+    }
 
     const learnerView = await getPaperGradesForLearner(learner.id);
     expect(learnerView).toHaveLength(1);
@@ -285,7 +296,10 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
       finalPoints: 16,
       maxPoints: 20,
     });
-    expect(corrected).toEqual({ ok: true, notified: 0 });
+    // A second review re-notifies nobody, and says it was already reviewed —
+    // which is what marks the audit record as a correction, not a first mark.
+    expect(corrected).toMatchObject({ ok: true, notified: 0 });
+    if (corrected.ok) expect(corrected.previous.alreadyReviewed).toBe(true);
     expect((await getPaperGradesForLearner(learner.id))[0].finalPoints).toBe(
       16
     );
@@ -400,6 +414,45 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
     expect(await getReference(examOnly!, teacherA.id, "teacher")).toBeNull();
   });
 
+  it("records what each module consumed, and reports it per teacher", async () => {
+    await recordAssistantUsage({
+      teacherId: teacherA.id,
+      module: "lesson",
+      model: "claude-test",
+      inputTokens: 700,
+      outputTokens: 1200,
+      ok: true,
+    });
+    await recordAssistantUsage({
+      teacherId: teacherA.id,
+      module: "lesson",
+      model: "claude-test",
+      inputTokens: 100,
+      outputTokens: 0,
+      ok: false,
+    });
+    await recordAssistantUsage({
+      teacherId: teacherB.id,
+      module: "grading",
+      model: "claude-test",
+      inputTokens: 5000,
+      outputTokens: 5000,
+      ok: true,
+    });
+
+    const mine = await getAssistantUsageSummary(teacherA.id);
+    expect(mine.totals.requests).toBe(2);
+    // A refused call is usage too — it is counted and marked, not hidden.
+    expect(mine.totals.failed).toBe(1);
+    expect(mine.totals.inputTokens).toBe(800);
+    expect(mine.totals.outputTokens).toBe(1200);
+    expect(mine.byModule.map(row => row.module)).toEqual(["lesson"]);
+    // Another teacher's consumption is never folded into this one's.
+    const theirs = await getAssistantUsageSummary(teacherB.id);
+    expect(theirs.totals.requests).toBe(1);
+    expect(theirs.totals.inputTokens).toBe(5000);
+  });
+
   afterAll(async () => {
     if (!HAS_DB) return;
     const db = await mustGetDb();
@@ -411,6 +464,9 @@ describe.skipIf(!HAS_DB)("REAL DB — teacher assistant storage", () => {
     ].filter((id): id is number => typeof id === "number");
     if (!userIds.length) return;
     // Fixture cleanup only — never done this way in application code.
+    await db
+      .delete(assistantUsage)
+      .where(inArray(assistantUsage.teacherId, userIds));
     await db
       .delete(teacherReferences)
       .where(inArray(teacherReferences.teacherId, userIds));

@@ -70,6 +70,23 @@ export async function localReadBytes(relKey: string): Promise<Buffer | null> {
   }
 }
 
+/**
+ * Removes a stored object. A key that is already gone counts as success — the
+ * caller's goal is "this file is not on disk any more", and a row whose file
+ * vanished underneath it must still be deletable.
+ */
+export async function localDelete(relKey: string): Promise<boolean> {
+  const key = normalizeKey(relKey);
+  try {
+    await fs.unlink(path.join(UPLOAD_ROOT, key));
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    console.error("[Storage] failed to delete local object:", key, error);
+    return false;
+  }
+}
+
 /** No presigning concept for local disk storage — this key-shaped path is never served as-is; every real caller rewrites it to the authenticated proxy path (server/protectedFiles.ts) before handing it to a client. */
 export async function localGetSignedUrl(relKey: string): Promise<string> {
   return `/local-storage/${normalizeKey(relKey)}`;

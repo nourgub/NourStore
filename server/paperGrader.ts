@@ -51,3 +51,60 @@ export function gradeStudentPaper(
     attachments,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Reading the proposed total back out of the report
+// ---------------------------------------------------------------------------
+//
+// For ONE purpose: the audit record written when a teacher confirms a mark
+// (server/routers/teacher.ts) should be able to say whether the human agreed
+// with the machine or overruled it. It is never used to fill a mark in, never
+// shown as a mark, and never sent to a learner — the teacher types the mark,
+// always.
+//
+// The prompt asks for a free-form Arabic report ending in a total line, not
+// for JSON, so this is best-effort by construction and therefore deliberately
+// narrow: it reads a "number/number" only from a line that names the total, so
+// a per-question "3/5" is never mistaken for the paper's mark. When the report
+// does not state its total plainly the answer is null — an honest "unknown"
+// beats a confident wrong number in an audit log.
+
+export type SuggestedMark = { points: number; maxPoints: number };
+
+/**
+ * Arabic-Indic digits turn up in generated reports as often as Latin ones, and
+ * so does the Arabic decimal separator (١٣٫٥).
+ */
+function toLatinDigits(text: string): string {
+  return text.replace(/[\u0660-\u0669\u06f0-\u06f9\u066b]/g, character => {
+    const code = character.charCodeAt(0);
+    if (code === 0x066b) return ".";
+    return String(code - (code >= 0x06f0 ? 0x06f0 : 0x0660));
+  });
+}
+
+const TOTAL_LINE =
+  /النقطة\s+(?:الإجمالية|النهائية|الكلية)|المجموع\s+(?:العام|الكلي|النهائي)|(?:^|[|\s])المجموع(?:$|[\s:|])/;
+const FRACTION = /(\d+(?:[.,]\d+)?)\s*\/\s*(\d+(?:[.,]\d+)?)/;
+
+/**
+ * The total the report proposes, or null when it does not state one in a form
+ * this can read without guessing.
+ */
+export function suggestedMarkFromReport(report: string): SuggestedMark | null {
+  const lines = toLatinDigits(report).split(/\r?\n/);
+  // Last match wins: the total is written at the end, after the per-question
+  // rows, and a report that repeats it repeats the same number.
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!TOTAL_LINE.test(line)) continue;
+    const match = line.match(FRACTION);
+    if (!match) continue;
+    const points = Number(match[1].replace(",", "."));
+    const maxPoints = Number(match[2].replace(",", "."));
+    if (!Number.isFinite(points) || !Number.isFinite(maxPoints)) continue;
+    if (maxPoints <= 0 || points < 0 || points > maxPoints) continue;
+    return { points, maxPoints };
+  }
+  return null;
+}

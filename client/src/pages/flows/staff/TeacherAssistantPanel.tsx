@@ -16,7 +16,7 @@
 // MARK: a graded paper is stored as a draft, and only the review box below —
 // where a human types the mark — makes it real and notifies the learner.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowLeftRight,
@@ -26,12 +26,14 @@ import {
   FileCheck2,
   FilePenLine,
   Paperclip,
+  Sigma,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { renderMathText } from "@shared/mathText";
 import { trpc } from "@/lib/trpc";
 import { type Lang } from "../shared";
 
@@ -81,10 +83,68 @@ function base64OfBytes(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// A phone photo of an exam paper is routinely 4-8 MB, which on a school's
+// connection is a minute of waiting and, past the server's limit, a rejected
+// upload. Re-encoding it in the browser keeps the page legible for the model
+// (2000px on the long edge is well above what reading handwriting needs) and
+// cuts the upload to a fraction. Anything that fails here — an old browser, a
+// picture the canvas cannot decode — falls back to the original file rather
+// than losing it.
+const COMPRESSIBLE_IMAGES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const COMPRESS_ABOVE_BYTES = 900_000;
+const MAX_IMAGE_EDGE = 2000;
+
+async function compressImage(
+  file: File
+): Promise<{ bytes: Uint8Array; fileName: string; mimeType: string } | null> {
+  try {
+    if (typeof createImageBitmap !== "function") return null;
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(
+      1,
+      MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height)
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    // A transparent PNG would flatten to black on JPEG; white is the paper.
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, "image/jpeg", 0.82)
+    );
+    if (!blob || blob.size >= file.size) return null;
+    const base = file.name.replace(/\.[^.]+$/, "") || "image";
+    return {
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      // The server cross-checks the extension against the MIME type and the
+      // magic bytes, so a re-encoded file must be named for what it now is.
+      fileName: `${base}.jpg`,
+      mimeType: "image/jpeg",
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function readPickedFile(file: File): Promise<PickedFile | null> {
   const extension = file.name.toLowerCase().split(".").pop() ?? "";
   const mimeType = MIME_BY_EXTENSION[extension];
   if (!mimeType) return null;
+  if (COMPRESSIBLE_IMAGES.has(mimeType) && file.size > COMPRESS_ABOVE_BYTES) {
+    const smaller = await compressImage(file);
+    if (smaller)
+      return {
+        fileName: smaller.fileName,
+        mimeType: smaller.mimeType,
+        dataBase64: base64OfBytes(smaller.bytes),
+        sizeBytes: smaller.bytes.byteLength,
+      };
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
   return {
     fileName: file.name,
@@ -242,6 +302,16 @@ const L = {
   working: { ar: "جاري العمل…", fr: "En cours…", en: "Working…" },
   copy: { ar: "نسخ النتيجة", fr: "Copier", en: "Copy result" },
   copied: { ar: "تم النسخ.", fr: "Copié.", en: "Copied." },
+  showRaw: {
+    ar: "النص الأصلي",
+    fr: "Texte source",
+    en: "Raw text",
+  },
+  showRendered: {
+    ar: "عرض الرموز الرياضية",
+    fr: "Maths affichées",
+    en: "Rendered maths",
+  },
   truncated: {
     ar: "النتيجة طويلة وتم قطعها قبل نهايتها — ضيّق المعطيات ثم أعد المحاولة.",
     fr: "Résultat tronqué — réduisez la demande puis relancez.",
@@ -410,6 +480,42 @@ const L = {
     ar: "تم تصحيح الأوراق كمسودات — راجع كل واحدة واعتمد نقطتها.",
     fr: "Copies corrigées en brouillon — relisez et validez chaque note.",
     en: "Papers graded as drafts — review each and confirm its mark.",
+  },
+  batchProgress: {
+    ar: "جارٍ التصحيح: الورقة {done} من {total}…",
+    fr: "Correction en cours : copie {done} sur {total}…",
+    en: "Grading paper {done} of {total}…",
+  },
+  batchStop: { ar: "أوقف التصحيح", fr: "Arrêter", en: "Stop grading" },
+  batchStopped: {
+    ar: "توقّف التصحيح — الأوراق المصحَّحة محفوظة كمسودات، والباقي ما يزال مرفقاً.",
+    fr: "Correction arrêtée — les copies déjà corrigées sont enregistrées, les autres restent jointes.",
+    en: "Grading stopped — graded papers are saved as drafts and the rest are still attached.",
+  },
+  usageTitle: {
+    ar: "استهلاكك في آخر {days} يوماً",
+    fr: "Votre consommation sur {days} jours",
+    en: "Your usage over the last {days} days",
+  },
+  usageLine: {
+    ar: "{requests} طلباً ({failed} فشل) — {input} رمزاً داخلاً و{output} رمزاً خارجاً.",
+    fr: "{requests} requêtes ({failed} en échec) — {input} jetons en entrée, {output} en sortie.",
+    en: "{requests} requests ({failed} failed) — {input} input tokens, {output} output tokens.",
+  },
+  usageNone: {
+    ar: "لا استهلاك مسجَّل بعد.",
+    fr: "Aucune consommation enregistrée.",
+    en: "No usage recorded yet.",
+  },
+  usageNoPrice: {
+    ar: "بالرموز لا بالدينار: السعر يتغيّر حسب النموذج، وهذا البرنامج لا يعرفه فلا يخمّنه.",
+    fr: "En jetons, pas en dinars : le prix dépend du modèle et cette application ne l'invente pas.",
+    en: "In tokens, not money: prices change per model, and this app does not invent a figure it does not know.",
+  },
+  privacy: {
+    ar: "تنبيه خصوصية: تُرسَل أوراق التلاميذ وأسماؤها إلى واجهة Claude لدى Anthropic لتحليلها، ولا تُستعمل في تدريب النماذج. غطِّ ما لا يلزم من بيانات شخصية قبل التصوير، واحذف الأوراق من المحفوظات عند انتهاء الحاجة.",
+    fr: "Confidentialité : les copies et les noms des élèves sont envoyés à l'API Claude d'Anthropic pour analyse et ne servent pas à entraîner les modèles. Masquez les données personnelles inutiles avant la photo et supprimez les copies de l'historique une fois inutiles.",
+    en: "Privacy: pupils' papers and names are sent to Anthropic's Claude API for analysis and are not used to train the models. Cover any personal data that isn't needed before photographing, and delete papers from the history once you are done.",
   },
 } as const;
 
@@ -654,6 +760,32 @@ function HistoryList({
   );
 }
 
+function UsageSummary({ lang }: { lang: Lang }) {
+  // Requests and tokens, never a money figure: the price of a token is not
+  // something this codebase knows, and a made-up total would be worse than no
+  // total at all.
+  const usage = trpc.teacher.assistantUsage.useQuery();
+  const data = usage.data;
+  if (!data) return null;
+  const number = (value: number) => value.toLocaleString("en-US");
+  return (
+    <div className="invite-box" style={{ marginTop: 12, flexWrap: "wrap" }}>
+      <p className="quiet-label" style={{ margin: 0 }}>
+        {t(L.usageTitle, lang).replace("{days}", String(data.sinceDays))}
+        {" — "}
+        {data.totals.requests === 0
+          ? t(L.usageNone, lang)
+          : t(L.usageLine, lang)
+              .replace("{requests}", number(data.totals.requests))
+              .replace("{failed}", number(data.totals.failed))
+              .replace("{input}", number(data.totals.inputTokens))
+              .replace("{output}", number(data.totals.outputTokens))}
+        {data.totals.requests > 0 && ` ${t(L.usageNoPrice, lang)}`}
+      </p>
+    </div>
+  );
+}
+
 function ResultBox({
   lang,
   value,
@@ -667,6 +799,13 @@ function ResultBox({
   saved?: boolean;
   children?: React.ReactNode;
 }) {
+  // The prompts ask Claude for $...$ formulas and nothing here renders LaTeX,
+  // so by default the teacher sees real maths (x², √Δ, ≤). The raw view stays
+  // one click away because that is the text the next module receives.
+  const [raw, setRaw] = useState(false);
+  const rendered = renderMathText(value);
+  const shown = raw ? value : rendered;
+  const changed = rendered !== value;
   return (
     <>
       {truncated && (
@@ -685,14 +824,14 @@ function ResultBox({
         dir="rtl"
         readOnly
         aria-label={t(L.title, lang)}
-        value={value}
+        value={shown}
       />
       <div className="invite-box" style={{ marginTop: 10 }}>
         <Button
           className="quiet-button"
           onClick={() => {
             navigator.clipboard
-              .writeText(value)
+              .writeText(shown)
               .then(() => toast.success(t(L.copied, lang)))
               .catch(() => toast.error(t(L.copy, lang)));
           }}
@@ -700,6 +839,12 @@ function ResultBox({
           {t(L.copy, lang)}
           <Copy size={15} />
         </Button>
+        {changed && (
+          <Button className="quiet-button" onClick={() => setRaw(!raw)}>
+            {t(raw ? L.showRendered : L.showRaw, lang)}
+            <Sigma size={15} />
+          </Button>
+        )}
         {children}
       </div>
     </>
@@ -789,6 +934,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
       setLessonResult(result);
       setSkipped(result.skippedFiles ?? []);
       utils.teacher.lessonPlans.invalidate();
+      utils.teacher.assistantUsage.invalidate();
     },
     onError,
   });
@@ -797,6 +943,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
       setExamResult(result);
       setSkipped(result.skippedFiles ?? []);
       utils.teacher.examPapers.invalidate();
+      utils.teacher.assistantUsage.invalidate();
     },
     onError,
   });
@@ -805,6 +952,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
       setSolutionsResult(result);
       setSkipped(result.skippedFiles ?? []);
       utils.teacher.examSolutionSets.invalidate();
+      utils.teacher.assistantUsage.invalidate();
     },
     onError,
   });
@@ -815,6 +963,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
       setSolutionSetId(result.solutionSetId);
       utils.teacher.paperGrades.invalidate();
       utils.teacher.examSolutionSets.invalidate();
+      utils.teacher.assistantUsage.invalidate();
     },
     onError,
   });
@@ -837,15 +986,58 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
       downloadBase64(file.fileName, file.contentType, file.dataBase64),
     onError,
   });
-  const batchGrade = trpc.teacher.gradeStudentPapersBatch.useMutation({
-    onSuccess: result => {
-      setSkipped(result.skippedFiles ?? []);
-      toast.success(t(L.batchDone, lang));
-      setGradingFiles([]);
+  // One paper per request, in a loop here rather than one long request on the
+  // server: a class of thirty is thirty short calls whose results are each
+  // saved the moment they arrive, so a dropped connection or a closed laptop
+  // costs the paper in flight and nothing else. The paper leaves the picker as
+  // soon as it is graded, which is also what makes "stop" and "resume" mean
+  // something.
+  const batchGrade = trpc.teacher.gradeStudentPapersBatch.useMutation();
+  const [batchProgress, setBatchProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const stopBatch = useRef(false);
+  const runBatch = async (solutionSetId: number) => {
+    const queue = [...gradingFiles];
+    const problems: SkippedFile[] = [];
+    stopBatch.current = false;
+    setSkipped([]);
+    setBatchProgress({ done: 0, total: queue.length });
+    let index = 0;
+    for (const file of queue) {
+      if (stopBatch.current) {
+        toast.message(t(L.batchStopped, lang));
+        break;
+      }
+      try {
+        const result = await batchGrade.mutateAsync({
+          solutionSetId,
+          files: [file],
+          maxPoints: asInt(maxPoints) || undefined,
+        });
+        problems.push(...(result.skippedFiles ?? []));
+        for (const paper of result.graded)
+          if (!paper.ok) problems.push({ name: paper.name, reason: paper.error });
+      } catch (error) {
+        // A failure on one paper must not abandon the rest of the class.
+        problems.push({
+          name: file.fileName,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+      index += 1;
+      setBatchProgress({ done: index, total: queue.length });
+      setGradingFiles(current =>
+        current.filter(picked => picked !== file)
+      );
+      setSkipped([...problems]);
       utils.teacher.paperGrades.invalidate();
-    },
-    onError,
-  });
+      utils.teacher.assistantUsage.invalidate();
+    }
+    setBatchProgress(null);
+    if (!stopBatch.current) toast.success(t(L.batchDone, lang));
+  };
   /** Word/PDF buttons for one saved row — hidden when the row was not saved. */
   const ExportButtons = ({
     kind,
@@ -947,6 +1139,7 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
         <Sparkles size={18} />
       </div>
       <ReferenceLibrary lang={lang} />
+      <UsageSummary lang={lang} />
       <div className="invite-box" style={{ flexWrap: "wrap", marginTop: 14 }}>
         {MODES.map(entry => (
           <Button
@@ -1304,6 +1497,12 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
             files={gradingFiles}
             setFiles={setGradingFiles}
           />
+          {/* A pupil's paper carries their handwriting and often their name.
+              Where it goes is the teacher's responsibility to know before they
+              upload it, not something to discover in a policy page. */}
+          <p className="quiet-label" style={{ marginTop: 10 }}>
+            {t(L.privacy, lang)}
+          </p>
           <div className="admin-form-grid">
             <select
               value={learnerId}
@@ -1375,16 +1574,23 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
                   toast.error(t(L.batchNeedsScale, lang));
                   return;
                 }
-                batchGrade.mutate({
-                  solutionSetId,
-                  files: gradingFiles,
-                  maxPoints: asInt(maxPoints) || undefined,
-                });
+                void runBatch(solutionSetId);
               }}
             >
               {t(L.batch, lang)}
               <ClipboardCheck size={15} />
             </Button>
+            {batchProgress && (
+              <Button
+                className="quiet-button"
+                onClick={() => {
+                  stopBatch.current = true;
+                }}
+              >
+                {t(L.batchStop, lang)}
+                <X size={15} />
+              </Button>
+            )}
             <Button
               className="quiet-button"
               disabled={exportMarks.isPending}
@@ -1398,6 +1604,13 @@ export function TeacherAssistantPanel({ lang }: { lang: Lang }) {
               <Download size={15} />
             </Button>
           </div>
+          {batchProgress && (
+            <p className="quiet-label" style={{ marginTop: 10 }}>
+              {t(L.batchProgress, lang)
+                .replace("{done}", String(batchProgress.done))
+                .replace("{total}", String(batchProgress.total))}
+            </p>
+          )}
           <SkippedNotice lang={lang} skipped={skipped} />
           {gradingResult && (
             <>

@@ -28,8 +28,13 @@ import {
   HeadingLevel,
   Packer,
   Paragraph,
+  Table,
+  TableCell,
+  TableRow,
   TextRun,
+  WidthType,
 } from "docx";
+import { renderMathText } from "../../shared/mathText";
 
 export type ExportFormat = "docx" | "pdf" | "xlsx";
 
@@ -51,6 +56,7 @@ type Line =
   | { type: "heading"; level: 1 | 2 | 3; text: string }
   | { type: "bullet"; text: string }
   | { type: "blank" }
+  | { type: "row"; cells: string[]; header: boolean }
   | { type: "text"; text: string };
 
 /** Reads the modules' Markdown-ish output into the few shapes worth styling. */
@@ -63,9 +69,24 @@ export function parseLines(body: string): Line[] {
       .replace(/\*\*(.+?)\*\*/g, "$1")
       .replace(/(^|\s)\*(\S.*?\S|\S)\*(?=\s|$)/g, "$1$2")
       .trim();
-  return body.split(/\r?\n/).map<Line>(raw => {
+  // Maths first: the $...$ spans become readable Unicode before anything is
+  // split into lines or cells.
+  const lines = renderMathText(body).split(/\r?\n/);
+  return lines.map<Line>((raw, index) => {
     const line = raw.trim();
     if (!line) return { type: "blank" };
+    // A Markdown table row: | المرحلة | النشاط | الزمن |. The separator row
+    // (|---|---|) marks the line above it as the header and is itself
+    // dropped — printing "---" inside a Word table would be absurd.
+    if (/^\|.*\|$/.test(line)) {
+      const cells = line.slice(1, -1).split("|").map(text => plain(text));
+      if (cells.every(text => /^:?-{2,}:?$/.test(text.replace(/\s/g, "")))) {
+        return { type: "blank" };
+      }
+      const next = (lines[index + 1] ?? "").trim();
+      const header = /^\|[\s:|-]+\|$/.test(next) && next.includes("-");
+      return { type: "row", cells, header };
+    }
     const heading = line.match(/^(#{1,3})\s+(.*)$/);
     if (heading)
       return {
@@ -93,14 +114,55 @@ export async function toDocx(title: string, body: string): Promise<Buffer> {
       alignment: AlignmentType.RIGHT,
       children: [new TextRun({ text, rightToLeft: true })],
     });
-  const paragraphs: Paragraph[] = [heading(title, 1)];
-  for (const line of parseLines(body)) {
+  const cell = (text: string, header: boolean) =>
+    new TableCell({
+      children: [
+        new Paragraph({
+          bidirectional: true,
+          alignment: AlignmentType.RIGHT,
+          children: [new TextRun({ text, rightToLeft: true, bold: header })],
+        }),
+      ],
+    });
+  const blocks: (Paragraph | Table)[] = [heading(title, 1)];
+  const lines = parseLines(body);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line.type === "row") {
+      // Consecutive row lines are ONE table. A timed lesson breakdown that
+      // prints as loose lines is exactly what a teacher would have to redo
+      // by hand before handing it in.
+      const rows: Extract<Line, { type: "row" }>[] = [];
+      while (index < lines.length) {
+        const candidate = lines[index];
+        if (candidate.type !== "row") break;
+        rows.push(candidate);
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(
+        new Table({
+          visuallyRightToLeft: true,
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: rows.map(
+            (row, rowIndex) =>
+              new TableRow({
+                tableHeader: rowIndex === 0 && row.header,
+                children: row.cells.map(text =>
+                  cell(text, rowIndex === 0 && row.header)
+                ),
+              })
+          ),
+        })
+      );
+      continue;
+    }
     if (line.type === "blank") {
-      paragraphs.push(new Paragraph({ children: [] }));
+      blocks.push(new Paragraph({ children: [] }));
     } else if (line.type === "heading") {
-      paragraphs.push(heading(line.text, line.level === 1 ? 2 : line.level));
+      blocks.push(heading(line.text, line.level === 1 ? 2 : line.level));
     } else {
-      paragraphs.push(
+      blocks.push(
         new Paragraph({
           bidirectional: true,
           alignment: AlignmentType.RIGHT,
@@ -110,7 +172,7 @@ export async function toDocx(title: string, body: string): Promise<Buffer> {
       );
     }
   }
-  const document = new Document({ sections: [{ children: paragraphs }] });
+  const document = new Document({ sections: [{ children: blocks }] });
   return Packer.toBuffer(document);
 }
 
@@ -148,6 +210,11 @@ export function toPdf(title: string, body: string): Promise<Buffer> {
     else if (line.type === "heading")
       write(line.text, line.level === 1 ? 15 : 13, 0.4);
     else if (line.type === "bullet") write(`• ${line.text}`, 11, 0.2);
+    else if (line.type === "row")
+      // PDFKit has no table primitive; the cells are drawn as one
+      // right-aligned line with separators, which stays legible in print
+      // without pretending to be a ruled table.
+      write(line.cells.join("   |   "), line.header ? 11 : 10.5, 0.15);
     else write(line.text, 11, 0.2);
   }
   doc.end();

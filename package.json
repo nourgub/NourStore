@@ -17,7 +17,8 @@
     "test:db:repeat": "node scripts/test-db-repeat.mjs",
     "test:all": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "node scripts/migrate.mjs",
+    "assistant:smoke": "tsx scripts/assistant-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",

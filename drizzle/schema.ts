@@ -1367,3 +1367,41 @@ export const teacherReferences = mysqlTable(
 );
 
 export type TeacherReference = typeof teacherReferences.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// What the teacher assistant consumed, request by request (migration 0027).
+//
+// Tokens, not money: the counts come from the API response and are facts,
+// while prices change per model — so nothing here stores a dinar figure. A
+// failed call is recorded too, because a month of refusals should be visible.
+// ---------------------------------------------------------------------------
+
+export const assistantUsage = mysqlTable(
+  "assistantUsage",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    teacherId: int("teacherId")
+      .notNull()
+      .references(() => users.id),
+    module: mysqlEnum("module", [
+      "lesson",
+      "exam",
+      "solutions",
+      "grading",
+    ]).notNull(),
+    model: varchar("model", { length: 120 }).notNull(),
+    inputTokens: int("inputTokens").default(0).notNull(),
+    outputTokens: int("outputTokens").default(0).notNull(),
+    /** False for a refusal or a provider error: usage that produced nothing. */
+    ok: boolean("ok").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    teacherDateIdx: index("assistantUsage_teacher_date_idx").on(
+      table.teacherId,
+      table.createdAt
+    ),
+  })
+);
+
+export type AssistantUsageRow = typeof assistantUsage.$inferSelect;

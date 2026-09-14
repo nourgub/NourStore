@@ -1,7 +1,13 @@
 import { afterAll, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import path from "path";
-import { localPut, localGet, localGetSignedUrl, UPLOAD_ROOT } from "./local";
+import {
+  localPut,
+  localGet,
+  localGetSignedUrl,
+  localDelete,
+  UPLOAD_ROOT,
+} from "./local";
 
 describe("local filesystem storage (zero external service)", () => {
   it("writes a real file to disk and returns a resolvable URL", async () => {
@@ -37,6 +43,16 @@ describe("local filesystem storage (zero external service)", () => {
     const signed = await localGetSignedUrl("test/hello.txt");
     expect(got.url).toBe("/local-storage/test/hello.txt");
     expect(signed).toBe("/local-storage/test/hello.txt");
+  });
+
+  it("deletes the file from disk, and treats an already-missing key as done", async () => {
+    const written = await localPut("test/gone.txt", "bye", "text/plain");
+    const fullPath = path.join(UPLOAD_ROOT, written.key);
+    expect(await localDelete(written.key)).toBe(true);
+    await expect(fs.readFile(fullPath)).rejects.toThrow();
+    // "Delete what is already gone" is the state the caller wanted, not a
+    // failure — a row whose file vanished must still be deletable.
+    expect(await localDelete(written.key)).toBe(true);
   });
 
   afterAll(async () => {

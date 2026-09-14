@@ -90,6 +90,58 @@ describe("export rendering", () => {
     expect(sheet.getRow(3).getCell(4).value).toBe("مسودة");
   });
 
+  it("turns a Markdown table into a real Word table, not loose lines", async () => {
+    const withTable = `## سير الدرس
+| المرحلة | النشاط | الزمن |
+|---|---|---|
+| الانطلاق | وضعية مشكلة | 10 د |
+| البناء | حل تمارين | 25 د |`;
+    const lines = parseLines(withTable);
+    // The |---| separator is dropped and marks the row above it as the header.
+    expect(lines[1]).toEqual({
+      type: "row",
+      cells: ["المرحلة", "النشاط", "الزمن"],
+      header: true,
+    });
+    expect(lines[2]).toEqual({ type: "blank" });
+    expect(lines[3]).toEqual({
+      type: "row",
+      cells: ["الانطلاق", "وضعية مشكلة", "10 د"],
+      header: false,
+    });
+
+    const buffer = await toDocx("تحضير درس", withTable);
+    const files = unzipSync(new Uint8Array(buffer));
+    const xml = Buffer.from(files["word/document.xml"]).toString("utf8");
+    // A real <w:tbl> is the difference between a document the teacher prints
+    // and one they have to rebuild by hand.
+    expect(xml).toContain("<w:tbl>");
+    expect(xml).toContain("<w:tblHeader");
+    expect(xml).toContain("وضعية مشكلة");
+  });
+
+  it("renders $...$ maths as Unicode instead of printing LaTeX", async () => {
+    const withMaths = `الصيغة: $x^2 + 3x - 4 = 0$
+- المميز $\\Delta = b^2 - 4ac$
+- الحل $x_1 = \\frac{-b + \\sqrt{\\Delta}}{2a}$`;
+    const lines = parseLines(withMaths);
+    expect(lines[0]).toEqual({ type: "text", text: "الصيغة: x² + 3x - 4 = 0" });
+    expect(lines[1]).toEqual({ type: "bullet", text: "المميز Δ = b² - 4ac" });
+    expect(lines[2]).toEqual({
+      type: "bullet",
+      text: "الحل x₁ = (-b + √(Δ))/(2a)",
+    });
+
+    const buffer = await toDocx("درس", withMaths);
+    const xml = Buffer.from(
+      unzipSync(new Uint8Array(buffer))["word/document.xml"]
+    ).toString("utf8");
+    expect(xml).toContain("x² + 3x - 4 = 0");
+    // No raw LaTeX and no stray dollar signs survive into the file.
+    expect(xml).not.toContain("\\Delta");
+    expect(xml).not.toContain("$");
+  });
+
   it("keeps generated filenames safe for every OS", () => {
     expect(safeFileName('امتحان/2026: "الفصل"', "pdf")).toBe("امتحان 2026 الفصل.pdf");
     expect(safeFileName("   ", "docx")).toBe("nourix.docx");

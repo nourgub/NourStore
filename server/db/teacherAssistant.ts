@@ -15,9 +15,10 @@
 //      "draft" with finalPoints NULL; markPaperGradeReviewed is the only
 //      thing that sets a mark, and only then is anyone notified.
 
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import type { MySqlColumn } from "drizzle-orm/mysql-core";
 import {
+  assistantUsage,
   courseEnrollments,
   courses,
   examPapers,
@@ -459,7 +460,18 @@ export async function deletePaperGrade(
 }
 
 export type ReviewGradeResult =
-  | { ok: true; notified: number }
+  | {
+      ok: true;
+      notified: number;
+      /** What the row held before this review — the caller writes the audit record. */
+      previous: {
+        report: string;
+        model: string;
+        learnerId: number | null;
+        finalPoints: number | null;
+        alreadyReviewed: boolean;
+      };
+    }
   | { ok: false; reason: "not_found" | "invalid_mark" };
 
 /**
@@ -501,7 +513,15 @@ export async function markPaperGradeReviewed(input: {
       reviewedAt: new Date(),
     })
     .where(eq(paperGrades.id, input.id));
-  if (alreadyReviewed || !existing.learnerId) return { ok: true, notified: 0 };
+  const previous = {
+    report: existing.report,
+    model: existing.model,
+    learnerId: existing.learnerId,
+    finalPoints: existing.finalPoints,
+    alreadyReviewed,
+  };
+  if (alreadyReviewed || !existing.learnerId)
+    return { ok: true, notified: 0, previous };
 
   const title = `نتيجة جديدة: ${input.finalPoints}/${input.maxPoints}`;
   const body = input.teacherNotes?.trim() || "راجع ورقتك المصححة مع أستاذك.";
@@ -530,7 +550,7 @@ export async function markPaperGradeReviewed(input: {
     });
     notified += 1;
   }
-  return { ok: true, notified };
+  return { ok: true, notified, previous };
 }
 
 /** A learner's own reviewed marks. Drafts are never visible to anyone but the teacher. */
@@ -732,10 +752,11 @@ export async function updateReference(input: {
 }
 
 /**
- * Removes the row. The stored object is deliberately left in place: this
- * codebase has no storage-deletion path anywhere yet (lesson assets behave
- * the same), and quietly inventing one here — on a provider that might be a
- * shared bucket — is not a decision to make as a side effect.
+ * Removes the row. The uploaded file is removed too, but by the caller
+ * (server/routers/teacher.ts) using the row's storageKey: deleting the object
+ * is I/O against whichever provider is configured, and this layer stays
+ * database-only. A caller that skips it leaves an orphaned object, never a
+ * dangling row.
  */
 export async function deleteReference(
   id: number,
@@ -748,4 +769,119 @@ export async function deleteReference(
   if (!existing) return false;
   await db.delete(teacherReferences).where(eq(teacherReferences.id, id));
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Usage — what the assistant consumed (migration 0027)
+// ---------------------------------------------------------------------------
+
+export type AssistantModule4 = "lesson" | "exam" | "solutions" | "grading";
+
+/**
+ * Records one API call. Never throws: a teacher's lesson plan must not be lost
+ * because the accounting row failed to insert.
+ */
+export async function recordAssistantUsage(input: {
+  teacherId: number;
+  module: AssistantModule4;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  ok: boolean;
+}): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.insert(assistantUsage).values({
+      teacherId: input.teacherId,
+      module: input.module,
+      model: input.model,
+      inputTokens: input.inputTokens,
+      outputTokens: input.outputTokens,
+      ok: input.ok,
+    });
+  } catch (error) {
+    console.error("[AssistantUsage] failed to record usage:", error);
+  }
+}
+
+export type AssistantUsageSummary = {
+  sinceDays: number;
+  totals: { requests: number; failed: number; inputTokens: number; outputTokens: number };
+  byModule: {
+    module: AssistantModule4;
+    requests: number;
+    failed: number;
+    inputTokens: number;
+    outputTokens: number;
+  }[];
+};
+
+/**
+ * One teacher's own usage over a recent window. Tokens and request counts
+ * only — no money figure, because this codebase does not know the price of a
+ * token and would have to invent it.
+ *
+ * Deliberately NOT widened for admins: this answers "what have I used", and an
+ * admin asking about someone else's spend is a different feature with a
+ * different consent story.
+ */
+export async function getAssistantUsageSummary(
+  teacherId: number,
+  sinceDays = 30
+): Promise<AssistantUsageSummary> {
+  const empty: AssistantUsageSummary = {
+    sinceDays,
+    totals: { requests: 0, failed: 0, inputTokens: 0, outputTokens: 0 },
+    byModule: [],
+  };
+  const db = await getDb();
+  if (!db) return empty;
+  const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select({
+      module: assistantUsage.module,
+      ok: assistantUsage.ok,
+      inputTokens: assistantUsage.inputTokens,
+      outputTokens: assistantUsage.outputTokens,
+    })
+    .from(assistantUsage)
+    .where(
+      and(
+        eq(assistantUsage.teacherId, teacherId),
+        gte(assistantUsage.createdAt, since)
+      )
+    );
+  const byModule = new Map<AssistantModule4, AssistantUsageSummary["byModule"][number]>();
+  for (const row of rows) {
+    const module = row.module as AssistantModule4;
+    const entry = byModule.get(module) ?? {
+      module,
+      requests: 0,
+      failed: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+    };
+    entry.requests += 1;
+    if (!row.ok) entry.failed += 1;
+    entry.inputTokens += row.inputTokens;
+    entry.outputTokens += row.outputTokens;
+    byModule.set(module, entry);
+  }
+  const list = Array.from(byModule.values()).sort(
+    (a, b) => b.requests - a.requests
+  );
+  return {
+    sinceDays,
+    totals: list.reduce(
+      (sum, entry) => ({
+        requests: sum.requests + entry.requests,
+        failed: sum.failed + entry.failed,
+        inputTokens: sum.inputTokens + entry.inputTokens,
+        outputTokens: sum.outputTokens + entry.outputTokens,
+      }),
+      empty.totals
+    ),
+    byModule: list,
+  };
 }

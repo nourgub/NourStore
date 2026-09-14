@@ -10,7 +10,11 @@
 // Prompt: server/prompts/mathExamSolutions.ts. Transport: server/claudeClient.ts.
 
 import { z } from "zod";
-import { askClaude, type ClaudeTextResult } from "./claudeClient";
+import {
+  askClaude,
+  type ClaudeTextResult,
+  type ClaudeUsage,
+} from "./claudeClient";
 import type { ExtractedAttachment } from "./attachments/extract";
 import {
   EXAM_IN_ATTACHMENT,
@@ -53,6 +57,8 @@ export type ExamSolutionsResult =
       totalPoints: number | null;
       model: string;
       truncated: boolean;
+      /** What the call cost in tokens, for the usage record. */
+      usage: ClaudeUsage;
     }
   | Extract<ClaudeTextResult, { ok: false }>;
 
@@ -128,6 +134,7 @@ export async function solveMathExam(
     totalPoints: questions ? sumGradingScale(questions) : null,
     model: result.model,
     truncated: result.truncated,
+    usage: result.usage,
   };
 }
 

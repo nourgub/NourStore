@@ -45,8 +45,9 @@ Arabic), self-hostable with zero mandatory third-party account.
   student's paper against that scale with partial credit and classified
   errors. The teacher can **upload files into it** — a photographed pupil's
   paper, a scanned exam, the syllabus as PDF/Word/Excel, or a ZIP of a whole
-  class's papers — and **take the result out as a file**: Word, PDF, or an
-  Excel marks sheet. A teacher can also keep a small **reference library** —
+  class's papers, with photos re-encoded in the browser first so a school
+  connection is not the bottleneck — and **take the result out as a file**:
+  Word (with real tables), PDF, or an Excel marks sheet. A teacher can also keep a small **reference library** —
   the syllabus, their past papers — uploaded once and attached automatically
   to every generation. Everything it produces is saved under the teacher's own
   account
@@ -197,12 +198,15 @@ server/
   attachments/extract.ts  uploaded file → text, or an image/PDF Claude reads itself
   attachments/references.ts  the saved reference library → attachments, per request
   exports/documentExport.ts  result → Word / PDF / Excel, laid out right-to-left
+shared/
+  mathText.ts          $...$ LaTeX-ish notation → readable Unicode maths
 drizzle/
   schema.ts           the full database schema
   *.sql                migrations, applied in filename order by scripts/migrate.mjs
 scripts/
   migrate.mjs          the real migration runner (see above)
   verify-*.ts          real-database verification scripts from past hardening passes
+  assistant-smoke.ts   one REAL Claude call per assistant module, for reading
 ```
 
 ## Known limitations (stated honestly, not silently left undocumented)
@@ -218,7 +222,10 @@ scripts/
   when the teacher reviews it and types the mark, which is what notifies the
   learner and their linked parents. The suggested figure is never scraped
   out of the report, and a grading scale that reviewed marks depend on
-  cannot be deleted.
+  cannot be deleted. Confirming a mark writes an audit row (who confirmed it,
+  when, what the assistant had proposed, and whether the teacher overruled
+  it), so "the AI gave him 8" is an answerable claim rather than an
+  unfalsifiable one.
 - **"Learning from your files" means reading them, not training on them.**
   A reference is read on every request — as the syllabus to follow, the past
   paper to imitate. No model is trained or fine-tuned, which is also why a
@@ -230,13 +237,35 @@ scripts/
   the filenames, not the bytes. Only reference-library files are stored (via
   the same storage provider as lesson assets). Old Office formats (`.doc`,
   `.xls`) are refused with the fix to apply rather than half-parsed.
-- **Deleting a reference removes the row, not the stored object.** This
-  codebase has no storage-deletion path anywhere (lesson assets behave the
-  same); inventing one here, possibly against a shared bucket, is not a
-  decision to make as a side effect.
-- **Batch grading is capped per request** (8 papers, 4 at a time): every
-  paper is its own API call, so an uncapped class would outlive the request
-  and cost accordingly. A full class is a few runs.
+  Deleting a reference deletes its stored file too (`storageDelete`, added
+  with this feature and available to any caller); a provider that fails the
+  delete leaves an orphaned object to sweep up, never a row the teacher
+  cannot get rid of.
+- **A pupil's paper leaves this server.** Grading sends the image or PDF, and
+  the pupil's name if one is attached, to Anthropic's API — it is not used to
+  train models, but it does leave the country the school is in. The grading
+  panel says so above the file picker rather than burying it in a policy
+  page, and the paper can be deleted from the history at any time.
+- **Batch grading is one paper per request, looped in the browser.** Thirty
+  papers are thirty short calls whose results are each saved as they arrive,
+  so a dropped connection costs the paper in flight and nothing else; "stop"
+  keeps everything already graded. The server still accepts up to 8 papers in
+  one call (4 at a time) for any caller that wants it.
+- **Usage is recorded in tokens, not money.** Every call writes a row
+  (`assistantUsage`, migration 0027) and the panel shows the teacher their own
+  last 30 days. No dinar figure anywhere: prices change per model and this
+  codebase does not know them, so it does not invent one.
+- **Maths notation is converted to Unicode, not typeset.** The prompts produce
+  `$x^2$`-style formulas and nothing here renders LaTeX, so `shared/mathText.ts`
+  turns the common notation into real characters (x², √, Δ, ≤) for the screen
+  and for every export. Notation it does not handle stays visible as itself —
+  a teacher who sees `\binom{n}{k}` knows it was not converted, which beats a
+  silently wrong formula.
+- **The answers' quality is not covered by the test suite.** Every test stubs
+  the HTTP layer, which proves the request and the parsing and nothing about
+  the pedagogy. `npm run assistant:smoke` (needs a real key, costs real money)
+  makes one live call per module, checks what can be checked mechanically, and
+  prints all four for a maths teacher to read.
 
 - **No outbound email anywhere in this codebase.** Every flow that would
   conventionally use email (password reset, notifications) is deliberately

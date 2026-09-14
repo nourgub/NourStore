@@ -12,14 +12,18 @@ import {
 import { generateMathLessonPlan } from "../lessonPlanner";
 import { designMathExam } from "../examDesigner";
 import { solveMathExam } from "../examSolutions";
-import { gradeStudentPaper, PROVISIONAL_GRADING_NOTICE } from "../paperGrader";
+import {
+  gradeStudentPaper,
+  suggestedMarkFromReport,
+  PROVISIONAL_GRADING_NOTICE,
+} from "../paperGrader";
 import {
   extractAttachment,
   type AttachmentInput,
   type ExtractedAttachment,
 } from "../attachments/extract";
 import { referencesToAttachments } from "../attachments/references";
-import { storagePut } from "../storage";
+import { storagePut, storageDelete } from "../storage";
 import {
   formatSolutionsForExport,
   examSolutionsSchema,
@@ -36,6 +40,7 @@ import {
   countReferences,
   deleteReference,
   getActiveReferences,
+  getReference,
   listReferences,
   saveReference,
   updateReference,
@@ -54,6 +59,9 @@ import {
   listLessonPlans,
   listPaperGrades,
   markPaperGradeReviewed,
+  recordAssistantUsage,
+  getAssistantUsageSummary,
+  type AssistantModule4,
   savePaperGrade,
   saveExamPaper,
   saveExamSolutionSet,
@@ -68,6 +76,7 @@ import {
   disconnectGoogleCalendar,
   setLessonLiveSession,
   createLearnerReport,
+  logAdminAction,
 } from "../db";
 
 // ---------------------------------------------------------------------------
@@ -245,6 +254,14 @@ export const teacherRouter = router({
     configured: isClaudeConfigured(),
     model: claudeModel(),
   })),
+  // What this teacher has consumed. Their own usage only — an admin looking
+  // at someone else's spend is a different feature with a different consent
+  // story, so this deliberately does not widen for admins.
+  assistantUsage: teacherProcedure
+    .input(z.object({ sinceDays: z.number().int().min(1).max(365).optional() }).optional())
+    .query(({ ctx, input }) =>
+      getAssistantUsageSummary(ctx.user.id, input?.sinceDays ?? 30)
+    ),
   // 1 — تحضير الدروس. The generated plan is saved as it is produced, so
   // closing the tab does not lose it; on a deployment with no DATABASE_URL
   // the save is a no-op and `id` comes back null rather than failing the
@@ -271,8 +288,9 @@ export const teacherRouter = router({
         "lesson",
         files
       );
-      const plan = asMarkdown(
-        await generateMathLessonPlan(context, attachments)
+      const plan = await asMarkdown(
+        await generateMathLessonPlan(context, attachments),
+        { teacherId: ctx.user.id, module: "lesson" }
       );
       const id = await saveLessonPlan({
         teacherId: ctx.user.id,
@@ -326,7 +344,10 @@ export const teacherRouter = router({
         "exam",
         files
       );
-      const paper = asMarkdown(await designMathExam(context, attachments));
+      const paper = await asMarkdown(
+        await designMathExam(context, attachments),
+        { teacherId: ctx.user.id, module: "exam" }
+      );
       const id = await saveExamPaper({
         teacherId: ctx.user.id,
         ...context,
@@ -401,6 +422,14 @@ export const teacherRouter = router({
         { examText: input.examText },
         attachments
       );
+      await recordAssistantUsage({
+        teacherId: ctx.user.id,
+        module: "solutions",
+        model: result.ok ? result.model : "unknown",
+        inputTokens: result.ok ? result.usage.inputTokens : 0,
+        outputTokens: result.ok ? result.usage.outputTokens : 0,
+        ok: result.ok,
+      });
       if (!result.ok) throw assistantError(result);
       const id = await saveExamSolutionSet({
         teacherId: ctx.user.id,
@@ -508,11 +537,12 @@ export const teacherRouter = router({
         "grading",
         input.files
       );
-      const report = asMarkdown(
+      const report = await asMarkdown(
         await gradeStudentPaper(
           { solutionsJson, studentAnswerText: input.studentAnswerText },
           attachments
-        )
+        ),
+        { teacherId: ctx.user.id, module: "grading" }
       );
       if (solutionSetId === null) {
         // A pasted scale is stored as a solution set of its own before the
@@ -558,12 +588,14 @@ export const teacherRouter = router({
         provisional: PROVISIONAL_GRADING_NOTICE,
       };
     }),
-  // A whole set of papers at once: one archive (or several files) in, one
-  // graded draft per pupil out, each named after its file. Capped at
-  // MAX_BATCH_PAPERS per call — every paper is its own Claude call, so an
-  // uncapped class would both cost a lot and outlast any HTTP timeout.
+  // A whole set of papers: one archive (or several files) in, one graded draft
+  // per pupil out, each named after its file. Capped at MAX_BATCH_PAPERS per
+  // call — every paper is its own Claude call, so an uncapped class would both
+  // cost a lot and outlast any HTTP timeout. The panel normally sends ONE
+  // paper per call and loops, which is why the limit counts papers per hour
+  // (the same 120 as single-paper grading) rather than a handful of calls.
   gradeStudentPapersBatch: teacherProcedure
-    .use(rateLimit("teacher-grade-batch", 20, 60 * 60 * 1000))
+    .use(rateLimit("teacher-grade-batch", 120, 60 * 60 * 1000))
     .input(
       z.object({
         solutionSetId: z.number().int().positive(),
@@ -584,6 +616,14 @@ export const teacherRouter = router({
           { solutionsJson: set.solutionsJson, studentAnswerText: "" },
           [paper]
         );
+        await recordAssistantUsage({
+          teacherId: ctx.user.id,
+          module: "grading",
+          model: result.ok ? result.model : "unknown",
+          inputTokens: result.ok ? result.usage.inputTokens : 0,
+          outputTokens: result.ok ? result.usage.outputTokens : 0,
+          ok: result.ok,
+        });
         if (!result.ok)
           return {
             name: paper.name,
@@ -675,7 +715,36 @@ export const teacherRouter = router({
           });
         throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
       }
-      return result;
+      // A mark that reached a pupil should be answerable for later: who
+      // confirmed it, when, and what the assistant had proposed. Without this
+      // the only record is the final number, and "the AI gave him 8" becomes
+      // unfalsifiable. The suggestion is read back out of the stored report
+      // and is null when the report did not state a total plainly — see
+      // suggestedMarkFromReport.
+      const suggested = suggestedMarkFromReport(result.previous.report);
+      await logAdminAction({
+        actorId: ctx.user.id,
+        action: "teacher.paper_grade.reviewed",
+        targetType: "paper_grade",
+        targetId: input.id,
+        details: {
+          finalPoints: input.finalPoints,
+          maxPoints: input.maxPoints,
+          suggestedPoints: suggested?.points ?? null,
+          suggestedMaxPoints: suggested?.maxPoints ?? null,
+          // Comparable only when the assistant used the same total.
+          agreedWithSuggestion:
+            suggested && suggested.maxPoints === input.maxPoints
+              ? suggested.points === input.finalPoints
+              : null,
+          model: result.previous.model,
+          learnerId: result.previous.learnerId,
+          previousFinalPoints: result.previous.finalPoints,
+          reReview: result.previous.alreadyReviewed,
+          notified: result.notified,
+        },
+      });
+      return { ok: result.ok, notified: result.notified };
     }),
   // ---------------------------------------------------------------------
   // The reference library — upload once, used by every generation
@@ -770,13 +839,18 @@ export const teacherRouter = router({
   deleteReference: teacherProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      const deleted = await deleteReference(
-        input.id,
-        ctx.user.id,
-        teacherRole(ctx.user.role)
-      );
+      const role = teacherRole(ctx.user.role);
+      // Read the row first so the uploaded file goes with it. "Delete" on a
+      // syllabus or a scanned past paper has to mean the file is gone, not
+      // just hidden from the list.
+      const existing = await getReference(input.id, ctx.user.id, role);
+      const deleted = await deleteReference(input.id, ctx.user.id, role);
       if (!deleted)
         throw new TRPCError({ code: "NOT_FOUND", message: "Not found" });
+      // The row is already gone; a storage provider that failed to remove the
+      // object leaves an orphan to sweep up, not a row the teacher cannot get
+      // rid of. storageDelete logs its own failures.
+      if (existing?.storageKey) await storageDelete(existing.storageKey);
       return { ok: true };
     }),
   // ---------------------------------------------------------------------
@@ -938,8 +1012,23 @@ function assistantError(
   return new TRPCError({ code: "BAD_GATEWAY", message: result.message });
 }
 
-/** Shared success shape for the three Markdown-returning modules. */
-function asMarkdown(result: ClaudeTextResult) {
+/**
+ * Shared success shape for the three Markdown-returning modules, and the one
+ * place their usage is recorded — including a failed call, because a month of
+ * refusals is usage the teacher should be able to see.
+ */
+async function asMarkdown(
+  result: ClaudeTextResult,
+  meta: { teacherId: number; module: AssistantModule4 }
+) {
+  await recordAssistantUsage({
+    teacherId: meta.teacherId,
+    module: meta.module,
+    model: result.ok ? result.model : "unknown",
+    inputTokens: result.ok ? result.usage.inputTokens : 0,
+    outputTokens: result.ok ? result.usage.outputTokens : 0,
+    ok: result.ok,
+  });
   if (!result.ok) throw assistantError(result);
   return {
     markdown: result.text,

@@ -39,6 +39,9 @@ export function claudeModel(): string {
 export const NOT_CONFIGURED_MESSAGE =
   "مساعد الأستاذ غير مفعَّل بعد. اضبط ANTHROPIC_API_KEY (مفتاح من https://console.anthropic.com/settings/keys) لتفعيله.";
 
+/** Token counts as the API reported them — never estimated here. */
+export type ClaudeUsage = { inputTokens: number; outputTokens: number };
+
 export type ClaudeTextResult =
   | {
       ok: true;
@@ -46,6 +49,8 @@ export type ClaudeTextResult =
       model: string;
       /** True when max_tokens cut the answer off — callers warn instead of pretending it is complete. */
       truncated: boolean;
+      /** What the call cost in tokens, straight from the API response. */
+      usage: ClaudeUsage;
     }
   | {
       ok: false;
@@ -180,6 +185,10 @@ export async function askClaude(input: {
       text,
       model: response.model,
       truncated: response.stop_reason === "max_tokens",
+      usage: {
+        inputTokens: response.usage.input_tokens ?? 0,
+        outputTokens: response.usage.output_tokens ?? 0,
+      },
     };
   } catch (error) {
     // Most specific first — a 401 is a deployment mistake to fix, a 429 is
