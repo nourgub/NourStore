@@ -15,6 +15,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
@@ -82,6 +83,25 @@ export async function s3Get(
   return { key, url };
 }
 
+/**
+ * Reads an object back as bytes (see localReadBytes for why this exists).
+ * Returns null when the object is gone rather than throwing.
+ */
+export async function s3ReadBytes(relKey: string): Promise<Buffer | null> {
+  try {
+    const response = await getClient().send(
+      new GetObjectCommand({ Bucket: ENV.s3Bucket, Key: normalizeKey(relKey) })
+    );
+    const body = response.Body as
+      | { transformToByteArray?: () => Promise<Uint8Array> }
+      | undefined;
+    if (!body?.transformToByteArray) return null;
+    return Buffer.from(await body.transformToByteArray());
+  } catch {
+    return null;
+  }
+}
+
 export async function s3GetSignedUrl(
   relKey: string,
   expiresInSeconds = 3600
@@ -93,4 +113,24 @@ export async function s3GetSignedUrl(
     new GetObjectCommand({ Bucket: ENV.s3Bucket, Key: key }),
     { expiresIn: expiresInSeconds }
   );
+}
+
+/**
+ * Removes a stored object. S3 treats deleting a missing key as success, and so
+ * does this: the caller's goal is "this file is gone", and a row whose object
+ * already vanished must still be deletable.
+ */
+export async function s3Delete(relKey: string): Promise<boolean> {
+  try {
+    await getClient().send(
+      new DeleteObjectCommand({
+        Bucket: ENV.s3Bucket,
+        Key: normalizeKey(relKey),
+      })
+    );
+    return true;
+  } catch (error) {
+    console.error("[Storage] failed to delete S3 object:", relKey, error);
+    return false;
+  }
 }

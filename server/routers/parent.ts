@@ -6,6 +6,7 @@ import {
   getParentLinks,
   getParentDashboard,
   getReportsForParent,
+  getPaperGradesForParent,
   createParentInvite,
   acceptParentInvite,
   unlinkParent,
@@ -17,6 +18,11 @@ export const parentRouter = router({
     getParentDashboard(ctx.user.id)
   ),
   reports: parentProcedure.query(({ ctx }) => getReportsForParent(ctx.user.id)),
+  // Their children's marks from the teacher assistant's paper grading —
+  // reviewed ones only, same rule as the learner's own view.
+  paperGrades: parentProcedure.query(({ ctx }) =>
+    getPaperGradesForParent(ctx.user.id)
+  ),
   createInvite: adminProcedure
     .input(z.object({ childId: z.number().int().positive() }))
     .mutation(async ({ input }) => {

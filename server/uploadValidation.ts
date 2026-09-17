@@ -32,6 +32,9 @@ const MIME_TO_EXTENSIONS: Record<string, string[]> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
     "docx",
   ],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ["xlsx"],
+  "application/vnd.ms-excel": ["xls"],
+  "text/csv": ["csv"],
 };
 
 // Executable / script extensions that must never be accepted regardless of the
@@ -125,6 +128,23 @@ const MAGIC_BYTES: Record<string, (bytes: Buffer) => boolean> = {
       bytes[0] === 0x50 &&
       bytes[1] === 0x4b &&
       (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07),
+  // .xlsx is a ZIP container too (Office Open XML), same as .docx above.
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": bytes =>
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07),
+  // Legacy binary .xls — same OLE Compound File signature as legacy .doc.
+  "application/vnd.ms-excel": bytes =>
+    bytes.length >= 8 &&
+    bytes[0] === 0xd0 &&
+    bytes[1] === 0xcf &&
+    bytes[2] === 0x11 &&
+    bytes[3] === 0xe0 &&
+    bytes[4] === 0xa1 &&
+    bytes[5] === 0xb1 &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0xe1,
   // Legacy binary .doc — OLE Compound File Binary Format signature.
   "application/msword": bytes =>
     bytes.length >= 8 &&
@@ -139,8 +159,7 @@ const MAGIC_BYTES: Record<string, (bytes: Buffer) => boolean> = {
 };
 
 export type UploadValidationResult =
-  | { ok: true }
-  | { ok: false; reason: string };
+  { ok: true } | { ok: false; reason: string };
 
 export function validateUploadBytes(input: {
   fileName: string;

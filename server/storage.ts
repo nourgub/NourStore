@@ -5,11 +5,19 @@
 // that want object storage instead of local disk.
 
 import { ENV } from "./_core/env";
-import { s3Put, s3Get, s3GetSignedUrl } from "./storageProviders/s3";
+import {
+  s3Put,
+  s3Get,
+  s3GetSignedUrl,
+  s3ReadBytes,
+  s3Delete,
+} from "./storageProviders/s3";
 import {
   localPut,
   localGet,
   localGetSignedUrl,
+  localReadBytes,
+  localDelete,
 } from "./storageProviders/local";
 
 export async function storagePut(
@@ -31,4 +39,26 @@ export async function storageGet(
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
   if (ENV.storageProvider === "s3") return s3GetSignedUrl(relKey);
   return localGetSignedUrl(relKey);
+}
+
+/**
+ * Reads a stored object back as bytes, for callers that must re-send the file
+ * itself rather than a link to it. Null means the object is not there.
+ */
+export async function storageReadBytes(relKey: string): Promise<Buffer | null> {
+  if (ENV.storageProvider === "s3") return s3ReadBytes(relKey);
+  return localReadBytes(relKey);
+}
+
+/**
+ * Deletes a stored object. Returns false only when the delete genuinely
+ * failed — a key that was already gone counts as done, so a database row whose
+ * file disappeared underneath it can still be cleaned up. Callers delete the
+ * row regardless: an orphaned object is a smaller problem than a row the user
+ * cannot get rid of.
+ */
+export async function storageDelete(relKey: string): Promise<boolean> {
+  if (!relKey) return true;
+  if (ENV.storageProvider === "s3") return s3Delete(relKey);
+  return localDelete(relKey);
 }

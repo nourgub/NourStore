@@ -37,6 +37,24 @@ Arabic), self-hostable with zero mandatory third-party account.
 - Gamification (streaks/badges), coupons, and a referral system
 - An "algorithm lab" with real sandboxed code execution and hidden test
   cases
+- A **maths teacher assistant** (Claude) with four chained modules: prepare
+  a lesson (objectives, opening situation, timed breakdown, worked examples,
+  graded exercises, common mistakes), design an exam paper (balanced
+  coverage, varied question types, rising difficulty, exact total), produce
+  the model solution and a per-step grading scale as JSON, and grade one
+  student's paper against that scale with partial credit and classified
+  errors. The teacher can **upload files into it** — a photographed pupil's
+  paper, a scanned exam, the syllabus as PDF/Word/Excel, or a ZIP of a whole
+  class's papers, with photos re-encoded in the browser first so a school
+  connection is not the bottleneck — and **take the result out as a file**:
+  Word (with real tables), PDF, or an Excel marks sheet. A teacher can also keep a small **reference library** —
+  the syllabus, their past papers — uploaded once and attached automatically
+  to every generation. Everything it produces is saved under the teacher's own
+  account
+  (with a per-mode history), and a mark only reaches a learner and their
+  parents once the teacher has reviewed the draft and typed the mark
+  themselves. This is the one feature that calls a third-party AI API and it
+  stays off until `ANTHROPIC_API_KEY` is set — see "Known limitations" below
 - Installable PWA (offline fallback page, install prompt), `robots.txt`,
   and a dynamic `sitemap.xml` that stays in sync with published courses
 
@@ -65,7 +83,8 @@ npm run dev                   # http://localhost:3000
 | `npm run check` | TypeScript typecheck, no build output |
 | `npm test` | Run the whole test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
 | `npm run test:unit` | Run only the fast, database-free tests — always safe, no infra needed |
-| `npm run test:db` | Run only `server/realDb.e2e.test.ts` against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:db` | Run the real-database suites (`server/realDb*.e2e.test.ts`) against a real MySQL instance (needs `DATABASE_URL`) |
+| `npm run test:db:memory` | Same suites, against a throwaway MySQL this script starts itself — no `DATABASE_URL`, no Docker (needs `libaio1t64` and `libnuma1` on Debian/Ubuntu) |
 | `npm run test:db:repeat [count]` | Run `test:db` `count` times (default 5), stopping at the first failure — checks for flakiness, not just a single pass |
 | `npm run test:all` | Same as `npm test` — both names exist so either convention works |
 | `npm run migrate` | Apply every not-yet-applied migration in `drizzle/*.sql` |
@@ -169,15 +188,84 @@ server/
   db/                 one file per domain (courses, subscriptions, quizzes, users, ...)
   _core/              env config, session/cookies, Google OAuth, Express wiring
   *Provider.ts         payment provider integrations (baridimob, slickpay)
+  claudeClient.ts      the one Claude call the teacher assistant's modules share
+  lessonPlanner.ts     module 1 — lesson preparation
+  examDesigner.ts      module 2 — exam design (the paper only, no solutions)
+  examSolutions.ts     module 3 — model solution + grading scale, parsed JSON
+  paperGrader.ts       module 4 — grades one paper against module 3's scale
+  prompts/             the Arabic pedagogical templates those four send
+  db/teacherAssistant.ts  storage for all four, scoped to the owning teacher
+  attachments/extract.ts  uploaded file → text, or an image/PDF Claude reads itself
+  attachments/references.ts  the saved reference library → attachments, per request
+  exports/documentExport.ts  result → Word / PDF / Excel, laid out right-to-left
+shared/
+  mathText.ts          $...$ LaTeX-ish notation → readable Unicode maths
 drizzle/
   schema.ts           the full database schema
   *.sql                migrations, applied in filename order by scripts/migrate.mjs
 scripts/
   migrate.mjs          the real migration runner (see above)
   verify-*.ts          real-database verification scripts from past hardening passes
+  assistant-smoke.ts   one REAL Claude call per assistant module, for reading
 ```
 
 ## Known limitations (stated honestly, not silently left undocumented)
+
+- **The teacher assistant needs a paid Claude API key, and is the only
+  third-party dependency that costs money per use.** Without
+  `ANTHROPIC_API_KEY` the teacher panel says so plainly and every endpoint
+  refuses — none of them returns a locally invented lesson plan, exam or
+  mark, because a fabricated plan taken into a classroom (or a fabricated
+  mark handed to a student) is worse than none.
+- **An AI-suggested mark is never a learner's mark.** A graded paper is
+  stored as a draft the teacher alone can see; it becomes a real mark only
+  when the teacher reviews it and types the mark, which is what notifies the
+  learner and their linked parents. The suggested figure is never scraped
+  out of the report, and a grading scale that reviewed marks depend on
+  cannot be deleted. Confirming a mark writes an audit row (who confirmed it,
+  when, what the assistant had proposed, and whether the teacher overruled
+  it), so "the AI gave him 8" is an answerable claim rather than an
+  unfalsifiable one.
+- **"Learning from your files" means reading them, not training on them.**
+  A reference is read on every request — as the syllabus to follow, the past
+  paper to imitate. No model is trained or fine-tuned, which is also why a
+  reference can be switched off or deleted and stops mattering immediately.
+  The library is capped at 20 files per teacher and 8 MB of stored files per
+  request, because every active reference rides along on every generation.
+- **Files attached to a single request are not archived.** The extracted text
+  or the image/PDF goes to the API for that request; the saved record keeps
+  the filenames, not the bytes. Only reference-library files are stored (via
+  the same storage provider as lesson assets). Old Office formats (`.doc`,
+  `.xls`) are refused with the fix to apply rather than half-parsed.
+  Deleting a reference deletes its stored file too (`storageDelete`, added
+  with this feature and available to any caller); a provider that fails the
+  delete leaves an orphaned object to sweep up, never a row the teacher
+  cannot get rid of.
+- **A pupil's paper leaves this server.** Grading sends the image or PDF, and
+  the pupil's name if one is attached, to Anthropic's API — it is not used to
+  train models, but it does leave the country the school is in. The grading
+  panel says so above the file picker rather than burying it in a policy
+  page, and the paper can be deleted from the history at any time.
+- **Batch grading is one paper per request, looped in the browser.** Thirty
+  papers are thirty short calls whose results are each saved as they arrive,
+  so a dropped connection costs the paper in flight and nothing else; "stop"
+  keeps everything already graded. The server still accepts up to 8 papers in
+  one call (4 at a time) for any caller that wants it.
+- **Usage is recorded in tokens, not money.** Every call writes a row
+  (`assistantUsage`, migration 0027) and the panel shows the teacher their own
+  last 30 days. No dinar figure anywhere: prices change per model and this
+  codebase does not know them, so it does not invent one.
+- **Maths notation is converted to Unicode, not typeset.** The prompts produce
+  `$x^2$`-style formulas and nothing here renders LaTeX, so `shared/mathText.ts`
+  turns the common notation into real characters (x², √, Δ, ≤) for the screen
+  and for every export. Notation it does not handle stays visible as itself —
+  a teacher who sees `\binom{n}{k}` knows it was not converted, which beats a
+  silently wrong formula.
+- **The answers' quality is not covered by the test suite.** Every test stubs
+  the HTTP layer, which proves the request and the parsing and nothing about
+  the pedagogy. `npm run assistant:smoke` (needs a real key, costs real money)
+  makes one live call per module, checks what can be checked mechanically, and
+  prints all four for a maths teacher to read.
 
 - **No outbound email anywhere in this codebase.** Every flow that would
   conventionally use email (password reset, notifications) is deliberately

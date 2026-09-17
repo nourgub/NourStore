@@ -22,4 +22,5 @@ export * from "./db/coupons";
 export * from "./db/errorLog";
 export * from "./db/reports";
 export * from "./db/googleCalendarConnections";
+export * from "./db/teacherAssistant";
 export { getDb } from "./db/shared";
