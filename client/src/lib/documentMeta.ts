@@ -42,8 +42,8 @@ export function setDocumentMeta(input: {
  */
 export function resetDocumentMeta() {
   setDocumentMeta({
-    title: "Nourix Academy – نوريكس أكاديمي",
+    title: "Nourix Academy – تعلّم اللغة الألمانية",
     description:
-      "Nourix Academy — منصة تعليم إلكتروني للسوق الجزائرية، تدعم العربية والفرنسية والإنجليزية، وتركز على الرياضيات والإعلام الآلي — من التأسيس إلى التحضير لشهادتي BEM وBAC.",
+      "Nourix Academy — منصة تعلّم اللغة الألمانية بالعربية والفرنسية والإنجليزية: قواعد، مفردات، استماع ومحادثة، قراءة وكتابة، وثقافة ألمانية، مع تحضير للامتحان الدولي واختبار مستوى إلكتروني مجاني.",
   });
 }

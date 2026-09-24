@@ -1,7 +1,7 @@
 {
   "name": "Nourix Academy",
   "short_name": "Nourix",
-  "description": "منصة Nourix Academy للتعلم عن بعد — الرياضيات والإعلام الآلي",
+  "description": "منصة Nourix Academy لتعلّم اللغة الألمانية عن بعد — من الأساسيات إلى التحضير للامتحان الدولي",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -30,9 +30,9 @@
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "مختبر الخوارزميات",
-      "short_name": "المختبر",
-      "url": "/lab?source=pwa-shortcut",
+      "name": "اختبار المستوى المجاني",
+      "short_name": "اختبار المستوى",
+      "url": "/placement?source=pwa-shortcut",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
