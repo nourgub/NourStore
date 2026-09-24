@@ -1,7 +1,7 @@
 // WhatsApp payment bot, built against Meta's real, publicly documented
 // WhatsApp Cloud API (developers.facebook.com/docs/whatsapp/cloud-api).
-// Unlike BaridiMob, this is not a guessed spec — the endpoints, payload
-// shapes, and webhook verification handshake below match Meta's actual API.
+// This is not a guessed spec — the endpoints, payload shapes, and webhook
+// verification handshake below match Meta's actual API.
 //
 // What is still required before this is live: a Meta Business Account with
 // WhatsApp Business Platform access, a verified sending phone number, a

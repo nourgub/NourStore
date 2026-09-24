@@ -95,110 +95,52 @@ panneau **Abonnements et accès** de l'espace admin (`subscriptions.assign`) —
 ce chemin ne crée jamais de fausse facture "payée" ; il grantit l'accès
 avec `paymentProvider = "manual"`, clairement distinct d'un paiement réel.
 
-## BaridiMob (Algérie Poste) — intégration réelle non disponible publiquement
+## Paiement manuel via virement postal (CCP/RIP) + WhatsApp
 
-Algérie Poste ne publie pas d'API BaridiMob en libre-service. La couche
-technique (`server/baridimobProvider.ts`) est prête à recevoir une vraie
-intégration mais refuse honnêtement toute tentative de paiement tant que
-les trois variables suivantes ne sont pas renseignées :
+C'est la **seule méthode de paiement de cette plateforme** — aucune
+passerelle automatisée (Stripe, BaridiMob, SlickPay, Chargily, etc.) n'est
+branchée ni prévue. L'apprenant paie par virement vers le compte
+postal/RIP de l'administration, puis confirme ce virement de l'une des deux
+façons suivantes ; les deux écrivent dans la même file d'attente de
+vérification humaine et ne peuvent jamais activer un abonnement toutes
+seules :
 
-- `BARIDIMOB_MERCHANT_ID`, `BARIDIMOB_API_KEY`, `BARIDIMOB_API_BASE_URL` —
-  ces valeurs n'existent qu'après un **enregistrement marchand réel** sur
-  https://baridiweb.poste.dz (ou via un agrégateur agréé par Algérie
-  Poste). Algérie Poste communique alors la spécification technique exacte
-  (endpoints, format de requête/réponse, schéma de signature) directement
-  au marchand — ce dépôt ne les invente pas.
-- Une fois ces informations obtenues, remplacer le corps de
-  `initiateBaridimobCheckout` (commentaire détaillé dans le fichier) par le
-  véritable appel HTTP, puis adapter `server/paymentsWebhook.ts` pour
-  vérifier la signature réelle des callbacks BaridiMob.
-- **Contrainte réglementaire déjà appliquée dans le code** : les paiements
-  locaux doivent être en DZD uniquement — `initiateBaridimobCheckout` rejette
-  toute autre devise, indépendamment de ce que l'API réelle imposerait aussi.
-- Tant que ces variables sont vides, la page `/pricing` affiche un message
-  honnête ("le paiement en ligne n'est pas encore activé") plutôt qu'un
-  faux succès ou une redirection inventée — vérifié par
-  `server/baridimobProvider.test.ts` et un test d'intégration réel contre
-  une base MySQL (voir AUDIT.md).
-
-## SlickPay — API publique réelle, sandbox gratuit en libre-service
-
-Contrairement à BaridiMob, SlickPay est un agrégateur de paiement algérien
-avec une **vraie API REST publique**, confirmée directement depuis le code
-source officiel de leur SDK (`@slick-pay-algeria/slickpay-npm`, MIT) —
-aucune donnée inventée. Un compte sandbox gratuit s'obtient sur
-https://slick-pay.com sans agrément commercial préalable.
-
-- `SLICKPAY_PUBLIC_KEY` — la clé publique récupérée depuis le tableau de
-  bord SlickPay (mode sandbox pour tester, production une fois prêt).
-- `SLICKPAY_SANDBOX` — `true` (défaut) pour pointer vers
-  `devapi.slick-pay.com`, `false` pour `prodapi.slick-pay.com`.
-- **Ce qui reste à faire** : le corps exact de la requête
-  `POST merchants/invoices` (montant, nom, e-mail, etc.) n'est documenté
-  nulle part de façon accessible (le site de documentation officiel est une
-  SPA JavaScript sans contenu statique récupérable) — `server/
-  slickpayProvider.ts` implémente tout ce qui est confirmé (URL de base,
-  authentification `Bearer`, endpoint) et s'arrête avant d'inventer ces
-  champs. Un premier appel réel contre le sandbox (une fois
-  `SLICKPAY_PUBLIC_KEY` disponible) confirmera le schéma exact.
-- Même contrainte réglementaire que BaridiMob : DZD uniquement, rejeté
-  côté code indépendamment de l'API réelle — voir
-  `server/slickpayProvider.test.ts`.
-
-## Chargily Pay — API publique réelle, entièrement confirmée et implémentée
-
-Contrairement à SlickPay, la documentation officielle de Chargily
-(https://dev.chargily.com/pay-v2/api-reference) est entièrement
-accessible et confirme tous les détails nécessaires — `server/
-chargilyProvider.ts` contient donc une implémentation réelle et complète,
-pas une ébauche.
-
-- `CHARGILY_SECRET_KEY` — clé secrète récupérée sur
-  https://pay.chargily.com/dashboard/developers-corner (les clés de test
-  commencent par `test_sk_`).
-- `CHARGILY_SANDBOX` — `true` (défaut) pour `pay.chargily.net/test/api/v2`,
-  `false` pour `pay.chargily.net/api/v2` une fois une clé réelle (non
-  `test_sk_`) en place.
-- Le webhook (`checkout.paid` / `checkout.failed` / `checkout.canceled`)
-  est déjà câblé dans `server/paymentsWebhook.ts`, avec vérification réelle
-  de la signature HMAC-SHA256 (en-tête `signature`, même clé secrète).
-- Même contrainte réglementaire que BaridiMob/SlickPay : DZD uniquement.
-  Chargily supporte aussi USD/EUR nativement, mais ce serait un choix de
-  politique commerciale délibéré à faire explicitement, pas un défaut ici.
-- Tant que `CHARGILY_SECRET_KEY` est vide, `/pricing` affiche un message
-  honnête plutôt qu'un faux succès — vérifié par
-  `server/chargilyProvider.test.ts`.
-
-## Paiement manuel via WhatsApp (bot + vérification humaine)
-
-Alternative pleinement fonctionnelle à BaridiMob, contrairement à ce dernier
-l'API WhatsApp Cloud de Meta est réellement publique et documentée
-(developers.facebook.com/docs/whatsapp/cloud-api) — ce n'est pas une
-spécification devinée.
-
-- Le lien `wa.me` (ouverture de WhatsApp avec un message pré-rempli
-  contenant la référence de commande `NX-INV-{id}`) fonctionne **dès
-  maintenant sans aucune configuration**, dès qu'un numéro WhatsApp est
-  enregistré dans **Panneau admin → Canal WhatsApp**.
-- Le bot automatique (réponse avec le RIB, réception des photos de reçu) a
-  besoin de trois variables : `WHATSAPP_ACCESS_TOKEN`,
-  `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN` — obtenues via un
-  compte Meta Business + WhatsApp Business Platform (numéro vérifié, jeton
-  d'accès permanent). Sans ces trois variables, le webhook répond `501` et
-  aucune tentative d'appel n'est faite.
-- Le RIB/CCP envoyé automatiquement par le bot se configure dans
-  **Panneau admin → Paiement via WhatsApp**.
-- **Le bot ne valide jamais un paiement automatiquement.** Une photo de
-  reçu ne prouve pas qu'un virement a réellement abouti — seul un humain
-  vérifiant le relevé bancaire réel peut le confirmer. Chaque reçu reçu
-  apparaît dans la file d'attente admin (**Panneau admin → Paiement via
-  WhatsApp**) pour approbation ou rejet manuel ; seule cette action
-  (ou un webhook de paiement réellement vérifié) peut activer un
+- **Téléversement direct sur `/pricing`** — le bouton principal ("Payer par
+  compte postal (CCP)") ouvre une fenêtre qui affiche le RIB/CCP enregistré
+  par l'administration, puis laisse l'apprenant téléverser une photo/PDF du
+  reçu (`subscriptions.uploadPaymentReceipt`, validation du type de fichier
+  + de la taille + détection de doublon par hachage SHA-256).
+- **WhatsApp** — le bouton secondaire ouvre `wa.me` avec un message
+  pré-rempli contenant la référence de commande `NX-INV-{id}`, sans aucune
+  configuration nécessaire dès qu'un numéro WhatsApp est enregistré dans
+  **Panneau admin → Canal WhatsApp**. Le bot automatique (réponse avec le
+  RIB, réception des photos de reçu) a besoin de trois variables :
+  `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_VERIFY_TOKEN` — obtenues via un compte Meta Business +
+  WhatsApp Business Platform (numéro vérifié, jeton d'accès permanent).
+  Sans ces trois variables, le webhook répond `501` et aucune tentative
+  d'appel n'est faite ; le téléversement direct ci-dessus continue de
+  fonctionner indépendamment.
+- Le RIB/CCP affiché dans les deux chemins se configure au même endroit :
+  **Panneau admin → Paiement via WhatsApp** (`platform.setPaymentRib`).
+- **Ni le bot ni le formulaire de téléversement ne valident jamais un
+  paiement automatiquement.** Une photo de reçu ne prouve pas qu'un
+  virement a réellement abouti — seul un humain vérifiant le relevé
+  bancaire réel peut le confirmer. Chaque reçu reçu apparaît dans la file
+  d'attente admin (**Panneau admin → Paiement via WhatsApp**) pour
+  approbation ou rejet manuel ; seule cette action peut activer un
   abonnement.
 - Vérifié de bout en bout contre une base MySQL réelle : création de
-  facture, analyse du message par le bot, soumission de reçu, rejet (aucune
-  activation), puis approbation (abonnement réellement activé) — les deux
-  chemins ont été testés (voir AUDIT.md).
+  facture, soumission de reçu (direct ou via le bot), rejet (aucune
+  activation), puis approbation (abonnement réellement activé) — voir
+  AUDIT.md.
+
+Le contrat de webhook générique (`server/paymentsWebhook.ts`, monté sur
+`POST /api/webhooks/payments/:provider`) reste dans le code pour une
+future passerelle automatisée, mais volontairement inerte tant que
+`PAYMENT_PROVIDER`/`PAYMENT_WEBHOOK_SECRET` ne sont pas définis — l'octroi
+d'accès reste manuel via **Panneau admin → Paiement via WhatsApp** ou le
+panneau **Abonnements et accès** (`subscriptions.assign`).
 
 ## Canaux de contact réels (WhatsApp, Instagram, Facebook)
 

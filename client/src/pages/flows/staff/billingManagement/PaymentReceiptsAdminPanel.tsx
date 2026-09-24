@@ -32,23 +32,23 @@ export function PaymentReceiptsAdminPanel({ lang }: { lang: Lang }) {
     <div className="flow-card staff-form">
       <div className="flow-card-title">
         <div>
-          <span className="section-kicker">NOURIX / WHATSAPP PAYMENTS</span>
+          <span className="section-kicker">NOURIX / PAYMENTS (CCP + WHATSAPP)</span>
           <h2>
             {lang === "ar"
-              ? "الدفع عبر WhatsApp"
+              ? "الدفع اليدوي (حساب بريدي CCP وواتساب)"
               : lang === "fr"
-                ? "Paiement via WhatsApp"
-                : "WhatsApp payments"}
+                ? "Paiement manuel (CCP et WhatsApp)"
+                : "Manual payment (CCP & WhatsApp)"}
           </h2>
         </div>
         <ClipboardCheck size={18} />
       </div>
       <p className="quiet-label">
         {lang === "ar"
-          ? "المتعلم يرسل مرجع الدفع عبر WhatsApp، فيرد البوت (إن كان مُفعَّلًا) بمعلومات الحساب البنكي أدناه، ثم يرسل المتعلم صورة الوصل هنا للمراجعة اليدوية. لا يتم تفعيل أي اشتراك تلقائيًا."
+          ? "المتعلم يحوّل المبلغ إلى الحساب البريدي (CCP/RIP) أدناه، ثم يرفع صورة الوصل مباشرة من صفحة الأسعار أو يرسلها عبر WhatsApp (يرد البوت، إن كان مُفعَّلًا، بمعلومات الحساب نفسها). كل الوصولات تصل هنا للمراجعة اليدوية — لا يتم تفعيل أي اشتراك تلقائيًا."
           : lang === "fr"
-            ? "L’apprenant envoie sa référence de paiement sur WhatsApp, le bot (si activé) répond avec les coordonnées bancaires ci-dessous, puis l’apprenant envoie une photo du reçu ici pour vérification manuelle. Aucun abonnement n’est activé automatiquement."
-            : "The learner sends their payment reference on WhatsApp, the bot (if enabled) replies with the bank details below, then the learner sends a receipt photo here for manual review. No subscription is ever auto-activated."}
+            ? "L’apprenant vire le montant vers le compte postal (CCP/RIP) ci-dessous, puis téléverse une photo du reçu directement depuis la page des tarifs ou l’envoie via WhatsApp (le bot, si activé, répond avec les mêmes coordonnées). Tous les reçus arrivent ici pour vérification manuelle. Aucun abonnement n’est activé automatiquement."
+            : "The learner transfers the amount to the postal account (CCP/RIP) below, then uploads a receipt photo directly from the pricing page or sends it via WhatsApp (the bot, if enabled, replies with the same details). Every receipt lands here for manual review. No subscription is ever auto-activated."}
       </p>
       {staleCount > 0 && (
         <p

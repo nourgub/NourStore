@@ -148,14 +148,13 @@ it("requires authentication to read/redeem referral codes", async () => {
   ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 });
 
-it("rejects a BaridiMob checkout in a non-DZD currency even for an authenticated learner, before hitting the database", async () => {
+it("rejects an anonymous checkout attempt before hitting the database", async () => {
   const caller = appRouter.createCaller(createPublicContext());
-  // Still gated by auth first — but the currency contract itself is verified in baridimobProvider.test.ts.
   await expect(
     caller.payments.initiateCheckout({
       planId: 1,
       currency: "USD",
-      provider: "baridimob",
+      provider: "manual",
     })
   ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 });

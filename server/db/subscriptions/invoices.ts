@@ -189,10 +189,10 @@ export async function expireStalePendingInvoices(
 ): Promise<{ expiredCount: number }> {
   // A checkout that's been "pending" for a week is an abandoned attempt,
   // not an in-progress one — a learner who opens WhatsApp checkout and
-  // never sends a receipt, or opens BaridiMob and closes the tab. Left
-  // "pending" forever, it clutters admin queues indefinitely and could in
-  // principle still be paid months later against a plan price that's
-  // since changed. Never touches paid/failed/refunded/canceled invoices —
+  // never sends a receipt, or opens the postal-transfer modal and never
+  // uploads one. Left "pending" forever, it clutters admin queues
+  // indefinitely and could in principle still be paid months later against
+  // a plan price that's since changed. Never touches paid/failed/refunded/canceled invoices —
   // only ones still sitting in "pending".
   const db = await getDb();
   if (!db) return { expiredCount: 0 };

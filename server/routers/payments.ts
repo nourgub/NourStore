@@ -3,9 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { rateLimit } from "../_core/procedures";
 import { ENV } from "../_core/env";
-import { initiateBaridimobCheckout } from "../baridimobProvider";
-import { initiateSlickpayCheckout } from "../slickpayProvider";
-import { initiateChargilyCheckout } from "../chargilyProvider";
 import {
   getSubscriptionPlans,
   validateCoupon,
@@ -30,9 +27,7 @@ export const paymentsRouter = router({
           .string()
           .length(3)
           .regex(/^[A-Za-z]{3}$/),
-        provider: z
-          .enum(["manual", "baridimob", "slickpay", "chargily", "whatsapp"])
-          .default("manual"),
+        provider: z.enum(["manual", "whatsapp"]).default("manual"),
         returnUrl: z.string().url().optional(),
         couponCode: z.string().min(2).max(40).optional(),
       })
@@ -88,105 +83,6 @@ export const paymentsRouter = router({
           userId: ctx.user.id,
           invoiceId: invoice.id,
         });
-      if (input.provider === "baridimob") {
-        const checkout = await initiateBaridimobCheckout({
-          invoiceId: invoice.id,
-          amountCents: finalAmountCents,
-          currency: plan.resolvedCurrency,
-          returnUrl: input.returnUrl || "",
-        });
-        if (!checkout.ok) {
-          // Never fakes success: the invoice stays "pending" and the person is told exactly why the redirect isn't available yet.
-          return {
-            invoice,
-            providerConfigured: false,
-            redirectUrl: null,
-            message: checkout.message,
-            couponMessage,
-            appliedCoupon: appliedCoupon?.code,
-          };
-        }
-        await recordPaymentAttempt({
-          invoiceId: invoice.id,
-          provider: "baridimob",
-          providerReference: checkout.providerReference,
-          status: "pending",
-        });
-        return {
-          invoice,
-          providerConfigured: true,
-          redirectUrl: checkout.redirectUrl,
-          message: undefined,
-          couponMessage,
-          appliedCoupon: appliedCoupon?.code,
-        };
-      }
-      if (input.provider === "slickpay") {
-        const checkout = await initiateSlickpayCheckout({
-          invoiceId: invoice.id,
-          amountCents: finalAmountCents,
-          currency: plan.resolvedCurrency,
-          returnUrl: input.returnUrl || "",
-        });
-        if (!checkout.ok) {
-          // Never fakes success: the invoice stays "pending" and the person is told exactly why the redirect isn't available yet.
-          return {
-            invoice,
-            providerConfigured: false,
-            redirectUrl: null,
-            message: checkout.message,
-            couponMessage,
-            appliedCoupon: appliedCoupon?.code,
-          };
-        }
-        await recordPaymentAttempt({
-          invoiceId: invoice.id,
-          provider: "slickpay",
-          providerReference: checkout.providerReference,
-          status: "pending",
-        });
-        return {
-          invoice,
-          providerConfigured: true,
-          redirectUrl: checkout.redirectUrl,
-          message: undefined,
-          couponMessage,
-          appliedCoupon: appliedCoupon?.code,
-        };
-      }
-      if (input.provider === "chargily") {
-        const checkout = await initiateChargilyCheckout({
-          invoiceId: invoice.id,
-          amountCents: finalAmountCents,
-          currency: plan.resolvedCurrency,
-          returnUrl: input.returnUrl || "",
-        });
-        if (!checkout.ok) {
-          // Never fakes success: the invoice stays "pending" and the person is told exactly why the redirect isn't available yet.
-          return {
-            invoice,
-            providerConfigured: false,
-            redirectUrl: null,
-            message: checkout.message,
-            couponMessage,
-            appliedCoupon: appliedCoupon?.code,
-          };
-        }
-        await recordPaymentAttempt({
-          invoiceId: invoice.id,
-          provider: "chargily",
-          providerReference: checkout.providerReference,
-          status: "pending",
-        });
-        return {
-          invoice,
-          providerConfigured: true,
-          redirectUrl: checkout.redirectUrl,
-          message: undefined,
-          couponMessage,
-          appliedCoupon: appliedCoupon?.code,
-        };
-      }
       if (input.provider === "whatsapp") {
         // wa.me links require zero API credentials — this always works as
         // long as an admin has saved a WhatsApp contact number. The bot

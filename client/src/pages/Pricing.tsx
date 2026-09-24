@@ -24,8 +24,7 @@ const labels = {
     hint: "اختر الخطة المناسبة لمتابعة كل الدورات والاختبارات.",
     back: "الرئيسية",
     payWhatsapp: "ادفع عبر WhatsApp",
-    payBaridimob: "ادفع عبر BaridiMob",
-    paySlickpay: "ادفع عبر SlickPay",
+    payPostal: "الدفع عبر الحساب البريدي (CCP)",
     loginFirst: "سجّل الدخول للمتابعة",
     currentPlan: "خطتك الحالية",
     noPlans: "لا توجد خطط منشورة حاليًا.",
@@ -42,8 +41,7 @@ const labels = {
     hint: "Choisissez le plan adapté pour suivre tous les cours et quiz.",
     back: "Accueil",
     payWhatsapp: "Payer via WhatsApp",
-    payBaridimob: "Payer avec BaridiMob",
-    paySlickpay: "Payer avec SlickPay",
+    payPostal: "Payer par compte postal (CCP)",
     loginFirst: "Connectez-vous pour continuer",
     currentPlan: "Votre plan actuel",
     noPlans: "Aucun plan publié pour le moment.",
@@ -60,8 +58,7 @@ const labels = {
     hint: "Choose the plan that fits to follow every course and quiz.",
     back: "Home",
     payWhatsapp: "Pay via WhatsApp",
-    payBaridimob: "Pay with BaridiMob",
-    paySlickpay: "Pay with SlickPay",
+    payPostal: "Pay via postal account (CCP)",
     loginFirst: "Sign in to continue",
     currentPlan: "Your current plan",
     noPlans: "No plans have been published yet.",
@@ -194,10 +191,7 @@ export default function Pricing() {
       ? t.free
       : `${(cents / 100).toLocaleString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-FR" : "en-US")} ${currency}`;
 
-  const pay = (
-    planId: number,
-    provider: "whatsapp" | "baridimob" | "slickpay" | "postal"
-  ) => {
+  const pay = (planId: number, provider: "whatsapp" | "postal") => {
     if (!isAuthenticated) {
       startLogin();
       return;
@@ -385,13 +379,13 @@ export default function Pricing() {
                     <Button
                       className="catalog-start"
                       disabled={checkout.isPending && payingPlanId === plan.id}
-                      onClick={() => pay(plan.id, "whatsapp")}
+                      onClick={() => pay(plan.id, "postal")}
                     >
                       {checkout.isPending && payingPlanId === plan.id
                         ? t.processing
                         : !isAuthenticated
                           ? t.loginFirst
-                          : t.payWhatsapp}
+                          : t.payPostal}
                       <Check size={15} />
                     </Button>
                     {isAuthenticated && (
@@ -400,35 +394,9 @@ export default function Pricing() {
                         disabled={
                           checkout.isPending && payingPlanId === plan.id
                         }
-                        onClick={() => pay(plan.id, "baridimob")}
+                        onClick={() => pay(plan.id, "whatsapp")}
                       >
-                        {t.payBaridimob}
-                      </Button>
-                    )}
-                    {isAuthenticated && (
-                      <Button
-                        className="quiet-button"
-                        disabled={
-                          checkout.isPending && payingPlanId === plan.id
-                        }
-                        onClick={() => pay(plan.id, "slickpay")}
-                      >
-                        {t.paySlickpay}
-                      </Button>
-                    )}
-                    {isAuthenticated && (
-                      <Button
-                        className="quiet-button"
-                        disabled={
-                          checkout.isPending && payingPlanId === plan.id
-                        }
-                        onClick={() => pay(plan.id, "postal")}
-                      >
-                        {lang === "ar"
-                          ? "الدفع عبر الحساب البريدي (CCP)"
-                          : lang === "fr"
-                            ? "Payer par compte postal (CCP)"
-                            : "Pay via postal account (CCP)"}
+                        {t.payWhatsapp}
                       </Button>
                     )}
                   </div>

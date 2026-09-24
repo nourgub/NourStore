@@ -14,34 +14,7 @@ export const ENV = {
   // without touching the invoice/subscription model. See DEPLOYMENT.md.
   paymentProvider: process.env.PAYMENT_PROVIDER ?? "",
   paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? "",
-  // BaridiMob / Algérie Poste (BaridiWEB) merchant credentials. Algérie
-  // Poste does not publish a public self-serve API — these values only
-  // exist once a real merchant agreement has been signed via
-  // https://baridiweb.poste.dz and Algérie Poste has issued integration
-  // details directly. Until all three are set, the BaridiMob provider
-  // reports itself as unconfigured rather than attempting a fake charge.
-  baridimobMerchantId: process.env.BARIDIMOB_MERCHANT_ID ?? "",
-  baridimobApiKey: process.env.BARIDIMOB_API_KEY ?? "",
-  baridimobApiBaseUrl: process.env.BARIDIMOB_API_BASE_URL ?? "",
-  // SlickPay — unlike BaridiMob, this one has a real public REST API
-  // (base URLs and the merchants/invoices endpoint confirmed directly from
-  // slick-pay-algeria's own official SDK source, not guessed) with a free
-  // self-serve sandbox at slick-pay.com — no merchant agreement required
-  // just to get a public_key and start testing. Until this is set, the
-  // SlickPay provider reports itself as unconfigured rather than attempting
-  // a fake charge, same as every other payment provider here.
-  slickpayPublicKey: process.env.SLICKPAY_PUBLIC_KEY ?? "",
-  slickpaySandbox: process.env.SLICKPAY_SANDBOX !== "false",
-  // Chargily Pay — a real, fully-documented public REST API (confirmed
-  // directly from https://dev.chargily.com/pay-v2/api-reference, not
-  // guessed) with a free sandbox: get a secret key from
-  // https://pay.chargily.com/dashboard/developers-corner (test keys start
-  // "test_sk_"). Until CHARGILY_SECRET_KEY is set, the Chargily provider
-  // reports itself as unconfigured rather than attempting a fake charge,
-  // same as every other payment provider here.
-  chargilySecretKey: process.env.CHARGILY_SECRET_KEY ?? "",
-  chargilySandbox: process.env.CHARGILY_SANDBOX !== "false",
-  // WhatsApp Cloud API (Meta) — unlike BaridiMob, this is a real public API
+  // WhatsApp Cloud API (Meta) — this is a real public API
   // (developers.facebook.com/docs/whatsapp/cloud-api). Still requires a
   // real Meta Business/WhatsApp Business Platform setup: a verified phone
   // number, a permanent access token, and a webhook verify token you choose.
