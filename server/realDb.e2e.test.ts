@@ -17,6 +17,7 @@ import {
   invoices,
   certificates,
   userSubscriptions,
+  blogPosts,
   type User,
 } from "../drizzle/schema";
 
@@ -1003,3 +1004,82 @@ describe.skipIf(!HAS_DB)(
     });
   }
 );
+
+describe.skipIf(!HAS_DB)("REAL DB — blog authoring and publish state", () => {
+  const adminOpenId = emailOpenId(`blog-admin-${RUN}@nourix.test`);
+  const slug = `real-db-blog-post-${RUN}`;
+  let admin: User;
+  let postId: number;
+
+  afterAll(async () => {
+    const db = await mustGetDb();
+    await db.delete(blogPosts).where(eq(blogPosts.slug, slug));
+    await db.execute("SET FOREIGN_KEY_CHECKS=0");
+    try {
+      await db.delete(users).where(eq(users.openId, adminOpenId));
+    } finally {
+      await db.execute("SET FOREIGN_KEY_CHECKS=1");
+    }
+  }, 30000);
+
+  it("a new post is a draft (invisible publicly) until an admin explicitly publishes it, and disappears again once unpublished", async () => {
+    const passwordHash = await hashPassword("Fixture-Pass-123");
+    const created = await createEmailUser({
+      openId: adminOpenId,
+      email: `blog-admin-${RUN}@nourix.test`,
+      name: "Fixture",
+      passwordHash,
+    });
+    if (!created.ok) throw new Error("Failed to create fixture admin user");
+    await setRole(adminOpenId, "admin");
+    admin = await getUserRow(adminOpenId);
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    const anon = appRouter.createCaller(ctxFor(null));
+
+    const createResult = await adminCaller.blog.createPost({
+      slug,
+      titleAr: "عنوان تجريبي",
+      titleFr: "Titre de test",
+      titleEn: "Test title",
+      excerptAr: "مقتطف تجريبي",
+      excerptFr: "Extrait de test",
+      excerptEn: "Test excerpt",
+      contentAr: "محتوى المقالة الكامل لأغراض الاختبار.",
+      contentFr: "Contenu complet de l'article à des fins de test.",
+      contentEn: "Full article content for testing purposes.",
+    });
+    expect(createResult).toBeTruthy();
+    const db = await mustGetDb();
+    const rows = await db
+      .select({ id: blogPosts.id, isPublished: blogPosts.isPublished })
+      .from(blogPosts)
+      .where(eq(blogPosts.slug, slug))
+      .limit(1);
+    if (!rows[0]) throw new Error("Fixture blog post was not created");
+    postId = rows[0].id;
+    expect(rows[0].isPublished).toBe(0);
+
+    // A draft is invisible on both the public list and the direct-by-slug read.
+    await expect(anon.blog.posts()).resolves.not.toContainEqual(
+      expect.objectContaining({ slug })
+    );
+    await expect(anon.blog.post({ slug })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+
+    await adminCaller.blog.setPostPublished({ id: postId, isPublished: true });
+    const published = await anon.blog.post({ slug });
+    expect(published.titleAr).toBe("عنوان تجريبي");
+    expect(published.contentEn).toBe(
+      "Full article content for testing purposes."
+    );
+    await expect(anon.blog.posts()).resolves.toContainEqual(
+      expect.objectContaining({ slug })
+    );
+
+    await adminCaller.blog.setPostPublished({ id: postId, isPublished: false });
+    await expect(anon.blog.post({ slug })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});

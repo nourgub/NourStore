@@ -171,6 +171,9 @@ export default function Home() {
             <button className="nav-link" onClick={() => scrollToId("footer")}>
               {copy.navAbout}
             </button>
+            <a className="nav-link" href="/blog">
+              {copy.navBlog}
+            </a>
             <a className="nav-link" href="/support">
               {copy.navSupport}
             </a>
@@ -274,6 +277,7 @@ export default function Home() {
             >
               {copy.navAbout}
             </button>
+            <a href="/blog">{copy.navBlog}</a>
             <a href="/support">{copy.navSupport}</a>
             <a href="/login">{copy.login}</a>
             <div className="mobile-language-row" aria-label="Language selector">
@@ -715,6 +719,7 @@ export default function Home() {
                 Facebook
               </a>
             )}
+            <a href="/blog">{copy.navBlog}</a>
             <a href="/support">{copy.navSupport}</a>
           </div>
           <div className="footer-lang">

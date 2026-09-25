@@ -142,6 +142,45 @@ describe("role permissions", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("rejects non-admin access to blog authoring, but leaves public post reads open", async () => {
+    for (const role of ["learner", "teacher", "institution"] as const) {
+      const caller = appRouter.createCaller(contextFor(role));
+      await expect(caller.blog.adminPosts()).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(
+        caller.blog.createPost({
+          slug: `test-post-${role}`,
+          titleAr: "عنوان",
+          titleFr: "Titre",
+          titleEn: "Title",
+          excerptAr: "مقتطف",
+          excerptFr: "Extrait",
+          excerptEn: "Excerpt",
+          contentAr: "محتوى",
+          contentFr: "Contenu",
+          contentEn: "Content",
+        })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller.blog.setPostPublished({ id: 1, isPublished: true })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(
+        caller.blog.deletePost({ id: 1 })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+    // The public read side needs no auth at all.
+    const anon = appRouter.createCaller({
+      user: null,
+      req: { protocol: "https", headers: {} } as TrpcContext["req"],
+      res: {} as TrpcContext["res"],
+    });
+    await expect(anon.blog.posts()).resolves.toEqual([]);
+    await expect(
+      anon.blog.post({ slug: "unknown-post" })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("rejects non-admin access to coupon management", async () => {
     const caller = appRouter.createCaller(contextFor("teacher"));
     await expect(caller.admin.coupons()).rejects.toMatchObject({

@@ -1021,3 +1021,31 @@ export const googleCalendarConnections = mysqlTable("googleCalendarConnections",
 });
 
 export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// A small admin-authored blog — organic-search content (IT/AI/e-commerce
+// tips) to bring visitors in for free, distinct from course content.
+// Plain text per language (rendered with white-space: pre-wrap client-side,
+// same convention as an "article" lesson) rather than HTML/markdown — no
+// rich-text sanitization to get wrong. Admin-only, mirroring badges/coupons.
+// ---------------------------------------------------------------------------
+
+export const blogPosts = mysqlTable("blogPosts", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  titleAr: varchar("titleAr", { length: 255 }).notNull(),
+  titleFr: varchar("titleFr", { length: 255 }).notNull(),
+  titleEn: varchar("titleEn", { length: 255 }).notNull(),
+  excerptAr: varchar("excerptAr", { length: 500 }).notNull(),
+  excerptFr: varchar("excerptFr", { length: 500 }).notNull(),
+  excerptEn: varchar("excerptEn", { length: 500 }).notNull(),
+  contentAr: text("contentAr").notNull(),
+  contentFr: text("contentFr").notNull(),
+  contentEn: text("contentEn").notNull(),
+  isPublished: int("isPublished").default(0).notNull(),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;

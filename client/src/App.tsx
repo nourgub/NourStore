@@ -16,6 +16,8 @@ import Home from "./pages/Home";
 // common first page and shouldn't show a loading flash.
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CourseCatalog = lazy(() => import("./pages/CourseCatalog"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
 const CourseDetail = lazy(() => import("./pages/CourseDetail"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Legal = lazy(() => import("./pages/Legal"));
@@ -97,6 +99,8 @@ function Router() {
         <Route path="/support" component={Support} />
         <Route path="/lesson/:lessonId" component={LessonViewer} />
         <Route path="/courses" component={CourseCatalog} />
+        <Route path="/blog" component={Blog} />
+        <Route path="/blog/:slug" component={BlogPost} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
