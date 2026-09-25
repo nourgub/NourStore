@@ -9,7 +9,6 @@ import {
   GraduationCap,
   UserRound,
   Building2,
-  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -121,12 +120,9 @@ const copy = {
     pendingApproval:
       "تم إنشاء حسابك بنجاح ✅ هو الآن بانتظار موافقة الإدارة، وستتمكن من تسجيل الدخول فور تفعيله.",
     roleLabel: "أنا…",
-    roleLearner: "متعلم اللغة الألمانية",
-    roleTeacher: "أستاذ/مدرّس اللغة الألمانية",
-    roleInstitution: "مدير مؤسسة / مركز تعليم لغة",
-    freeAssessment: "احجز تحديد مستواك مجانًا",
-    freeAssessmentHint:
-      "اختبار إلكتروني قصير يحدد مستواك في اللغة الألمانية فورًا، دون الحاجة لحساب.",
+    roleLearner: "متعلم",
+    roleTeacher: "أستاذ/مدرّب",
+    roleInstitution: "مدير مؤسسة / مركز تكوين",
   },
   fr: {
     loginTitle: "Bienvenue sur Nourix Academy",
@@ -151,12 +147,9 @@ const copy = {
     pendingApproval:
       "Votre compte a été créé avec succès ✅ Il est maintenant en attente d'approbation par l'administration ; vous pourrez vous connecter dès son activation.",
     roleLabel: "Je suis…",
-    roleLearner: "Apprenant d'allemand",
-    roleTeacher: "Professeur d'allemand",
-    roleInstitution: "Responsable d'établissement / centre de langue",
-    freeAssessment: "Réservez votre test de niveau gratuit",
-    freeAssessmentHint:
-      "Un court test en ligne qui détermine votre niveau d'allemand immédiatement, sans compte requis.",
+    roleLearner: "Apprenant",
+    roleTeacher: "Formateur",
+    roleInstitution: "Responsable d'établissement / centre de formation",
   },
   en: {
     loginTitle: "Welcome to Nourix Academy",
@@ -181,12 +174,9 @@ const copy = {
     pendingApproval:
       "Your account was created successfully ✅ It is now awaiting approval by an administrator, and you'll be able to log in as soon as it's activated.",
     roleLabel: "I am…",
-    roleTeacher: "German language teacher",
-    roleLearner: "German language learner",
-    roleInstitution: "Institution / language-center manager",
-    freeAssessment: "Book your free level assessment",
-    freeAssessmentHint:
-      "A short online test that determines your German level instantly, no account needed.",
+    roleTeacher: "Instructor/trainer",
+    roleLearner: "Learner",
+    roleInstitution: "Institution / training-center manager",
   },
 } as const;
 
@@ -338,33 +328,6 @@ export default function AuthPage({
                 />
               </div>
             </>
-          )}
-
-          {register && !pendingApproval && (
-            <Link
-              href="/placement"
-              className="auth-security"
-              style={{
-                display: "flex",
-                gap: 10,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "rgba(241,206,99,.08)",
-                border: "1px solid rgba(241,206,99,.25)",
-                marginBottom: 14,
-                textDecoration: "none",
-              }}
-            >
-              <ClipboardCheck size={16} />
-              <span>
-                <strong style={{ display: "block", fontSize: 13 }}>
-                  {t.freeAssessment}
-                </strong>
-                <small style={{ fontSize: 11, opacity: 0.75 }}>
-                  {t.freeAssessmentHint}
-                </small>
-              </span>
-            </Link>
           )}
 
           {pendingApproval ? (

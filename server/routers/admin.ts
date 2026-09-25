@@ -8,9 +8,6 @@ import { remindStaleCheckoutSessions } from "../whatsappBot";
 import {
   getAllCourses,
   getManagedLearnerCount,
-  getPlacementTestsForAdmin,
-  createPlacementTest,
-  createPlacementQuestion,
   setCoursePublished,
   logAdminAction,
   archiveManagedCourse,
@@ -48,33 +45,6 @@ export const adminRouter = router({
   learnerCount: adminProcedure.query(({ ctx }) =>
     getManagedLearnerCount(ctx.user.role, ctx.user.id)
   ),
-  placementTests: adminProcedure.query(() => getPlacementTestsForAdmin()),
-  createPlacementTest: adminProcedure
-    .input(
-      z.object({
-        subject: z.string().min(1).max(40),
-        titleAr: z.string().min(2),
-        titleFr: z.string().min(2),
-        titleEn: z.string().min(2),
-        isPublished: z.boolean().optional(),
-      })
-    )
-    .mutation(({ input }) => createPlacementTest(input)),
-  createPlacementQuestion: adminProcedure
-    .input(
-      z.object({
-        testId: z.number().int().positive(),
-        promptAr: z.string().min(2),
-        promptFr: z.string().min(2),
-        promptEn: z.string().min(2),
-        optionsJson: z.string().optional(),
-        answerKey: z.string().optional(),
-        skill: z.string().min(2),
-        difficulty: z.enum(["starter", "easy", "medium", "hard"]),
-        orderIndex: z.number().int().min(0),
-      })
-    )
-    .mutation(({ input }) => createPlacementQuestion(input)),
   publishCourse: adminProcedure
     .input(
       z.object({
@@ -313,6 +283,8 @@ export const adminRouter = router({
           "scale",
           "graduation-cap",
           "clipboard-check",
+          "briefcase",
+          "shopping-cart",
         ]),
         titleAr: z.string().min(2).max(255),
         titleFr: z.string().min(2).max(255),

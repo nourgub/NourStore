@@ -21,15 +21,7 @@ function contextFor(role: "learner" | "teacher" | "admin"): TrpcContext {
 }
 
 describe("learning flows", () => {
-  it("returns an honest empty placement state when no published test exists", async () => {
-    const caller = appRouter.createCaller(contextFor("learner"));
-    await expect(caller.placement.current()).resolves.toEqual({
-      test: undefined,
-      questions: [],
-    });
-  });
-
-  it("never fakes lesson access — returns an honest non-'ok' state for a nonexistent lesson (exact reason depends on whether a database is connected)", async () => {
+it("never fakes lesson access — returns an honest non-'ok' state for a nonexistent lesson (exact reason depends on whether a database is connected)", async () => {
     const caller = appRouter.createCaller(contextFor("learner"));
     const result = await caller.learning.lesson({ lessonId: 999999 });
     expect(result.access).not.toBe("ok");
@@ -42,14 +34,7 @@ describe("learning flows", () => {
     ).resolves.toEqual({ enrolled: false, lessons: [] });
   });
 
-  it("does not accept a placement submission for a missing test", async () => {
-    const caller = appRouter.createCaller(contextFor("learner"));
-    await expect(
-      caller.placement.submit({ testId: 999999, answersJson: "{}" })
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  it("returns empty enrollments without inventing learner activity", async () => {
+it("returns empty enrollments without inventing learner activity", async () => {
     const caller = appRouter.createCaller(contextFor("learner"));
     await expect(caller.progress.enrollments()).resolves.toEqual([]);
   });

@@ -11,11 +11,11 @@ const copy = {
   ar: {
     title: "من أنت؟",
     hint: "اختر نوع حسابك لنُظهر لك اللوحة والأدوات المناسبة — يمكن لاحقًا لإدارة المنصة تعديل هذا إن احتجت.",
-    learner: "متعلم اللغة الألمانية",
-    learnerDesc: "أتابع دروسًا ومستويات، وأحضّر للامتحان الدولي، وأحصل على شهادات.",
-    teacher: "أستاذ/مدرّس اللغة الألمانية",
-    teacherDesc: "أنشئ الدروس والاختبارات، وأتابع تقدم المتعلمين الذين أدرّسهم.",
-    institution: "مدير مؤسسة / مركز تعليم لغة",
+    learner: "متعلم",
+    learnerDesc: "أتابع الدروس والكتب حسب مستواي، وأحصل على شهادة عند إتمام كل مسار.",
+    teacher: "أستاذ / مدرّب",
+    teacherDesc: "أنشئ الدروس والاختبارات، وأرفع الكتب والمراجع، وأتابع تقدم المتعلمين.",
+    institution: "مدير مؤسسة / مركز تكوين",
     institutionDesc:
       "أشرف على مجموعة من الأساتذة والمتعلمين داخل مؤسستي، وأتابع دوراتهم وأعدادهم.",
     confirm: "تأكيد الاختيار",
@@ -23,29 +23,29 @@ const copy = {
   fr: {
     title: "Qui êtes-vous ?",
     hint: "Choisissez votre type de compte pour afficher le tableau de bord adapté — l’administration pourra le modifier plus tard si besoin.",
-    learner: "Apprenant d'allemand",
+    learner: "Apprenant",
     learnerDesc:
-      "Je suis des leçons et des niveaux, je me prépare à l'examen international, et j'obtiens des certificats.",
-    teacher: "Professeur d'allemand",
+      "Je suis les leçons et les livres selon mon niveau, et j'obtiens un certificat à chaque parcours complété.",
+    teacher: "Formateur",
     teacherDesc:
-      "Je crée des leçons et des évaluations, et je suis la progression des apprenants que j'enseigne.",
-    institution: "Responsable d'établissement / centre de langue",
+      "Je crée les leçons et les évaluations, j'ajoute les livres et références, et je suis la progression des apprenants.",
+    institution: "Responsable d'établissement / centre de formation",
     institutionDesc:
-      "Je supervise un groupe de professeurs et d'apprenants au sein de mon établissement, et je suis leurs cours et effectifs.",
+      "Je supervise un groupe de formateurs et d'apprenants au sein de mon établissement, et je suis leurs cours et effectifs.",
     confirm: "Confirmer le choix",
   },
   en: {
     title: "Who are you?",
     hint: "Choose your account type to see the right dashboard and tools — the administration can change this later if needed.",
-    learner: "German language learner",
+    learner: "Learner",
     learnerDesc:
-      "I follow lessons and levels, prepare for the international exam, and earn certificates.",
-    teacher: "German language teacher",
+      "I follow lessons and books at my own level, and earn a certificate for every path completed.",
+    teacher: "Instructor / trainer",
     teacherDesc:
-      "I create lessons and assessments, and track the progress of the learners I teach.",
-    institution: "Institution / language-center manager",
+      "I create lessons and assessments, add books and references, and track learner progress.",
+    institution: "Institution / training-center manager",
     institutionDesc:
-      "I oversee a group of teachers and learners within my institution, and track their courses and headcount.",
+      "I oversee a group of instructors and learners within my institution, and track their courses and headcount.",
     confirm: "Confirm choice",
   },
 } as const;

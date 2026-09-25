@@ -64,7 +64,6 @@ export const questions = [
 ];
 export const courseLabels = {
   ar: {
-    placement: "اختبار المستوى",
     quiz: "اختبار نهاية الوحدة",
     parent: "فضاء الولي",
     teacher: "لوحة الأستاذ",
@@ -90,7 +89,6 @@ export const courseLabels = {
     dashboard: "لوحة التحكم",
   },
   fr: {
-    placement: "Test de niveau",
     quiz: "Quiz de fin d’unité",
     parent: "Espace parent",
     teacher: "Espace enseignant",
@@ -116,7 +114,6 @@ export const courseLabels = {
     dashboard: "Tableau de bord",
   },
   en: {
-    placement: "Placement test",
     quiz: "Unit-end quiz",
     parent: "Parent space",
     teacher: "Teacher space",

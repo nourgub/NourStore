@@ -5,7 +5,6 @@
 export * from "./db/adminAudit";
 export * from "./db/usersAuth";
 export * from "./db/subjects";
-export * from "./db/placement";
 export * from "./db/quizzes";
 export * from "./db/courses";
 export * from "./db/notifications";

@@ -284,10 +284,6 @@ export default function CourseDetail() {
                       <BookOpen size={14} />
                       {live.units.length} {t.unit}
                     </span>
-                    <span>
-                      <Sparkles size={14} />
-                      {t.optional}
-                    </span>
                   </div>
                   {joinButton}
                   {isAuthenticated &&

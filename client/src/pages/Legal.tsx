@@ -42,7 +42,7 @@ const privacyContent = {
       },
       {
         h: "البيانات التي نجمعها",
-        p: "الاسم، البريد الإلكتروني، رقم الهاتف (إن قُدِّم)، بيانات الالتحاق والتقدم الدراسي، نتائج الاختبارات، وبيانات الفوترة (دون تخزين تفاصيل بطاقة الدفع الكاملة — تُعالج عبر مزود الدفع مباشرة).",
+        p: "الاسم، البريد الإلكتروني، رقم الهاتف (إن قُدِّم)، بيانات الالتحاق والتقدم الدراسي، نتائج الاختبارات، وبيانات الفوترة (لا نجمع أو نُخزّن أي بيانات بطاقة بنكية — الدفع يدوي عبر تحويل بريدي وإثبات دفع فقط).",
       },
       {
         h: "أساس المعالجة",
@@ -54,11 +54,7 @@ const privacyContent = {
       },
       {
         h: "مشاركة البيانات",
-        p: "لا نبيع بياناتك لأي طرف ثالث. قد تُشارك بيانات محدودة مع مزود الدفع (لإتمام العملية) ومزود الاستضافة التقنية، بالقدر اللازم فقط لتشغيل الخدمة.",
-      },
-      {
-        h: "بيانات الأطفال وأولياء الأمور",
-        p: "بالنسبة للمتعلمين القاصرين، تتطلب المنصة موافقة/إشراف ولي الأمر عبر ميزة ربط الحساب. لا نجمع بيانات تفوق ما هو ضروري لتقديم الخدمة التعليمية.",
+        p: "لا نبيع بياناتك لأي طرف ثالث. قد تُشارك بيانات محدودة مع مزود الاستضافة التقنية فقط، بالقدر اللازم لتشغيل الخدمة. الدفع يدوي بالكامل (تحويل بريدي ومراجعة إدارية) ولا يمر عبر أي مزود دفع خارجي.",
       },
       {
         h: "مدة الاحتفاظ بالبيانات",
@@ -79,7 +75,7 @@ const privacyContent = {
       },
       {
         h: "Données collectées",
-        p: "Nom, e-mail, numéro de téléphone (si fourni), données d’inscription et de progression, résultats aux évaluations, et données de facturation (les informations complètes de carte ne sont jamais stockées — elles sont traitées directement par le prestataire de paiement).",
+        p: "Nom, e-mail, numéro de téléphone (si fourni), données d'inscription et de progression, résultats aux évaluations, et données de facturation (nous ne collectons ni ne stockons aucune donnée de carte bancaire — le paiement est manuel, par virement postal et justificatif de paiement).",
       },
       {
         h: "Base légale du traitement",
@@ -91,11 +87,7 @@ const privacyContent = {
       },
       {
         h: "Partage des données",
-        p: "Nous ne vendons pas vos données. Des données limitées peuvent être partagées avec le prestataire de paiement (pour finaliser la transaction) et l’hébergeur technique, dans la stricte mesure nécessaire au fonctionnement du service.",
-      },
-      {
-        h: "Données des enfants et des parents",
-        p: "Pour les apprenants mineurs, la plateforme requiert le consentement/suivi d’un parent via la fonctionnalité de liaison de compte. Nous ne collectons pas plus de données que nécessaire à la prestation pédagogique.",
+        p: "Nous ne vendons pas vos données. Des données limitées peuvent être partagées uniquement avec l'hébergeur technique, dans la stricte mesure nécessaire au fonctionnement du service. Le paiement est entièrement manuel (virement postal et vérification par l'administration) et ne passe par aucun prestataire de paiement externe.",
       },
       {
         h: "Durée de conservation",
@@ -116,7 +108,7 @@ const privacyContent = {
       },
       {
         h: "Data we collect",
-        p: "Name, email, phone number (if provided), enrollment and progress data, assessment results, and billing data (full card details are never stored — they are processed directly by the payment provider).",
+        p: "Name, email, phone number (if provided), enrollment and progress data, assessment results, and billing data (we never collect or store any card details — payment is manual, via postal transfer and a payment receipt).",
       },
       {
         h: "Legal basis for processing",
@@ -128,13 +120,9 @@ const privacyContent = {
       },
       {
         h: "Data sharing",
-        p: "We do not sell your data. Limited data may be shared with the payment provider (to complete a transaction) and the technical hosting provider, only to the extent necessary to operate the service.",
+        p: "We do not sell your data. Limited data may be shared only with the technical hosting provider, to the extent necessary to operate the service. Payment is entirely manual (postal transfer and review by the administration) and never goes through any external payment provider.",
       },
-      {
-        h: "Children's and parents' data",
-        p: "For minor learners, the platform requires parental consent/oversight via the account-linking feature. We do not collect more data than necessary to deliver the educational service.",
-      },
-      {
+{
         h: "Data retention",
         p: "We retain your data for as long as your account is active, and for an additional period after cancellation where accounting/tax rules require it.",
       },
@@ -156,11 +144,11 @@ const termsContent = {
       },
       {
         h: "الحسابات والأدوار",
-        p: "يوفر النظام أدوارًا متعددة (متعلم، ولي أمر، أستاذ، مؤسسة، مسؤول). كل مستخدم مسؤول عن سرية بيانات دخوله وعن دقة المعلومات المقدمة.",
+        p: "يوفر النظام أدوارًا متعددة (متعلم، أستاذ/مدرّب، مؤسسة، مسؤول). كل مستخدم مسؤول عن سرية بيانات دخوله وعن دقة المعلومات المقدمة.",
       },
       {
         h: "الاشتراكات والدفع",
-        p: "تُعرض الأسعار بالدينار الجزائري (DZD) وفق التنظيم المعمول به. الدفع الإلكتروني يتم عبر مزود دفع خارجي؛ لا نُخزّن بيانات بطاقتك البنكية الكاملة. الوصول اليدوي من الإدارة لا يُعتبر عملية دفع.",
+        p: "تُعرض الأسعار بالدينار الجزائري (DZD) وفق التنظيم المعمول به. الدفع يتم يدويًا عبر تحويل بريدي (CCP/RIP) وإرسال إثبات الدفع للمراجعة (عبر المنصة أو واتساب)؛ لا نطلب ولا نُخزّن أي بيانات لبطاقة بنكية. تفعيل الاشتراك يتم بعد مراجعة الإدارة للإيصال.",
       },
       {
         h: "الإلغاء والاسترجاع",
@@ -197,11 +185,11 @@ const termsContent = {
       },
       {
         h: "Comptes et rôles",
-        p: "Le système propose plusieurs rôles (apprenant, parent, enseignant, institution, administrateur). Chaque utilisateur est responsable de la confidentialité de ses identifiants et de l’exactitude des informations fournies.",
+        p: "Le système propose plusieurs rôles (apprenant, formateur/enseignant, institution, administrateur). Chaque utilisateur est responsable de la confidentialité de ses identifiants et de l’exactitude des informations fournies.",
       },
       {
         h: "Abonnements et paiement",
-        p: "Les prix sont affichés en dinars algériens (DZD) conformément à la réglementation en vigueur. Le paiement en ligne s’effectue via un prestataire externe ; nous ne stockons jamais les informations complètes de votre carte. Un accès accordé manuellement par l’administration ne constitue pas un paiement.",
+        p: "Les prix sont affichés en dinars algériens (DZD) conformément à la réglementation en vigueur. Le paiement s'effectue manuellement par virement postal (CCP/RIP) suivi de l'envoi d'un justificatif pour vérification (via la plateforme ou WhatsApp) ; nous ne demandons ni ne stockons aucune donnée de carte bancaire. L'abonnement est activé après vérification du reçu par l'administration.",
       },
       {
         h: "Annulation et remboursement",
@@ -238,11 +226,11 @@ const termsContent = {
       },
       {
         h: "Accounts and roles",
-        p: "The system offers multiple roles (learner, parent, teacher, institution, admin). Each user is responsible for the confidentiality of their credentials and the accuracy of the information they provide.",
+        p: "The system offers multiple roles (learner, teacher/instructor, institution, admin). Each user is responsible for the confidentiality of their credentials and the accuracy of the information they provide.",
       },
       {
         h: "Subscriptions and payment",
-        p: "Prices are shown in Algerian dinars (DZD) per applicable regulation. Online payment is processed via an external provider; we never store your full card details. Access granted manually by the administration does not constitute a payment.",
+        p: "Prices are shown in Algerian dinars (DZD) per applicable regulation. Payment is manual, via postal transfer (CCP/RIP) followed by sending proof of payment for review (through the platform or WhatsApp); we never request or store any card details. A subscription is activated once the administration has reviewed the receipt.",
       },
       {
         h: "Cancellation and refunds",

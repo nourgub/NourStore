@@ -54,7 +54,7 @@ import {
   Code2Icon,
   ClockIcon,
 } from "./shared";
-import { ContentStructureForm, PlacementAdminPanel } from "./staff/CourseManagement";
+import { ContentStructureForm } from "./staff/CourseManagement";
 import { QuizBuilder, FinalExamBuilder, GradingQueuePanel } from "./staff/QuizManagement";
 import {
   AdminUsersPanel,
@@ -265,10 +265,10 @@ export function StaffSpace({
                 : "Nourix Academy control"
               : institution
                 ? lang === "ar"
-                  ? "إدارة مركز تعليم اللغة"
+                  ? "إدارة مركز التكوين"
                   : lang === "fr"
-                    ? "Gérez votre centre de langue"
-                    : "Manage your language center"
+                    ? "Gérez votre centre de formation"
+                    : "Manage your training center"
                 : lang === "ar"
                   ? "مساحة بناء التعلم"
                   : "Build the learning experience"}
@@ -885,7 +885,6 @@ export function StaffSpace({
             </div>
           )}
         </div>
-        {admin && <PlacementAdminPanel lang={lang} />}{" "}
         {admin && <AdminUsersPanel lang={lang} />}
         {admin && <CreateUserPanel lang={lang} />}
         {admin && <EnrollLearnerPanel lang={lang} />}

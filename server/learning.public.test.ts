@@ -68,15 +68,6 @@ it("requires authentication to read a unit quiz (never resolves anonymously)", a
   });
 });
 
-it("never exposes answerKey/explanation fields on the public placement contract", async () => {
-  const caller = appRouter.createCaller(createPublicContext());
-  const placement = await caller.placement.current();
-  for (const question of placement.questions) {
-    expect(question).not.toHaveProperty("answerKey");
-    expect(question).not.toHaveProperty("explanationAr");
-  }
-});
-
 it("resolves a currency-aware plan list without throwing (empty array with no database)", async () => {
   const caller = appRouter.createCaller(createPublicContext());
   await expect(

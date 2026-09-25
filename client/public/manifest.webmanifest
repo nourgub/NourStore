@@ -1,7 +1,7 @@
 {
   "name": "Nourix Academy",
   "short_name": "Nourix",
-  "description": "منصة Nourix Academy لتعلّم اللغة الألمانية عن بعد — من الأساسيات إلى التحضير للامتحان الدولي",
+  "description": "منصة Nourix Academy للتكوين عن بعد في الإعلام الآلي، البيروتيك، الذكاء الاصطناعي، والتجارة الإلكترونية",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -30,9 +30,9 @@
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "اختبار المستوى المجاني",
-      "short_name": "اختبار المستوى",
-      "url": "/placement?source=pwa-shortcut",
+      "name": "الدورات",
+      "short_name": "الدورات",
+      "url": "/courses?source=pwa-shortcut",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]

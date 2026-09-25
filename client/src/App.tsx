@@ -33,11 +33,6 @@ const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
 // learner taking a quiz downloaded the whole admin panel's code too. Split
 // into two independent modules (client/src/pages/flows/) so each is
 // fetched only by the visitors who actually need it.
-const PlacementTest = lazy(() =>
-  import("./pages/flows/LearnerFlows").then((m) => ({
-    default: m.PlacementTest,
-  }))
-);
 const UnitQuiz = lazy(() =>
   import("./pages/flows/LearnerFlows").then((m) => ({ default: m.UnitQuiz }))
 );
@@ -82,7 +77,6 @@ function Router() {
         />
         <Route path="/workspace" component={Workspace} />
         <Route path="/dashboard" component={Dashboard} />
-        <Route path="/placement" component={PlacementTest} />
         <Route path="/quiz/:unitId" component={UnitQuiz} />
         <Route path="/quiz" component={UnitQuiz} />
         <Route path="/exam/:courseId" component={FinalExam} />

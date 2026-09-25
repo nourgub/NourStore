@@ -20,10 +20,10 @@ export const users = mysqlTable("users", {
   // (server/_core/emailAuth.ts) — null for Google OAuth accounts. Format: "scrypt:<salt-hex>:<hash-hex>", never a plain
   // password, never a reversible encoding.
   passwordHash: varchar("passwordHash", { length: 200 }),
-  // Nourix Academy: a German-language learning platform. "learner" = a
-  // language learner; "teacher" = a language teacher/instructor;
-  // "institution" = a language-center manager overseeing a group of
-  // teachers/learners (courses + learner counts only — no platform-wide
+  // Nourix Academy: an IT/office-software/AI/e-commerce training
+  // platform. "learner" = a trainee; "teacher" = an instructor/trainer;
+  // "institution" = a training-center manager overseeing a group of
+  // instructors/learners (courses + learner counts only — no platform-wide
   // revenue/analytics access and no ability to change other users'
   // roles, unlike "admin"). "parent" (a K-12-era role) stays removed.
   role: mysqlEnum("role", ["learner", "teacher", "institution", "admin"])
@@ -491,71 +491,8 @@ export const lessonProgress = mysqlTable(
   })
 );
 
-export const placementTests = mysqlTable("placementTests", {
-  id: int("id").autoincrement().primaryKey(),
-  // A real subject slug (see `subjects` table), or "combined" for a multi-subject placement test.
-  subject: varchar("subject", { length: 40 }).notNull(),
-  titleAr: varchar("titleAr", { length: 255 }).notNull(),
-  titleFr: varchar("titleFr", { length: 255 }).notNull(),
-  titleEn: varchar("titleEn", { length: 255 }).notNull(),
-  isPublished: int("isPublished").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export const placementQuestions = mysqlTable(
-  "placementQuestions",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    testId: int("testId")
-      .notNull()
-      .references(() => placementTests.id),
-    promptAr: text("promptAr").notNull(),
-    promptFr: text("promptFr").notNull(),
-    promptEn: text("promptEn").notNull(),
-    optionsJson: text("optionsJson"),
-    answerKey: text("answerKey"),
-    skill: varchar("skill", { length: 160 }).notNull(),
-    difficulty: mysqlEnum("difficulty", ["starter", "easy", "medium", "hard"])
-      .default("starter")
-      .notNull(),
-    orderIndex: int("orderIndex").notNull(),
-  },
-  table => ({
-    testIdx: index("placementQuestions_testId_idx").on(table.testId),
-  })
-);
-
-export const placementAttempts = mysqlTable(
-  "placementAttempts",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    testId: int("testId")
-      .notNull()
-      .references(() => placementTests.id),
-    userId: int("userId")
-      .notNull()
-      .references(() => users.id),
-    score: int("score").default(0).notNull(),
-    recommendedLevel: mysqlEnum("recommendedLevel", [
-      "starter",
-      "foundation",
-      "intermediate",
-      "advanced",
-      "exam",
-    ]).notNull(),
-    answersJson: text("answersJson"),
-    completedAt: timestamp("completedAt").defaultNow().notNull(),
-  },
-  table => ({
-    userIdx: index("placementAttempts_userId_idx").on(table.userId),
-  })
-);
-
 export type Enrollment = typeof courseEnrollments.$inferSelect;
 export type LessonProgress = typeof lessonProgress.$inferSelect;
-export type PlacementTest = typeof placementTests.$inferSelect;
-export type PlacementQuestion = typeof placementQuestions.$inferSelect;
-export type PlacementAttempt = typeof placementAttempts.$inferSelect;
 
 export const certificates = mysqlTable(
   "certificates",

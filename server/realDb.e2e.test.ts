@@ -157,7 +157,7 @@ describe.skipIf(!HAS_DB)("REAL DB — full learner journey against real MySQL", 
     const teacherCaller = appRouter.createCaller(ctxFor(teacher));
     const courseResult = await teacherCaller.content.createCourse({
       slug: courseSlug,
-      subject: "grammar",
+      subject: "computing",
       level: "foundation",
       titleAr: "دورة اختبار قاعدة البيانات",
       titleFr: "Cours de test base de données",
@@ -971,7 +971,7 @@ describe.skipIf(!HAS_DB)(
       const institutionCaller = appRouter.createCaller(ctxFor(institution));
       const courseResult = await institutionCaller.content.createCourse({
         slug: courseSlug,
-        subject: "grammar",
+        subject: "computing",
         level: "foundation",
         titleAr: "دورة المؤسسة",
         titleFr: "Cours de l'établissement",

@@ -6,7 +6,6 @@ import { platformRouter } from "./routers/platform";
 import { subscriptionsRouter } from "./routers/subscriptions";
 import { paymentsRouter } from "./routers/payments";
 import { progressRouter } from "./routers/progress";
-import { placementRouter } from "./routers/placement";
 import { notificationsRouter } from "./routers/notifications";
 import { certificatesRouter } from "./routers/certificates";
 import { quizzesRouter } from "./routers/quizzes";
@@ -24,7 +23,6 @@ export const appRouter = router({
   subscriptions: subscriptionsRouter,
   payments: paymentsRouter,
   progress: progressRouter,
-  placement: placementRouter,
   notifications: notificationsRouter,
   certificates: certificatesRouter,
   quizzes: quizzesRouter,

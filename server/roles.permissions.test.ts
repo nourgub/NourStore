@@ -168,7 +168,7 @@ describe("role permissions", () => {
       await expect(
         caller.admin.createSkill({
           slug: "algebra-basics",
-          subject: "grammar",
+          subject: "computing",
           titleAr: "أ",
           titleFr: "a",
           titleEn: "a",
@@ -246,7 +246,7 @@ describe("role permissions", () => {
 
       await db.insert(courses).values({
         slug: `role-upload-course-${RUN}`,
-        subject: "grammar",
+        subject: "computing",
         level: "foundation",
         titleAr: "دورة اختبار",
         titleFr: "Cours de test",
@@ -476,7 +476,7 @@ describe("role permissions", () => {
     const createError = await institution.content
       .createCourse({
         slug: `role-institution-${RUN}`,
-        subject: "grammar",
+        subject: "computing",
         level: "starter",
         titleAr: "دورة",
         titleFr: "cours",
@@ -495,7 +495,7 @@ describe("role permissions", () => {
     await expect(
       learner.content.createCourse({
         slug: `role-learner-${RUN}`,
-        subject: "grammar",
+        subject: "computing",
         level: "starter",
         titleAr: "أ",
         titleFr: "a",

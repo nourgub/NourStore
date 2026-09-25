@@ -29,12 +29,16 @@ import {
 } from "./Home.i18n";
 
 const LEVEL_LABEL: Record<string, Record<Lang, string>> = {
-  starter: { ar: "A1", fr: "A1", en: "A1" },
-  foundation: { ar: "A2", fr: "A2", en: "A2" },
-  intermediate: { ar: "B1", fr: "B1", en: "B1" },
-  advanced: { ar: "B2", fr: "B2", en: "B2" },
-  exam: { ar: "C1 · تحضير الامتحان", fr: "C1 · prépa. examen", en: "C1 · exam prep" },
-  professional: { ar: "C2", fr: "C2", en: "C2" },
+  starter: { ar: "مبتدئ", fr: "Débutant", en: "Beginner" },
+  foundation: { ar: "أساسي", fr: "Élémentaire", en: "Elementary" },
+  intermediate: { ar: "متوسط", fr: "Intermédiaire", en: "Intermediate" },
+  advanced: { ar: "متقدم", fr: "Avancé", en: "Advanced" },
+  exam: {
+    ar: "تحضير شهادة معتمدة",
+    fr: "Préparation certification",
+    en: "Certification prep",
+  },
+  professional: { ar: "احترافي", fr: "Professionnel", en: "Professional" },
 };
 
 export default function Home() {
