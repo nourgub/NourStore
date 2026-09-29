@@ -83,6 +83,9 @@ export async function createSubscriptionPlan(input: {
   slug: string;
   planType?: "free" | "monthly" | "quarterly" | "yearly" | "one_time";
   currency?: string;
+  // Null/omitted = platform-wide (unlocks every non-free published course —
+  // the original behavior). Set = this plan unlocks only that one course.
+  courseId?: number | null;
   titleAr: string;
   titleFr: string;
   titleEn: string;
@@ -100,6 +103,7 @@ export async function createSubscriptionPlan(input: {
       ...input,
       planType: input.planType ?? "monthly",
       currency: (input.currency ?? "DZD").toUpperCase(),
+      courseId: input.courseId ?? null,
       isActive: 1,
     });
 }
@@ -108,6 +112,7 @@ export async function updateSubscriptionPlan(input: {
   id: number;
   planType?: "free" | "monthly" | "quarterly" | "yearly" | "one_time";
   currency?: string;
+  courseId?: number | null;
   titleAr: string;
   titleFr: string;
   titleEn: string;
@@ -125,6 +130,7 @@ export async function updateSubscriptionPlan(input: {
     .set({
       ...(input.planType ? { planType: input.planType } : {}),
       ...(input.currency ? { currency: input.currency.toUpperCase() } : {}),
+      ...(input.courseId !== undefined ? { courseId: input.courseId } : {}),
       titleAr: input.titleAr,
       titleFr: input.titleFr,
       titleEn: input.titleEn,

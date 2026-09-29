@@ -20,4 +20,5 @@ export * from "./db/errorLog";
 export * from "./db/reports";
 export * from "./db/googleCalendarConnections";
 export * from "./db/blog";
+export * from "./db/products";
 export { getDb } from "./db/shared";

@@ -8,6 +8,7 @@ import { type Lang } from "../../shared";
 export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
   const plans = trpc.subscriptions.managedPlans.useQuery();
   const members = trpc.subscriptions.members.useQuery();
+  const courses = trpc.admin.courses.useQuery();
   const [plan, setPlan] = useState({
     slug: "",
     titleAr: "",
@@ -18,6 +19,9 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
     descriptionEn: "",
     priceCents: "0",
     durationDays: "30",
+    // "" = platform-wide (unlocks every non-free published course); a real
+    // course id scopes this plan to that one course only.
+    courseId: "",
   });
   const [userId, setUserId] = useState(0);
   const [planId, setPlanId] = useState(0);
@@ -37,6 +41,7 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
         descriptionEn: "",
         priceCents: "0",
         durationDays: "30",
+        courseId: "",
       });
     },
   });
@@ -54,7 +59,10 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
     onSuccess: () => planPrices.refetch(),
   });
   const canCreate =
-    Object.values(plan).every(Boolean) && /^[a-z0-9-]+$/.test(plan.slug);
+    Object.entries(plan)
+      .filter(([key]) => key !== "courseId")
+      .every(([, value]) => Boolean(value)) &&
+    /^[a-z0-9-]+$/.test(plan.slug);
   return (
     <div className="flow-card staff-form">
       <div className="flow-card-title">
@@ -135,6 +143,28 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
           value={plan.durationDays}
           onChange={e => setPlan({ ...plan, durationDays: e.target.value })}
         />
+        <select
+          aria-label={
+            lang === "ar" ? "نطاق الخطة (دورة محددة)" : "Plan scope (course)"
+          }
+          value={plan.courseId}
+          onChange={e => setPlan({ ...plan, courseId: e.target.value })}
+        >
+          <option value="">
+            {lang === "ar"
+              ? "وصول شامل لكل المنصة"
+              : "Platform-wide access (all courses)"}
+          </option>
+          {(courses.data ?? []).map(course => (
+            <option key={course.id} value={String(course.id)}>
+              {lang === "ar"
+                ? course.titleAr
+                : lang === "fr"
+                  ? course.titleFr
+                  : course.titleEn}
+            </option>
+          ))}
+        </select>
       </div>
       <Button
         className="gold-button"
@@ -144,6 +174,7 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
             ...plan,
             priceCents: Number(plan.priceCents),
             durationDays: Number(plan.durationDays),
+            courseId: plan.courseId ? Number(plan.courseId) : undefined,
           })
         }
       >
@@ -164,7 +195,14 @@ export function SubscriptionAdminPanel({ lang }: { lang: Lang }) {
                 </strong>
                 <small>
                   {item.priceCents} {item.currency} · {item.durationDays}{" "}
-                  {lang === "ar" ? "يومًا" : "days"}
+                  {lang === "ar" ? "يومًا" : "days"} ·{" "}
+                  {item.courseId
+                    ? (courses.data ?? []).find(c => c.id === item.courseId)
+                        ?.titleAr ??
+                      (lang === "ar" ? "دورة محددة" : "Course-specific")
+                    : lang === "ar"
+                      ? "كل المنصة"
+                      : "Platform-wide"}
                 </small>
               </p>
               <Button

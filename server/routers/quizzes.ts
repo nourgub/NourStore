@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { rateLimit } from "../_core/procedures";
 import {
-  hasActiveSubscription,
+  hasActiveSubscriptionForCourse,
   getUnitQuizForLearner,
   getUnitQuizWithQuestions,
   submitQuizAttempt,
@@ -26,20 +26,28 @@ export const quizzesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!(await hasActiveSubscription(ctx.user.id)))
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Active subscription required",
-        });
-      // Learner must be enrolled in the owning (published) course before a quiz can resolve for them at all.
+      // Learner must be enrolled in the owning (published) course before a
+      // quiz can resolve for them at all — this also resolves the owning
+      // courseId, needed below for the now course-scoped subscription check
+      // (a course-specific plan no longer implies access to every course).
       const learnerView = await getUnitQuizForLearner(
         input.unitId,
         ctx.user.id
       );
-      if (!learnerView.quiz)
+      if (!learnerView.quiz || !learnerView.courseId)
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Unit quiz not found",
+        });
+      if (
+        !(await hasActiveSubscriptionForCourse(
+          ctx.user.id,
+          learnerView.courseId
+        ))
+      )
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Active subscription required",
         });
       // Grading itself is done from the server-only, answerKey-bearing copy — never sent to the browser directly.
       const data = await getUnitQuizWithQuestions(input.unitId);
@@ -97,7 +105,7 @@ export const quizzesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!(await hasActiveSubscription(ctx.user.id)))
+      if (!(await hasActiveSubscriptionForCourse(ctx.user.id, input.courseId)))
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Active subscription required",

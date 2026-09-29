@@ -48,7 +48,7 @@ export async function cancelActiveSubscription(
   // being treated as an ongoing commitment (and would stop any future
   // auto-renewal charge, once one exists) without clawing back days the
   // learner already paid for. Deliberately does NOT flip status away from
-  // "active"/"trialing": hasActiveSubscription() and every enrollment gate
+  // "active"/"trialing": hasActiveSubscriptionForCourse() and every enrollment gate
   // key off status, and revoking access the instant someone cancels — for
   // time they've already paid for — would be the wrong, unfair behavior.
   // The existing expiry sweep naturally transitions status to "expired"

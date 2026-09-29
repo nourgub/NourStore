@@ -5,6 +5,7 @@ import { rateLimit } from "../_core/procedures";
 import { ENV } from "../_core/env";
 import {
   getSubscriptionPlans,
+  getProductById,
   validateCoupon,
   createInvoice,
   redeemCoupon,
@@ -18,33 +19,72 @@ export const paymentsRouter = router({
   // paymentsWebhook.ts) or an admin's manual receipt review (see
   // admin.reviewPaymentReceipt). If no provider is configured, this says
   // so honestly instead of pretending a charge could complete.
+  //
+  // Handles both checkout kinds through the same reusable manual-payment
+  // flow: exactly one of planId (a subscription, platform-wide or
+  // course-scoped) or productId (a standalone one-time purchase — a book,
+  // the full-book bundle) must be given, matching createInvoice's own
+  // discriminated union.
   initiateCheckout: protectedProcedure
     .use(rateLimit("checkout-initiate", 20, 60 * 60 * 1000))
     .input(
-      z.object({
-        planId: z.number().int().positive(),
-        currency: z
-          .string()
-          .length(3)
-          .regex(/^[A-Za-z]{3}$/),
-        provider: z.enum(["manual", "whatsapp"]).default("manual"),
-        returnUrl: z.string().url().optional(),
-        couponCode: z.string().min(2).max(40).optional(),
-      })
+      z
+        .object({
+          planId: z.number().int().positive().optional(),
+          productId: z.number().int().positive().optional(),
+          currency: z
+            .string()
+            .length(3)
+            .regex(/^[A-Za-z]{3}$/)
+            .optional(),
+          provider: z.enum(["manual", "whatsapp"]).default("manual"),
+          returnUrl: z.string().url().optional(),
+          couponCode: z.string().min(2).max(40).optional(),
+        })
+        .refine(v => (v.planId ? 1 : 0) + (v.productId ? 1 : 0) === 1, {
+          message: "Exactly one of planId or productId is required",
+        })
     )
     .mutation(async ({ ctx, input }) => {
-      const plans = await getSubscriptionPlans(true, input.currency);
-      const plan = plans.find(p => p.id === input.planId);
-      if (!plan)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-      let finalAmountCents = plan.resolvedPriceCents;
+      let titleAr: string;
+      let resolvedCurrency: string;
+      let resolvedPriceCents: number;
+      let invoiceTarget: { planId: number } | { productId: number };
+      if (input.planId) {
+        const plans = await getSubscriptionPlans(true, input.currency);
+        const plan = plans.find(p => p.id === input.planId);
+        if (!plan)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Plan not found",
+          });
+        titleAr = plan.titleAr;
+        resolvedCurrency = plan.resolvedCurrency;
+        resolvedPriceCents = plan.resolvedPriceCents;
+        invoiceTarget = { planId: plan.id };
+      } else {
+        const product = await getProductById(input.productId!);
+        if (!product || product.isActive !== 1)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Product not found",
+          });
+        titleAr = product.titleAr;
+        // Products aren't multi-currency (unlike plans/planPrices) — always
+        // charged in the product's own set currency, matching real pricing
+        // given by the platform owner.
+        resolvedCurrency = product.currency;
+        resolvedPriceCents = product.priceCents;
+        invoiceTarget = { productId: product.id };
+      }
+      let finalAmountCents = resolvedPriceCents;
       let appliedCoupon: { id: number; code: string } | null = null;
       let couponMessage: string | undefined;
       if (input.couponCode) {
         const validation = await validateCoupon({
           code: input.couponCode,
           userId: ctx.user.id,
-          amountCents: plan.resolvedPriceCents,
+          amountCents: resolvedPriceCents,
         });
         if (validation.ok) {
           finalAmountCents = validation.discountedAmountCents;
@@ -67,8 +107,8 @@ export const paymentsRouter = router({
       }
       const invoice = await createInvoice({
         userId: ctx.user.id,
-        planId: plan.id,
-        currency: plan.resolvedCurrency,
+        ...invoiceTarget,
+        currency: resolvedCurrency,
         amountCents: finalAmountCents,
         provider: input.provider,
       });
@@ -102,7 +142,7 @@ export const paymentsRouter = router({
           };
         }
         const prefilledText = encodeURIComponent(
-          `مرحبًا، أريد الدفع للاشتراك في ${plan.titleAr} — المرجع: NX-INV-${invoice.id} — المبلغ: ${(finalAmountCents / 100).toLocaleString("ar-DZ")} ${plan.resolvedCurrency}`
+          `مرحبًا، أريد الدفع لـ ${titleAr} — المرجع: NX-INV-${invoice.id} — المبلغ: ${(finalAmountCents / 100).toLocaleString("ar-DZ")} ${resolvedCurrency}`
         );
         return {
           invoice,

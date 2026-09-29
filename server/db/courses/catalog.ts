@@ -15,6 +15,7 @@ import {
   lessons,
   units,
   userSubscriptions,
+  subscriptionPlans,
 } from "../../../drizzle/schema";
 import { ENV } from "../../_core/env";
 import { getDb } from "../shared";
@@ -128,15 +129,33 @@ export async function getCoursesForRole(
 }
 
 
-export async function hasActiveSubscription(userId: number) {
-    const db = await getDb();
+/**
+ * A learner has access to `courseId` if they hold an unexpired active/
+ * trialing subscription whose plan is either platform-wide
+ * (subscriptionPlans.courseId IS NULL — the original "any subscription
+ * unlocks everything" design, still supported) or scoped to this exact
+ * course. Every call site that already knows which course it's gating
+ * (getLessonForLearner, getLessonAssets, enrollInCourse, quiz/final-exam
+ * submission) passes it in — see each course-scoped plan's own comment in
+ * schema.ts for why this isn't a platform-wide check anymore.
+ */
+export async function hasActiveSubscriptionForCourse(
+  userId: number,
+  courseId: number
+) {
+  const db = await getDb();
   if (!db) return false;
   const rows = await db
     .select({
       status: userSubscriptions.status,
       expiresAt: userSubscriptions.expiresAt,
+      planCourseId: subscriptionPlans.courseId,
     })
     .from(userSubscriptions)
+    .innerJoin(
+      subscriptionPlans,
+      eq(subscriptionPlans.id, userSubscriptions.planId)
+    )
     .where(
       and(
         eq(userSubscriptions.userId, userId),
@@ -145,7 +164,9 @@ export async function hasActiveSubscription(userId: number) {
     )
     .orderBy(desc(userSubscriptions.updatedAt));
   return rows.some(
-    row => !row.expiresAt || row.expiresAt.getTime() > Date.now()
+    row =>
+      (!row.expiresAt || row.expiresAt.getTime() > Date.now()) &&
+      (row.planCourseId === null || row.planCourseId === courseId)
   );
 }
 
@@ -184,7 +205,8 @@ export async function getLessonAssets(lessonId: number, userId: number) {
     .limit(1);
   if (!enrolled.length) return [];
   const eligible =
-    courseRow.isCourseFree === 1 || (await hasActiveSubscription(userId));
+    courseRow.isCourseFree === 1 ||
+    (await hasActiveSubscriptionForCourse(userId, courseRow.courseId));
   if (!eligible) return [];
   if (await isLessonLocked(db, userId, courseRow.courseId, lessonId))
     return [];
@@ -356,7 +378,8 @@ async function getLessonForLearnerMysql(lessonId: number, userId: number) {
   if (!enrolled.length)
     return { access: "not_enrolled" as const, courseSlug: row.courseSlug };
   const eligible =
-    row.isCourseFree === 1 || (await hasActiveSubscription(userId));
+    row.isCourseFree === 1 ||
+    (await hasActiveSubscriptionForCourse(userId, row.courseId));
   if (!eligible)
     return {
       access: "subscription_required" as const,

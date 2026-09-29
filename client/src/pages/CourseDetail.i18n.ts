@@ -28,6 +28,8 @@ export const labels = {
     enrollNotFoundError: "تعذر الالتحاق — هذه الدورة غير متاحة حاليًا.",
     enrollGenericError: "تعذر الالتحاق بالدورة. حاول مرة أخرى.",
     seePricing: "عرض خطط الاشتراك",
+    coursePrice: "سعر الدورة",
+    buyAccess: "شراء الوصول لهذه الدورة",
   },
   fr: {
     back: "Retour aux parcours",
@@ -58,6 +60,8 @@ export const labels = {
     enrollNotFoundError: "Inscription impossible — ce cours n’est pas disponible actuellement.",
     enrollGenericError: "Impossible de rejoindre le cours. Réessayez.",
     seePricing: "Voir les formules d’abonnement",
+    coursePrice: "Prix du cours",
+    buyAccess: "Acheter l’accès à ce cours",
   },
   en: {
     back: "Back to paths",
@@ -87,5 +91,7 @@ export const labels = {
     enrollNotFoundError: "Couldn't enroll — this course isn't available right now.",
     enrollGenericError: "Couldn't join the course. Please try again.",
     seePricing: "See subscription plans",
+    coursePrice: "Course price",
+    buyAccess: "Buy access to this course",
   },
 } as const;

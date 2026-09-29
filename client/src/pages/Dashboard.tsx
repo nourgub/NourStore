@@ -83,6 +83,9 @@ export default function Dashboard() {
   const invoicesQuery = trpc.subscriptions.myInvoices.useQuery(undefined, {
     enabled: isAuthenticated,
   });
+  const myPurchasesQuery = trpc.products.myPurchases.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
   const summary = summaryQuery.data;
   const enrollments = summary?.enrollments ?? [];
   const attempts = summary?.attempts ?? [];
@@ -757,6 +760,86 @@ export default function Dashboard() {
                       : "No invoices yet."}
                 </p>
               )}
+            </div>
+          </section>
+          <section className="dashboard-subscription">
+            <div>
+              <div className="section-kicker">NOURIX / DOWNLOADS</div>
+              <h2>
+                {lang === "ar"
+                  ? "مشترياتي من المتجر"
+                  : lang === "fr"
+                    ? "Mes achats de la boutique"
+                    : "My store purchases"}
+              </h2>
+              {myPurchasesQuery.data?.length ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  {myPurchasesQuery.data.map(purchase => (
+                    <div
+                      key={purchase.purchaseId}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: 13,
+                        gap: 10,
+                      }}
+                    >
+                      <span>
+                        {lang === "ar"
+                          ? purchase.titleAr
+                          : lang === "fr"
+                            ? purchase.titleFr
+                            : purchase.titleEn}
+                      </span>
+                      {purchase.downloadUrl ? (
+                        <a className="quiet-button" href={purchase.downloadUrl}>
+                          {lang === "ar"
+                            ? "تحميل"
+                            : lang === "fr"
+                              ? "Télécharger"
+                              : "Download"}
+                        </a>
+                      ) : (
+                        <small className="quiet-label">
+                          {lang === "ar"
+                            ? "بانتظار رفع الملف من الإدارة"
+                            : lang === "fr"
+                              ? "En attente de mise en ligne du fichier"
+                              : "Waiting for the file to be uploaded"}
+                        </small>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>
+                  {lang === "ar"
+                    ? "لا توجد مشتريات بعد."
+                    : lang === "fr"
+                      ? "Aucun achat pour le moment."
+                      : "No purchases yet."}
+                </p>
+              )}
+              <Link
+                href="/store"
+                className="catalog-home-link"
+                style={{ marginTop: 10, display: "inline-flex" }}
+              >
+                {lang === "ar"
+                  ? "زيارة المتجر"
+                  : lang === "fr"
+                    ? "Visiter la boutique"
+                    : "Visit the store"}
+                <ForwardArrow dir={dir} size={13} />
+              </Link>
             </div>
           </section>
           <section className="dashboard-subscription">

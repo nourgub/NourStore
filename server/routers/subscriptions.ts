@@ -108,6 +108,9 @@ export const subscriptionsRouter = router({
           .length(3)
           .regex(/^[A-Za-z]{3}$/)
           .optional(),
+        // Omitted/null = platform-wide plan (unlocks every non-free
+        // published course). Set = unlocks only that one course.
+        courseId: z.number().int().positive().nullable().optional(),
         titleAr: z.string().min(2).max(255),
         titleFr: z.string().min(2).max(255),
         titleEn: z.string().min(2).max(255),
@@ -123,6 +126,7 @@ export const subscriptionsRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        courseId: z.number().int().positive().nullable().optional(),
         titleAr: z.string().min(2).max(255),
         titleFr: z.string().min(2).max(255),
         titleEn: z.string().min(2).max(255),

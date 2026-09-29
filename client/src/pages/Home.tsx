@@ -174,6 +174,9 @@ export default function Home() {
             <a className="nav-link" href="/blog">
               {copy.navBlog}
             </a>
+            <a className="nav-link" href="/store">
+              {copy.navStore}
+            </a>
             <a className="nav-link" href="/support">
               {copy.navSupport}
             </a>
@@ -278,6 +281,7 @@ export default function Home() {
               {copy.navAbout}
             </button>
             <a href="/blog">{copy.navBlog}</a>
+            <a href="/store">{copy.navStore}</a>
             <a href="/support">{copy.navSupport}</a>
             <a href="/login">{copy.login}</a>
             <div className="mobile-language-row" aria-label="Language selector">
@@ -720,6 +724,7 @@ export default function Home() {
               </a>
             )}
             <a href="/blog">{copy.navBlog}</a>
+            <a href="/store">{copy.navStore}</a>
             <a href="/support">{copy.navSupport}</a>
           </div>
           <div className="footer-lang">

@@ -38,6 +38,11 @@ export default function CourseDetail() {
     { slug },
     { enabled: Boolean(slug) }
   );
+  // Course pricing is no longer always platform-wide — a plan can be scoped
+  // to unlock just this one course (subscriptionPlans.courseId). Shown here
+  // so a visitor knows the real price before clicking join, instead of only
+  // discovering it after a subscription_required rejection.
+  const plansQuery = trpc.subscriptions.plans.useQuery({ currency: "DZD" });
   const enrollmentsQuery = trpc.progress.enrollments.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -54,6 +59,9 @@ export default function CourseDetail() {
     ? enrollmentsQuery.data?.find(row => row.courseId === course.id)
     : undefined;
   const isEnrolled = Boolean(enrollment);
+  const coursePlan = course
+    ? plansQuery.data?.find(p => p.courseId === course.id)
+    : undefined;
   const courseProgressQuery = trpc.progress.courseProgress.useQuery(
     { courseId: course?.id ?? 0 },
     { enabled: isAuthenticated && Boolean(course?.id) && isEnrolled }
@@ -285,7 +293,43 @@ export default function CourseDetail() {
                       {live.units.length} {t.unit}
                     </span>
                   </div>
+                  {!course.isFree && coursePlan && !isEnrolled && (
+                    <div style={{ margin: "10px 0" }}>
+                      <strong style={{ fontSize: 22, color: "#f1ce63" }}>
+                        {(coursePlan.resolvedPriceCents / 100).toLocaleString(
+                          lang === "ar"
+                            ? "ar-DZ"
+                            : lang === "fr"
+                              ? "fr-FR"
+                              : "en-US"
+                        )}{" "}
+                        {coursePlan.resolvedCurrency}
+                      </strong>
+                      <span
+                        style={{
+                          opacity: 0.6,
+                          fontSize: 12,
+                          marginInlineStart: 8,
+                        }}
+                      >
+                        {t.coursePrice}
+                      </span>
+                    </div>
+                  )}
                   {joinButton}
+                  {!course.isFree && coursePlan && !isEnrolled && (
+                    <Link
+                      href="/pricing"
+                      className="quiet-button"
+                      style={{
+                        display: "inline-flex",
+                        marginTop: 8,
+                        textAlign: "center",
+                      }}
+                    >
+                      {t.buyAccess}
+                    </Link>
+                  )}
                   {isAuthenticated &&
                     isEnrolled &&
                     !course.isFree &&

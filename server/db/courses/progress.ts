@@ -13,7 +13,7 @@ import { computeProgressPercent, isCourseComplete } from "../../courseProgress";
 import { awardPoints, checkAndAwardBadges } from "../gamification";
 import { issueCertificate } from "../certificates";
 import { createNotification } from "../notifications";
-import { hasActiveSubscription, isLessonLocked } from "./catalog";
+import { hasActiveSubscriptionForCourse, isLessonLocked } from "./catalog";
 
 export async function getUserEnrollments(userId: number) {
   const db = await getDb();
@@ -69,7 +69,7 @@ export async function enrollInCourse(input: {
   if (
     !input.bypassSubscriptionCheck &&
     course.isFree !== 1 &&
-    !(await hasActiveSubscription(input.userId))
+    !(await hasActiveSubscriptionForCourse(input.userId, input.courseId))
   ) {
     return { ok: false as const, reason: "subscription_required" as const };
   }
@@ -109,7 +109,11 @@ export async function updateLessonProgress(input: {
     const db = await getDb();
   if (!db) return { ok: false as const, reason: "unavailable" as const };
   const lessonRows = await db
-    .select({ courseId: courses.id, isPublished: courses.isPublished })
+    .select({
+      courseId: courses.id,
+      isPublished: courses.isPublished,
+      isCourseFree: courses.isFree,
+    })
     .from(lessons)
     .leftJoin(units, eq(units.id, lessons.unitId))
     .leftJoin(courses, eq(courses.id, units.courseId))
@@ -130,6 +134,11 @@ export async function updateLessonProgress(input: {
     .limit(1);
   if (!enrollment[0])
     return { ok: false as const, reason: "not_enrolled" as const };
+  if (
+    lessonRows[0]?.isCourseFree !== 1 &&
+    !(await hasActiveSubscriptionForCourse(input.userId, courseId))
+  )
+    return { ok: false as const, reason: "subscription_required" as const };
   // Server-enforced sequencing: a learner cannot record progress on a lesson
   // while the previous lesson in course order is still incomplete.
   if (await isLessonLocked(db, input.userId, courseId, input.lessonId))

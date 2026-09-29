@@ -20,6 +20,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const CourseDetail = lazy(() => import("./pages/CourseDetail"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const Store = lazy(() => import("./pages/Store"));
 const Legal = lazy(() => import("./pages/Legal"));
 const Support = lazy(() => import("./pages/Support"));
 const LessonViewer = lazy(() => import("./pages/LessonViewer"));
@@ -94,6 +95,7 @@ function Router() {
         <Route path="/verify/certificate" component={CertificateVerify} />
         <Route path="/courses/:slug" component={CourseDetail} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/store" component={Store} />
         <Route path="/legal/:doc" component={Legal} />
         <Route path="/legal" component={Legal} />
         <Route path="/support" component={Support} />

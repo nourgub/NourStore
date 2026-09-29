@@ -72,6 +72,13 @@ export const subscriptionPlans = mysqlTable("subscriptionPlans", {
   ])
     .default("monthly")
     .notNull(),
+  // NULL = platform-wide access (unlocks every non-free published course —
+  // the original, still-supported design). Set = this plan unlocks only
+  // that one course; hasActiveSubscriptionForCourse (server/db/courses)
+  // checks both cases. References courses.id via a thunk despite `courses`
+  // being declared later in this file — standard drizzle forward-reference
+  // pattern, resolved lazily at introspection time, not at module load.
+  courseId: int("courseId").references(() => courses.id),
   // Default/fallback price shown when no per-currency row exists in planPrices for the viewer's currency.
   currency: varchar("currency", { length: 3 }).default("DZD").notNull(),
   titleAr: varchar("titleAr", { length: 255 }).notNull(),
@@ -107,6 +114,35 @@ export const planPrices = mysqlTable(
     ),
   })
 );
+
+/**
+ * A standalone, one-time-purchase digital item (a book/PDF, a bundle ZIP)
+ * — deliberately separate from `subscriptionPlans`/`userSubscriptions`
+ * (recurring/duration-based platform or per-course access). Buying a
+ * product never touches a subscription; it only ever grants a
+ * `productPurchases` row (see below). The file itself is stored via the
+ * same storage abstraction as `lessonAssets` (server/storageProviders).
+ */
+export const products = mysqlTable("products", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  titleAr: varchar("titleAr", { length: 255 }).notNull(),
+  titleFr: varchar("titleFr", { length: 255 }).notNull(),
+  titleEn: varchar("titleEn", { length: 255 }).notNull(),
+  descriptionAr: text("descriptionAr").notNull(),
+  descriptionFr: text("descriptionFr").notNull(),
+  descriptionEn: text("descriptionEn").notNull(),
+  priceCents: int("priceCents").notNull(),
+  currency: varchar("currency", { length: 3 }).default("DZD").notNull(),
+  storageKey: varchar("storageKey", { length: 500 }),
+  fileName: varchar("fileName", { length: 255 }),
+  fileMimeType: varchar("fileMimeType", { length: 100 }),
+  isActive: int("isActive").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Product = typeof products.$inferSelect;
 
 export const userSubscriptions = mysqlTable(
   "userSubscriptions",
@@ -144,6 +180,36 @@ export const userSubscriptions = mysqlTable(
     planIdx: index("userSubscriptions_planId_idx").on(table.planId),
   })
 );
+
+/**
+ * Entitlement granted by a paid `products` purchase — the product
+ * equivalent of `userSubscriptions`, but permanent (no expiresAt/status):
+ * a one-time purchase never expires. `invoiceId` is nullable purely so an
+ * admin could in principle grant one manually (mirroring how
+ * `userSubscriptions.paymentProvider` already supports "manual"), though
+ * every real purchase today goes through the same manual-payment flow as
+ * everything else in this codebase and does set it.
+ */
+export const productPurchases = mysqlTable(
+  "productPurchases",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id),
+    productId: int("productId")
+      .notNull()
+      .references(() => products.id),
+    invoiceId: int("invoiceId").references(() => invoices.id),
+    purchasedAt: timestamp("purchasedAt").defaultNow().notNull(),
+  },
+  table => ({
+    userIdx: index("productPurchases_userId_idx").on(table.userId),
+    productIdx: index("productPurchases_productId_idx").on(table.productId),
+  })
+);
+
+export type ProductPurchase = typeof productPurchases.$inferSelect;
 
 /**
  * Subject catalog — lets an admin add a new subject (e.g. physics,
@@ -548,6 +614,13 @@ export type Notification = typeof notifications.$inferSelect;
  * long after the original successful attempt. No table here assumes Stripe
  * or any specific provider — `provider` is a free-form string ("manual",
  * "stripe", etc.), and provider wiring lives entirely outside this schema.
+ *
+ * Exactly one of `planId`/`productId` is set on any given invoice — a
+ * subscription-plan purchase or a one-time product purchase, never both
+ * (enforced at the application layer in createInvoice, not a DB CHECK
+ * constraint, matching this schema's existing style of app-layer
+ * invariants). `markInvoicePaid` branches on which one is set to decide
+ * whether to extend a subscription or grant a product entitlement.
  */
 export const invoices = mysqlTable(
   "invoices",
@@ -556,9 +629,8 @@ export const invoices = mysqlTable(
     userId: int("userId")
       .notNull()
       .references(() => users.id),
-    planId: int("planId")
-      .notNull()
-      .references(() => subscriptionPlans.id),
+    planId: int("planId").references(() => subscriptionPlans.id),
+    productId: int("productId").references(() => products.id),
     subscriptionId: int("subscriptionId").references(
       () => userSubscriptions.id
     ),

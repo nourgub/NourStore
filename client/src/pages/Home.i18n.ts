@@ -10,6 +10,7 @@ export type Copy = {
   navAbout: string;
   navSupport: string;
   navBlog: string;
+  navStore: string;
   login: string;
   start: string;
   eyebrow: string;
@@ -61,6 +62,7 @@ export const translations: Record<Lang, Copy> = {
     navAbout: "عن المنصة",
     navSupport: "الدعم",
     navBlog: "المدونة",
+    navStore: "المتجر",
     login: "تسجيل الدخول",
     start: "إنشاء حساب مجاني",
     eyebrow: "منصة تكوين في الإعلام الآلي، البيروتيك، الذكاء الاصطناعي والتجارة الإلكترونية",
@@ -115,6 +117,7 @@ export const translations: Record<Lang, Copy> = {
     navAbout: "À propos",
     navSupport: "Support",
     navBlog: "Blog",
+    navStore: "Boutique",
     login: "Se connecter",
     start: "Créer un compte gratuit",
     eyebrow: "Une plateforme de formation en informatique, bureautique, intelligence artificielle et e-commerce",
@@ -170,6 +173,7 @@ export const translations: Record<Lang, Copy> = {
     navAbout: "About",
     navSupport: "Support",
     navBlog: "Blog",
+    navStore: "Store",
     login: "Log in",
     start: "Create a free account",
     eyebrow: "A training platform for IT, office software, artificial intelligence and e-commerce",

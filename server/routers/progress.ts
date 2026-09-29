@@ -16,7 +16,6 @@ import {
   redeemReferralCode,
   getCourseProgressForLearner,
   enrollInCourse,
-  hasActiveSubscription,
   updateLessonProgress,
 } from "../db";
 
@@ -112,11 +111,6 @@ export const progressRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!(await hasActiveSubscription(ctx.user.id)))
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Active subscription required",
-        });
       const result = await updateLessonProgress({
         userId: ctx.user.id,
         ...input,
@@ -132,6 +126,11 @@ export const progressRouter = router({
             code: "FORBIDDEN",
             message:
               "You must enroll in this course before tracking progress",
+          });
+        if (result.reason === "subscription_required")
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Active subscription required",
           });
         if (result.reason === "locked")
           throw new TRPCError({

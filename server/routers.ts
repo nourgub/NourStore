@@ -15,6 +15,7 @@ import { institutionRouter } from "./routers/institution";
 import { adminRouter } from "./routers/admin";
 import { supportRouter } from "./routers/support";
 import { blogRouter } from "./routers/blog";
+import { productsRouter } from "./routers/products";
 
 export const appRouter = router({
   diagnostics: diagnosticsRouter,
@@ -33,6 +34,7 @@ export const appRouter = router({
   admin: adminRouter,
   support: supportRouter,
   blog: blogRouter,
+  products: productsRouter,
 });
 
 export type AppRouter = typeof appRouter;

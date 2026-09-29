@@ -5,18 +5,26 @@ import {
   refunds,
   subscriptionPlans,
   userSubscriptions,
+  productPurchases,
 } from "../../../drizzle/schema";
 import { getDb } from "../shared";
 import { createNotification } from "../notifications";
 import { grantReferralRewardIfEligible } from "../gamification";
 
-export async function createInvoice(input: {
-  userId: number;
-  planId: number;
-  currency: string;
-  amountCents: number;
-  provider: string;
-}) {
+/**
+ * Exactly one of `planId`/`productId` must be set — a subscription-plan
+ * checkout or a one-time product checkout, never both and never neither.
+ * Enforced here at the application layer (see the invoices table's own
+ * comment in schema.ts for why this isn't a DB CHECK constraint).
+ */
+export async function createInvoice(
+  input: {
+    userId: number;
+    currency: string;
+    amountCents: number;
+    provider: string;
+  } & ({ planId: number; productId?: undefined } | { planId?: undefined; productId: number })
+) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db
@@ -24,6 +32,7 @@ export async function createInvoice(input: {
     .values({
       userId: input.userId,
       planId: input.planId,
+      productId: input.productId,
       currency: input.currency.toUpperCase(),
       amountCents: input.amountCents,
       provider: input.provider,
@@ -72,21 +81,15 @@ export async function markInvoicePaid(input: {
   const invoice = invoiceRows[0];
   if (!invoice) return undefined;
   if (invoice.status === "paid") return invoice; // idempotent, cheap fast-path
-  const planRows = await db
-    .select({ durationDays: subscriptionPlans.durationDays })
-    .from(subscriptionPlans)
-    .where(eq(subscriptionPlans.id, invoice.planId))
-    .limit(1);
-  const durationDays = planRows[0]?.durationDays ?? 30;
   // Real atomicity, not just a fast-path check: the WHERE clause requires
   // status = "pending" at the moment of the write itself, so two calls
   // racing on the same invoice (a duplicated WhatsApp webhook delivery is
   // a documented, real occurrence on Meta's platform; so is an admin
   // double-clicking "approve") can never both win this update. Only the
-  // caller whose UPDATE actually matched a row proceeds to grant a
-  // subscription — the loser sees affectedRows === 0 and returns the
-  // already-paid invoice untouched, exactly like the idempotent read
-  // above, but race-safe instead of merely time-of-check-safe.
+  // caller whose UPDATE actually matched a row proceeds to grant access —
+  // the loser sees affectedRows === 0 and returns the already-paid invoice
+  // untouched, exactly like the idempotent read above, but race-safe
+  // instead of merely time-of-check-safe.
   const updateResult = (await db
     .update(invoices)
     .set({
@@ -100,7 +103,7 @@ export async function markInvoicePaid(input: {
     )) as unknown as [{ affectedRows: number }, unknown];
   if (updateResult[0].affectedRows === 0) {
     // Lost the race (or the invoice was already rejected, not pending) —
-    // never grant a second subscription period for the same invoice.
+    // never grant access twice for the same invoice.
     const fresh = await db
       .select()
       .from(invoices)
@@ -114,44 +117,81 @@ export async function markInvoicePaid(input: {
     providerReference: input.providerReference,
     status: "succeeded",
   });
-  const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-  await db
-    .update(userSubscriptions)
-    .set({ status: "expired" })
-    .where(
-      and(
-        eq(userSubscriptions.userId, invoice.userId),
-        eq(userSubscriptions.status, "active")
-      )
-    );
-  await db
-    .insert(userSubscriptions)
-    .values({
-      userId: invoice.userId,
-      planId: invoice.planId,
-      status: "active",
-      expiresAt,
-      paymentProvider: input.provider,
-      providerCustomerId: undefined,
-      providerSubscriptionId: input.providerReference,
-    });
-  const subscriptionRows = await db
-    .select({ id: userSubscriptions.id })
-    .from(userSubscriptions)
-    .where(
-      and(
-        eq(userSubscriptions.userId, invoice.userId),
-        eq(userSubscriptions.planId, invoice.planId),
-        eq(userSubscriptions.status, "active")
-      )
-    )
-    .orderBy(desc(userSubscriptions.createdAt))
-    .limit(1);
-  if (subscriptionRows[0])
+
+  // Exactly one of planId/productId is set (see createInvoice/schema.ts) —
+  // a subscription-plan invoice extends the learner's platform/course
+  // access; a product invoice grants a permanent, one-time entitlement.
+  // Never both, since an invoice is only ever created for one or the other.
+  if (invoice.planId) {
+    const planRows = await db
+      .select({ durationDays: subscriptionPlans.durationDays })
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, invoice.planId))
+      .limit(1);
+    const durationDays = planRows[0]?.durationDays ?? 30;
+    const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
     await db
-      .update(invoices)
-      .set({ subscriptionId: subscriptionRows[0].id })
-      .where(eq(invoices.id, invoice.id));
+      .update(userSubscriptions)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(userSubscriptions.userId, invoice.userId),
+          eq(userSubscriptions.status, "active")
+        )
+      );
+    await db
+      .insert(userSubscriptions)
+      .values({
+        userId: invoice.userId,
+        planId: invoice.planId,
+        status: "active",
+        expiresAt,
+        paymentProvider: input.provider,
+        providerCustomerId: undefined,
+        providerSubscriptionId: input.providerReference,
+      });
+    const subscriptionRows = await db
+      .select({ id: userSubscriptions.id })
+      .from(userSubscriptions)
+      .where(
+        and(
+          eq(userSubscriptions.userId, invoice.userId),
+          eq(userSubscriptions.planId, invoice.planId),
+          eq(userSubscriptions.status, "active")
+        )
+      )
+      .orderBy(desc(userSubscriptions.createdAt))
+      .limit(1);
+    if (subscriptionRows[0])
+      await db
+        .update(invoices)
+        .set({ subscriptionId: subscriptionRows[0].id })
+        .where(eq(invoices.id, invoice.id));
+  } else if (invoice.productId) {
+    // A one-time purchase never expires and is never "renewed" — only
+    // grant it once per invoice (this function is itself already
+    // race-safe/idempotent above, but a defensive existence check costs
+    // nothing and protects against ever calling this path twice for the
+    // same invoice by other means).
+    const existing = await db
+      .select({ id: productPurchases.id })
+      .from(productPurchases)
+      .where(
+        and(
+          eq(productPurchases.userId, invoice.userId),
+          eq(productPurchases.productId, invoice.productId)
+        )
+      )
+      .limit(1);
+    if (!existing.length) {
+      await db.insert(productPurchases).values({
+        userId: invoice.userId,
+        productId: invoice.productId,
+        invoiceId: invoice.id,
+      });
+    }
+  }
+
   await createNotification({
     userId: invoice.userId,
     type: "payment",

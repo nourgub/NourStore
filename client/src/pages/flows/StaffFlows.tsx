@@ -82,6 +82,7 @@ import {
   PaymentReceiptsAdminPanel,
 } from "./staff/BillingManagement";
 import { BlogAdminPanel } from "./staff/BlogManagement";
+import { StoreAdminPanel } from "./staff/StoreManagement";
 
 export function StaffSpace({
   admin = false,
@@ -906,6 +907,7 @@ export function StaffSpace({
         {admin && <SystemStatusPanel lang={lang} />}
         {admin && <SkillsAdminPanel lang={lang} />}
         {admin && <SubscriptionAdminPanel lang={lang} />}
+        {admin && <StoreAdminPanel lang={lang} />}
         {admin && <PaymentReceiptsAdminPanel lang={lang} />}
         {admin && <WhatsAppAdminPanel lang={lang} />}
       </div>

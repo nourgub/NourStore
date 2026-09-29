@@ -1,8 +1,9 @@
-// Two kinds of real, sensitive files are stored under local storage
+// Three kinds of real, sensitive files are stored under local storage
 // (server/storageProviders/local.ts):
 //   1. Payment receipt images (bank-transfer screenshots — real financial
 //      and personal data).
 //   2. Paid lesson video/attachment files.
+//   3. Purchased product files (book PDFs, the full-book ZIP bundle).
 // The tRPC layer correctly restricts who is *told* each URL (admins for
 // receipts; enrolled/eligible learners for lesson assets), but the URL
 // itself, once known by anyone — a leaked screenshot, browser history
@@ -21,10 +22,10 @@
 import type { Express, Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { UPLOAD_ROOT } from "./storageProviders/local";
 import { getDb } from "./db/shared";
-import { paymentReceipts, invoices, lessonAssets } from "../drizzle/schema";
+import { paymentReceipts, invoices, lessonAssets, products, productPurchases } from "../drizzle/schema";
 import { authenticateRequest } from "./_core/session";
 import { getLessonForLearner } from "./db/courses";
 import type { User } from "../drizzle/schema";
@@ -175,6 +176,63 @@ export function registerProtectedFileRoutes(app: Express) {
         }
       }
       await streamProtectedFile(res, asset.storageKey, asset.mimeType);
+    }
+  );
+
+  app.get(
+    "/api/protected-files/product/:productId",
+    async (req: Request, res: Response) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const productId = Number(req.params.productId);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        res.status(400).json({ error: "Invalid product id." });
+        return;
+      }
+      const db = await getDb();
+      if (!db) {
+        res.status(503).json({ error: "Database unavailable." });
+        return;
+      }
+      const rows = await db
+        .select({
+          storageKey: products.storageKey,
+          mimeType: products.fileMimeType,
+        })
+        .from(products)
+        .where(eq(products.id, productId))
+        .limit(1);
+      const product = rows[0];
+      if (!product) {
+        res.status(404).json({ error: "Product not found." });
+        return;
+      }
+      // Only an admin or a learner with a real, paid productPurchases row
+      // for this exact product may ever download its file — re-checked on
+      // every single request, same posture as the lesson-asset route above.
+      if (user.role !== "admin") {
+        const owned = await db
+          .select({ id: productPurchases.id })
+          .from(productPurchases)
+          .where(
+            and(
+              eq(productPurchases.userId, user.id),
+              eq(productPurchases.productId, productId)
+            )
+          )
+          .limit(1);
+        if (!owned.length) {
+          res
+            .status(403)
+            .json({ error: "Not authorized to download this product." });
+          return;
+        }
+      }
+      if (!product.storageKey) {
+        res.status(404).json({ error: "Product file not found." });
+        return;
+      }
+      await streamProtectedFile(res, product.storageKey, product.mimeType);
     }
   );
 }

@@ -40,7 +40,7 @@ export async function getUnitQuizForLearner(unitId: number, userId: number) {
 
 async function getUnitQuizForLearnerMysql(unitId: number, userId: number) {
   const db = await getDb();
-  if (!db) return { quiz: undefined, questions: [] };
+  if (!db) return { quiz: undefined, questions: [], courseId: undefined };
   const owningCourse = await db
     .select({ courseId: courses.id })
     .from(units)
@@ -48,7 +48,7 @@ async function getUnitQuizForLearnerMysql(unitId: number, userId: number) {
     .where(and(eq(units.id, unitId), eq(courses.isPublished, 1)))
     .limit(1);
   const courseId = owningCourse[0]?.courseId;
-  if (!courseId) return { quiz: undefined, questions: [] };
+  if (!courseId) return { quiz: undefined, questions: [], courseId: undefined };
   const enrolled = await db
     .select({ id: courseEnrollments.id })
     .from(courseEnrollments)
@@ -59,14 +59,14 @@ async function getUnitQuizForLearnerMysql(unitId: number, userId: number) {
       )
     )
     .limit(1);
-  if (!enrolled.length) return { quiz: undefined, questions: [] };
+  if (!enrolled.length) return { quiz: undefined, questions: [], courseId };
   const quizRows = await db
     .select()
     .from(unitQuizzes)
     .where(eq(unitQuizzes.unitId, unitId))
     .limit(1);
   const quiz = quizRows[0];
-  if (!quiz) return { quiz: undefined, questions: [] };
+  if (!quiz) return { quiz: undefined, questions: [], courseId };
   const questions = await db
     .select({
       id: quizQuestions.id,
@@ -81,7 +81,7 @@ async function getUnitQuizForLearnerMysql(unitId: number, userId: number) {
     .from(quizQuestions)
     .where(eq(quizQuestions.quizId, quiz.id))
     .orderBy(quizQuestions.orderIndex);
-  return { quiz, questions };
+  return { quiz, questions, courseId };
 }
 
 
