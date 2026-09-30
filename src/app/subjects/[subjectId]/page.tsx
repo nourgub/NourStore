@@ -7,9 +7,8 @@ import { listGenerationsForTeacher } from "@/lib/generation";
 import { UploadDocumentForm } from "@/components/UploadDocumentForm";
 import { GenerateExamForm } from "@/components/GenerateExamForm";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SUBJECTS } from "@/lib/agents/subjects";
 import type { SubjectId } from "@/lib/types";
-
-const SUBJECT_NAMES: Record<string, string> = { math: "الرياضيات" };
 
 const PIPELINE = [
   { label: "محلّل المنهج", icon: Search },
@@ -21,7 +20,7 @@ const PIPELINE = [
 
 export default async function SubjectPage({ params }: { params: Promise<{ subjectId: string }> }) {
   const { subjectId } = await params;
-  if (subjectId !== "math") notFound();
+  if (!(subjectId in SUBJECTS)) notFound();
 
   const teacher = await getCurrentTeacher();
   if (!teacher) redirect("/login");
@@ -38,7 +37,7 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
         <Link href="/dashboard" className="mb-4 inline-flex items-center gap-1 text-sm text-brand-600 hover:underline">
           <ArrowRight size={14} /> العودة إلى المواد
         </Link>
-        <h1 className="mb-3 text-2xl font-bold text-brand-900">فريق وكلاء {SUBJECT_NAMES[subjectId]}</h1>
+        <h1 className="mb-3 text-2xl font-bold text-brand-900">فريق وكلاء {SUBJECTS[subjectId as SubjectId].displayName}</h1>
 
         <div className="mb-8 flex flex-wrap items-center gap-2">
           {PIPELINE.map((p, i) => {

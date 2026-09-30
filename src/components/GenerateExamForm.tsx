@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CurriculumDocument, SubjectId } from "@/lib/types";
-import { AVAILABLE_MATH_TOPICS } from "@/lib/agents/mockContent";
+import { SUBJECTS } from "@/lib/agents/subjects";
 
 export function GenerateExamForm({
   subjectId,
@@ -24,8 +24,8 @@ export function GenerateExamForm({
 
   const selectedDocument = documents.find((d) => d.id === documentId) ?? null;
   const topicOptions = useMemo(
-    () => (selectedDocument ? selectedDocument.topics : AVAILABLE_MATH_TOPICS),
-    [selectedDocument],
+    () => (selectedDocument ? selectedDocument.topics : SUBJECTS[subjectId].availableTopics),
+    [selectedDocument, subjectId],
   );
 
   function onSelectDocument(id: string) {

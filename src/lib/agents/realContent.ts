@@ -20,6 +20,7 @@ export interface QuestionSpec {
 }
 
 export interface RealGenerationInput {
+  subjectPersona: string;
   examTitle: string;
   gradeLevel: string;
   styleNotes?: string;
@@ -51,7 +52,7 @@ function getClient(): Anthropic {
   return client;
 }
 
-export async function generateMathQuestionsWithClaude(
+export async function generateQuestionsWithClaude(
   input: RealGenerationInput,
 ): Promise<GeneratedQuestion[]> {
   const questionList = input.specs
@@ -60,8 +61,8 @@ export async function generateMathQuestionsWithClaude(
 
   const curriculumExcerpt = input.curriculumText?.slice(0, MAX_CURRICULUM_CHARS_IN_PROMPT);
 
-  const prompt = `أنت أستاذ رياضيات خبير تُعِدّ امتحانًا بعنوان "${input.examTitle}" لمستوى "${input.gradeLevel}".
-أنشئ بالضبط ${input.specs.length} سؤال(أسئلة) رياضية أصلية ومتنوعة، بنفس ترتيب القائمة التالية (كل سؤال يطابق محوره ومستوى صعوبته):
+  const prompt = `أنت ${input.subjectPersona} تُعِدّ امتحانًا بعنوان "${input.examTitle}" لمستوى "${input.gradeLevel}".
+أنشئ بالضبط ${input.specs.length} سؤال(أسئلة) أصلية ومتنوعة، بنفس ترتيب القائمة التالية (كل سؤال يطابق محوره ومستوى صعوبته):
 ${questionList}
 ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب مراعاتها في الصياغة: "${input.styleNotes}"\n` : ""}${
     curriculumExcerpt

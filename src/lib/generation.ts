@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { GENERATED_DIR, findDocument, findRequest, insertRequest, listRequests } from "./db";
-import { runMathAgentPipeline } from "./agents/pipeline";
+import { runAgentPipeline } from "./agents/pipeline";
 import { buildExamDocx } from "./docx/buildExamDocx";
 import { buildSolutionDocx } from "./docx/buildSolutionDocx";
 import { buildRubricDocx } from "./docx/buildRubricDocx";
@@ -32,7 +32,7 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     if (!document) throw new GenerationError("وثيقة المنهج غير موجودة");
   }
 
-  const { steps, questions } = await runMathAgentPipeline({
+  const { steps, questions } = await runAgentPipeline(input.subjectId, {
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
     topics: input.topics,

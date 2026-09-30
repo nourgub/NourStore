@@ -15,9 +15,9 @@ const SUBJECTS = [
   {
     id: "arabic",
     name: "اللغة العربية",
-    description: "قريبًا — نفس التدفق يُطبَّق على مادة جديدة بعد تجربة الرياضيات.",
+    description: "فريق وكلاء متخصص: قواعد، صرف، فهم قرائي، بلاغة، وإملاء — بنفس تدفق الرياضيات.",
     icon: BookOpen,
-    available: false,
+    available: true,
   },
   { id: "physics", name: "الفيزياء", description: "قريبًا.", icon: Atom, available: false },
 ];

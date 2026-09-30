@@ -1,6 +1,6 @@
-import type { AgentStep, CurriculumDocument, GeneratedQuestion } from "../types";
-import { AVAILABLE_MATH_TOPICS, generateMathQuestion } from "./mockContent";
-import { generateMathQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
+import type { AgentStep, CurriculumDocument, GeneratedQuestion, SubjectId } from "../types";
+import { getSubjectDefinition } from "./subjects";
+import { generateQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
 
 export interface PipelineInput {
   examTitle: string;
@@ -34,18 +34,22 @@ function pickDifficulty(mix: PipelineInput["difficultyMix"], index: number, tota
 }
 
 /**
- * Runs the Math subject's agent team over the given request.
+ * Runs a subject's agent team over the given request. The subject (its
+ * topic bank, mock-fallback generator, and the persona used to open the
+ * Claude prompt) is looked up from subjects.ts — this function itself
+ * has no subject-specific logic.
  *
- * Question content comes from `generateMathQuestionsWithClaude` (real Claude
+ * Question content comes from `generateQuestionsWithClaude` (real Claude
  * API call) whenever ANTHROPIC_API_KEY is configured, falling back to the
- * templated bank in mockContent.ts otherwise — or if the API call itself
+ * subject's templated mock bank otherwise — or if the API call itself
  * fails, so a request never hard-fails just because generation had a hiccup.
  */
-export async function runMathAgentPipeline(input: PipelineInput): Promise<PipelineOutput> {
+export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInput): Promise<PipelineOutput> {
+  const subject = getSubjectDefinition(subjectId);
   const steps: AgentStep[] = [];
 
   // 1) Curriculum Analyzer Agent
-  const requestedTopics = input.topics.length > 0 ? input.topics : AVAILABLE_MATH_TOPICS.slice(0, 3);
+  const requestedTopics = input.topics.length > 0 ? input.topics : subject.availableTopics.slice(0, 3);
   const styleNote = input.document?.styleNotes?.trim();
   const curriculumText = input.document?.extractionStatus === "extracted" ? input.document.extractedText : "";
   steps.push(
@@ -78,7 +82,8 @@ export async function runMathAgentPipeline(input: PipelineInput): Promise<Pipeli
 
   if (isRealGenerationConfigured()) {
     try {
-      questions = await generateMathQuestionsWithClaude({
+      questions = await generateQuestionsWithClaude({
+        subjectPersona: subject.persona,
         examTitle: input.examTitle,
         gradeLevel: input.gradeLevel,
         styleNotes: styleNote,
@@ -88,10 +93,10 @@ export async function runMathAgentPipeline(input: PipelineInput): Promise<Pipeli
       usedRealGeneration = true;
     } catch (err) {
       fallbackReason = err instanceof Error ? err.message : "خطأ غير معروف في نداء نموذج الذكاء الاصطناعي";
-      questions = specs.map((s) => generateMathQuestion(s.topic, s.difficulty, s.pointsBudget));
+      questions = specs.map((s) => subject.generateMockQuestion(s.topic, s.difficulty, s.pointsBudget));
     }
   } else {
-    questions = specs.map((s) => generateMathQuestion(s.topic, s.difficulty, s.pointsBudget));
+    questions = specs.map((s) => subject.generateMockQuestion(s.topic, s.difficulty, s.pointsBudget));
   }
 
   steps.push(

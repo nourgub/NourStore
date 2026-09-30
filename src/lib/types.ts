@@ -1,4 +1,4 @@
-export type SubjectId = "math";
+export type SubjectId = "math" | "arabic";
 
 export interface Teacher {
   id: string;
