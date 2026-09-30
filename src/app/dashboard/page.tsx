@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Calculator, BookOpen, Atom, ArrowLeft } from "lucide-react";
+import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -34,6 +34,20 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-brand-900">مرحبًا، {teacher.fullName}</h1>
           <p className="mt-1 text-sm text-brand-600">اختر مادة لبدء العمل مع فريق الوكلاء الخاص بها</p>
         </div>
+
+        {teacher.subscriptionStatus !== "active" && (
+          <Link
+            href="/billing"
+            className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 transition hover:bg-amber-100"
+          >
+            <AlertCircle size={20} className="shrink-0" />
+            <p className="text-sm font-semibold">
+              {teacher.subscriptionStatus === "pending"
+                ? "فعّل اشتراكك لتتمكن من توليد الامتحانات — اضغط هنا لإتمام الدفع."
+                : "لم نتمكن من تأكيد وصل الدفع السابق — اضغط هنا لإرسال وصل جديد."}
+            </p>
+          </Link>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {SUBJECTS.map((s) => {

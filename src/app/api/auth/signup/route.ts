@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findTeacherByEmail, insertTeacher } from "@/lib/db";
 import { hashPassword, isValidEmail } from "@/lib/auth";
 import { createSessionCookie } from "@/lib/session";
+import { getAdminEmail } from "@/lib/billingConfig";
 import type { Teacher } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
     email,
     passwordHash: hash,
     passwordSalt: salt,
+    // The platform owner's own account shouldn't need to pay itself.
+    subscriptionStatus: email === getAdminEmail() ? "active" : "pending",
     createdAt: new Date().toISOString(),
   };
 

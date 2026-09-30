@@ -1,16 +1,32 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { CurriculumDocument, ExtractionStatus, GenerationRequest, Session, SubjectId, Teacher } from "./types";
+import type {
+  CurriculumDocument,
+  ExtractionStatus,
+  GenerationRequest,
+  PaymentRequest,
+  PaymentRequestStatus,
+  Session,
+  SubjectId,
+  SubscriptionStatus,
+  Teacher,
+} from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "nourstore.sqlite3");
 export const GENERATED_DIR = path.join(DATA_DIR, "generated");
+export const RECEIPTS_DIR = path.join(DATA_DIR, "receipts");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(GENERATED_DIR, { recursive: true });
+fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
 
 const db = new Database(DB_FILE);
+// Next.js runs multiple worker processes, each opening its own connection to
+// this same file — busy_timeout makes a worker wait for a momentary lock
+// (e.g. another worker's schema migration) instead of throwing immediately.
+db.pragma("busy_timeout = 5000");
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
@@ -21,6 +37,7 @@ db.exec(`
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     password_salt TEXT NOT NULL,
+    subscription_status TEXT NOT NULL DEFAULT 'pending',
     created_at TEXT NOT NULL
   );
 
@@ -64,45 +81,70 @@ db.exec(`
     finished_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_requests_teacher_subject ON requests(teacher_id, subject_id);
+
+  CREATE TABLE IF NOT EXISTS payment_requests (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    receipt_path TEXT NOT NULL,
+    receipt_mime_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON payment_requests(status);
+  CREATE INDEX IF NOT EXISTS idx_payment_requests_teacher ON payment_requests(teacher_id);
 `);
+
+// Forward-compatible column add for DBs created before subscription_status
+// existed — CREATE TABLE IF NOT EXISTS above won't alter an existing table.
+const teacherColumns = db.prepare(`PRAGMA table_info(teachers)`).all() as { name: string }[];
+if (!teacherColumns.some((c) => c.name === "subscription_status")) {
+  db.exec(`ALTER TABLE teachers ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'pending'`);
+}
 
 // ---------- Teachers ----------
 
+interface TeacherRow {
+  id: string;
+  full_name: string;
+  email: string;
+  password_hash: string;
+  password_salt: string;
+  subscription_status: SubscriptionStatus;
+  created_at: string;
+}
+
+function rowToTeacher(row: TeacherRow): Teacher {
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    email: row.email,
+    passwordHash: row.password_hash,
+    passwordSalt: row.password_salt,
+    subscriptionStatus: row.subscription_status,
+    createdAt: row.created_at,
+  };
+}
+
 export function insertTeacher(teacher: Teacher): void {
   db.prepare(
-    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, created_at)
-     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @createdAt)`,
+    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, created_at)
+     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @createdAt)`,
   ).run(teacher);
 }
 
 export function findTeacherByEmail(email: string): Teacher | null {
-  const row = db.prepare(`SELECT * FROM teachers WHERE email = ?`).get(email) as
-    | { id: string; full_name: string; email: string; password_hash: string; password_salt: string; created_at: string }
-    | undefined;
-  if (!row) return null;
-  return {
-    id: row.id,
-    fullName: row.full_name,
-    email: row.email,
-    passwordHash: row.password_hash,
-    passwordSalt: row.password_salt,
-    createdAt: row.created_at,
-  };
+  const row = db.prepare(`SELECT * FROM teachers WHERE email = ?`).get(email) as TeacherRow | undefined;
+  return row ? rowToTeacher(row) : null;
 }
 
 export function findTeacherById(id: string): Teacher | null {
-  const row = db.prepare(`SELECT * FROM teachers WHERE id = ?`).get(id) as
-    | { id: string; full_name: string; email: string; password_hash: string; password_salt: string; created_at: string }
-    | undefined;
-  if (!row) return null;
-  return {
-    id: row.id,
-    fullName: row.full_name,
-    email: row.email,
-    passwordHash: row.password_hash,
-    passwordSalt: row.password_salt,
-    createdAt: row.created_at,
-  };
+  const row = db.prepare(`SELECT * FROM teachers WHERE id = ?`).get(id) as TeacherRow | undefined;
+  return row ? rowToTeacher(row) : null;
+}
+
+export function updateTeacherSubscriptionStatus(teacherId: string, status: SubscriptionStatus): void {
+  db.prepare(`UPDATE teachers SET subscription_status = ? WHERE id = ?`).run(status, teacherId);
 }
 
 // ---------- Sessions ----------
@@ -243,4 +285,71 @@ export function findRequest(id: string, teacherId: string): GenerationRequest | 
     | RequestRow
     | undefined;
   return row ? rowToRequest(row) : null;
+}
+
+// ---------- Payment requests (manual BaridiMob/CCP receipt review) ----------
+
+interface PaymentRequestRow {
+  id: string;
+  teacher_id: string;
+  receipt_path: string;
+  receipt_mime_type: string;
+  status: PaymentRequestStatus;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+function rowToPaymentRequest(row: PaymentRequestRow): PaymentRequest {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    receiptPath: row.receipt_path,
+    receiptMimeType: row.receipt_mime_type,
+    status: row.status,
+    createdAt: row.created_at,
+    reviewedAt: row.reviewed_at,
+  };
+}
+
+export function insertPaymentRequest(request: PaymentRequest): void {
+  db.prepare(
+    `INSERT INTO payment_requests (id, teacher_id, receipt_path, receipt_mime_type, status, created_at, reviewed_at)
+     VALUES (@id, @teacherId, @receiptPath, @receiptMimeType, @status, @createdAt, @reviewedAt)`,
+  ).run(request);
+}
+
+export function listPendingPaymentRequests(): (PaymentRequest & { teacherName: string; teacherEmail: string })[] {
+  const rows = db
+    .prepare(
+      `SELECT pr.*, t.full_name AS teacher_full_name, t.email AS teacher_email
+       FROM payment_requests pr JOIN teachers t ON t.id = pr.teacher_id
+       WHERE pr.status = 'pending'
+       ORDER BY pr.created_at ASC`,
+    )
+    .all() as (PaymentRequestRow & { teacher_full_name: string; teacher_email: string })[];
+  return rows.map((row) => ({
+    ...rowToPaymentRequest(row),
+    teacherName: row.teacher_full_name,
+    teacherEmail: row.teacher_email,
+  }));
+}
+
+export function findPaymentRequest(id: string): PaymentRequest | null {
+  const row = db.prepare(`SELECT * FROM payment_requests WHERE id = ?`).get(id) as PaymentRequestRow | undefined;
+  return row ? rowToPaymentRequest(row) : null;
+}
+
+export function findLatestPaymentRequestForTeacher(teacherId: string): PaymentRequest | null {
+  const row = db
+    .prepare(`SELECT * FROM payment_requests WHERE teacher_id = ? ORDER BY created_at DESC LIMIT 1`)
+    .get(teacherId) as PaymentRequestRow | undefined;
+  return row ? rowToPaymentRequest(row) : null;
+}
+
+export function updatePaymentRequestStatus(id: string, status: PaymentRequestStatus): void {
+  db.prepare(`UPDATE payment_requests SET status = ?, reviewed_at = ? WHERE id = ?`).run(
+    status,
+    new Date().toISOString(),
+    id,
+  );
 }

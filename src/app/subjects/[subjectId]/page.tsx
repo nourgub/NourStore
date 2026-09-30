@@ -24,6 +24,7 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
 
   const teacher = await getCurrentTeacher();
   if (!teacher) redirect("/login");
+  if (teacher.subscriptionStatus !== "active") redirect("/billing");
 
   const [documents, generations] = await Promise.all([
     listDocumentsForTeacher(teacher.id, subjectId as SubjectId),

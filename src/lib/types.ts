@@ -1,12 +1,27 @@
 export type SubjectId = "math" | "arabic";
 
+export type SubscriptionStatus = "pending" | "active" | "rejected";
+
 export interface Teacher {
   id: string;
   fullName: string;
   email: string;
   passwordHash: string;
   passwordSalt: string;
+  subscriptionStatus: SubscriptionStatus;
   createdAt: string;
+}
+
+export type PaymentRequestStatus = "pending" | "approved" | "rejected";
+
+export interface PaymentRequest {
+  id: string;
+  teacherId: string;
+  receiptPath: string;
+  receiptMimeType: string;
+  status: PaymentRequestStatus;
+  createdAt: string;
+  reviewedAt: string | null;
 }
 
 export interface Session {
