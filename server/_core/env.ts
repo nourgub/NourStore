@@ -87,6 +87,12 @@ export const ENV = {
   // endpoints refuse to run anything (501) rather than silently accepting
   // unauthenticated requests that trigger real notifications.
   cronSecret: process.env.CRON_SECRET ?? "",
+  // Tafawoq AI Teacher (server/tafawoq/) — Claude API key. Optional, like
+  // every other integration here: without it the teacher still runs the
+  // full placement → analysis → lesson → exercises → video loop from the
+  // curated curriculum templates, and the UI labels that content as such.
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
+  tafawoqModel: process.env.TAFAWOQ_MODEL || "claude-opus-5-5",
 };
 
 // ---------------------------------------------------------------------------
@@ -174,6 +180,14 @@ export function checkEnv(): EnvCheckResult {
       "CRON_SECRET is not set. Scheduled jobs (/api/scheduled/*) will refuse " +
         "to run (501) — certificate reminders, subscription expiry, etc. " +
         "will not fire automatically until it is set."
+    );
+  }
+
+  if (!ENV.anthropicApiKey) {
+    warnings.push(
+      "ANTHROPIC_API_KEY is not set. The Tafawoq AI Teacher will use its " +
+        "curated offline templates for lessons, exercises, tutor replies and " +
+        "video scripts instead of generating them with Claude."
     );
   }
 

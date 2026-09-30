@@ -1,8 +1,10 @@
 import {
   bigint,
+  double,
   index,
   int,
   mysqlEnum,
+  mediumtext,
   mysqlTable,
   text,
   timestamp,
@@ -1176,3 +1178,151 @@ export const googleCalendarConnections = mysqlTable("googleCalendarConnections",
 });
 
 export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Tafawoq AI Teacher (server/tafawoq/). One personal-teacher profile per
+// user, a per-skill knowledge-tracing state, every assessment (placement
+// and practice) with its server-only answer key, a per-question attempt
+// log (the evidence behind mastery, learning speed and recurring errors),
+// and the generated lessons, videos and tutor dialogue.
+// ---------------------------------------------------------------------------
+
+export const tafawoqStudents = mysqlTable("tafawoqStudents", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique().references(() => users.id),
+  displayName: varchar("displayName", { length: 100 }).notNull(),
+  age: int("age").notNull(),
+  schoolLevel: mysqlEnum("schoolLevel", ["primary", "middle", "bem", "secondary", "bac"]).notNull(),
+  goals: text("goals"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TafawoqStudent = typeof tafawoqStudents.$inferSelect;
+
+export const tafawoqSkillStates = mysqlTable(
+  "tafawoqSkillStates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    skillKey: varchar("skillKey", { length: 64 }).notNull(),
+    pKnown: double("pKnown").notNull(),
+    attempts: int("attempts").default(0).notNull(),
+    correct: int("correct").default(0).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    studentSkillUnique: uniqueIndex("tafawoqSkillStates_student_lesson_skill").on(
+      table.studentId,
+      table.lessonKey,
+      table.skillKey
+    ),
+  })
+);
+
+export const tafawoqAssessments = mysqlTable(
+  "tafawoqAssessments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    kind: mysqlEnum("kind", ["placement", "practice"]).notNull(),
+    // Full items INCLUDING answer keys — never returned to the browser as-is.
+    itemsJson: mediumtext("itemsJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template", "bank"]).notNull(),
+    status: mysqlEnum("status", ["open", "graded"]).default("open").notNull(),
+    score: int("score"),
+    resultJson: mediumtext("resultJson"),
+    masteryBefore: double("masteryBefore"),
+    masteryAfter: double("masteryAfter"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    gradedAt: timestamp("gradedAt"),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqAssessments_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqAttempts = mysqlTable(
+  "tafawoqAttempts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    assessmentId: int("assessmentId").notNull().references(() => tafawoqAssessments.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    skillKey: varchar("skillKey", { length: 64 }).notNull(),
+    questionId: varchar("questionId", { length: 64 }).notNull(),
+    difficulty: int("difficulty").notNull(),
+    correct: int("correct").notNull(),
+    misconception: varchar("misconception", { length: 200 }),
+    responseMs: int("responseMs"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqAttempts_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqLessons = mysqlTable(
+  "tafawoqLessons",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    tier: mysqlEnum("tier", ["weak", "intermediate", "advanced"]).notNull(),
+    contentJson: mediumtext("contentJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqLessons_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqVideos = mysqlTable(
+  "tafawoqVideos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    personalLessonId: int("personalLessonId").references(() => tafawoqLessons.id),
+    scriptJson: mediumtext("scriptJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqVideos_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqMessages = mysqlTable(
+  "tafawoqMessages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    role: mysqlEnum("role", ["tutor", "student"]).notNull(),
+    content: text("content").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqMessages_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
