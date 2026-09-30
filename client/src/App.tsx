@@ -26,6 +26,8 @@ const Support = lazy(() => import("./pages/Support"));
 const LessonViewer = lazy(() => import("./pages/LessonViewer"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AuthPage = lazy(() => import("./pages/Auth"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Workspace = lazy(() => import("./pages/Workspace"));
 const Search = lazy(() => import("./pages/Search"));
 const Notifications = lazy(() => import("./pages/Notifications"));
@@ -78,6 +80,8 @@ function Router() {
           path="/register"
           component={() => <AuthPage mode="register" />}
         />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/workspace" component={Workspace} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/quiz/:unitId" component={UnitQuiz} />

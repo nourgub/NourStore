@@ -18,6 +18,11 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
     "S3_SECRET_ACCESS_KEY",
     "CRON_SECRET",
     "OWNER_OPEN_ID",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_FROM",
   ];
   const previous: Record<string, string | undefined> = {};
   for (const key of keys) previous[key] = process.env[key];
@@ -131,5 +136,48 @@ describe("server startup env validation (checkEnv)", () => {
     expect(fatal).toEqual([]);
     expect(warnings.some(m => m.includes("CRON_SECRET"))).toBe(true);
     expect(warnings.some(m => m.includes("OWNER_OPEN_ID"))).toBe(true);
+  });
+
+  it("warns in production when SMTP is entirely unconfigured (password reset can't send email)", async () => {
+    const checkEnv = await loadCheckEnvWith({
+      JWT_SECRET: "a".repeat(32),
+      DATABASE_URL: "mysql://user:pass@localhost:3306/db",
+      NODE_ENV: "production",
+    });
+    const { fatal, warnings } = checkEnv();
+    expect(fatal).toEqual([]);
+    expect(warnings.some(m => m.includes("SMTP is not configured"))).toBe(
+      true
+    );
+  });
+
+  it("warns (does not fail) when SMTP is only partially configured", async () => {
+    const checkEnv = await loadCheckEnvWith({
+      JWT_SECRET: "a".repeat(32),
+      DATABASE_URL: "mysql://user:pass@localhost:3306/db",
+      NODE_ENV: "production",
+      SMTP_HOST: "smtp.example.com",
+      SMTP_USER: "user@example.com",
+      // SMTP_PASS/SMTP_FROM intentionally missing
+    });
+    const { fatal, warnings } = checkEnv();
+    expect(fatal).toEqual([]);
+    expect(
+      warnings.some(m => m.includes("SMTP is partially configured"))
+    ).toBe(true);
+  });
+
+  it("never warns about SMTP when all four variables are set", async () => {
+    const checkEnv = await loadCheckEnvWith({
+      JWT_SECRET: "a".repeat(32),
+      DATABASE_URL: "mysql://user:pass@localhost:3306/db",
+      NODE_ENV: "production",
+      SMTP_HOST: "smtp.example.com",
+      SMTP_USER: "user@example.com",
+      SMTP_PASS: "app-password",
+      SMTP_FROM: "noreply@example.com",
+    });
+    const { warnings } = checkEnv();
+    expect(warnings.some(m => m.toLowerCase().includes("smtp"))).toBe(false);
   });
 });

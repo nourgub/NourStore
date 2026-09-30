@@ -52,6 +52,19 @@ export const ENV = {
   // Redis can be self-hosted with zero external account, see the `redis`
   // service in docker-compose.yml.
   redisUrl: process.env.REDIS_URL ?? "",
+  // Outbound transactional email (password reset, etc.) — unset by
+  // default. Any standard SMTP account works: a self-hosted mail server,
+  // or a real provider's SMTP credentials (Gmail app password, SendGrid,
+  // Mailgun, Resend, etc.) — nothing provider-specific is hardcoded here,
+  // same "bring your own credentials" posture as WhatsApp/S3 above. Until
+  // all four of SMTP_HOST/SMTP_USER/SMTP_PASS/SMTP_FROM are set,
+  // server/_core/email.ts's isEmailConfigured() is false and every send
+  // is a safe, logged no-op rather than a crash.
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: Number(process.env.SMTP_PORT ?? "587"),
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  smtpFrom: process.env.SMTP_FROM ?? "",
   // Scheduled jobs (cron): unset by default. The app exposes real HTTP
   // endpoints under /api/scheduled/* (server/scheduledJobs.ts) that any
   // external scheduler can call — a self-hosted cron container (see the
@@ -140,6 +153,27 @@ export function checkEnv(): EnvCheckResult {
           "File uploads would fail outright. Set the missing S3 variables, or set STORAGE_PROVIDER=local."
       );
     }
+  }
+
+  if (
+    ENV.isProduction &&
+    (ENV.smtpHost || ENV.smtpUser || ENV.smtpPass || ENV.smtpFrom) &&
+    !(ENV.smtpHost && ENV.smtpUser && ENV.smtpPass && ENV.smtpFrom)
+  ) {
+    warnings.push(
+      "SMTP is partially configured — set all of SMTP_HOST, SMTP_USER, " +
+        "SMTP_PASS, and SMTP_FROM, or none of them. Partial config means " +
+        "isEmailConfigured() stays false and no password-reset email will " +
+        "ever be sent, silently."
+    );
+  } else if (ENV.isProduction && !ENV.smtpHost) {
+    warnings.push(
+      "SMTP is not configured. The self-service 'forgot password' flow " +
+        "will accept requests but never actually send a reset email — " +
+        "learners who forget their password need an admin to reset it " +
+        "manually in the meantime. Set SMTP_HOST/SMTP_USER/SMTP_PASS/" +
+        "SMTP_FROM to enable real email delivery."
+    );
   }
 
   if (ENV.isProduction && !ENV.cronSecret) {

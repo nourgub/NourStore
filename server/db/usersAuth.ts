@@ -1,11 +1,16 @@
 import {
+  and,
   desc,
   eq,
+  gt,
+  isNull,
 } from "drizzle-orm";
+import crypto from "crypto";
 import {
   InsertUser,
   User,
   users,
+  passwordResetTokens,
 } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
 import { getDb } from "./shared";
@@ -297,15 +302,105 @@ export async function updateUserRole(
 }
 
 /**
- * The only account-recovery path this platform has: there's no outbound
- * email infrastructure anywhere in this codebase (every other flow —
- * payment confirmation, support — is deliberately WhatsApp/admin-mediated
- * instead), so a self-service "email me a reset link" flow isn't something
- * that can work today without adding a new external email dependency. An
- * admin sets a new password directly here and relays it to the learner
- * through the platform's existing contact channel (WhatsApp) — same
+ * Looks up an email/password account by email for the self-service
+ * "forgot password" flow — never matches a Google-authenticated account
+ * (loginMethod !== "email"), since those have no password to reset.
+ * Deliberately returns only what's needed to send a reset email (never
+ * passwordHash), and the caller (requestPasswordReset in
+ * routers/auth.ts) never reveals whether a match was found either way —
+ * this is looked up purely to decide whether to actually send an email,
+ * not to shape the response.
+ */
+export async function getUserIdForPasswordReset(
+  email: string
+): Promise<{ userId: number; name: string | null } | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select({ id: users.id, name: users.name, loginMethod: users.loginMethod })
+    .from(users)
+    .where(eq(users.email, email.trim().toLowerCase()))
+    .limit(1);
+  const user = rows[0];
+  if (!user || user.loginMethod !== "email") return undefined;
+  return { userId: user.id, name: user.name };
+}
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Creates a fresh, single-use reset token for a self-service "forgot
+ * password" email — see the passwordResetTokens table comment in
+ * schema.ts for why only its SHA-256 hash is ever stored. Returns the raw
+ * token (the only time it exists in plaintext) so the caller can embed it
+ * in the emailed reset link; nothing later ever reads it back out.
+ */
+export async function createPasswordResetToken(
+  userId: number
+): Promise<string | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  await db.insert(passwordResetTokens).values({
+    userId,
+    tokenHash,
+    expiresAt: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
+  });
+  return rawToken;
+}
+
+/**
+ * Validates a raw reset token from an emailed link and, if it's real,
+ * unused, and unexpired, atomically marks it used and sets the account's
+ * new password in the same call — race-safe via the same
+ * "UPDATE ... WHERE still-valid" pattern used by markInvoicePaid
+ * (server/db/subscriptions/invoices.ts): two requests racing on the same
+ * token can never both succeed, since only the request whose UPDATE
+ * actually matches a row proceeds to change the password.
+ */
+export async function resetPasswordWithToken(
+  rawToken: string,
+  newPasswordHash: string
+): Promise<{ ok: true } | { ok: false; reason: "invalid_or_expired" }> {
+  const db = await getDb();
+  if (!db) return { ok: false, reason: "invalid_or_expired" };
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const updateResult = (await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, tokenHash),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, new Date())
+      )
+    )) as unknown as [{ affectedRows: number }, unknown];
+  if (updateResult[0].affectedRows === 0)
+    return { ok: false, reason: "invalid_or_expired" };
+  const rows = await db
+    .select({ userId: passwordResetTokens.userId })
+    .from(passwordResetTokens)
+    .where(eq(passwordResetTokens.tokenHash, tokenHash))
+    .limit(1);
+  const userId = rows[0]?.userId;
+  if (!userId) return { ok: false, reason: "invalid_or_expired" };
+  await db
+    .update(users)
+    .set({ passwordHash: newPasswordHash })
+    .where(eq(users.id, userId));
+  return { ok: true };
+}
+
+/**
+ * The fallback account-recovery path for a deployment that hasn't
+ * configured SMTP yet (see server/_core/email.ts's isEmailConfigured) —
+ * an admin sets a new password directly here and relays it to the learner
+ * through the platform's existing contact channel (WhatsApp), same
  * "manual review is the bottleneck, not silently broken" posture already
- * used for payment approval.
+ * used for payment approval. Once SMTP is configured, the self-service
+ * flow above (createPasswordResetToken/resetPasswordWithToken) is the
+ * primary path and this becomes a manual backstop rather than the only option.
  */
 export async function adminResetPassword(
   userId: number,

@@ -123,6 +123,7 @@ const copy = {
     roleLearner: "متعلم",
     roleTeacher: "أستاذ/مدرّب",
     roleInstitution: "مدير مؤسسة / مركز تكوين",
+    forgotPassword: "نسيت كلمة المرور؟",
   },
   fr: {
     loginTitle: "Bienvenue sur Nourix Academy",
@@ -150,6 +151,7 @@ const copy = {
     roleLearner: "Apprenant",
     roleTeacher: "Formateur",
     roleInstitution: "Responsable d'établissement / centre de formation",
+    forgotPassword: "Mot de passe oublié ?",
   },
   en: {
     loginTitle: "Welcome to Nourix Academy",
@@ -177,6 +179,7 @@ const copy = {
     roleTeacher: "Instructor/trainer",
     roleLearner: "Learner",
     roleInstitution: "Institution / training-center manager",
+    forgotPassword: "Forgot your password?",
   },
 } as const;
 
@@ -424,6 +427,18 @@ export default function AuthPage({
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                 />
+                {!register && (
+                  <Link
+                    href="/forgot-password"
+                    style={{
+                      fontSize: 12,
+                      opacity: 0.7,
+                      alignSelf: "flex-end",
+                    }}
+                  >
+                    {t.forgotPassword}
+                  </Link>
+                )}
               </div>
               {register && (
                 <small style={{ opacity: 0.55, fontSize: 11 }}>

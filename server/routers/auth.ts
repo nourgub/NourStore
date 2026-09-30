@@ -12,15 +12,28 @@ import {
   emailOpenId,
   validatePasswordStrength,
 } from "../_core/emailAuth";
+import { isEmailConfigured, sendEmail } from "../_core/email";
 import {
   toPublicUser,
   createEmailUser,
   getEmailUserPasswordHash,
   markUserSignedIn,
   chooseOwnRole,
+  getUserIdForPasswordReset,
+  createPasswordResetToken,
+  resetPasswordWithToken,
 } from "../db";
 import { rateLimit } from "../_core/procedures";
 import { notifyAdminOfPendingRegistration } from "../whatsappBot";
+import type { TrpcContext } from "../_core/context";
+
+// Same pattern as buildRedirectUri in googleAuth.ts — respects a reverse
+// proxy's X-Forwarded-Proto so the reset link uses https in production
+// even when Express itself only sees a plain http connection from the proxy.
+function buildOrigin(req: TrpcContext["req"]): string {
+  const proto = req.headers["x-forwarded-proto"] || req.protocol;
+  return `${proto}://${req.get("host")}`;
+}
 
 export const authRouter = router({
   me: publicProcedure.query(opts => (opts.ctx.user ? toPublicUser(opts.ctx.user) : null)),
@@ -170,6 +183,89 @@ export const authRouter = router({
             "Account type has already been chosen — contact an admin to change it.",
         });
       return result;
+    }),
+  // Lets the client show an honest "email sending isn't set up yet, contact
+  // support" message on the forgot-password page instead of pretending a
+  // reset email is on its way when no SMTP is configured.
+  passwordResetConfig: publicProcedure.query(() => ({
+    emailConfigured: isEmailConfigured(),
+  })),
+  // Never reveals whether the given email actually has an account (or
+  // whether it's an email/password account at all) — always responds the
+  // same way regardless, exactly like a real bank/webmail "forgot
+  // password" flow. Rate-limited the same way as registerWithEmail (per
+  // email and per IP) to stop this from being usable to mass-probe emails
+  // or mass-trigger sends.
+  requestPasswordReset: publicProcedure
+    .input(z.object({ email: z.string().email().max(320) }))
+    .mutation(async ({ ctx, input }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      if (
+        !(await checkRateLimit(
+          `password-reset-request:${normalizedEmail}`,
+          5,
+          60 * 60 * 1000
+        )) ||
+        !(await checkRateLimit(
+          `password-reset-request-ip:${ctx.req.ip || "unknown"}`,
+          20,
+          60 * 60 * 1000
+        ))
+      )
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts, try again later",
+        });
+      const match = await getUserIdForPasswordReset(normalizedEmail);
+      if (match && isEmailConfigured()) {
+        const token = await createPasswordResetToken(match.userId);
+        if (token) {
+          const resetUrl = `${buildOrigin(ctx.req)}/reset-password?token=${token}`;
+          await sendEmail({
+            to: normalizedEmail,
+            subject: "إعادة تعيين كلمة المرور — Nourix Academy",
+            text: `مرحبًا${match.name ? " " + match.name : ""}،\n\nطلبت إعادة تعيين كلمة المرور لحسابك في Nourix Academy. اضغط على الرابط التالي لتعيين كلمة مرور جديدة (صالح لمدة ساعة واحدة):\n\n${resetUrl}\n\nإذا لم تطلب هذا، تجاهل هذه الرسالة ببساطة.`,
+            html: `<p>مرحبًا${match.name ? " " + match.name : ""}،</p><p>طلبت إعادة تعيين كلمة المرور لحسابك في Nourix Academy. اضغط على الرابط التالي لتعيين كلمة مرور جديدة (صالح لمدة ساعة واحدة):</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>إذا لم تطلب هذا، تجاهل هذه الرسالة ببساطة.</p>`,
+          }).catch(() => {});
+        }
+      }
+      // Always the same response — existence of the account is never leaked.
+      return { ok: true } as const;
+    }),
+  resetPassword: publicProcedure
+    .input(
+      z.object({
+        token: z.string().min(1).max(200),
+        newPassword: z.string().min(1).max(200),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // rateLimit (procedures.ts) assumes an authenticated ctx.user, which
+      // this pre-authentication public procedure never has — rate-limited
+      // by IP directly instead, same as requestPasswordReset's IP guard.
+      if (
+        !(await checkRateLimit(
+          `password-reset-submit-ip:${ctx.req.ip || "unknown"}`,
+          10,
+          60 * 60 * 1000
+        ))
+      )
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts, try again later",
+        });
+      const strength = validatePasswordStrength(input.newPassword);
+      if (!strength.ok)
+        throw new TRPCError({ code: "BAD_REQUEST", message: strength.reason });
+      const newPasswordHash = await hashPassword(input.newPassword);
+      const result = await resetPasswordWithToken(input.token, newPasswordHash);
+      if (!result.ok)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This reset link is invalid or has expired. Request a new one.",
+        });
+      return { ok: true } as const;
     }),
   logout: publicProcedure.mutation(({ ctx }) => {
     const cookieOptions = getSessionCookieOptions(ctx.req);

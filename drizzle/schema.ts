@@ -54,6 +54,36 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+/**
+ * Self-service "forgot password" tokens — only ever created for
+ * loginMethod="email" accounts (Google-authenticated accounts have no
+ * password to reset). Stores a SHA-256 hash of the token, never the raw
+ * token itself, so a database read (or leak) alone can never be used to
+ * take over an account — only the raw token in the emailed link can,
+ * exactly like a payment receipt's contentHash is a hash, never the
+ * original bytes. A token is single-use (usedAt) and short-lived
+ * (expiresAt), checked by consumePasswordResetToken in
+ * server/db/usersAuth.ts.
+ */
+export const passwordResetTokens = mysqlTable(
+  "passwordResetTokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id),
+    tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    userIdx: index("passwordResetTokens_userId_idx").on(table.userId),
+  })
+);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
 export const platformSettings = mysqlTable("platformSettings", {
   key: varchar("key", { length: 64 }).primaryKey(),
   value: text("value").notNull(),

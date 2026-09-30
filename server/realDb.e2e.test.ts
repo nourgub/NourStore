@@ -1,10 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import crypto from "crypto";
 import { and, eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 import { getDb } from "./db/shared";
-import { createEmailUser } from "./db/usersAuth";
-import { hashPassword, emailOpenId } from "./_core/emailAuth";
+import {
+  createEmailUser,
+  getUserIdForPasswordReset,
+  createPasswordResetToken,
+  resetPasswordWithToken,
+} from "./db/usersAuth";
+import { hashPassword, verifyPassword, emailOpenId } from "./_core/emailAuth";
 import { createPaymentReceipt, reviewPaymentReceipt } from "./db/whatsappPayments";
 import { markInvoicePaid, cancelActiveSubscription } from "./db/subscriptions";
 import {
@@ -18,6 +24,7 @@ import {
   certificates,
   userSubscriptions,
   blogPosts,
+  passwordResetTokens,
   type User,
 } from "../drizzle/schema";
 
@@ -1081,5 +1088,112 @@ describe.skipIf(!HAS_DB)("REAL DB — blog authoring and publish state", () => {
     await expect(anon.blog.post({ slug })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+});
+
+describe.skipIf(!HAS_DB)("REAL DB — self-service password reset", () => {
+  const learnerOpenId = emailOpenId(`reset-learner-${RUN}@nourix.test`);
+  const learnerEmail = `reset-learner-${RUN}@nourix.test`;
+  const originalPassword = "Original-Pass-123";
+  const newPassword = "Brand-New-Pass-456";
+  let learner: User;
+
+  afterAll(async () => {
+    const db = await mustGetDb();
+    if (learner)
+      await db
+        .delete(passwordResetTokens)
+        .where(eq(passwordResetTokens.userId, learner.id));
+    await db.delete(users).where(eq(users.openId, learnerOpenId));
+  }, 30000);
+
+  it("only matches a real email/password account, never reveals via the DB lookup alone", async () => {
+    const passwordHash = await hashPassword(originalPassword);
+    const created = await createEmailUser({
+      openId: learnerOpenId,
+      email: learnerEmail,
+      name: "Reset Fixture",
+      passwordHash,
+    });
+    if (!created.ok) throw new Error("Failed to create fixture learner");
+    learner = await getUserRow(learnerOpenId);
+
+    await expect(
+      getUserIdForPasswordReset(`no-such-account-${RUN}@nourix.test`)
+    ).resolves.toBeUndefined();
+    await expect(getUserIdForPasswordReset(learnerEmail)).resolves.toEqual({
+      userId: learner.id,
+      name: "Reset Fixture",
+    });
+  });
+
+  it("a real token changes the password exactly once, then is dead — and an expired token is rejected", async () => {
+    const token = await createPasswordResetToken(learner.id);
+    if (!token) throw new Error("Expected a real reset token");
+
+    // Old password still works until the token is actually consumed.
+    await expect(verifyPassword(originalPassword, learner.passwordHash)).resolves.toBe(
+      true
+    );
+
+    const result = await resetPasswordWithToken(token, await hashPassword(newPassword));
+    expect(result).toEqual({ ok: true });
+
+    const db = await mustGetDb();
+    const rows = await db
+      .select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(eq(users.id, learner.id))
+      .limit(1);
+    await expect(
+      verifyPassword(newPassword, rows[0]?.passwordHash ?? null)
+    ).resolves.toBe(true);
+    await expect(
+      verifyPassword(originalPassword, rows[0]?.passwordHash ?? null)
+    ).resolves.toBe(false);
+
+    // Single-use: the exact same token can never be consumed a second time,
+    // even though it's still within its original expiry window.
+    await expect(
+      resetPasswordWithToken(token, await hashPassword("Yet-Another-Pass-789"))
+    ).resolves.toEqual({ ok: false, reason: "invalid_or_expired" });
+
+    // A token whose expiry has already passed is rejected the same way,
+    // regardless of it never having been used.
+    const expiredToken = await createPasswordResetToken(learner.id);
+    if (!expiredToken) throw new Error("Expected a real reset token");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(expiredToken)
+      .digest("hex");
+    await db
+      .update(passwordResetTokens)
+      .set({ expiresAt: new Date(Date.now() - 60 * 1000) })
+      .where(eq(passwordResetTokens.tokenHash, tokenHash));
+    await expect(
+      resetPasswordWithToken(expiredToken, await hashPassword("Should-Never-Apply-000"))
+    ).resolves.toEqual({ ok: false, reason: "invalid_or_expired" });
+  });
+
+  it("the router never reveals whether an email has an account, and rejects a bogus token honestly", async () => {
+    const anon = appRouter.createCaller(ctxFor(null));
+    // Same {ok:true} shape whether or not the email actually belongs to an
+    // account — this is the whole point of the endpoint (see
+    // requestPasswordReset's comment in routers/auth.ts).
+    await expect(
+      anon.auth.requestPasswordReset({ email: learnerEmail })
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      anon.auth.requestPasswordReset({
+        email: `no-such-account-${RUN}@nourix.test`,
+      })
+    ).resolves.toEqual({ ok: true });
+
+    await expect(
+      anon.auth.resetPassword({
+        token: "this-token-does-not-exist-anywhere",
+        newPassword: "Some-Valid-Pass-123",
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
