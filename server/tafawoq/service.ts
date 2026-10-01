@@ -11,11 +11,13 @@ import { TRPCError } from "@trpc/server";
 import type {
   ContentSource,
   PersonalLesson,
+  BacStream,
   PublicQuestion,
   SchoolLevel,
   VideoScript,
 } from "@shared/tafawoq";
 import * as store from "../db/tafawoq";
+import { createParentInvite, getParentLinks } from "../db/parent";
 import {
   LESSONS,
   SUBJECTS,
@@ -109,6 +111,7 @@ export function catalog() {
       subject: lesson.subject,
       title: lesson.title,
       levels: lesson.levels,
+      streams: lesson.streams ?? null,
       skills: lesson.skills.map(skill => ({ key: skill.key, name: skill.name })),
     })),
   };
@@ -136,13 +139,14 @@ export async function overview(userId: number) {
 
 export async function register(
   userId: number,
-  input: { displayName: string; age: number; schoolLevel: SchoolLevel; goals?: string }
+  input: { displayName: string; age: number; schoolLevel: SchoolLevel; stream?: BacStream | null; goals?: string }
 ) {
   return store.upsertTafawoqStudent({
     userId,
     displayName: input.displayName.trim(),
     age: input.age,
     schoolLevel: input.schoolLevel,
+    stream: input.schoolLevel === "bac" ? input.stream ?? null : null,
     goals: input.goals?.trim() || null,
   });
 }
@@ -556,4 +560,120 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
   const { text, source } = await tutorText(context, lesson, history, message);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
   return { reply: text, source };
+}
+
+// ---------------------------------------------------------------------------
+// Parents: a student shares a one-time code; a parent who redeems it (the
+// platform's existing parent-link flow) sees this report for that child.
+// ---------------------------------------------------------------------------
+
+export async function createParentCode(userId: number) {
+  const invite = await createParentInvite(userId);
+  if (!invite) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database not configured" });
+  return invite;
+}
+
+export type ParentAdvice =
+  | { kind: "inactive"; days: number | null }
+  | { kind: "focus"; lessonTitle: string; skillName: string }
+  | { kind: "recurring"; lessonTitle: string; errorLabel: string }
+  | { kind: "progress"; lessonTitle: string; from: number; to: number }
+  | { kind: "complete"; lessonTitle: string };
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * The parent's view of each linked child: per lesson the level, mastery
+ * trend, strengths, weaknesses and recurring errors; this week's effort
+ * (questions answered, accuracy, minutes); and concrete advice items. The
+ * advice is returned as structured codes so the parent's own interface
+ * language renders it.
+ */
+export async function parentReport(parentUserId: number) {
+  const links = (await getParentLinks(parentUserId)).filter(link => link.status === "active");
+  const weekAgo = new Date(Date.now() - 7 * DAY);
+  return Promise.all(
+    links.map(async link => {
+      const student = await store.getTafawoqStudentByUser(link.childId);
+      if (!student) {
+        return { linkId: link.id, childName: link.childName, profile: null, lessons: [], week: null, lastActivityAt: null, advice: [] as ParentAdvice[] };
+      }
+      const allStates = await store.getAllSkillStates(student.id);
+      const lessonKeys = Array.from(new Set(allStates.map(row => row.lessonKey)));
+      const lessons = (
+        await Promise.all(
+          lessonKeys.map(async key => {
+            const lesson = getLesson(key);
+            if (!lesson) return null;
+            const context = await loadContext(student, lesson);
+            const history = await store.listGradedAssessments(student.id, lesson.key);
+            return {
+              key: lesson.key,
+              title: lesson.title,
+              mastery: context.mastery,
+              tier: context.tier,
+              complete: isLessonComplete(
+                allStates
+                  .filter(row => row.lessonKey === key)
+                  .map(row => ({ skill: row.skillKey, pKnown: row.pKnown, attempts: row.attempts, correct: row.correct }))
+              ),
+              startMastery: history[0]?.masteryAfter ?? context.mastery,
+              sessions: history.length,
+              strengths: context.strengths.map(skill => skill.name),
+              weaknesses: context.weaknesses.map(skill => skill.name),
+              recurringErrors: context.recurringErrors.map(error => ({ label: error.label, count: error.count })),
+              focus: context.focusSkills.map(skill => skill.name),
+              learningSpeed: context.learningSpeed,
+            };
+          })
+        )
+      ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+      const activity = await store.getActivitySince(student.id, weekAgo);
+      const lastActivityAt = await store.getLastActivity(student.id);
+      const week = {
+        answered: activity.length,
+        accuracy: activity.length ? activity.filter(row => row.correct === 1).length / activity.length : null,
+        minutes: Math.ceil(activity.reduce((sum, row) => sum + (row.responseMs ?? 0), 0) / 60_000),
+        activeDays: new Set(activity.map(row => row.createdAt.toISOString().slice(0, 10))).size,
+      };
+
+      const advice: ParentAdvice[] = [];
+      if (!activity.length) {
+        advice.push({
+          kind: "inactive",
+          days: lastActivityAt ? Math.floor((Date.now() - lastActivityAt.getTime()) / DAY) : null,
+        });
+      }
+      for (const lesson of lessons) {
+        if (lesson.complete) {
+          advice.push({ kind: "complete", lessonTitle: lesson.title });
+          continue;
+        }
+        if (lesson.mastery - lesson.startMastery >= 0.05) {
+          advice.push({ kind: "progress", lessonTitle: lesson.title, from: lesson.startMastery, to: lesson.mastery });
+        }
+        if (lesson.recurringErrors[0]) {
+          advice.push({ kind: "recurring", lessonTitle: lesson.title, errorLabel: lesson.recurringErrors[0].label });
+        }
+        if (lesson.focus[0]) {
+          advice.push({ kind: "focus", lessonTitle: lesson.title, skillName: lesson.focus[0] });
+        }
+      }
+      return {
+        linkId: link.id,
+        childName: link.childName,
+        profile: {
+          displayName: student.displayName,
+          age: student.age,
+          schoolLevel: student.schoolLevel,
+          stream: student.stream,
+        },
+        lessons,
+        week,
+        lastActivityAt,
+        advice,
+      };
+    })
+  );
 }

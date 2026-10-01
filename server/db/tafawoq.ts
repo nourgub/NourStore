@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   tafawoqAssessments,
@@ -9,7 +9,7 @@ import {
   tafawoqStudents,
   tafawoqVideos,
 } from "../../drizzle/schema";
-import type { SchoolLevel, Tier } from "@shared/tafawoq";
+import type { BacStream, SchoolLevel, Tier } from "@shared/tafawoq";
 import type { SkillState } from "../tafawoq/studentModel";
 import { getDb } from "./shared";
 
@@ -48,6 +48,7 @@ export async function upsertTafawoqStudent(input: {
   displayName: string;
   age: number;
   schoolLevel: SchoolLevel;
+  stream: BacStream | null;
   goals: string | null;
 }) {
   const db = await requireDb();
@@ -59,6 +60,7 @@ export async function upsertTafawoqStudent(input: {
         displayName: input.displayName,
         age: input.age,
         schoolLevel: input.schoolLevel,
+        stream: input.stream,
         goals: input.goals,
       },
     });
@@ -309,4 +311,29 @@ export async function listMessages(studentId: number, lessonKey: string) {
     .from(tafawoqMessages)
     .where(and(eq(tafawoqMessages.studentId, studentId), eq(tafawoqMessages.lessonKey, lessonKey)))
     .orderBy(asc(tafawoqMessages.id));
+}
+
+/** Every answered question since `since`, across lessons — for weekly activity. */
+export async function getActivitySince(studentId: number, since: Date) {
+  const db = await requireDb();
+  return db
+    .select({
+      lessonKey: tafawoqAttempts.lessonKey,
+      correct: tafawoqAttempts.correct,
+      responseMs: tafawoqAttempts.responseMs,
+      createdAt: tafawoqAttempts.createdAt,
+    })
+    .from(tafawoqAttempts)
+    .where(and(eq(tafawoqAttempts.studentId, studentId), gte(tafawoqAttempts.createdAt, since)));
+}
+
+export async function getLastActivity(studentId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ createdAt: tafawoqAttempts.createdAt })
+    .from(tafawoqAttempts)
+    .where(eq(tafawoqAttempts.studentId, studentId))
+    .orderBy(desc(tafawoqAttempts.id))
+    .limit(1);
+  return rows[0]?.createdAt ?? null;
 }

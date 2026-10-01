@@ -19,6 +19,10 @@ export const SCHOOL_LEVEL_LABELS_AR: Record<SchoolLevel, string> = {
   bac: "البكالوريا (BAC)",
 };
 
+/** Algerian BAC streams (الشعب). Only meaningful when schoolLevel is "bac". */
+export const BAC_STREAMS = ["sciences", "math", "techmath", "gestion", "lettres", "langues"] as const;
+export type BacStream = (typeof BAC_STREAMS)[number];
+
 /** The three personalization tiers every generated artifact is shaped by. */
 export const TIERS = ["weak", "intermediate", "advanced"] as const;
 export type Tier = (typeof TIERS)[number];

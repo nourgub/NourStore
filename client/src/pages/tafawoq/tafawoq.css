@@ -175,3 +175,4 @@
   .tfq-header-actions .tfq-btn .tfq-btn-label { display: none; }
   .tfq-main { padding: 20px 12px 64px; }
 }
+.tfq-code { font-size: 26px; font-weight: 800; letter-spacing: .12em; color: var(--primary); }

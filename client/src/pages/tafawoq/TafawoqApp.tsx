@@ -16,13 +16,14 @@ import {
   Send,
   Sparkles,
   Target,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { setDocumentMeta } from "@/lib/documentMeta";
 import type { Lang } from "@/lib/language";
-import { SCHOOL_LEVELS, type SchoolLevel } from "@shared/tafawoq";
+import { BAC_STREAMS, SCHOOL_LEVELS, type BacStream, type SchoolLevel } from "@shared/tafawoq";
 import {
   AnalysisView,
   MasteryBar,
@@ -34,6 +35,7 @@ import {
   M,
   percent,
   type SubmitResult,
+  type ParentReportOutput,
   type WorkspaceOutput,
 } from "./components";
 import { Content, StringsProvider, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
@@ -89,6 +91,8 @@ export default function TafawoqApp() {
             <p className="tfq-muted">{t.loading}</p>
           ) : !isAuthenticated ? (
             <Landing />
+          ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
+            <ParentView />
           ) : user && user.role !== "learner" && user.role !== "admin" ? (
             <div className="tfq-card tfq-empty">
               <h2>{t.staffOnly}</h2>
@@ -144,7 +148,11 @@ function Home() {
   if (!student || editing) {
     return <RegisterForm student={student ?? null} onDone={() => setEditing(false)} />;
   }
-  const lessons = (catalog.data?.lessons ?? []).filter(lesson => lesson.levels.includes(student.schoolLevel));
+  const lessons = (catalog.data?.lessons ?? []).filter(
+    lesson =>
+      lesson.levels.includes(student.schoolLevel) &&
+      (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream))
+  );
   const progress = new Map((overview.data?.lessons ?? []).map(entry => [entry.key, entry]));
   const subjects = catalog.data?.subjects ?? [];
   return (
@@ -155,6 +163,7 @@ function Home() {
           <h1 style={{ marginBottom: 4 }}>{t.whatToday}</h1>
           <p className="tfq-muted">
             {t.years(student.age)} · {t.levels[student.schoolLevel]}
+            {student.schoolLevel === "bac" && student.stream ? ` · ${t.streams[student.stream]}` : ""}
           </p>
         </div>
         <button type="button" className="tfq-btn ghost small" onClick={() => setEditing(true)}>
@@ -220,7 +229,7 @@ function RegisterForm({
   student,
   onDone,
 }: {
-  student: { displayName: string; age: number; schoolLevel: SchoolLevel; goals: string | null } | null;
+  student: { displayName: string; age: number; schoolLevel: SchoolLevel; stream: BacStream | null; goals: string | null } | null;
   onDone: () => void;
 }) {
   const t = useT();
@@ -229,6 +238,7 @@ function RegisterForm({
   const [displayName, setDisplayName] = useState(student?.displayName ?? user?.name ?? "");
   const [age, setAge] = useState(String(student?.age ?? ""));
   const [schoolLevel, setSchoolLevel] = useState<SchoolLevel>(student?.schoolLevel ?? "bac");
+  const [stream, setStream] = useState<BacStream | "">(student?.stream ?? "");
   const [goals, setGoals] = useState(student?.goals ?? "");
   const register = trpc.tafawoq.register.useMutation({
     onSuccess: async () => {
@@ -238,7 +248,8 @@ function RegisterForm({
     onError: error => toast.error(errorMessage(t, error)),
   });
   const ageNumber = Number(age);
-  const valid = displayName.trim().length >= 2 && ageNumber >= 6 && ageNumber <= 25;
+  const valid =
+    displayName.trim().length >= 2 && ageNumber >= 6 && ageNumber <= 25 && (schoolLevel !== "bac" || stream !== "");
   return (
     <div className="tfq-card" style={{ maxWidth: 620, margin: "0 auto" }}>
       <div className="tfq-kicker">{t.step1}</div>
@@ -248,7 +259,14 @@ function RegisterForm({
         className="tfq-form"
         onSubmit={event => {
           event.preventDefault();
-          if (valid) register.mutate({ displayName, age: ageNumber, schoolLevel, goals: goals || undefined });
+          if (valid)
+            register.mutate({
+              displayName,
+              age: ageNumber,
+              schoolLevel,
+              stream: schoolLevel === "bac" && stream ? stream : null,
+              goals: goals || undefined,
+            });
         }}
       >
         <label className="tfq-field">
@@ -269,6 +287,21 @@ function RegisterForm({
             ))}
           </select>
         </label>
+        {schoolLevel === "bac" && (
+          <label className="tfq-field">
+            {t.stream}
+            <select className="tfq-select" value={stream} onChange={event => setStream(event.target.value as BacStream)} required>
+              <option value="" disabled>
+                {t.chooseStream}
+              </option>
+              {BAC_STREAMS.map(entry => (
+                <option key={entry} value={entry}>
+                  {t.streams[entry]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="tfq-field">
           {t.goals}
           <textarea className="tfq-textarea" dir="auto" value={goals} maxLength={500} placeholder={t.goalsPlaceholder} onChange={event => setGoals(event.target.value)} />
@@ -854,6 +887,208 @@ function ProgressTab({ data }: { data: WorkspaceData }) {
           {t.historyNote}
         </p>
       </div>
+      <ShareWithParent />
     </>
+  );
+}
+
+function ShareWithParent() {
+  const t = useT();
+  const create = trpc.tafawoq.createParentCode.useMutation({ onError: error => toast.error(errorMessage(t, error)) });
+  const days = create.data ? Math.max(1, Math.round((new Date(create.data.expiresAt).getTime() - Date.now()) / 86_400_000)) : 7;
+  return (
+    <div className="tfq-card">
+      <h3>
+        <Users size={16} /> {t.shareTitle}
+      </h3>
+      <p className="tfq-muted">{t.shareDesc}</p>
+      {create.data ? (
+        <div className="tfq-banner" style={{ fontSize: 16 }}>
+          <bdi dir="ltr" className="tfq-code">{create.data.code}</bdi>
+          <div className="tfq-muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {t.shareCode(create.data.code, days)}
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="tfq-btn ghost" disabled={create.isPending} onClick={() => create.mutate()}>
+          {create.isPending ? t.loading : t.shareButton}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Parent report
+// ---------------------------------------------------------------------------
+
+function ParentView() {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const report = trpc.tafawoq.parentReport.useQuery();
+  const [code, setCode] = useState("");
+  const accept = trpc.parent.acceptInvite.useMutation({
+    onSuccess: async linked => {
+      if (linked) {
+        toast.success(t.parentLinked);
+        setCode("");
+        await utils.tafawoq.parentReport.invalidate();
+      } else {
+        toast.error(t.parentInvalid);
+      }
+    },
+    onError: () => toast.error(t.parentInvalid),
+  });
+  const children = report.data ?? [];
+  return (
+    <>
+      <div className="tfq-kicker">{t.parentTitle}</div>
+      <h1 style={{ marginBottom: 4 }}>{t.parentTitle}</h1>
+      <p className="tfq-muted">{t.parentDesc}</p>
+      <form
+        className="tfq-card tfq-row"
+        style={{ marginTop: 16 }}
+        onSubmit={event => {
+          event.preventDefault();
+          if (code.trim().length >= 6) accept.mutate({ code: code.trim().toUpperCase() });
+        }}
+      >
+        <label className="tfq-field" style={{ flex: "1 1 240px" }}>
+          {t.parentCodeLabel}
+          <input className="tfq-input" dir="ltr" value={code} maxLength={32} onChange={event => setCode(event.target.value)} />
+        </label>
+        <button type="submit" className="tfq-btn" disabled={code.trim().length < 6 || accept.isPending} style={{ alignSelf: "flex-end" }}>
+          {t.parentLink}
+        </button>
+      </form>
+      {report.isLoading ? (
+        <p className="tfq-muted">{t.loading}</p>
+      ) : report.error ? (
+        <div className="tfq-card">{errorMessage(t, report.error)}</div>
+      ) : !children.length ? (
+        <div className="tfq-card tfq-empty">{t.parentNoChildren}</div>
+      ) : (
+        children.map(child => <ChildReport key={child.linkId} child={child} />)
+      )}
+    </>
+  );
+}
+
+type ChildReportData = ParentReportOutput[number];
+
+function ChildReport({ child }: { child: ChildReportData }) {
+  const t = useT();
+  const adviceText = (item: ChildReportData["advice"][number]) => {
+    switch (item.kind) {
+      case "inactive":
+        return t.adviceInactive(item.days);
+      case "focus":
+        return t.adviceFocus(item.lessonTitle, item.skillName);
+      case "recurring":
+        return t.adviceRecurring(item.lessonTitle, item.errorLabel);
+      case "progress":
+        return t.adviceProgress(item.lessonTitle, percent(item.from), percent(item.to));
+      default:
+        return t.adviceComplete(item.lessonTitle);
+    }
+  };
+  return (
+    <section className="tfq-card" style={{ marginTop: 16 }}>
+      <div className="tfq-spread">
+        <h2 style={{ margin: 0 }}>
+          <Content as="span">{child.profile?.displayName ?? child.childName ?? "—"}</Content>
+        </h2>
+        {child.profile && (
+          <span className="tfq-muted" style={{ fontSize: 14 }}>
+            {t.years(child.profile.age)} · {t.levels[child.profile.schoolLevel]}
+            {child.profile.stream ? ` · ${t.streams[child.profile.stream]}` : ""}
+          </span>
+        )}
+      </div>
+      {!child.profile ? (
+        <p className="tfq-muted" style={{ marginTop: 10 }}>{t.parentNoProfile}</p>
+      ) : (
+        <>
+          {child.week && (
+            <div className="tfq-steps" style={{ marginTop: 14 }}>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.thisWeek}</span>
+                <strong>{t.answered(child.week.answered)}</strong>
+                <span className="tfq-muted" style={{ fontSize: 13 }}>
+                  {child.week.accuracy !== null ? t.accuracy(percent(child.week.accuracy)) : "—"}
+                </span>
+              </div>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.thisWeek}</span>
+                <strong>{t.minutes(child.week.minutes)}</strong>
+                <span className="tfq-muted" style={{ fontSize: 13 }}>{t.activeDays(child.week.activeDays)}</span>
+              </div>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.lastActivity}</span>
+                <strong>{child.lastActivityAt ? new Date(child.lastActivityAt).toLocaleDateString() : t.never}</strong>
+              </div>
+            </div>
+          )}
+          {child.advice.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h3>{t.advice}</h3>
+              <ul className="tfq-list">
+                {child.advice.map((item, index) => (
+                  <li key={index}>
+                    <M>{adviceText(item)}</M>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!child.lessons.length ? (
+            <p className="tfq-muted" style={{ marginTop: 10 }}>{t.parentNoLessons}</p>
+          ) : (
+            child.lessons.map(lesson => (
+              <div key={lesson.key} className="tfq-result-item">
+                <div className="tfq-spread">
+                  <Content as="span">
+                    <strong>{lesson.title}</strong>
+                  </Content>
+                  <div className="tfq-row">
+                    <span className={`tfq-chip ${lesson.complete ? "good" : ""}`}>
+                      {lesson.complete ? t.complete : t.tiers[lesson.tier]}
+                    </span>
+                    <span className="tfq-muted" style={{ fontSize: 13 }}>{t.sessions(lesson.sessions)}</span>
+                  </div>
+                </div>
+                <div className="tfq-row" style={{ marginTop: 8 }}>
+                  <span className="tfq-muted" style={{ fontSize: 13 }}>{percent(lesson.startMastery)}</span>
+                  <div style={{ flex: 1 }}>
+                    <MasteryBar value={lesson.mastery} />
+                  </div>
+                  <strong>{percent(lesson.mastery)}</strong>
+                </div>
+                <div className="tfq-grid" style={{ marginTop: 10, gap: 10 }}>
+                  <div>
+                    <div className="tfq-kicker">{t.strengths}</div>
+                    <Content>{lesson.strengths.length ? <M>{lesson.strengths.join("، ")}</M> : "—"}</Content>
+                  </div>
+                  <div>
+                    <div className="tfq-kicker">{t.weaknesses}</div>
+                    <Content>{lesson.weaknesses.length ? <M>{lesson.weaknesses.join("، ")}</M> : "—"}</Content>
+                  </div>
+                  <div>
+                    <div className="tfq-kicker">{t.recurring}</div>
+                    <Content>
+                      {lesson.recurringErrors.length ? (
+                        <M>{lesson.recurringErrors.map(error => error.label).join("، ")}</M>
+                      ) : (
+                        "—"
+                      )}
+                    </Content>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
+    </section>
   );
 }

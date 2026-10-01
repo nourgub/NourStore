@@ -158,6 +158,30 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const overview = await caller.tafawoq.overview();
       expect(overview.student?.displayName).toBe("أحمد");
       expect(overview.lessons.map(entry => entry.key)).toEqual([lesson.key]);
+
+      // Parent report: Ahmed shares a one-time code, his parent redeems it.
+      const { code } = await caller.tafawoq.createParentCode();
+      const parent = await fixtureUser("parent");
+      const strangerParent = await fixtureUser("stranger-parent");
+      const db = await getDb();
+      await db!.update(users).set({ role: "parent" }).where(eq(users.id, parent.id));
+      await db!.update(users).set({ role: "parent" }).where(eq(users.id, strangerParent.id));
+      const parentCaller = appRouter.createCaller(ctxFor({ ...parent, role: "parent" }));
+      await expect(parentCaller.parent.acceptInvite({ code })).resolves.toBe(true);
+      await expect(parentCaller.parent.acceptInvite({ code })).resolves.toBe(false); // single use
+
+      const [child] = await parentCaller.tafawoq.parentReport();
+      expect(child.profile?.displayName).toBe("أحمد");
+      expect(child.lessons.map(entry => entry.key)).toEqual([lesson.key]);
+      expect(child.lessons[0].sessions).toBe(2);
+      expect(child.lessons[0].weaknesses.length).toBeGreaterThan(0);
+      expect(child.week?.answered).toBe(15);
+      expect(child.advice.some(item => item.kind === "focus" || item.kind === "progress")).toBe(true);
+
+      // A parent sees only children who shared a code with them.
+      const stranger = appRouter.createCaller(ctxFor({ ...strangerParent, role: "parent" }));
+      await expect(stranger.tafawoq.parentReport()).resolves.toEqual([]);
+      await expect(caller.tafawoq.parentReport()).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   }
 );

@@ -3,9 +3,9 @@
 // (ctx.user.id → tafawoqStudents.userId); an assessment id from another
 // student is reported as NOT_FOUND by the service layer.
 import { z } from "zod";
-import { SCHOOL_LEVELS } from "@shared/tafawoq";
+import { BAC_STREAMS, SCHOOL_LEVELS } from "@shared/tafawoq";
 import { publicProcedure, router } from "../_core/trpc";
-import { learnerProcedure, rateLimit } from "../_core/procedures";
+import { learnerProcedure, parentProcedure, rateLimit } from "../_core/procedures";
 import * as tafawoq from "../tafawoq/service";
 
 const lessonKey = z.string().min(1).max(64);
@@ -22,6 +22,7 @@ export const tafawoqRouter = router({
         displayName: z.string().trim().min(2).max(100),
         age: z.number().int().min(6).max(25),
         schoolLevel: z.enum(SCHOOL_LEVELS),
+        stream: z.enum(BAC_STREAMS).nullable().optional(),
         goals: z.string().max(500).optional(),
       })
     )
@@ -73,6 +74,14 @@ export const tafawoqRouter = router({
   startTutor: learnerProcedure
     .input(z.object({ lessonKey }))
     .mutation(({ ctx, input }) => tafawoq.startTutor(ctx.user.id, input.lessonKey)),
+
+  /** A one-time code the student gives a parent (redeemed via parent.acceptInvite). */
+  createParentCode: learnerProcedure
+    .use(rateLimit("tafawoq-parent-code", 10, HOUR))
+    .mutation(({ ctx }) => tafawoq.createParentCode(ctx.user.id)),
+
+  /** Report on the caller's own actively linked children only. */
+  parentReport: parentProcedure.query(({ ctx }) => tafawoq.parentReport(ctx.user.id)),
 
   sendMessage: learnerProcedure
     .use(rateLimit("tafawoq-chat", 60, HOUR))

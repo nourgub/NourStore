@@ -12,7 +12,7 @@
 // depends on a generated question with a wrong answer key. Claude is used
 // on top of this model for explanations, exercises, grading of free-form
 // answers, the tutor dialogue and the video script (see ./ai.ts).
-import type { SchoolLevel } from "@shared/tafawoq";
+import type { BacStream, SchoolLevel } from "@shared/tafawoq";
 import { createRng, type Generator } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { derivativeGenerators } from "./lessons/derivativesGenerators";
@@ -53,6 +53,8 @@ export type Lesson = {
   subject: SubjectKey;
   title: string;
   levels: SchoolLevel[];
+  /** BAC streams whose programme includes this lesson; omitted = every stream. */
+  streams?: BacStream[];
   skills: Skill[];
   misconceptions: Record<string, string>;
   /** Hand-written, reviewed items. */
@@ -1170,6 +1172,37 @@ export const LESSONS: Lesson[] = [
   fractions,
   ohmLaw,
 ];
+
+/**
+ * Which BAC streams study each lesson (Algerian 3AS programmes). Kept in one
+ * table so a teacher can review it at a glance. Scientific streams
+ * (sciences, math, techmath) take the whole programme; gestion has no
+ * complex numbers or space geometry; the literary streams keep sequences
+ * and probability.
+ */
+const STREAMS_BY_LESSON: Record<string, BacStream[]> = {
+  "math-limits": ["sciences", "math", "techmath", "gestion"],
+  "math-derivatives": ["sciences", "math", "techmath", "gestion"],
+  "math-exponential": ["sciences", "math", "techmath", "gestion"],
+  "math-logarithm": ["sciences", "math", "techmath", "gestion"],
+  "math-integrals": ["sciences", "math", "techmath", "gestion"],
+  "math-complex": ["sciences", "math", "techmath"],
+  "math-space-geometry": ["sciences", "math", "techmath"],
+  "math-sequences": ["sciences", "math", "techmath", "gestion", "lettres", "langues"],
+  "math-probability": ["sciences", "math", "techmath", "gestion", "lettres", "langues"],
+};
+for (const lesson of LESSONS) {
+  if (STREAMS_BY_LESSON[lesson.key]) lesson.streams = STREAMS_BY_LESSON[lesson.key];
+}
+
+/** Lessons a student is offered: their school level, and their BAC stream if they chose one. */
+export function lessonsFor(student: { schoolLevel: SchoolLevel; stream: BacStream | null }): Lesson[] {
+  return LESSONS.filter(
+    lesson =>
+      lesson.levels.includes(student.schoolLevel) &&
+      (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream))
+  );
+}
 
 export function getLesson(lessonKey: string): Lesson | undefined {
   return LESSONS.find(lesson => lesson.key === lessonKey);

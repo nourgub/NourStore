@@ -9,6 +9,7 @@ type Outputs = inferRouterOutputs<AppRouter>["tafawoq"];
 export type SubmitResult = Outputs["submitAssessment"];
 export type Analysis = SubmitResult["analysis"];
 export type WorkspaceOutput = Outputs["workspace"];
+export type ParentReportOutput = Outputs["parentReport"];
 
 export const percent = (value: number) => `${Math.round(value * 100)}%`;
 

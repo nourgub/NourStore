@@ -10,6 +10,7 @@ export type Copy = {
   navForParents: string;
   navAbout: string;
   navSupport: string;
+  navTeacher: string;
   login: string;
   start: string;
   eyebrow: string;
@@ -72,6 +73,7 @@ export type Copy = {
 export const translations: Record<Lang, Copy> = {
   ar: {
     navHome: "الرئيسية",
+    navTeacher: "أستاذي الذكي (مجاني)",
     navCourses: "الدورات",
     navHow: "كيف نتعلم؟",
     navForParents: "للأولياء",
@@ -146,6 +148,7 @@ export const translations: Record<Lang, Copy> = {
   },
   fr: {
     navHome: "Accueil",
+    navTeacher: "Mon professeur IA (gratuit)",
     navCourses: "Cours",
     navHow: "Notre méthode",
     navForParents: "Parents",
@@ -224,6 +227,7 @@ export const translations: Record<Lang, Copy> = {
   },
   en: {
     navHome: "Home",
+    navTeacher: "My AI teacher (free)",
     navCourses: "Courses",
     navHow: "How it works",
     navForParents: "For parents",

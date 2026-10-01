@@ -1193,6 +1193,8 @@ export const tafawoqStudents = mysqlTable("tafawoqStudents", {
   displayName: varchar("displayName", { length: 100 }).notNull(),
   age: int("age").notNull(),
   schoolLevel: mysqlEnum("schoolLevel", ["primary", "middle", "bem", "secondary", "bac"]).notNull(),
+  // BAC stream (شعبة); null below BAC, or for a BAC student who hasn't chosen.
+  stream: mysqlEnum("stream", ["sciences", "math", "techmath", "gestion", "lettres", "langues"]),
   goals: text("goals"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LESSONS, getLesson, selectPlacementQuestions } from "./curriculum";
+import { LESSONS, getLesson, lessonsFor, selectPlacementQuestions } from "./curriculum";
 import { answersMatch, gradeDeterministic, normalizeAnswer } from "./grading";
 import {
   MASTERED,
@@ -256,5 +256,20 @@ describe("offline personalization templates", () => {
     expect(script.scenes[0].narration).toContain("مرحباً أحمد");
     expect(script.scenes[0].narration).toContain("مشتقة xⁿ");
     expect(script.scenes.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("BAC streams", () => {
+  it("offers each stream only its programme's lessons", () => {
+    const keys = (stream: Parameters<typeof lessonsFor>[0]["stream"]) =>
+      lessonsFor({ schoolLevel: "bac", stream }).map(lesson => lesson.key);
+    expect(keys("math")).toContain("math-complex");
+    expect(keys("gestion")).not.toContain("math-complex");
+    expect(keys("gestion")).toContain("math-logarithm");
+    expect(keys("lettres")).toEqual(expect.arrayContaining(["math-sequences", "math-probability"]));
+    expect(keys("lettres")).not.toContain("math-integrals");
+    // No stream chosen yet: everything at the level is offered.
+    expect(keys(null).length).toBeGreaterThanOrEqual(keys("math").length);
+    expect(lessonsFor({ schoolLevel: "middle", stream: null }).map(lesson => lesson.key)).toContain("math-linear-equations");
   });
 });
