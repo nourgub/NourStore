@@ -20,6 +20,7 @@ const ar = {
     "لا نعطي نفس الدرس لجميع التلاميذ. تفوّق يحلل مستواك الحقيقي، ثم يُنشئ لك شرحاً وتمارين لا تنتهي وفيديو تعليمياً خاصاً بك وحدك، ويتابع تقدمك خطوة بخطوة.",
   start: "ابدأ مع أستاذك",
   haveAccount: "لدي حساب",
+  imParent: "أنا ولي — أريد متابعة ابني",
   steps: [
     ["اختبار تحديد المستوى", "10 أسئلة تكشف ما تتقنه وما يصعب عليك"],
     ["تحليل ذكي لمستواك", "نقاط القوة والضعف والأخطاء المتكررة وسرعة التعلم"],
@@ -206,6 +207,7 @@ const fr: TafawoqStrings = {
     "Pas le même cours pour tout le monde. Tafawoq analyse ton vrai niveau, puis crée pour toi des explications, des exercices illimités et une vidéo personnelle, et suit tes progrès pas à pas.",
   start: "Commencer avec mon professeur",
   haveAccount: "J’ai un compte",
+  imParent: "Je suis parent — suivre mon enfant",
   steps: [
     ["Test de positionnement", "10 questions pour savoir ce que tu maîtrises"],
     ["Analyse intelligente", "points forts, points faibles, erreurs récurrentes, vitesse d’apprentissage"],
@@ -386,6 +388,7 @@ const en: TafawoqStrings = {
     "Not the same lesson for everyone. Tafawoq analyses your real level, then creates explanations, unlimited exercises and a personal video just for you, and tracks your progress step by step.",
   start: "Start with my teacher",
   haveAccount: "I have an account",
+  imParent: "I'm a parent — follow my child",
   steps: [
     ["Placement test", "10 questions that reveal what you master"],
     ["Smart analysis", "strengths, weaknesses, recurring errors, learning speed"],

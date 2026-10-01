@@ -284,7 +284,7 @@ export async function adminResetPassword(
 
 export async function chooseOwnRole(
   userId: number,
-  role: "learner" | "teacher" | "institution"
+  role: "learner" | "parent" | "teacher" | "institution"
 ): Promise<{ ok: true } | { ok: false; reason: "already_chosen" }> {
   const db = await getDb();
   if (!db) return { ok: false, reason: "already_chosen" };

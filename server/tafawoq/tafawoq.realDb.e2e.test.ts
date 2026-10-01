@@ -163,10 +163,16 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const { code } = await caller.tafawoq.createParentCode();
       const parent = await fixtureUser("parent");
       const strangerParent = await fixtureUser("stranger-parent");
+      // Parents pick their own account type at sign-up; it can't be changed afterwards.
+      await appRouter.createCaller(ctxFor(parent)).auth.chooseRole({ role: "parent" });
+      await expect(
+        appRouter.createCaller(ctxFor(parent)).auth.chooseRole({ role: "teacher" })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await appRouter.createCaller(ctxFor(strangerParent)).auth.chooseRole({ role: "parent" });
       const db = await getDb();
-      await db!.update(users).set({ role: "parent" }).where(eq(users.id, parent.id));
-      await db!.update(users).set({ role: "parent" }).where(eq(users.id, strangerParent.id));
-      const parentCaller = appRouter.createCaller(ctxFor({ ...parent, role: "parent" }));
+      const [parentRow] = await db!.select().from(users).where(eq(users.id, parent.id));
+      expect(parentRow.role).toBe("parent");
+      const parentCaller = appRouter.createCaller(ctxFor(parentRow));
       await expect(parentCaller.parent.acceptInvite({ code })).resolves.toBe(true);
       await expect(parentCaller.parent.acceptInvite({ code })).resolves.toBe(false); // single use
 

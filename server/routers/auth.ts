@@ -142,7 +142,10 @@ export const authRouter = router({
   // "admin" is intentionally not an option here — see chooseOwnRole in db.ts.
   chooseRole: protectedProcedure
     .use(rateLimit("choose-role", 5, 60 * 60 * 1000))
-    .input(z.object({ role: z.enum(["learner", "teacher", "institution"]) }))
+    // "parent" is self-selectable: a parent account sees nothing until a
+    // child shares a one-time code with it (parent.acceptInvite), so it
+    // grants no access on its own. "admin" never is.
+    .input(z.object({ role: z.enum(["learner", "parent", "teacher", "institution"]) }))
     .mutation(async ({ ctx, input }) => {
       const result = await chooseOwnRole(ctx.user.id, input.role);
       if (!result.ok)

@@ -124,6 +124,11 @@ function Landing() {
           {t.haveAccount}
         </a>
       </div>
+      <p style={{ marginTop: 14 }}>
+        <a className="tfq-muted" href="/register?next=/tafawoq" style={{ textDecoration: "underline" }}>
+          <Users size={14} /> {t.imParent}
+        </a>
+      </p>
       <div className="tfq-steps">
         {t.steps.map(([title, desc], index) => (
           <div className="tfq-step" key={title}>

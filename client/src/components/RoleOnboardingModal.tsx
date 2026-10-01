@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { GraduationCap, School, UserRound } from "lucide-react";
+import { GraduationCap, HeartHandshake, School, UserRound } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 
 type Lang = "ar" | "fr" | "en";
-type Role = "learner" | "teacher" | "institution";
+type Role = "learner" | "parent" | "teacher" | "institution";
 
 const copy = {
   ar: {
@@ -13,6 +13,8 @@ const copy = {
     hint: "اختر نوع حسابك لنُظهر لك اللوحة والأدوات المناسبة — يمكن لاحقًا لإدارة المنصة تعديل هذا إن احتجت.",
     learner: "متعلم",
     learnerDesc: "أتابع دورات وأخوض اختبارات وأحصل على شهادات.",
+    parent: "ولي",
+    parentDesc: "أتابع مستوى ابني وتقدمه برمز يعطيني إياه من حسابه.",
     teacher: "أستاذ",
     teacherDesc: "أنشئ دورات ودروسًا واختبارات وأصحّح إجابات المتعلمين.",
     institution: "إداري (مؤسسة)",
@@ -25,6 +27,8 @@ const copy = {
     learner: "Apprenant",
     learnerDesc:
       "Je suis des cours, passe des évaluations et obtiens des certificats.",
+    parent: "Parent",
+    parentDesc: "Je suis le niveau et les progrès de mon enfant grâce au code qu’il me donne.",
     teacher: "Enseignant",
     teacherDesc:
       "Je crée des cours, des leçons, des quiz et je corrige les réponses.",
@@ -38,6 +42,8 @@ const copy = {
     hint: "Choose your account type to see the right dashboard and tools — the administration can change this later if needed.",
     learner: "Learner",
     learnerDesc: "I follow courses, take assessments, and earn certificates.",
+    parent: "Parent",
+    parentDesc: "I follow my child's level and progress with a code they give me.",
     teacher: "Teacher",
     teacherDesc:
       "I create courses, lessons, quizzes, and grade learner answers.",
@@ -85,6 +91,7 @@ export default function RoleOnboardingModal() {
       title: t.learner,
       desc: t.learnerDesc,
     },
+    { role: "parent", icon: HeartHandshake, title: t.parent, desc: t.parentDesc },
     { role: "teacher", icon: UserRound, title: t.teacher, desc: t.teacherDesc },
     {
       role: "institution",
