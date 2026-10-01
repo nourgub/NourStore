@@ -31,6 +31,7 @@ import {
   ResultItems,
   SkillMastery,
   SourceChip,
+  M,
   percent,
   type SubmitResult,
   type WorkspaceOutput,
@@ -63,7 +64,7 @@ export default function TafawoqApp() {
               <GraduationCap size={20} />
             </span>
             <span>
-              TAFAWOQ AI TEACHER
+              TAFAWOQ<span className="tfq-brand-long"> AI TEACHER</span>
               <small>{t.brand}</small>
             </span>
           </Link>
@@ -78,7 +79,7 @@ export default function TafawoqApp() {
             </label>
             {isAuthenticated && (
               <button type="button" className="tfq-btn ghost small" onClick={() => logout()}>
-                <LogOut size={14} /> {t.logout}
+                <LogOut size={14} /> <span className="tfq-btn-label">{t.logout}</span>
               </button>
             )}
           </div>
@@ -409,7 +410,7 @@ function PlacementReport({
           <Content>
             <ul className="tfq-list">
               {result.errorsThisTime.map(error => (
-                <li key={error.key}>{error.label}</li>
+                <li key={error.key}><M>{error.label}</M></li>
               ))}
             </ul>
           </Content>
@@ -547,7 +548,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
       <div className="tfq-chat" aria-live="polite">
         {data.messages.map(message => (
           <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">
-            {message.content}
+            <M>{message.content}</M>
           </div>
         ))}
         {pending && (
@@ -627,37 +628,37 @@ function LessonTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
       <Content>
         <article className="tfq-card">
           <h2>{content.title}</h2>
-          <p>{content.intro}</p>
+          <p><M>{content.intro}</M></p>
         </article>
         {content.sections.map((section, index) => (
           <article className="tfq-card" key={`${section.skill}-${index}`}>
             <div className="tfq-kicker">{t.part(index + 1)}</div>
             <h3>{section.heading}</h3>
-            <p style={{ whiteSpace: "pre-wrap" }}>{section.explanation}</p>
+            <p style={{ whiteSpace: "pre-wrap" }}><M>{section.explanation}</M></p>
             {section.examples.map((example, position) => (
               <div className="tfq-example" key={position}>
                 <strong>{t.example(position + 1)}: </strong>
-                <span dir="auto">{example.problem}</span>
+                <span><M>{example.problem}</M></span>
                 <ol>
                   {example.steps.map((step, stepIndex) => (
-                    <li key={stepIndex} dir="auto">
-                      {step}
+                    <li key={stepIndex}>
+                      <M>{step}</M>
                     </li>
                   ))}
                 </ol>
                 <div>
-                  ✔ <strong dir="auto">{example.answer}</strong>
+                  ✔ <strong><M>{example.answer}</M></strong>
                 </div>
               </div>
             ))}
-            {section.commonMistake && <div className="tfq-mistake">{section.commonMistake}</div>}
+            {section.commonMistake && <div className="tfq-mistake"><M>{section.commonMistake}</M></div>}
           </article>
         ))}
         <article className="tfq-card">
           <h3>{t.remember}</h3>
           <ul className="tfq-list">
             {content.summary.map((line, index) => (
-              <li key={index}>{line}</li>
+              <li key={index}><M>{line}</M></li>
             ))}
           </ul>
           <p className="tfq-muted" style={{ marginTop: 10 }}>

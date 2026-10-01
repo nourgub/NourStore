@@ -35,7 +35,7 @@ export function SkillMastery({ skills }: { skills: Analysis["skills"] }) {
     <div>
       {skills.map(skill => (
         <div className="tfq-skill-row" key={skill.key}>
-          <Content as="span">{skill.name}</Content>
+          <Content as="span"><M>{skill.name}</M></Content>
           <MasteryBar value={skill.mastery} />
           <strong style={{ textAlign: "end" }}>{percent(skill.mastery)}</strong>
         </div>
@@ -65,7 +65,7 @@ export function AnalysisView({ analysis }: { analysis: Analysis }) {
           <ul className="tfq-list tfq-kv">
             {analysis.strengths.map(skill => (
               <li key={skill.key}>
-                <Content as="span">{skill.name}</Content> <span className="tfq-chip good">{percent(skill.mastery)}</span>
+                <Content as="span"><M>{skill.name}</M></Content> <span className="tfq-chip good">{percent(skill.mastery)}</span>
               </li>
             ))}
           </ul>
@@ -79,7 +79,7 @@ export function AnalysisView({ analysis }: { analysis: Analysis }) {
           <ul className="tfq-list tfq-kv">
             {analysis.weaknesses.map(skill => (
               <li key={skill.key}>
-                <Content as="span">{skill.name}</Content> <span className="tfq-chip warn">{percent(skill.mastery)}</span>
+                <Content as="span"><M>{skill.name}</M></Content> <span className="tfq-chip warn">{percent(skill.mastery)}</span>
               </li>
             ))}
           </ul>
@@ -93,7 +93,7 @@ export function AnalysisView({ analysis }: { analysis: Analysis }) {
           <ul className="tfq-list tfq-kv">
             {analysis.recurringErrors.map(error => (
               <li key={error.key}>
-                <Content as="span">{error.label}</Content> <span className="tfq-muted">({error.count}×)</span>
+                <Content as="span"><M>{error.label}</M></Content> <span className="tfq-muted">({error.count}×)</span>
               </li>
             ))}
           </ul>
@@ -116,8 +116,8 @@ export function PlanView({ plan }: { plan: Analysis["plan"] }) {
           </span>
           <div>
             <Content>
-              <strong>{step.name}</strong>
-              <div className="tfq-muted" style={{ fontSize: 13 }}>{step.action}</div>
+              <strong><M>{step.name}</M></strong>
+              <div className="tfq-muted" style={{ fontSize: 13 }}><M>{step.action}</M></div>
             </Content>
             <div style={{ marginTop: 6, maxWidth: 260 }}>
               <MasteryBar value={step.mastery} />
@@ -190,7 +190,7 @@ export function QuestionRunner({
           ))}
         </div>
       </div>
-      <Content className="tfq-question">{question.prompt}</Content>
+      <Content className="tfq-question"><M>{question.prompt}</M></Content>
       {question.type === "mcq" ? (
         <Content className="tfq-options">
           {question.options?.map(option => (
@@ -200,7 +200,7 @@ export function QuestionRunner({
               className={`tfq-option ${current === option ? "selected" : ""}`}
               onClick={() => record(option)}
             >
-              {option}
+              <M>{option}</M>
             </button>
           ))}
         </Content>
@@ -278,13 +278,13 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
             {item.correct ? <CheckCircle2 size={18} color="#4fbf7f" /> : <XCircle size={18} color="#e07b7b" />}
             <Content as="span">
               <strong>
-                {index + 1}. {item.prompt}
+                {index + 1}. <M>{item.prompt}</M>
               </strong>
             </Content>
           </div>
           <div className="tfq-muted" style={{ fontSize: 14, marginTop: 6 }}>
-            {t.yourAnswer}: <bdi>{item.given || "—"}</bdi>
-            {item.correct ? "" : <> · {t.correctAnswer}: <bdi>{item.correctAnswer}</bdi></>}
+            {t.yourAnswer}: <bdi dir="ltr">{item.given || "—"}</bdi>
+            {item.correct ? "" : <> · {t.correctAnswer}: <bdi dir="ltr">{item.correctAnswer}</bdi></>}
           </div>
           {item.feedback && <Content><p style={{ marginTop: 6 }}>{item.feedback}</p></Content>}
           {!item.correct && (
@@ -292,18 +292,49 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
               <strong>{t.solution}</strong>
               <ol>
                 {item.explanation.split("\n").map((line, position) => (
-                  <li key={position}>{line}</li>
+                  <li key={position}><M>{line}</M></li>
                 ))}
               </ol>
             </Content>
           )}
           {item.misconception && (
             <div className="tfq-mistake">
-              {t.detectedError}: <Content as="span">{item.misconception}</Content>
+              {t.detectedError}: <Content as="span"><M>{item.misconception}</M></Content>
             </div>
           )}
         </div>
       ))}
     </div>
+  );
+}
+
+const ARABIC_RUN = /([\u0600-\u06FF\u0750-\u077F](?:[\u0600-\u06FF\u0750-\u077F،؛؟«»ـ.:!]|\s+(?=[\u0600-\u06FF\u0750-\u077F«]))*)/;
+
+/**
+ * Renders mixed Arabic + math text so each formula keeps its own
+ * left-to-right order inside a right-to-left sentence: without this,
+ * "−2 + (−4) = −6" is displayed as "6− = (4−) + 2−". Arabic runs stay as
+ * they are; every other run is wrapped in an isolated LTR span.
+ */
+export function M({ children }: { children: string }) {
+  const parts = children.split(ARABIC_RUN).filter(part => part !== "");
+  return (
+    <>
+      {parts.map((part, index) =>
+        ARABIC_RUN.test(part) || !part.trim() ? (
+          part
+        ) : (
+          // Surrounding spaces stay outside the isolated span, so they
+          // separate the formula from the Arabic words on the correct side.
+          <span key={index}>
+            {/^\s/.test(part) ? " " : ""}
+            <span className="tfq-math" dir="ltr">
+              {part.trim()}
+            </span>
+            {/\s$/.test(part) ? " " : ""}
+          </span>
+        )
+      )}
+    </>
   );
 }

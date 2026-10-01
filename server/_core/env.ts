@@ -185,9 +185,9 @@ export function checkEnv(): EnvCheckResult {
 
   if (!ENV.anthropicApiKey) {
     warnings.push(
-      "ANTHROPIC_API_KEY is not set. The Tafawoq AI Teacher will use its " +
-        "curated offline templates for lessons, exercises, tutor replies and " +
-        "video scripts instead of generating them with Claude."
+      "ANTHROPIC_API_KEY is not set. The Tafawoq AI Teacher runs in its free " +
+        "mode (generated exercises, equivalence grading, rule-based tutor) — " +
+        "fully functional; set the key only to add Claude-written content."
     );
   }
 

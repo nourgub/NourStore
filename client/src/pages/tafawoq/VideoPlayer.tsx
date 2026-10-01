@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { VideoScene, VideoScript } from "@shared/tafawoq";
 import { useT } from "./i18n";
+import { M } from "./components";
 
 /**
  * Renders a generated personal video script as a narrated, animated video:
@@ -97,7 +98,7 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
         <div className={`tfq-avatar ${speaking ? "speaking" : ""}`} aria-hidden>
           <GraduationCap size={26} />
         </div>
-        {(playing || finished || index > 0) && <div className="tfq-caption">{scene.narration}</div>}
+        {(playing || finished || index > 0) && <div className="tfq-caption"><M>{scene.narration}</M></div>}
         {!playing && index === 0 && !finished && (
           <button
             type="button"
@@ -168,7 +169,7 @@ function SceneVisual({ scene }: { scene: VideoScene }) {
           <h2>{visual.heading}</h2>
           <ul>
             {visual.lines.map((line, index) => (
-              <li key={index}>{line}</li>
+              <li key={index}><M>{line}</M></li>
             ))}
           </ul>
         </>
@@ -178,17 +179,17 @@ function SceneVisual({ scene }: { scene: VideoScene }) {
         <>
           <h2>{visual.heading}</h2>
           <div className="tfq-formula">{visual.formula}</div>
-          {visual.caption && <p style={{ marginTop: 14, fontSize: "clamp(14px, 2vw, 20px)" }}>{visual.caption}</p>}
+          {visual.caption && <p style={{ marginTop: 14, fontSize: "clamp(14px, 2vw, 20px)" }}><M>{visual.caption}</M></p>}
         </>
       );
     case "example":
       return (
         <>
           <h2>{visual.heading}</h2>
-          <p style={{ fontSize: "clamp(15px, 2.2vw, 22px)", fontWeight: 600 }}>{visual.problem}</p>
+          <p style={{ fontSize: "clamp(15px, 2.2vw, 22px)", fontWeight: 600 }}><M>{visual.problem}</M></p>
           <ol>
             {visual.steps.map((step, index) => (
-              <li key={index}>{step}</li>
+              <li key={index}><M>{step}</M></li>
             ))}
           </ol>
         </>

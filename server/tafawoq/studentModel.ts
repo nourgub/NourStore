@@ -42,7 +42,9 @@ export function itemParams(observation: Observation) {
     observation.type === "mcq"
       ? Math.min(0.3, 1 / Math.max(2, observation.optionsCount ?? 4))
       : 0.05;
-  const slip = 0.08 + 0.06 * (observation.difficulty - 1);
+  // Slip grows with difficulty; the floor keeps one wrong answer on a
+  // placement test from reading as "knows nothing" (1%).
+  const slip = 0.12 + 0.05 * (observation.difficulty - 1);
   return { guess, slip };
 }
 
@@ -60,7 +62,7 @@ export function bktUpdate(
   // bounded transition so one lucky answer can't declare mastery.
   const transit = options.learning ? 0.08 + 0.04 * (observation.difficulty - 1) : 0;
   const next = posterior + (1 - posterior) * transit;
-  return clamp(next, 0.01, 0.99);
+  return clamp(next, 0.05, 0.99);
 }
 
 export function applyObservations(

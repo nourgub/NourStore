@@ -167,3 +167,11 @@
 .tfq-lang select { background: transparent; color: var(--foreground); border: 0; font: inherit; font-size: 13px; cursor: pointer; }
 .tfq-lang option { background: var(--card); color: var(--foreground); }
 .tfq[dir="ltr"] .tfq-caption, .tfq[dir="ltr"] .tfq-avatar { direction: rtl; }
+.tfq-math { unicode-bidi: isolate; direction: ltr; white-space: pre-wrap; }
+@media (max-width: 560px) {
+  .tfq-header { padding: 10px 12px; }
+  .tfq-brand { font-size: 14px; }
+  .tfq-brand small, .tfq-brand-long { display: none; }
+  .tfq-header-actions .tfq-btn .tfq-btn-label { display: none; }
+  .tfq-main { padding: 20px 12px 64px; }
+}
