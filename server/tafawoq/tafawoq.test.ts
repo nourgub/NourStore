@@ -98,11 +98,19 @@ describe("grading", () => {
     expect(gradeDeterministic(item, "3x²")).toEqual({ status: "correct" });
   });
 
-  it("leaves an unrecognised short answer for the AI grader instead of guessing", () => {
+  it("accepts any mathematically equivalent form, and nothing else", () => {
     const item = derivatives.bank.find(question => question.id === "der-09")!;
     expect(gradeDeterministic(item, "6x^2 - 4").status).toBe("correct");
-    expect(gradeDeterministic(item, "2(3x²−2)").status).toBe("unmatched");
+    expect(gradeDeterministic(item, "2(3x²−2)").status).toBe("correct");
+    expect(gradeDeterministic(item, "-4 + 6·x²").status).toBe("correct");
+    expect(gradeDeterministic(item, "6x² + 4").status).toBe("unmatched");
     expect(gradeDeterministic(item, "   ").status).toBe("incorrect");
+  });
+
+  it("respects exact grading where the form itself is the skill", () => {
+    const simplify = getLesson("math-fractions")!.bank.find(question => question.id === "fr-04")!;
+    expect(gradeDeterministic(simplify, "2/3").status).toBe("correct");
+    expect(gradeDeterministic(simplify, "6/9").status).toBe("unmatched");
   });
 });
 

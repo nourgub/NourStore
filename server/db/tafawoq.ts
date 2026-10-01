@@ -238,6 +238,15 @@ export async function getAttempts(studentId: number, lessonKey: string) {
   }));
 }
 
+export async function getAttemptedQuestionIds(studentId: number, lessonKey: string) {
+  const db = await requireDb();
+  const rows = await db
+    .selectDistinct({ questionId: tafawoqAttempts.questionId })
+    .from(tafawoqAttempts)
+    .where(and(eq(tafawoqAttempts.studentId, studentId), eq(tafawoqAttempts.lessonKey, lessonKey)));
+  return rows.map(row => row.questionId);
+}
+
 export async function saveLesson(input: {
   studentId: number;
   lessonKey: string;

@@ -1,10 +1,13 @@
 // Tafawoq AI Teacher — deterministic answer checking.
 //
-// Multiple-choice and exact short answers are always graded here, never by
-// a model. Only a short answer that doesn't match any accepted form is
-// passed on to Claude (./ai.ts gradeShortAnswer), which can recognise an
-// equivalent form like "2+6x" for "6x+2" and explain the mistake.
+// Multiple-choice answers and short answers are graded here, never by a
+// model: a short answer passes when it matches an accepted form or — unless
+// the item says grading: "exact" — when it is mathematically equivalent to
+// the key (./mathExpr.ts), so "2(3x²−2)" passes for "6x² − 4". Only an
+// answer that fails both is optionally passed on to Claude (./ai.ts), when
+// one is configured, to explain the mistake.
 import type { BankQuestion } from "./curriculum";
+import { expressionsEquivalent } from "./mathExpr";
 
 const DIGITS: Record<string, string> = {
   "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
@@ -54,7 +57,7 @@ export type DeterministicGrade =
   | { status: "unmatched" };
 
 export function gradeDeterministic(
-  question: Pick<BankQuestion, "type" | "answer" | "accept" | "distractors" | "options">,
+  question: Pick<BankQuestion, "type" | "answer" | "accept" | "distractors" | "options" | "grading">,
   given: string
 ): DeterministicGrade {
   if (question.type === "mcq") {
@@ -69,5 +72,8 @@ export function gradeDeterministic(
   if (!normalizeAnswer(given)) return { status: "incorrect", misconception: null };
   const accepted = [question.answer, ...(question.accept ?? [])];
   if (accepted.some(form => answersMatch(form, given))) return { status: "correct" };
+  if (question.grading !== "exact" && accepted.some(form => expressionsEquivalent(form, given))) {
+    return { status: "correct" };
+  }
   return { status: "unmatched" };
 }

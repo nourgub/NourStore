@@ -6,7 +6,8 @@ import { getDb } from "../db/shared";
 import { createEmailUser } from "../db/usersAuth";
 import { hashPassword, emailOpenId } from "../_core/emailAuth";
 import { users, type User } from "../../drizzle/schema";
-import { getLesson, selectPlacementQuestions } from "./curriculum";
+import { getLesson, type BankQuestion } from "./curriculum";
+import { tafawoqAssessments } from "../../drizzle/schema";
 
 /**
  * REAL DATABASE end-to-end run of the Tafawoq AI Teacher loop:
@@ -25,6 +26,13 @@ function ctxFor(user: User | null): TrpcContext {
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { cookie: () => {}, clearCookie: () => {} } as unknown as TrpcContext["res"],
   };
+}
+
+/** The server-side copy of an assessment, answer keys included. */
+async function storedItems(assessmentId: number): Promise<BankQuestion[]> {
+  const db = await getDb();
+  const [row] = await db!.select().from(tafawoqAssessments).where(eq(tafawoqAssessments.id, assessmentId));
+  return JSON.parse(row.itemsJson);
 }
 
 async function fixtureUser(label: string): Promise<User> {
@@ -74,7 +82,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
 
       // Ahmed understands functions but consistently forgets to decrement
       // the exponent, and misses everything built on the power rule.
-      const bank = selectPlacementQuestions(lesson, 10);
+      const bank = await storedItems(placement.assessmentId);
       const answers = bank.map(item => {
         if (item.skill === "function_values" || item.skill === "derivative_meaning") {
           return { questionId: item.id, answer: item.answer, responseMs: 20_000 };
@@ -123,13 +131,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
 
       const practice = await caller.tafawoq.generatePractice({ lessonKey: lesson.key });
       expect(practice.questions).toHaveLength(5);
-      const db = await getDb();
-      const { tafawoqAssessments } = await import("../../drizzle/schema");
-      const [stored] = await db!
-        .select()
-        .from(tafawoqAssessments)
-        .where(eq(tafawoqAssessments.id, practice.assessmentId));
-      const keyed = JSON.parse(stored.itemsJson) as Array<{ id: string; answer: string }>;
+      const keyed = await storedItems(practice.assessmentId);
 
       // Another student can't see or submit Ahmed's assessment.
       const intruder = appRouter.createCaller(ctxFor(other));

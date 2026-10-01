@@ -3,7 +3,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { CheckCircle2, ChevronLeft, Sparkles, XCircle } from "lucide-react";
 import type { AppRouter } from "../../../../server/routers";
 import type { PublicQuestion } from "@shared/tafawoq";
-import { LEARNING_SPEED_LABELS_AR, TIER_LABELS_AR } from "@shared/tafawoq";
+import { Content, useT } from "./i18n";
 
 type Outputs = inferRouterOutputs<AppRouter>["tafawoq"];
 export type SubmitResult = Outputs["submitAssessment"];
@@ -22,13 +22,10 @@ export function MasteryBar({ value }: { value: number }) {
 }
 
 export function SourceChip({ source }: { source: "ai" | "template" | "bank" }) {
-  return source === "ai" ? (
+  const t = useT();
+  return (
     <span className="tfq-chip">
-      <Sparkles size={12} /> مولَّد بالذكاء الاصطناعي لك
-    </span>
-  ) : (
-    <span className="tfq-chip info" title="ANTHROPIC_API_KEY غير مضبوط أو تعذّر التوليد">
-      نسخة من المنهاج المُعدّ مسبقاً
+      <Sparkles size={12} /> {source === "ai" ? t.generatedAi : t.generatedFree}
     </span>
   );
 }
@@ -38,7 +35,7 @@ export function SkillMastery({ skills }: { skills: Analysis["skills"] }) {
     <div>
       {skills.map(skill => (
         <div className="tfq-skill-row" key={skill.key}>
-          <span>{skill.name}</span>
+          <Content as="span">{skill.name}</Content>
           <MasteryBar value={skill.mastery} />
           <strong style={{ textAlign: "end" }}>{percent(skill.mastery)}</strong>
         </div>
@@ -49,58 +46,59 @@ export function SkillMastery({ skills }: { skills: Analysis["skills"] }) {
 
 /** The student profile the teacher built: level, strengths, weaknesses, errors, speed. */
 export function AnalysisView({ analysis }: { analysis: Analysis }) {
+  const t = useT();
   return (
     <div className="tfq-grid">
       <div className="tfq-card">
-        <div className="tfq-kicker">المستوى الحالي</div>
+        <div className="tfq-kicker">{t.currentLevel}</div>
         <div className="tfq-row" style={{ margin: "8px 0" }}>
           <span className="tfq-big-number">{percent(analysis.mastery)}</span>
-          <span className="tfq-chip">{TIER_LABELS_AR[analysis.tier]}</span>
+          <span className="tfq-chip">{t.tiers[analysis.tier]}</span>
         </div>
         <p className="tfq-muted">
-          نسبة الإتقان العامة للدرس · سرعة التعلم: {LEARNING_SPEED_LABELS_AR[analysis.learningSpeed]}
+          {t.overallMastery} · {t.learningSpeed}: {t.speeds[analysis.learningSpeed]}
         </p>
       </div>
       <div className="tfq-card">
-        <div className="tfq-kicker">نقاط القوة</div>
+        <div className="tfq-kicker">{t.strengths}</div>
         {analysis.strengths.length ? (
           <ul className="tfq-list tfq-kv">
             {analysis.strengths.map(skill => (
               <li key={skill.key}>
-                {skill.name} <span className="tfq-chip good">{percent(skill.mastery)}</span>
+                <Content as="span">{skill.name}</Content> <span className="tfq-chip good">{percent(skill.mastery)}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="tfq-muted">ستظهر بعد مزيد من التمارين.</p>
+          <p className="tfq-muted">{t.strengthsLater}</p>
         )}
       </div>
       <div className="tfq-card">
-        <div className="tfq-kicker">نقاط الضعف</div>
+        <div className="tfq-kicker">{t.weaknesses}</div>
         {analysis.weaknesses.length ? (
           <ul className="tfq-list tfq-kv">
             {analysis.weaknesses.map(skill => (
               <li key={skill.key}>
-                {skill.name} <span className="tfq-chip warn">{percent(skill.mastery)}</span>
+                <Content as="span">{skill.name}</Content> <span className="tfq-chip warn">{percent(skill.mastery)}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="tfq-muted">لا توجد نقاط ضعف واضحة 👏</p>
+          <p className="tfq-muted">{t.noWeaknesses}</p>
         )}
       </div>
       <div className="tfq-card">
-        <div className="tfq-kicker">الأخطاء المتكررة</div>
+        <div className="tfq-kicker">{t.recurring}</div>
         {analysis.recurringErrors.length ? (
           <ul className="tfq-list tfq-kv">
             {analysis.recurringErrors.map(error => (
               <li key={error.key}>
-                {error.label} <span className="tfq-muted">({error.count}×)</span>
+                <Content as="span">{error.label}</Content> <span className="tfq-muted">({error.count}×)</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="tfq-muted">لا يوجد خطأ تكرر مرتين أو أكثر.</p>
+          <p className="tfq-muted">{t.noRecurring}</p>
         )}
       </div>
     </div>
@@ -108,7 +106,7 @@ export function AnalysisView({ analysis }: { analysis: Analysis }) {
 }
 
 export function PlanView({ plan }: { plan: Analysis["plan"] }) {
-  const labels = { mastered: "متقن", focus: "الآن", next: "التالي", locked: "لاحقاً" } as const;
+  const labels = useT().planLabels;
   return (
     <div>
       {plan.map((step, index) => (
@@ -117,8 +115,10 @@ export function PlanView({ plan }: { plan: Analysis["plan"] }) {
             {step.status === "mastered" ? "✓" : index + 1}
           </span>
           <div>
-            <strong>{step.name}</strong>
-            <div className="tfq-muted" style={{ fontSize: 13 }}>{step.action}</div>
+            <Content>
+              <strong>{step.name}</strong>
+              <div className="tfq-muted" style={{ fontSize: 13 }}>{step.action}</div>
+            </Content>
             <div style={{ marginTop: 6, maxWidth: 260 }}>
               <MasteryBar value={step.mastery} />
             </div>
@@ -150,6 +150,7 @@ export function QuestionRunner({
   onSubmit: (answers: Answer[]) => void;
   submitLabel: string;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [draft, setDraft] = useState("");
@@ -182,18 +183,16 @@ export function QuestionRunner({
   return (
     <div className="tfq-card">
       <div className="tfq-spread">
-        <span className="tfq-muted">
-          السؤال {index + 1} من {questions.length}
-        </span>
+        <span className="tfq-muted">{t.questionOf(index + 1, questions.length)}</span>
         <div className="tfq-progress-dots" aria-hidden>
           {questions.map((entry, position) => (
             <span key={entry.id} className={answers[entry.id]?.answer.trim() || position < index ? "done" : ""} />
           ))}
         </div>
       </div>
-      <div className="tfq-question">{question.prompt}</div>
+      <Content className="tfq-question">{question.prompt}</Content>
       {question.type === "mcq" ? (
-        <div className="tfq-options">
+        <Content className="tfq-options">
           {question.options?.map(option => (
             <button
               type="button"
@@ -204,12 +203,13 @@ export function QuestionRunner({
               {option}
             </button>
           ))}
-        </div>
+        </Content>
       ) : (
+        <>
         <input
           className="tfq-input"
           dir="auto"
-          placeholder="اكتب إجابتك هنا"
+          placeholder={t.typeAnswer}
           value={draft}
           onChange={event => setDraft(event.target.value)}
           onBlur={() => draft !== current && record(draft)}
@@ -217,6 +217,8 @@ export function QuestionRunner({
             if (event.key === "Enter") record(draft);
           }}
         />
+        <p className="tfq-muted" style={{ fontSize: 12, marginTop: 6 }}>{t.anyForm}</p>
+        </>
       )}
       <div className="tfq-spread" style={{ marginTop: 18 }}>
         <button
@@ -228,7 +230,7 @@ export function QuestionRunner({
             setIndex(index - 1);
           }}
         >
-          السابق
+          {t.previous}
         </button>
         {isLast ? (
           <button
@@ -247,7 +249,7 @@ export function QuestionRunner({
               onSubmit(questions.map(entry => final[entry.id] ?? { questionId: entry.id, answer: "", responseMs: 0 }));
             }}
           >
-            {submitting ? "جارٍ التصحيح…" : `${submitLabel} (${answeredCount}/${questions.length})`}
+            {submitting ? t.checking : `${submitLabel} (${answeredCount}/${questions.length})`}
           </button>
         ) : (
           <button
@@ -258,7 +260,7 @@ export function QuestionRunner({
               setIndex(index + 1);
             }}
           >
-            التالي <ChevronLeft size={16} />
+            {t.next} <ChevronLeft size={16} className="tfq-flip" />
           </button>
         )}
       </div>
@@ -267,22 +269,39 @@ export function QuestionRunner({
 }
 
 export function ResultItems({ items }: { items: SubmitResult["items"] }) {
+  const t = useT();
   return (
     <div>
       {items.map((item, index) => (
         <div key={item.questionId} className={`tfq-result-item ${item.correct ? "ok" : "ko"}`}>
           <div className="tfq-row">
             {item.correct ? <CheckCircle2 size={18} color="#4fbf7f" /> : <XCircle size={18} color="#e07b7b" />}
-            <strong>
-              {index + 1}. {item.prompt}
-            </strong>
+            <Content as="span">
+              <strong>
+                {index + 1}. {item.prompt}
+              </strong>
+            </Content>
           </div>
           <div className="tfq-muted" style={{ fontSize: 14, marginTop: 6 }}>
-            إجابتك: {item.given || "—"} {item.correct ? "" : `· الإجابة الصحيحة: ${item.correctAnswer}`}
+            {t.yourAnswer}: <bdi>{item.given || "—"}</bdi>
+            {item.correct ? "" : <> · {t.correctAnswer}: <bdi>{item.correctAnswer}</bdi></>}
           </div>
-          {item.feedback && <p style={{ marginTop: 6 }}>{item.feedback}</p>}
-          {!item.correct && <p style={{ marginTop: 6 }}>{item.explanation}</p>}
-          {item.misconception && <div className="tfq-mistake">الخطأ المكتشف: {item.misconception}</div>}
+          {item.feedback && <Content><p style={{ marginTop: 6 }}>{item.feedback}</p></Content>}
+          {!item.correct && (
+            <Content className="tfq-example">
+              <strong>{t.solution}</strong>
+              <ol>
+                {item.explanation.split("\n").map((line, position) => (
+                  <li key={position}>{line}</li>
+                ))}
+              </ol>
+            </Content>
+          )}
+          {item.misconception && (
+            <div className="tfq-mistake">
+              {t.detectedError}: <Content as="span">{item.misconception}</Content>
+            </div>
+          )}
         </div>
       ))}
     </div>

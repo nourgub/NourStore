@@ -13,6 +13,10 @@
 // on top of this model for explanations, exercises, grading of free-form
 // answers, the tutor dialogue and the video script (see ./ai.ts).
 import type { SchoolLevel } from "@shared/tafawoq";
+import { createRng, type Generator } from "./generators/core";
+import { instantiate } from "./generators/instantiate";
+import { derivativeGenerators } from "./lessons/derivativesGenerators";
+import { BAC_LESSONS } from "./lessons";
 
 export type Skill = {
   key: string;
@@ -35,17 +39,39 @@ export type BankQuestion = {
   accept?: string[];
   /** Wrong option → misconception key (see Lesson.misconceptions). */
   distractors?: Record<string, string>;
+  /** "exact": only the listed forms pass (no equivalence), e.g. "simplify". */
+  grading?: "expression" | "exact";
   explanation: string;
+  /** Worked solution (generated items). */
+  steps?: string[];
 };
 
 export type Lesson = {
   key: string;
+  /** Curriculum this lesson belongs to — the unit of internationalisation. */
+  curriculum: CurriculumKey;
   subject: SubjectKey;
   title: string;
   levels: SchoolLevel[];
   skills: Skill[];
   misconceptions: Record<string, string>;
+  /** Hand-written, reviewed items. */
   bank: BankQuestion[];
+  /** Parametric generators — unlimited computed items (./generators/). */
+  generators?: Generator[];
+  /** Optional per-misconception remedy the tutor uses to correct it. */
+  remedies?: Record<string, string>;
+};
+
+/**
+ * A national curriculum. Everything the student sees about a lesson is
+ * written in the curriculum's language; adding a country means adding a
+ * curriculum and its lessons — the student model, generators, grading and
+ * teacher loop are curriculum-agnostic.
+ */
+export type CurriculumKey = "dz";
+export const CURRICULA: Record<CurriculumKey, { country: string; language: "ar" | "fr" | "en"; name: string }> = {
+  dz: { country: "DZ", language: "ar", name: "المنهاج الجزائري" },
 };
 
 export type SubjectKey = "math" | "physics";
@@ -57,6 +83,7 @@ export const SUBJECTS: Record<SubjectKey, { name: string }> = {
 
 const derivatives: Lesson = {
   key: "math-derivatives",
+  curriculum: "dz",
   subject: "math",
   title: "الاشتقاق",
   levels: ["secondary", "bac"],
@@ -185,6 +212,26 @@ const derivatives: Lesson = {
     chain_forgot_inner: "نسيان الضرب في مشتقة الدالة الداخلية",
     tangent_formula_error: "خطأ في تطبيق دستور معادلة المماس",
     sign_variation_confusion: "ربط خاطئ بين إشارة المشتقة واتجاه التغير",
+    derivative_primitive_confusion: "الخلط بين المشتقة والدالة الأصلية",
+    no_differentiation: "كتابة الدالة نفسها بدل مشتقتها",
+  },
+  generators: derivativeGenerators,
+  remedies: {
+    function_eval_error: "ضع العدد المعوَّض بين قوسين دائماً، واحسب القوى قبل الضرب والجمع: (−3)² = 9 وليس −9.",
+    tangent_slope_confusion: "f(a) هو ارتفاع النقطة، أما f′(a) فهو الميل. في معادلة المماس الميل هو f′(a) دائماً.",
+    power_no_decrement: "بعد إنزال الأس، لا تنسَ أن تنقصه بواحد: (x³)′ = 3x² وليس 3x³.",
+    power_no_coefficient: "الأس ينزل ليصبح معاملاً مضروباً: (x⁴)′ = 4x³.",
+    power_sign_error: "اكتب 1/xⁿ على شكل x⁻ⁿ ثم طبق القاعدة: الأس يصبح −n−1 والمعامل −n.",
+    constant_derivative_nonzero: "الثابت لا يتغير، لذلك مشتقته معدومة: (7)′ = 0.",
+    product_as_product_of_derivatives: "مشتقة الجداء ليست جداء المشتقات: (uv)′ = u′v + uv′.",
+    product_forgot_term: "قاعدة الجداء فيها حدّان دائماً: u′v ثم uv′ — اكتبهما قبل التبسيط.",
+    quotient_sign: "في (u/v)′ البسط هو u′v − uv′ بهذا الترتيب بالضبط.",
+    quotient_denominator: "المقام في مشتقة الحاصل هو v² وليس v.",
+    chain_forgot_inner: "في الدالة المركبة اضرب دائماً في مشتقة الدالة الداخلية u′.",
+    tangent_formula_error: "احفظ الدستور كما هو: y = f′(a)(x − a) + f(a)، ثم انشر وبسّط.",
+    sign_variation_confusion: "إشارة f′ هي التي تحدد اتجاه التغير: f′ > 0 ⇒ f متزايدة، f′ < 0 ⇒ f متناقصة.",
+    derivative_primitive_confusion: "الاشتقاق ينقص الأس (xⁿ → n·xⁿ⁻¹)، أما الدالة الأصلية فتزيده (xⁿ → xⁿ⁺¹/(n+1)).",
+    no_differentiation: "المطلوب هو f′ وليس f: طبق قاعدة الاشتقاق على كل حد.",
   },
   bank: [
     {
@@ -409,6 +456,7 @@ const derivatives: Lesson = {
 
 const linearEquations: Lesson = {
   key: "math-linear-equations",
+  curriculum: "dz",
   subject: "math",
   title: "المعادلات من الدرجة الأولى",
   levels: ["middle", "bem"],
@@ -644,6 +692,7 @@ const linearEquations: Lesson = {
 
 const fractions: Lesson = {
   key: "math-fractions",
+  curriculum: "dz",
   subject: "math",
   title: "الكسور",
   levels: ["primary", "middle"],
@@ -763,6 +812,7 @@ const fractions: Lesson = {
       type: "short",
       prompt: "اختزل الكسر 6/9 إلى أبسط شكل.",
       answer: "2/3",
+      grading: "exact",
       explanation: "نقسم البسط والمقام على 3.",
     },
     {
@@ -861,6 +911,7 @@ const fractions: Lesson = {
 
 const ohmLaw: Lesson = {
   key: "physics-ohm-law",
+  curriculum: "dz",
   subject: "physics",
   title: "الدارة الكهربائية وقانون أوم",
   levels: ["middle", "bem", "secondary"],
@@ -1098,7 +1149,27 @@ const ohmLaw: Lesson = {
   ],
 };
 
-export const LESSONS: Lesson[] = [derivatives, linearEquations, fractions, ohmLaw];
+// BAC math in teaching order (derivatives right after limits), then the
+// middle-school and physics lessons.
+const LESSON_ORDER = [
+  "math-limits",
+  "math-derivatives",
+  "math-exponential",
+  "math-logarithm",
+  "math-sequences",
+  "math-complex",
+  "math-integrals",
+  "math-probability",
+  "math-space-geometry",
+];
+export const LESSONS: Lesson[] = [
+  ...[...BAC_LESSONS, derivatives].sort(
+    (a, b) => LESSON_ORDER.indexOf(a.key) - LESSON_ORDER.indexOf(b.key)
+  ),
+  linearEquations,
+  fractions,
+  ohmLaw,
+];
 
 export function getLesson(lessonKey: string): Lesson | undefined {
   return LESSONS.find(lesson => lesson.key === lessonKey);
@@ -1109,20 +1180,36 @@ export function getQuestion(lesson: Lesson, questionId: string) {
 }
 
 /**
+ * Every item the placement test can draw from: the reviewed bank plus one
+ * freshly generated instance of each generator.
+ */
+export function itemPool(lesson: Lesson, seed: number): BankQuestion[] {
+  const rng = createRng(seed);
+  return [
+    ...lesson.bank,
+    ...(lesson.generators ?? []).map(generator =>
+      instantiate(generator, rng.int(1, 2 ** 30))
+    ),
+  ];
+}
+
+/**
  * Picks the placement items: every skill is measured at least once (its
  * easiest item first, so a weak student is not measured only on hard
  * questions), then the remaining slots are filled round-robin across
- * skills with the next-easiest items. Deterministic, ordered easy → hard.
+ * skills with the next-easiest items. Ordered easy → hard.
  */
 export function selectPlacementQuestions(
   lesson: Lesson,
-  count = 10
+  count = 10,
+  seed = 1
 ): BankQuestion[] {
+  const pool = itemPool(lesson, seed);
   const bySkill = new Map<string, BankQuestion[]>();
   for (const skill of lesson.skills) {
     bySkill.set(
       skill.key,
-      lesson.bank
+      pool
         .filter(question => question.skill === skill.key)
         .sort((a, b) => a.difficulty - b.difficulty)
     );

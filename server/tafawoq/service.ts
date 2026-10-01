@@ -25,6 +25,7 @@ import {
   type Lesson,
 } from "./curriculum";
 import { buildStudentContext, type StudentContext } from "./context";
+import { randomSeed } from "./generators/core";
 import { gradeDeterministic } from "./grading";
 import * as ai from "./ai";
 import {
@@ -156,7 +157,7 @@ export async function startPlacement(userId: number, lessonKey: string) {
   const open = await store.getOpenAssessment(student.id, lesson.key, "placement");
   const items: StoredItem[] = open
     ? JSON.parse(open.itemsJson)
-    : selectPlacementQuestions(lesson, 10);
+    : selectPlacementQuestions(lesson, 10, randomSeed());
   const assessmentId =
     open?.id ??
     (await store.createAssessment({
@@ -174,11 +175,12 @@ export async function generatePractice(userId: number, lessonKey: string) {
   const lesson = lessonOrThrow(lessonKey);
   const context = await loadContext(student, lesson);
   const plan = buildExercisePlan(context, 5);
-  const placementIds = new Set(selectPlacementQuestions(lesson, 10).map(item => item.id));
+  // Avoid repeating bank items the student has already answered.
+  const seenIds = new Set(await store.getAttemptedQuestionIds(student.id, lesson.key));
   const fallback = templateExercises(
     lesson,
     plan,
-    placementIds,
+    seenIds,
     [...context.skills]
       .filter(skill => skill.mastery < MASTERED)
       .sort((a, b) => a.mastery - b.mastery)

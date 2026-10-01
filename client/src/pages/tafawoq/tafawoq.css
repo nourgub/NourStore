@@ -160,3 +160,10 @@
   .tfq-skill-row .tfq-bar { grid-column: 1 / -1; grid-row: 2; }
   .tfq-caption { inset-inline: 10px; bottom: 76px; }
 }
+
+[dir="rtl"] .tfq-flip, .tfq[dir="rtl"] .tfq-flip { transform: none; }
+.tfq[dir="ltr"] .tfq-flip { transform: scaleX(-1); }
+.tfq-lang { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 10px; color: var(--muted-foreground); }
+.tfq-lang select { background: transparent; color: var(--foreground); border: 0; font: inherit; font-size: 13px; cursor: pointer; }
+.tfq-lang option { background: var(--card); color: var(--foreground); }
+.tfq[dir="ltr"] .tfq-caption, .tfq[dir="ltr"] .tfq-avatar { direction: rtl; }

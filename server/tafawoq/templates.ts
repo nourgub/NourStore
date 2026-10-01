@@ -5,10 +5,12 @@
 // from the same student model as the AI path (tier, focus skills,
 // recurring errors, name), so the experience stays personal — just less
 // rich — rather than silently degrading to a generic lesson.
-import type { PersonalLesson, VideoScene, VideoScript } from "@shared/tafawoq";
+import type { LessonExample, PersonalLesson, VideoScene, VideoScript } from "@shared/tafawoq";
 import { TIER_LABELS_AR } from "@shared/tafawoq";
 import type { BankQuestion, Lesson } from "./curriculum";
 import type { StudentContext } from "./context";
+import { createRng, randomSeed } from "./generators/core";
+import { instantiate } from "./generators/instantiate";
 import { normalizeAnswer } from "./grading";
 import { targetDifficulty } from "./studentModel";
 
@@ -52,7 +54,8 @@ export function templateExercises(
   plan: ExercisePlanItem[],
   avoidIds: Set<string>,
   /** Skills to borrow from, in order, once a planned skill's bank runs out. */
-  fallbackSkills: string[] = []
+  fallbackSkills: string[] = [],
+  seed: number = randomSeed()
 ): BankQuestion[] {
   const used = new Set<string>();
   const closest = (pool: BankQuestion[], difficulty: number) =>
@@ -63,7 +66,17 @@ export function templateExercises(
           Number(avoidIds.has(a.id)) - Number(avoidIds.has(b.id)) ||
           Math.abs(a.difficulty - difficulty) - Math.abs(b.difficulty - difficulty)
       )[0];
+  const rng = createRng(seed);
   return plan.map(item => {
+    // Generators first: an unlimited supply of fresh, computed items at
+    // exactly the planned difficulty (or the closest one available).
+    const generators = (lesson.generators ?? []).filter(generator => generator.skill === item.skill);
+    if (generators.length) {
+      const gap = (difficulty: number) => Math.abs(difficulty - item.difficulty);
+      const best = Math.min(...generators.map(generator => gap(generator.difficulty)));
+      const generator = rng.pick(generators.filter(entry => gap(entry.difficulty) === best));
+      return instantiate(generator, rng.int(1, 2 ** 30));
+    }
     const order = [item.skill, ...fallbackSkills.filter(skill => skill !== item.skill)];
     let chosen: BankQuestion | undefined;
     for (const skill of order) {
@@ -79,6 +92,35 @@ export function templateExercises(
       lesson.bank[0];
     used.add(chosen.id);
     return chosen;
+  });
+}
+
+/**
+ * Fresh worked examples from the skill's generators, at a difficulty that
+ * fits the tier: a weak student sees two easy ones, an advanced one a hard
+ * one. Undefined when the skill has no generators.
+ */
+export function generatedExamples(
+  lesson: Lesson,
+  skillKey: string,
+  tier: StudentContext["tier"],
+  seed: number = randomSeed()
+): LessonExample[] | undefined {
+  const generators = (lesson.generators ?? []).filter(generator => generator.skill === skillKey);
+  if (!generators.length) return undefined;
+  const rng = createRng(seed);
+  const target = tier === "weak" ? 1 : tier === "intermediate" ? 2 : 3;
+  const sorted = [...generators].sort(
+    (a, b) => Math.abs(a.difficulty - target) - Math.abs(b.difficulty - target)
+  );
+  const count = tier === "weak" ? 2 : 1;
+  return Array.from({ length: count }, (_, index) => {
+    const item = instantiate(sorted[Math.min(index, sorted.length - 1)], rng.int(1, 2 ** 30));
+    return {
+      problem: item.prompt,
+      steps: item.steps ?? [item.explanation],
+      answer: item.answer,
+    };
   });
 }
 
@@ -123,7 +165,10 @@ export function templateLesson(lesson: Lesson, context: StudentContext): Persona
       skill: skill.key,
       heading: skill.name,
       explanation,
-      examples: [skill.example, ...bankExamples],
+      examples: [
+        skill.example,
+        ...(generatedExamples(lesson, skill.key, context.tier) ?? bankExamples),
+      ],
       commonMistake: mistake ? `انتبه: ${mistake.label}.` : undefined,
     };
   });
@@ -234,14 +279,23 @@ export function templateOpening(context: StudentContext): string {
   return parts.join(" ");
 }
 
-/** Keyword-routed reply used when no model is configured. */
-export function templateTutorReply(
-  lesson: Lesson,
-  context: StudentContext,
-  message: string
-): string {
+type TutorIntent = "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
+
+const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
+  ["thanks", /شكر|merci|thank/],
+  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|pourquoi|erreur|faute|why|mistake|wrong/],
+  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
+  ["challenge", /تحد|أصعب|اصعب|متقدم|défi|difficile|challenge|harder/],
+  ["example", /مثال|أمثلة|امثلة|exemple|example/],
+];
+
+export function detectIntent(message: string): TutorIntent {
   const text = message.toLowerCase();
-  // Pick the skill whose name shares the most words with the message.
+  return INTENT_WORDS.find(([, pattern]) => pattern.test(text))?.[0] ?? "explain";
+}
+
+function mentionedSkill(lesson: Lesson, message: string) {
+  const text = message.toLowerCase();
   let mentioned: Lesson["skills"][number] | undefined;
   let best = 0;
   for (const candidate of lesson.skills) {
@@ -254,12 +308,61 @@ export function templateTutorReply(
       mentioned = candidate;
     }
   }
+  return mentioned;
+}
+
+function formatExample(example: LessonExample): string {
+  return `${example.problem}\n${example.steps.map((step, index) => `${index + 1}) ${step}`).join("\n")}\n✔ ${example.answer}`;
+}
+
+/**
+ * The free tutor: understands what the student is asking for (explain,
+ * an example, why they keep making a mistake, simpler, a challenge) and
+ * answers from the student model, the lesson's explanations and remedies,
+ * and freshly generated worked examples. No model call.
+ */
+export function templateTutorReply(
+  lesson: Lesson,
+  context: StudentContext,
+  message: string,
+  seed: number = randomSeed()
+): string {
+  const intent = detectIntent(message);
   const skill =
-    mentioned ?? lesson.skills.find(entry => entry.key === context.focusSkills[0]?.key);
-  if (!skill) {
-    return `أحسنت يا ${context.name}، مستواك في هذا الدرس ممتاز. جرّب التمارين الصعبة في قسم «التمارين» لتثبيت إتقانك.`;
+    mentionedSkill(lesson, message) ??
+    lesson.skills.find(entry => entry.key === context.focusSkills[0]?.key) ??
+    lesson.skills.find(entry => entry.key === [...context.skills].sort((a, b) => a.mastery - b.mastery)[0]?.key);
+  if (!skill) return `أحسنت يا ${context.name}! جرّب قسم «التمارين» لتثبيت ما تعلمته.`;
+
+  const example = (tier: StudentContext["tier"]) =>
+    generatedExamples(lesson, skill.key, tier, seed)?.[0] ?? skill.example;
+
+  switch (intent) {
+    case "thanks":
+      return `بالتوفيق يا ${context.name}! ${
+        context.focusSkills[0] ? `خطوتك التالية: ${context.focusSkills[0].name}. ` : ""
+      }أنا هنا متى احتجتني.`;
+    case "mistake": {
+      const error = context.recurringErrors[0];
+      if (!error) {
+        return `لم ألاحظ عندك خطأً يتكرر حتى الآن يا ${context.name} 👍 إن أخطأت في تمرين، راجع التصحيح خطوة بخطوة في قسم «التمارين» وسأتابع أخطاءك تلقائياً.`;
+      }
+      const remedy = lesson.remedies?.[error.key];
+      return `لاحظت أنك تقع ${error.count} مرات في هذا الخطأ: ${error.label}.\n${
+        remedy ? `✅ ${remedy}\n` : ""
+      }\nلنرَ الطريقة الصحيحة على مثال:\n${formatExample(example("weak"))}`;
+    }
+    case "simpler": {
+      const sentences = skill.explanation.split(/(?<=[.:])\s+/).filter(Boolean);
+      return `لا بأس، لنأخذها خطوة بخطوة — ${skill.name}:\n${sentences
+        .map((sentence, index) => `${index + 1}. ${sentence}`)
+        .join("\n")}\n\nمثال سهل:\n${formatExample(example("weak"))}\n\nهل اتضحت الفكرة؟ اطلب «مثال» لمثال آخر.`;
+    }
+    case "challenge":
+      return `تحدٍّ في ${skill.name} 💪\n${formatExample(example("advanced"))}\n\nحاول حل مسألة مشابهة في قسم «التمارين».`;
+    case "example":
+      return `مثال محلول في ${skill.name}:\n${formatExample(example(context.tier))}\n\nاطلب «مثال» مرة أخرى لمثال جديد بأرقام مختلفة.`;
+    default:
+      return `${skill.name}: ${skill.explanation}\n\nمثال:\n${formatExample(example(context.tier))}\n\nهل تريد مثالاً آخر أو شرحاً أبسط؟`;
   }
-  return `${skill.name}: ${skill.explanation}\n\nمثال: ${skill.example.problem}\n${skill.example.steps
-    .map((step, index) => `${index + 1}) ${step}`)
-    .join("\n")}\n✔ ${skill.example.answer}\n\nهل تريد أن تجرب تمريناً مشابهاً؟ افتح قسم «التمارين».`;
 }

@@ -11,6 +11,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { VideoScene, VideoScript } from "@shared/tafawoq";
+import { useT } from "./i18n";
 
 /**
  * Renders a generated personal video script as a narrated, animated video:
@@ -20,6 +21,7 @@ import type { VideoScene, VideoScript } from "@shared/tafawoq";
  * narration length, with captions.
  */
 export function VideoPlayer({ script }: { script: VideoScript }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -88,7 +90,7 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
 
   return (
     <div className="tfq-video" ref={container}>
-      <div className="tfq-stage">
+      <div className="tfq-stage" dir="rtl" lang="ar">
         <div className="tfq-stage-inner" key={index}>
           <SceneVisual scene={scene} />
         </div>
@@ -103,24 +105,24 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
             style={{ position: "absolute", bottom: 18 }}
             onClick={() => setPlaying(true)}
           >
-            <Play size={18} /> تشغيل الفيديو
+            <Play size={18} /> {t.playVideo}
           </button>
         )}
       </div>
       <div className="tfq-controls" dir="ltr">
-        <button type="button" aria-label="السابق" onClick={() => go(index - 1)}>
+        <button type="button" aria-label={t.video.previous} onClick={() => go(index - 1)}>
           <SkipBack size={18} />
         </button>
         {finished ? (
-          <button type="button" aria-label="إعادة" onClick={() => { go(0); setPlaying(true); }}>
+          <button type="button" aria-label={t.video.replay} onClick={() => { go(0); setPlaying(true); }}>
             <RotateCcw size={18} />
           </button>
         ) : (
-          <button type="button" aria-label={playing ? "إيقاف مؤقت" : "تشغيل"} onClick={() => setPlaying(!playing)}>
+          <button type="button" aria-label={playing ? t.video.pause : t.video.play} onClick={() => setPlaying(!playing)}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
         )}
-        <button type="button" aria-label="التالي" onClick={() => go(index + 1)}>
+        <button type="button" aria-label={t.video.next} onClick={() => go(index + 1)}>
           <SkipForward size={18} />
         </button>
         <div className="tfq-timeline" dir="rtl">
@@ -134,7 +136,7 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
         </div>
         <button
           type="button"
-          aria-label={muted ? "تشغيل الصوت" : "كتم الصوت"}
+          aria-label={muted ? t.video.unmute : t.video.mute}
           onClick={() => setMuted(!muted)}
           disabled={!canSpeak}
         >
@@ -142,7 +144,7 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
         </button>
         <button
           type="button"
-          aria-label="ملء الشاشة"
+          aria-label={t.video.fullscreen}
           onClick={() => container.current?.requestFullscreen?.()}
         >
           <Maximize2 size={18} />
