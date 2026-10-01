@@ -51,14 +51,10 @@ jobs:
       - name: Sync web build into the iOS project
         run: npx cap sync ios
 
-      - name: Install CocoaPods dependencies
-        working-directory: ios/App
-        run: pod install
-
       - name: Build for iOS Simulator (no signing required)
         working-directory: ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace \
+          xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
             -configuration Debug \
@@ -68,7 +64,7 @@ jobs:
       - name: Build for a real device's architecture, unsigned
         working-directory: ios/App
         run: |
-          xcodebuild -workspace App.xcworkspace \
+          xcodebuild -project App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
             -configuration Debug \
