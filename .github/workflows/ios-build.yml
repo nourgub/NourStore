@@ -1,0 +1,92 @@
+name: iOS build (Capacitor)
+
+# Proves the iOS app actually compiles with a real Xcode toolchain, using
+# GitHub's own hosted macOS runners — no physical Mac needed. This cannot
+# run locally in this project's usual Linux dev environment, only here.
+#
+# Produces two unsigned artifacts:
+#   - an iOS Simulator build (no Apple account needed at all — this is the
+#     strongest "does it actually build and run" proof available without
+#     any signing credentials)
+#   - an unsigned real-device-architecture build (CODE_SIGNING_ALLOWED=NO)
+#     — proves the device target compiles too, but cannot be installed on
+#     a real iPhone as-is: Apple requires every app installed on a real
+#     device to be signed with a real Apple ID (free) or Apple Developer
+#     Program membership (paid, needed for TestFlight/App Store). That
+#     account has to belong to the platform's owner, not this workflow —
+#     see README note below once signing secrets are supplied.
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/amal-run-t48ma3]
+    paths:
+      - "client/**"
+      - "capacitor.config.json"
+      - "package.json"
+      - "assets/**"
+      - ".github/workflows/ios-build.yml"
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Generate branded icons/splash
+        run: npx capacitor-assets generate --ios
+
+      - name: Sync web build into the iOS project
+        run: npx cap sync ios
+
+      - name: Install CocoaPods dependencies
+        working-directory: ios/App
+        run: pod install
+
+      - name: Build for iOS Simulator (no signing required)
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build-simulator \
+            build
+
+      - name: Build for a real device's architecture, unsigned
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Debug \
+            -derivedDataPath build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: ios/App/build-simulator/Build/Products/Debug-iphonesimulator/App.app
+          retention-days: 14
+
+      - name: Upload unsigned device build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-device-build-unsigned
+          path: ios/App/build-device/Build/Products/Debug-iphoneos/App.app
+          retention-days: 14
