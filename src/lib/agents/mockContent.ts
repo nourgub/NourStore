@@ -123,15 +123,24 @@ export function generateMathQuestion(
   difficulty: Difficulty,
   pointsBudget: number,
 ): GeneratedQuestion {
+  const isKnownTopic = topic in TOPIC_TEMPLATES;
   const template = TOPIC_TEMPLATES[topic] ?? TOPIC_TEMPLATES["المعادلات الخطية"];
   const built = template.build(difficulty);
+
+  // The demo bank only covers a handful of generic topics — be upfront
+  // about the substitution instead of silently answering the wrong topic
+  // (this matters more now that the UI offers precise curriculum topics
+  // the bank was never written to cover).
+  const prompt = isKnownTopic
+    ? built.prompt
+    : `[ملاحظة: الوضع التجريبي لا يغطي محور "${topic}" بدقة بعد — هذا سؤال نموذجي عام بديل. فعّل Claude API لتوليد أسئلة مطابقة لهذا المحور تحديدًا.]\n\n${built.prompt}`;
 
   return {
     id: `q_${Math.random().toString(36).slice(2, 10)}`,
     topic,
     difficulty,
     points: pointsBudget,
-    prompt: built.prompt,
+    prompt,
     solution: built.solution,
     rubric: scaleRubricToBudget(built.rubric, pointsBudget),
   };

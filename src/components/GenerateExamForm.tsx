@@ -13,9 +13,11 @@ export function GenerateExamForm({
   documents: CurriculumDocument[];
 }) {
   const router = useRouter();
+  const subject = SUBJECTS[subjectId];
   const [documentId, setDocumentId] = useState<string>("");
   const [examTitle, setExamTitle] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
+  const [selectedLevelId, setSelectedLevelId] = useState("");
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [numQuestions, setNumQuestions] = useState(6);
   const [difficultyMix, setDifficultyMix] = useState<"متوازن" | "سهل" | "صعب">("متوازن");
@@ -23,20 +25,31 @@ export function GenerateExamForm({
   const [loading, setLoading] = useState(false);
 
   const selectedDocument = documents.find((d) => d.id === documentId) ?? null;
-  const topicOptions = useMemo(
-    () => (selectedDocument ? selectedDocument.topics : SUBJECTS[subjectId].availableTopics),
-    [selectedDocument, subjectId],
-  );
+  const selectedLevel = subject.levelOptions?.find((l) => l.id === selectedLevelId) ?? null;
+
+  const topicOptions = useMemo(() => {
+    if (selectedDocument) return selectedDocument.topics;
+    if (selectedLevel) return selectedLevel.topics;
+    return subject.availableTopics;
+  }, [selectedDocument, selectedLevel, subject.availableTopics]);
 
   function onSelectDocument(id: string) {
     setDocumentId(id);
     const doc = documents.find((d) => d.id === id);
     if (doc) {
+      setSelectedLevelId("");
       setGradeLevel(doc.gradeLevel);
       setSelectedTopics(doc.topics);
     } else {
       setSelectedTopics([]);
     }
+  }
+
+  function onSelectLevel(levelId: string) {
+    setSelectedLevelId(levelId);
+    const level = subject.levelOptions?.find((l) => l.id === levelId);
+    setGradeLevel(level?.label ?? "");
+    setSelectedTopics([]);
   }
 
   function toggleTopic(topic: string) {
@@ -73,6 +86,8 @@ export function GenerateExamForm({
     router.push(`/subjects/${subjectId}/results/${data.request.id}`);
   }
 
+  const showLevelPicker = Boolean(subject.levelOptions) && !selectedDocument;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-brand-200 bg-white p-5">
       <h3 className="font-bold text-brand-800">توليد امتحان جديد</h3>
@@ -106,13 +121,38 @@ export function GenerateExamForm({
 
       <div>
         <label className="mb-1 block text-sm font-medium text-brand-800">المستوى الدراسي</label>
-        <input
-          required
-          value={gradeLevel}
-          onChange={(e) => setGradeLevel(e.target.value)}
-          placeholder="مثال: السنة الثانية ثانوي"
-          className="w-full rounded-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-        />
+        {showLevelPicker ? (
+          <select
+            required
+            value={selectedLevelId}
+            onChange={(e) => onSelectLevel(e.target.value)}
+            className="w-full rounded-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            <option value="">اختر المستوى والشعبة</option>
+            <optgroup label="المتوسط">
+              {subject.levelOptions!.filter((l) => l.stage === "متوسط").map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="الثانوي">
+              {subject.levelOptions!.filter((l) => l.stage === "ثانوي").map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        ) : (
+          <input
+            required
+            value={gradeLevel}
+            onChange={(e) => setGradeLevel(e.target.value)}
+            placeholder="مثال: السنة الثانية ثانوي"
+            className="w-full rounded-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        )}
       </div>
 
       <div>

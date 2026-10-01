@@ -22,15 +22,35 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(GENERATED_DIR, { recursive: true });
 fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
 
-const db = new Database(DB_FILE);
+function sleepSync(ms: number) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 // Next.js runs multiple worker processes, each opening its own connection to
-// this same file — busy_timeout makes a worker wait for a momentary lock
-// (e.g. another worker's schema migration) instead of throwing immediately.
+// this same (possibly brand-new) file. busy_timeout covers ordinary
+// read/write contention, but the one-time switch to WAL mode needs an
+// exclusive lock that can fail immediately with SQLITE_BUSY even with
+// busy_timeout set — so retry that step by hand instead of racing on it.
+function withBusyRetry<T>(fn: () => T, attempts = 5): T {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return fn();
+    } catch (err) {
+      const isBusy = err instanceof Error && "code" in err && err.code === "SQLITE_BUSY";
+      if (!isBusy || i === attempts - 1) throw err;
+      sleepSync(100 * (i + 1));
+    }
+  }
+  throw new Error("unreachable");
+}
+
+const db = new Database(DB_FILE);
 db.pragma("busy_timeout = 5000");
-db.pragma("journal_mode = WAL");
+withBusyRetry(() => db.pragma("journal_mode = WAL"));
 db.pragma("foreign_keys = ON");
 
-db.exec(`
+withBusyRetry(() =>
+  db.exec(`
   CREATE TABLE IF NOT EXISTS teachers (
     id TEXT PRIMARY KEY,
     full_name TEXT NOT NULL,
@@ -93,13 +113,14 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON payment_requests(status);
   CREATE INDEX IF NOT EXISTS idx_payment_requests_teacher ON payment_requests(teacher_id);
-`);
+`),
+);
 
 // Forward-compatible column add for DBs created before subscription_status
 // existed — CREATE TABLE IF NOT EXISTS above won't alter an existing table.
 const teacherColumns = db.prepare(`PRAGMA table_info(teachers)`).all() as { name: string }[];
 if (!teacherColumns.some((c) => c.name === "subscription_status")) {
-  db.exec(`ALTER TABLE teachers ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'pending'`);
+  withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'pending'`));
 }
 
 // ---------- Teachers ----------

@@ -1,6 +1,7 @@
 import type { GeneratedQuestion, SubjectId } from "../types";
 import { AVAILABLE_MATH_TOPICS, generateMathQuestion } from "./mockContent";
 import { AVAILABLE_ARABIC_TOPICS, generateArabicQuestion } from "./arabicContent";
+import { MATH_CURRICULUM, type MathLevelOption } from "./mathCurriculum";
 
 type Difficulty = "سهل" | "متوسط" | "صعب";
 
@@ -11,6 +12,9 @@ export interface SubjectDefinition {
   persona: string;
   availableTopics: string[];
   generateMockQuestion: (topic: string, difficulty: Difficulty, pointsBudget: number) => GeneratedQuestion;
+  // When present, the UI offers a level/stream picker (e.g. Algerian grade
+  // levels) instead of a free-text grade level, with topics scoped per level.
+  levelOptions?: MathLevelOption[];
 }
 
 export const SUBJECTS: Record<SubjectId, SubjectDefinition> = {
@@ -20,6 +24,7 @@ export const SUBJECTS: Record<SubjectId, SubjectDefinition> = {
     persona: "أستاذ رياضيات خبير",
     availableTopics: AVAILABLE_MATH_TOPICS,
     generateMockQuestion: generateMathQuestion,
+    levelOptions: MATH_CURRICULUM,
   },
   arabic: {
     id: "arabic",
