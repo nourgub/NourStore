@@ -53,6 +53,35 @@ async function startServer() {
   // X-Forwarded-For value on every request.
   app.set("trust proxy", 1);
   const server = createServer(app);
+  // The web app is always same-origin (frontend and API served from the
+  // same host), so it never needed CORS. The native mobile app (Capacitor
+  // — see capacitor.config.json) is the one real exception: its WebView
+  // loads the bundled app from a fixed local origin distinct from this
+  // API's real domain, so a credentialed cross-origin request needs an
+  // explicit, reflected Access-Control-Allow-Origin — never a wildcard,
+  // since a wildcard can't be combined with credentials at all, and
+  // reflecting any arbitrary origin would defeat the point. Limited to
+  // the two fixed origins Capacitor itself actually uses per platform
+  // (https://localhost on Android with androidScheme:"https", capacitor://localhost on iOS) — never a real third-party site.
+  const CAPACITOR_APP_ORIGINS = new Set([
+    "https://localhost",
+    "capacitor://localhost",
+  ]);
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && CAPACITOR_APP_ORIGINS.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      res.setHeader("Vary", "Origin");
+    }
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
   // Configure body parser with larger size limit for file uploads.
   // The `verify` callback captures the exact, unparsed raw bytes onto
   // req.rawBody before JSON parsing — real webhook signature verification

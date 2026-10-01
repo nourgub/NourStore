@@ -100,10 +100,21 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// A plain web build keeps the original relative path (same-origin request
+// — the server that serves the page also serves /api/trpc). The native
+// mobile app (Capacitor — see capacitor.config.json) bundles the compiled
+// web assets locally, so its WebView has no real backend at its own
+// origin; VITE_API_BASE_URL lets that build point requests at the real,
+// separately-deployed backend domain instead. Unset (the default) leaves
+// every existing deployment unaffected.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  ? import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, "")
+  : "";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: `${API_BASE_URL}/api/trpc`,
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
