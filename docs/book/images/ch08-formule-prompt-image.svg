@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="800" height="500" font-family="Tahoma, Arial, sans-serif">
+<title>صيغة برومبت الصورة</title>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="400" y="38" font-size="20" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">صيغة برومبت الصورة في ثماني لبنات</text>
+<text x="400" y="62" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">Sujet + Action + Décor + Style + Lumière + Cadrage + Couleurs + Paramètres</text>
+<rect x="30" y="90" width="170" height="120" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2.5"/>
+<rect x="30" y="90" width="170" height="34" rx="12" fill="#2563eb"/>
+<rect x="30" y="110" width="170" height="14" fill="#2563eb"/>
+<text x="115" y="113" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">1. Sujet</text>
+<text x="115" y="152" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الموضوع</text>
+<text x="115" y="186" font-size="12" fill="#2563eb" font-weight="normal" text-anchor="middle" font-style="italic">une potière marocaine</text>
+<text x="210" y="156" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="220" y="90" width="170" height="120" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2.5"/>
+<rect x="220" y="90" width="170" height="34" rx="12" fill="#2563eb"/>
+<rect x="220" y="110" width="170" height="14" fill="#2563eb"/>
+<text x="305" y="113" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">2. Action</text>
+<text x="305" y="152" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الفعل</text>
+<text x="305" y="186" font-size="12" fill="#2563eb" font-weight="normal" text-anchor="middle" font-style="italic">façonne un vase</text>
+<text x="400" y="156" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="410" y="90" width="170" height="120" rx="12" fill="#ffffff" stroke="#16a34a" stroke-width="2.5"/>
+<rect x="410" y="90" width="170" height="34" rx="12" fill="#16a34a"/>
+<rect x="410" y="110" width="170" height="14" fill="#16a34a"/>
+<text x="495" y="113" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">3. Décor</text>
+<text x="495" y="152" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">المكان والخلفية</text>
+<text x="495" y="186" font-size="12" fill="#16a34a" font-weight="normal" text-anchor="middle" font-style="italic">atelier à Safi</text>
+<text x="590" y="156" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="600" y="90" width="170" height="120" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="2.5"/>
+<rect x="600" y="90" width="170" height="34" rx="12" fill="#7c3aed"/>
+<rect x="600" y="110" width="170" height="14" fill="#7c3aed"/>
+<text x="685" y="113" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">4. Style</text>
+<text x="685" y="152" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الأسلوب الفني</text>
+<text x="685" y="186" font-size="12" fill="#7c3aed" font-weight="normal" text-anchor="middle" font-style="italic">photo réaliste</text>
+<rect x="30" y="240" width="170" height="120" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2.5"/>
+<rect x="30" y="240" width="170" height="34" rx="12" fill="#ea580c"/>
+<rect x="30" y="260" width="170" height="14" fill="#ea580c"/>
+<text x="115" y="263" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">5. Lumière</text>
+<text x="115" y="302" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الإضاءة</text>
+<text x="115" y="336" font-size="12" fill="#ea580c" font-weight="normal" text-anchor="middle" font-style="italic">lumière dorée du soir</text>
+<text x="210" y="306" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="220" y="240" width="170" height="120" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2.5"/>
+<rect x="220" y="240" width="170" height="34" rx="12" fill="#ea580c"/>
+<rect x="220" y="260" width="170" height="14" fill="#ea580c"/>
+<text x="305" y="263" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">6. Cadrage</text>
+<text x="305" y="302" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">زاوية وحجم اللقطة</text>
+<text x="305" y="336" font-size="12" fill="#ea580c" font-weight="normal" text-anchor="middle" font-style="italic">plan moyen</text>
+<text x="400" y="306" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="410" y="240" width="170" height="120" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="2.5"/>
+<rect x="410" y="240" width="170" height="34" rx="12" fill="#7c3aed"/>
+<rect x="410" y="260" width="170" height="14" fill="#7c3aed"/>
+<text x="495" y="263" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">7. Couleurs</text>
+<text x="495" y="302" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الألوان</text>
+<text x="495" y="336" font-size="12" fill="#7c3aed" font-weight="normal" text-anchor="middle" font-style="italic">terre cuite et bleu</text>
+<text x="590" y="306" font-size="20" fill="#9ca3af" font-weight="bold" text-anchor="middle">+</text>
+<rect x="600" y="240" width="170" height="120" rx="12" fill="#ffffff" stroke="#1f2937" stroke-width="2.5"/>
+<rect x="600" y="240" width="170" height="34" rx="12" fill="#1f2937"/>
+<rect x="600" y="260" width="170" height="14" fill="#1f2937"/>
+<text x="685" y="263" font-size="15" fill="#ffffff" font-weight="bold" text-anchor="middle">8. Paramètres</text>
+<text x="685" y="302" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">المعاملات التقنية</text>
+<text x="685" y="336" font-size="12" fill="#1f2937" font-weight="normal" text-anchor="middle" font-style="italic">--ar 4:5</text>
+<rect x="30" y="395" width="740" height="88" rx="10" fill="#f3f4f6" stroke="#d1d5db"/>
+<text x="400" y="420" font-size="13" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">النتيجة بعد التجميع (النسخة الإنجليزية لأدوات الصور):</text>
+<text x="400" y="446" font-size="13" fill="#374151" font-weight="normal" text-anchor="middle">A Moroccan potter shaping a clay vase, in a workshop in Safi, realistic photo,</text>
+<text x="400" y="468" font-size="13" fill="#374151" font-weight="normal" text-anchor="middle">warm golden evening light, medium shot, terracotta and blue tones --ar 4:5</text>
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" font-family="Tahoma, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="38" font-size="22" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">بنية أغنية في Suno: الوسوم تصنع الهيكل</text>
+  <text x="400" y="64" font-size="14" fill="#1f2937" text-anchor="middle">Structure d'une chanson — balises de paroles</text>
+  <!-- timeline line -->
+  <line x1="40" y1="170" x2="760" y2="170" stroke="#1f2937" stroke-width="2"/>
+  <!-- blocks left to right (time flows left to right as in audio players) -->
+  <g font-size="13" text-anchor="middle">
+    <rect x="40" y="110" width="70" height="50" rx="8" fill="#e5e7eb" stroke="#1f2937"/>
+    <text x="75" y="140" fill="#1f2937">[Intro]</text>
+    <rect x="118" y="110" width="80" height="50" rx="8" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="158" y="140" fill="#2563eb">[Verse]</text>
+    <rect x="206" y="110" width="90" height="50" rx="8" fill="#ffedd5" stroke="#ea580c"/>
+    <text x="251" y="140" fill="#ea580c">[Pre-Chorus]</text>
+    <rect x="304" y="100" width="90" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="349" y="135" fill="#7c3aed" font-weight="bold">[Chorus]</text>
+    <rect x="402" y="110" width="80" height="50" rx="8" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="442" y="140" fill="#2563eb">[Verse]</text>
+    <rect x="490" y="100" width="90" height="60" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="535" y="135" fill="#7c3aed" font-weight="bold">[Chorus]</text>
+    <rect x="588" y="110" width="80" height="50" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="628" y="140" fill="#16a34a">[Bridge]</text>
+    <rect x="676" y="110" width="84" height="50" rx="8" fill="#e5e7eb" stroke="#1f2937"/>
+    <text x="718" y="140" fill="#1f2937">[Outro]</text>
+  </g>
+  <text x="760" y="192" font-size="12" fill="#1f2937" text-anchor="end">الزمن ←  →  Temps</text>
+  <!-- explanations -->
+  <g font-size="14" direction="rtl" text-anchor="end">
+    <rect x="420" y="220" width="340" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed"/>
+    <text x="745" y="248" fill="#7c3aed" font-weight="bold">اللازمة [Chorus]</text>
+    <text x="745" y="272" fill="#1f2937">نفس الكلمات تتكرر، وهي الجزء الذي يُحفظ.</text>
+    <text x="745" y="292" fill="#1f2937">اجعلها قصيرة وجذابة.</text>
+    <rect x="40" y="220" width="360" height="80" rx="10" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="385" y="248" fill="#2563eb" font-weight="bold">المقطع [Verse]</text>
+    <text x="385" y="272" fill="#1f2937">يحكي القصة؛ كلمات مختلفة في كل مقطع.</text>
+    <text x="385" y="292" fill="#1f2937">4 إلى 8 أسطر عادةً.</text>
+    <rect x="40" y="315" width="720" height="85" rx="10" fill="#ffffff" stroke="#ea580c" stroke-dasharray="6 4"/>
+    <text x="745" y="343" fill="#ea580c" font-weight="bold">برومبت الأسلوب (Style prompt) منفصل عن الكلمات:</text>
+    <text x="745" y="370" fill="#1f2937">النوع + المزاج + الآلات + الإيقاع + نوع الصوت</text>
+  </g>
+  <text x="60" y="388" font-size="13" fill="#1f2937" text-anchor="start">ex: raï pop, joyful, mandole, darbuka, 100 bpm, male vocals</text>
+</svg>

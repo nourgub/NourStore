@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" font-family="Tahoma, Arial, sans-serif">
+<title>أحجام اللقطات</title>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="400" y="38" font-size="20" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">أحجام اللقطات (الكادراج) في برومبت الصورة</text>
+<text x="400" y="62" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">Les cadrages : gros plan, plan moyen, plan large</text>
+<defs>
+<clipPath id="f0"><rect x="30" y="90" width="230" height="200" rx="10"/></clipPath>
+<clipPath id="f1"><rect x="285" y="90" width="230" height="200" rx="10"/></clipPath>
+<clipPath id="f2"><rect x="540" y="90" width="230" height="200" rx="10"/></clipPath>
+</defs>
+<g clip-path="url(#f0)">
+<rect x="30" y="90" width="230" height="200" fill="#e0f2fe"/>
+<rect x="30" y="240" width="230" height="50" fill="#bbf7d0"/>
+<path d="M 30 240 L 90 175 L 140 240 Z" fill="#94a3b8"/>
+<path d="M 110 240 L 190 160 L 260 240 Z" fill="#64748b"/>
+<circle cx="220" cy="120" r="16" fill="#fde047"/>
+<rect x="58" y="215" width="8" height="28" fill="#92400e"/><circle cx="62" cy="208" r="14" fill="#16a34a"/>
+<circle cx="150" cy="210" r="5" fill="#fcd9b6" stroke="#1f2937" stroke-width="1.0"/>
+<circle cx="148.2" cy="209.5" r="0.4" fill="#1f2937"/>
+<circle cx="151.8" cy="209.5" r="0.4" fill="#1f2937"/>
+<path d="M 148.2 211.8 Q 150 213.0 151.8 211.8" fill="none" stroke="#1f2937" stroke-width="1.0"/>
+<path d="M 145.0 210.0 A 5 5 0 0 1 155.0 210.0 Q 150 207.5 145.0 210.0 Z" fill="#1f2937"/>
+<path d="M 143.0 217.8 Q 143.0 215.8 147.0 215.8 L 153.0 215.8 Q 157.0 215.8 157.0 217.8 L 156.0 231.8 L 144.0 231.8 Z" fill="#2563eb"/>
+<rect x="144.8" y="231.8" width="4.5" height="15.0" fill="#1f2937"/>
+<rect x="150.8" y="231.8" width="4.5" height="15.0" fill="#1f2937"/>
+</g>
+<rect x="30" y="90" width="230" height="200" rx="10" fill="none" stroke="#16a34a" stroke-width="3"/>
+<text x="145" y="318" font-size="17" fill="#16a34a" font-weight="bold" text-anchor="middle">Plan large</text>
+<text x="145" y="342" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">لقطة واسعة</text>
+<text x="145" y="362" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">wide shot</text>
+<text x="145" y="388" font-size="12" fill="#374151" font-weight="normal" direction="rtl" text-anchor="middle">الشخص صغير والمكان هو البطل</text>
+<g clip-path="url(#f1)">
+<rect x="285" y="90" width="230" height="200" fill="#e0f2fe"/>
+<rect x="285" y="250" width="230" height="40" fill="#f5e6d3"/>
+<circle cx="400" cy="146" r="26" fill="#fcd9b6" stroke="#1f2937" stroke-width="1.3"/>
+<circle cx="390.9" cy="143.4" r="2.3" fill="#1f2937"/>
+<circle cx="409.1" cy="143.4" r="2.3" fill="#1f2937"/>
+<path d="M 390.9 155.1 Q 400 161.6 409.1 155.1" fill="none" stroke="#1f2937" stroke-width="1.0"/>
+<path d="M 374.0 146.0 A 26 26 0 0 1 426.0 146.0 Q 400 133.0 374.0 146.0 Z" fill="#1f2937"/>
+<path d="M 363.6 186.3 Q 363.6 175.9 384.4 175.9 L 415.6 175.9 Q 436.4 175.9 436.4 186.3 L 431.2 259.1 L 368.8 259.1 Z" fill="#2563eb"/>
+<rect x="372.7" y="259.1" width="23.4" height="78.0" fill="#1f2937"/>
+<rect x="403.9" y="259.1" width="23.4" height="78.0" fill="#1f2937"/>
+</g>
+<rect x="285" y="90" width="230" height="200" rx="10" fill="none" stroke="#2563eb" stroke-width="3"/>
+<text x="400" y="318" font-size="17" fill="#2563eb" font-weight="bold" text-anchor="middle">Plan moyen</text>
+<text x="400" y="342" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">لقطة متوسطة</text>
+<text x="400" y="362" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">medium shot</text>
+<text x="400" y="388" font-size="12" fill="#374151" font-weight="normal" direction="rtl" text-anchor="middle">من الرأس إلى الخصر: تعابير + حركة</text>
+<g clip-path="url(#f2)">
+<rect x="540" y="90" width="230" height="200" fill="#e0f2fe"/>
+<circle cx="655" cy="175" r="70" fill="#fcd9b6" stroke="#1f2937" stroke-width="3.5"/>
+<circle cx="630.5" cy="168.0" r="6.3" fill="#1f2937"/>
+<circle cx="679.5" cy="168.0" r="6.3" fill="#1f2937"/>
+<path d="M 630.5 199.5 Q 655 217.0 679.5 199.5" fill="none" stroke="#1f2937" stroke-width="2.8"/>
+<path d="M 585.0 175.0 A 70 70 0 0 1 725.0 175.0 Q 655 140.0 585.0 175.0 Z" fill="#1f2937"/>
+<path d="M 557.0 283.5 Q 557.0 255.5 613.0 255.5 L 697.0 255.5 Q 753.0 255.5 753.0 283.5 L 739.0 479.5 L 571.0 479.5 Z" fill="#2563eb"/>
+<rect x="581.5" y="479.5" width="63.0" height="210.0" fill="#1f2937"/>
+<rect x="665.5" y="479.5" width="63.0" height="210.0" fill="#1f2937"/>
+</g>
+<rect x="540" y="90" width="230" height="200" rx="10" fill="none" stroke="#7c3aed" stroke-width="3"/>
+<text x="655" y="318" font-size="17" fill="#7c3aed" font-weight="bold" text-anchor="middle">Gros plan</text>
+<text x="655" y="342" font-size="15" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">لقطة قريبة</text>
+<text x="655" y="362" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">close-up</text>
+<text x="655" y="388" font-size="12" fill="#374151" font-weight="normal" direction="rtl" text-anchor="middle">الوجه يملأ الصورة: عاطفة وتفاصيل</text>
+</svg>

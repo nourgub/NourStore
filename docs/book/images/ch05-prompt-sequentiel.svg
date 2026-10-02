@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" font-family="Tahoma, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="40" font-size="24" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">البرومبت المتسلسل (Enchaînement de prompts)</text>
+  <g font-size="15" text-anchor="middle">
+    <rect x="610" y="90" width="160" height="110" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+    <text x="690" y="125" font-weight="bold" fill="#2563eb" direction="rtl">برومبت ١</text>
+    <text x="690" y="152" fill="#1f2937" direction="rtl">بحث وأفكار</text>
+    <text x="690" y="178" fill="#2563eb" font-size="13">Idées</text>
+    <rect x="420" y="90" width="160" height="110" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <text x="500" y="125" font-weight="bold" fill="#7c3aed" direction="rtl">برومبت ٢</text>
+    <text x="500" y="152" fill="#1f2937" direction="rtl">مخطط</text>
+    <text x="500" y="178" fill="#7c3aed" font-size="13">Plan</text>
+    <rect x="230" y="90" width="160" height="110" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="310" y="125" font-weight="bold" fill="#16a34a" direction="rtl">برومبت ٣</text>
+    <text x="310" y="152" fill="#1f2937" direction="rtl">كتابة المسودة</text>
+    <text x="310" y="178" fill="#16a34a" font-size="13">Brouillon</text>
+    <rect x="40" y="90" width="160" height="110" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+    <text x="120" y="125" font-weight="bold" fill="#ea580c" direction="rtl">برومبت ٤</text>
+    <text x="120" y="152" fill="#1f2937" direction="rtl">مراجعة وتحسين</text>
+    <text x="120" y="178" fill="#ea580c" font-size="13">Révision</text>
+  </g>
+  <g stroke="#1f2937" stroke-width="3" fill="none">
+    <path d="M608 145 L584 145"/><path d="M592 137 L582 145 L592 153"/>
+    <path d="M418 145 L394 145"/><path d="M402 137 L392 145 L402 153"/>
+    <path d="M228 145 L204 145"/><path d="M212 137 L202 145 L212 153"/>
+  </g>
+  <text x="400" y="250" font-size="16" fill="#1f2937" text-anchor="middle" direction="rtl">مخرجات كل خطوة تصبح مدخلات الخطوة التالية، وتراجعها أنت بين كل خطوة وأخرى</text>
+</svg>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" font-family="Tahoma, Arial, sans-serif">
+<title>تشريح برومبت Midjourney</title>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="400" y="38" font-size="20" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">تشريح برومبت Midjourney: نص وصفي ثم معاملات</text>
+<text x="400" y="62" font-size="13" fill="#6b7280" font-weight="normal" text-anchor="middle" font-style="italic">Anatomie d'un prompt Midjourney (paramètres à la fin)</text>
+<rect x="27" y="110" width="250" height="46" rx="8" fill="#1f2937" fill-opacity="0.12" stroke="#1f2937" stroke-width="2"/>
+<text x="152.0" y="139" font-size="14" fill="#1f2937" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">a cozy café in Fes, cinematic</text>
+<line x1="152.0" y1="156" x2="152.0" y2="193" stroke="#1f2937" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="152.0" cy="193" r="4" fill="#1f2937"/>
+<text x="152.0" y="215" font-size="13" fill="#1f2937" font-weight="bold" direction="rtl" text-anchor="middle">الوصف: ماذا تريد أن ترى</text>
+<rect x="285" y="110" width="92" height="46" rx="8" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb" stroke-width="2"/>
+<text x="331.0" y="139" font-size="14" fill="#2563eb" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">--ar 16:9</text>
+<line x1="331.0" y1="156" x2="331.0" y2="263" stroke="#2563eb" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="331.0" cy="263" r="4" fill="#2563eb"/>
+<text x="331.0" y="285" font-size="13" fill="#2563eb" font-weight="bold" direction="rtl" text-anchor="middle">النسبة: عرض:ارتفاع</text>
+<rect x="385" y="110" width="62" height="46" rx="8" fill="#7c3aed" fill-opacity="0.12" stroke="#7c3aed" stroke-width="2"/>
+<text x="416.0" y="139" font-size="14" fill="#7c3aed" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">--v 7</text>
+<line x1="416.0" y1="156" x2="416.0" y2="193" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="416.0" cy="193" r="4" fill="#7c3aed"/>
+<text x="416.0" y="215" font-size="13" fill="#7c3aed" font-weight="bold" direction="rtl" text-anchor="middle">نسخة النموذج</text>
+<rect x="455" y="110" width="122" height="46" rx="8" fill="#ea580c" fill-opacity="0.12" stroke="#ea580c" stroke-width="2"/>
+<text x="516.0" y="139" font-size="14" fill="#ea580c" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">--stylize 250</text>
+<line x1="516.0" y1="156" x2="516.0" y2="263" stroke="#ea580c" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="516.0" cy="263" r="4" fill="#ea580c"/>
+<text x="516.0" y="285" font-size="13" fill="#ea580c" font-weight="bold" direction="rtl" text-anchor="middle">قوة اللمسة الفنية</text>
+<rect x="585" y="110" width="98" height="46" rx="8" fill="#16a34a" fill-opacity="0.12" stroke="#16a34a" stroke-width="2"/>
+<text x="634.0" y="139" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">--chaos 10</text>
+<line x1="634.0" y1="156" x2="634.0" y2="193" stroke="#16a34a" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="634.0" cy="193" r="4" fill="#16a34a"/>
+<text x="634.0" y="215" font-size="13" fill="#16a34a" font-weight="bold" direction="rtl" text-anchor="middle">تنوّع النتائج الأربع</text>
+<rect x="691" y="110" width="90" height="46" rx="8" fill="#dc2626" fill-opacity="0.12" stroke="#dc2626" stroke-width="2"/>
+<text x="736.0" y="139" font-size="14" fill="#dc2626" font-weight="bold" text-anchor="middle" font-family="Consolas, Courier New, monospace">--no text</text>
+<line x1="736.0" y1="156" x2="736.0" y2="263" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 3"/>
+<circle cx="736.0" cy="263" r="4" fill="#dc2626"/>
+<text x="736.0" y="285" font-size="13" fill="#dc2626" font-weight="bold" direction="rtl" text-anchor="middle">ما لا تريده</text>
+<rect x="27" y="330" width="746" height="52" rx="10" fill="#fff7ed" stroke="#ea580c"/>
+<text x="400" y="352" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">المعاملات تُكتب في آخر البرومبت، تبدأ بشرطتين، وبينها مسافات.</text>
+<text x="400" y="372" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">أسماؤها وقيمها تتغير مع كل نسخة جديدة: راجع التوثيق الرسمي.</text>
+</svg>

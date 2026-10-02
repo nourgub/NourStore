@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" width="800" height="460" font-family="Tahoma, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="400" y="36" text-anchor="middle" direction="rtl" font-size="22" font-weight="bold" fill="#1f2937">صيغ الفيديو الثلاث الأساسية</text>
+<text x="400" y="58" text-anchor="middle" font-size="14" fill="#1f2937">Formats d'image (Ratio)</text>
+<rect x="610" y="90" width="180" height="320" rx="8" fill="#2563eb" fill-opacity="0.12" stroke="#2563eb" stroke-width="3"/>
+<text x="700.0" y="260.0" text-anchor="middle" font-size="34" font-weight="bold" fill="#2563eb">9:16</text>
+<text x="700.0" y="438" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">عمودي — Vertical</text>
+<text x="700.0" y="458" text-anchor="middle" font-size="13" fill="#1f2937">1080 × 1920</text>
+<text x="700.0" y="476" text-anchor="middle" font-size="12" fill="#2563eb">TikTok · Reels · Shorts</text>
+<rect x="250" y="140" width="300" height="169" rx="8" fill="#7c3aed" fill-opacity="0.12" stroke="#7c3aed" stroke-width="3"/>
+<text x="400.0" y="234.5" text-anchor="middle" font-size="34" font-weight="bold" fill="#7c3aed">16:9</text>
+<text x="400.0" y="337" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">أفقي — Horizontal</text>
+<text x="400.0" y="357" text-anchor="middle" font-size="13" fill="#1f2937">1920 × 1080</text>
+<text x="400.0" y="375" text-anchor="middle" font-size="12" fill="#7c3aed">YouTube · TV · Web</text>
+<rect x="40" y="140" width="180" height="180" rx="8" fill="#16a34a" fill-opacity="0.12" stroke="#16a34a" stroke-width="3"/>
+<text x="130.0" y="240.0" text-anchor="middle" font-size="34" font-weight="bold" fill="#16a34a">1:1</text>
+<text x="130.0" y="348" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">مربّع — Carré</text>
+<text x="130.0" y="368" text-anchor="middle" font-size="13" fill="#1f2937">1080 × 1080</text>
+<text x="130.0" y="386" text-anchor="middle" font-size="12" fill="#16a34a">Instagram · Facebook</text>
+<rect x="625" y="105" width="150" height="10" rx="5" fill="#2563eb" fill-opacity="0.35"/>
+</svg>

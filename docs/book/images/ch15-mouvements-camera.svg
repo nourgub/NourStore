@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" width="800" height="560" font-family="Tahoma, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="400" y="34" text-anchor="middle" direction="rtl" font-size="22" font-weight="bold" fill="#1f2937">حركات الكاميرا الأساسية</text>
+<text x="400" y="56" text-anchor="middle" font-size="14" fill="#1f2937">Mouvements de caméra</text>
+<rect x="540" y="75" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="650" y="270" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">الاستدارة الأفقية</text>
+<text x="650" y="290" text-anchor="middle" font-size="12" fill="#7c3aed">Panoramique · Pan</text>
+<g transform="translate(650,175) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
+<path d="M595,220 A60,40 0 0,0 705,220" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/><path d="M705,130 A60,40 0 0,0 595,130" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
+<rect x="290" y="75" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="400" y="270" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">الإمالة العمودية</text>
+<text x="400" y="290" text-anchor="middle" font-size="12" fill="#7c3aed">Inclinaison · Tilt</text>
+<g transform="translate(400,175) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
+<path d="M450,220 A40,55 0 0,0 450,125" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/><path d="M350,125 A40,55 0 0,0 350,220" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
+<rect x="40" y="75" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="150" y="270" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">التقدّم/التراجع</text>
+<text x="150" y="290" text-anchor="middle" font-size="12" fill="#7c3aed">Travelling · Dolly</text>
+<g transform="translate(100,175) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
+<circle cx="220" cy="175" r="16" fill="#16a34a"/><line x1="130" y1="215" x2="195" y2="215" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/><line x1="60" y1="233" x2="220" y2="233" stroke="#1f2937" stroke-width="2" stroke-dasharray="6,4"/>
+<rect x="540" y="315" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="650" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">الدوران حول الموضوع</text>
+<text x="650" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Orbite · Orbit</text>
+<circle cx="650" cy="415" r="16" fill="#16a34a"/><ellipse cx="650" cy="415" rx="85" ry="50" fill="none" stroke="#ea580c" stroke-width="3" stroke-dasharray="8,5"/><path d="M710,451 L680,463" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
+<g transform="translate(565,415) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
+<rect x="290" y="315" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="400" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">التقريب البصري</text>
+<text x="400" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Zoom</text>
+<g transform="translate(340,415) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
+<rect x="410" y="370" width="80" height="90" fill="none" stroke="#1f2937" stroke-width="2"/><rect x="430" y="393" width="40" height="45" fill="none" stroke="#ea580c" stroke-width="2.5"/><line x1="412" y1="372" x2="428" y2="391" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/><line x1="488" y1="458" x2="472" y2="440" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/>
+<rect x="40" y="315" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
+<text x="150" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">لقطة الدرون</text>
+<text x="150" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Plan drone</text>
+<g transform="translate(110,375)"><rect x="-14" y="-6" width="28" height="12" rx="3" fill="#1f2937"/><line x1="-30" y1="-12" x2="30" y2="-12" stroke="#1f2937" stroke-width="3"/><circle cx="-30" cy="-12" r="5" fill="#1f2937"/><circle cx="30" cy="-12" r="5" fill="#1f2937"/></g>
+<path d="M60,475 L90,435 L120,460 L160,420 L200,465 L245,475 z" fill="#16a34a" fill-opacity="0.35"/><path d="M140,375 Q190,360 230,390" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
+</svg>

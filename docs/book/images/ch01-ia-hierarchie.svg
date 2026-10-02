@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="Tahoma, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="40" font-size="24" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">العائلة الكبيرة للذكاء الاصطناعي</text>
+  <ellipse cx="400" cy="330" rx="370" ry="250" fill="#dbeafe" stroke="#2563eb" stroke-width="3"/>
+  <ellipse cx="400" cy="365" rx="285" ry="190" fill="#ede9fe" stroke="#7c3aed" stroke-width="3"/>
+  <ellipse cx="400" cy="400" rx="200" ry="135" fill="#dcfce7" stroke="#16a34a" stroke-width="3"/>
+  <ellipse cx="400" cy="435" rx="120" ry="80" fill="#ffedd5" stroke="#ea580c" stroke-width="3"/>
+  <text x="400" y="112" font-size="20" font-weight="bold" fill="#2563eb" text-anchor="middle" direction="rtl">الذكاء الاصطناعي</text>
+  <text x="400" y="136" font-size="15" fill="#2563eb" text-anchor="middle">Intelligence Artificielle (IA)</text>
+  <text x="400" y="205" font-size="19" font-weight="bold" fill="#7c3aed" text-anchor="middle" direction="rtl">التعلّم الآلي</text>
+  <text x="400" y="228" font-size="14" fill="#7c3aed" text-anchor="middle">Apprentissage automatique (ML)</text>
+  <text x="400" y="300" font-size="18" font-weight="bold" fill="#16a34a" text-anchor="middle" direction="rtl">التعلّم العميق</text>
+  <text x="400" y="322" font-size="14" fill="#16a34a" text-anchor="middle">Apprentissage profond (DL)</text>
+  <text x="400" y="425" font-size="17" font-weight="bold" fill="#ea580c" text-anchor="middle" direction="rtl">الذكاء التوليدي</text>
+  <text x="400" y="448" font-size="14" fill="#ea580c" text-anchor="middle">IA générative</text>
+  <text x="400" y="470" font-size="12" fill="#1f2937" text-anchor="middle">ChatGPT · Midjourney · Suno</text>
+  <text x="120" y="330" font-size="12" fill="#1f2937" text-anchor="middle" direction="rtl">قواعد يدوية</text>
+  <text x="120" y="348" font-size="12" fill="#1f2937" text-anchor="middle">(شطرنج 1997)</text>
+  <text x="215" y="400" font-size="12" fill="#1f2937" text-anchor="middle" direction="rtl">فلتر الرسائل المزعجة</text>
+  <text x="290" y="470" font-size="12" fill="#1f2937" text-anchor="middle" direction="rtl">التعرّف على الوجوه</text>
+</svg>

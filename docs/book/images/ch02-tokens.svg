@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="Tahoma, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="40" font-size="24" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">كيف يقطّع النموذج الجملة إلى رموز (Tokens)</text>
+  <text x="400" y="90" font-size="16" fill="#1f2937" text-anchor="middle" direction="rtl">١) الجملة كما تكتبها:</text>
+  <rect x="150" y="105" width="500" height="50" rx="10" fill="#f3f4f6" stroke="#1f2937" stroke-width="2"/>
+  <text x="400" y="138" font-size="20" fill="#1f2937" text-anchor="middle">Bonjour, je vends des sacs artisanaux</text>
+  <path d="M400 160 L400 195" stroke="#1f2937" stroke-width="3"/>
+  <path d="M390 185 L400 200 L410 185" fill="none" stroke="#1f2937" stroke-width="3"/>
+  <text x="400" y="225" font-size="16" fill="#1f2937" text-anchor="middle" direction="rtl">٢) الجملة بعد التقطيع إلى رموز (Jetons):</text>
+  <g font-size="17" text-anchor="middle">
+    <rect x="30" y="245" width="95" height="44" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="77" y="274" fill="#2563eb">Bon</text>
+    <rect x="130" y="245" width="70" height="44" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/><text x="165" y="274" fill="#7c3aed">jour</text>
+    <rect x="205" y="245" width="40" height="44" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><text x="225" y="274" fill="#16a34a">,</text>
+    <rect x="250" y="245" width="55" height="44" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/><text x="277" y="274" fill="#ea580c">je</text>
+    <rect x="310" y="245" width="90" height="44" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="355" y="274" fill="#2563eb">vends</text>
+    <rect x="405" y="245" width="65" height="44" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/><text x="437" y="274" fill="#7c3aed">des</text>
+    <rect x="475" y="245" width="70" height="44" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/><text x="510" y="274" fill="#16a34a">sacs</text>
+    <rect x="550" y="245" width="70" height="44" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/><text x="585" y="274" fill="#ea580c">artis</text>
+    <rect x="625" y="245" width="70" height="44" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="660" y="274" fill="#2563eb">anaux</text>
+  </g>
+  <text x="720" y="274" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">= ٩ رموز</text>
+  <rect x="60" y="320" width="680" height="115" rx="12" fill="#f9fafb" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="710" y="352" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• الرمز قطعة من كلمة، وليس دائماً كلمة كاملة.</text>
+  <text x="710" y="382" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• الكلمات النادرة والعربية غالباً تُقطَّع إلى رموز أكثر.</text>
+  <text x="710" y="412" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• تقريب مفيد: ١٠٠ رمز ≈ ٧٥ كلمة إنجليزية (التقطيع الفعلي يختلف حسب النموذج).</text>
+</svg>

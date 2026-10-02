@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" width="800" height="460" font-family="Tahoma, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="38" font-size="22" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">الأتمتة: مُشغِّل واحد ← عدة إجراءات</text>
+  <text x="400" y="62" font-size="14" fill="#1f2937" text-anchor="middle">Automatisation : Déclencheur → Actions (Zapier / Make)</text>
+  <!-- trigger (right side, RTL reading) -->
+  <rect x="580" y="170" width="190" height="110" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="675" y="200" font-size="15" font-weight="bold" fill="#ea580c" text-anchor="middle" direction="rtl">⚡ المُشغِّل</text>
+  <text x="675" y="220" font-size="12" fill="#ea580c" text-anchor="middle">Déclencheur (Trigger)</text>
+  <text x="675" y="248" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">طلبية جديدة في المتجر</text>
+  <text x="675" y="268" font-size="12" fill="#1f2937" text-anchor="middle">Nouvelle commande</text>
+  <!-- AI step middle -->
+  <rect x="320" y="170" width="190" height="110" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="415" y="200" font-size="15" font-weight="bold" fill="#7c3aed" text-anchor="middle" direction="rtl">🤖 خطوة ذكاء اصطناعي</text>
+  <text x="415" y="220" font-size="12" fill="#7c3aed" text-anchor="middle">Étape IA (optionnelle)</text>
+  <text x="415" y="248" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">صياغة رسالة شكر</text>
+  <text x="415" y="268" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">باسم الزبون</text>
+  <line x1="578" y1="225" x2="514" y2="225" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- actions left -->
+  <g font-size="13" text-anchor="middle" direction="rtl">
+    <rect x="30" y="90" width="230" height="70" rx="10" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="145" y="118" fill="#2563eb" font-weight="bold">إجراء 1 (Action)</text>
+    <text x="145" y="142" fill="#1f2937">إضافة سطر في Google Sheets</text>
+    <rect x="30" y="190" width="230" height="70" rx="10" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="145" y="218" fill="#2563eb" font-weight="bold">إجراء 2 (Action)</text>
+    <text x="145" y="242" fill="#1f2937">إرسال بريد شكر للزبون</text>
+    <rect x="30" y="290" width="230" height="70" rx="10" fill="#dbeafe" stroke="#2563eb"/>
+    <text x="145" y="318" fill="#2563eb" font-weight="bold">إجراء 3 (Action)</text>
+    <text x="145" y="342" fill="#1f2937">تنبيه لصاحب المتجر</text>
+  </g>
+  <line x1="318" y1="210" x2="264" y2="130" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="318" y1="225" x2="264" y2="225" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="318" y1="240" x2="264" y2="320" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
+  <!-- footer -->
+  <rect x="30" y="385" width="740" height="55" rx="10" fill="#dcfce7" stroke="#16a34a"/>
+  <text x="755" y="410" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="end" direction="rtl">القاعدة: «عندما يحدث X ← افعل Y». البيانات (الاسم، المبلغ، البريد) تنتقل من خطوة لأخرى.</text>
+  <text x="755" y="430" font-size="12" fill="#1f2937" text-anchor="end" direction="rtl">في Zapier يُسمّى المسار «Zap»، وفي Make يُسمّى «Scénario».</text>
+</svg>

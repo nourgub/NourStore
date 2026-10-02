@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" width="800" height="460" font-family="Tahoma, Arial, sans-serif">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="400" y="36" text-anchor="middle" font-size="22" font-weight="bold" fill="#1f2937" direction="rtl">مستويات الصوت المقترحة في الفيديو (Niveaux audio en dB)</text>
+  <!-- axis -->
+  <line x1="120" y1="70" x2="120" y2="390" stroke="#1f2937" stroke-width="2"/>
+  <line x1="120" y1="390" x2="760" y2="390" stroke="#1f2937" stroke-width="2"/>
+  <!-- scale: y = 70 + (-dB)*10  (0 dB at 70, -32 at 390) -->
+  <g font-size="13" fill="#1f2937" text-anchor="end">
+    <text x="110" y="75">0 dB</text>
+    <text x="110" y="135">-6 dB</text>
+    <text x="110" y="195">-12 dB</text>
+    <text x="110" y="255">-18 dB</text>
+    <text x="110" y="315">-24 dB</text>
+    <text x="110" y="375">-30 dB</text>
+  </g>
+  <g stroke="#e5e7eb" stroke-width="1">
+    <line x1="120" y1="130" x2="760" y2="130"/>
+    <line x1="120" y1="190" x2="760" y2="190"/>
+    <line x1="120" y1="250" x2="760" y2="250"/>
+    <line x1="120" y1="310" x2="760" y2="310"/>
+    <line x1="120" y1="370" x2="760" y2="370"/>
+  </g>
+  <!-- danger zone -->
+  <rect x="120" y="70" width="640" height="10" fill="#ea580c" opacity="0.25"/>
+  <text x="755" y="66" text-anchor="end" font-size="12" fill="#ea580c" direction="rtl">منطقة التشبّع (Saturation) — لا تتجاوز -1 dB</text>
+  <!-- bars: top at peak, bottom at 390 -->
+  <!-- voix: -6 to -3 => draw to -6 (y=130) -->
+  <rect x="160" y="130" width="110" height="260" fill="#2563eb" rx="4"/>
+  <text x="215" y="120" text-anchor="middle" font-size="14" font-weight="bold" fill="#2563eb">-6 à -3 dB</text>
+  <!-- musique sous voix: -20 to -18 => y=270 -->
+  <rect x="310" y="270" width="110" height="120" fill="#7c3aed" rx="4"/>
+  <text x="365" y="260" text-anchor="middle" font-size="14" font-weight="bold" fill="#7c3aed">-20 à -18 dB</text>
+  <!-- musique seule: -12 to -8 => y=190 -->
+  <rect x="460" y="190" width="110" height="200" fill="#16a34a" rx="4"/>
+  <text x="515" y="180" text-anchor="middle" font-size="14" font-weight="bold" fill="#16a34a">-12 à -8 dB</text>
+  <!-- effets: -15 to -10 => y=220 -->
+  <rect x="610" y="220" width="110" height="170" fill="#ea580c" rx="4"/>
+  <text x="665" y="210" text-anchor="middle" font-size="14" font-weight="bold" fill="#ea580c">-15 à -10 dB</text>
+  <!-- labels -->
+  <g font-size="14" fill="#1f2937" text-anchor="middle">
+    <text x="215" y="412" direction="rtl">التعليق الصوتي</text>
+    <text x="215" y="430">(Voix off)</text>
+    <text x="365" y="412" direction="rtl">موسيقى تحت الصوت</text>
+    <text x="365" y="430">(Musique + voix)</text>
+    <text x="515" y="412" direction="rtl">موسيقى وحدها</text>
+    <text x="515" y="430">(Musique seule)</text>
+    <text x="665" y="412" direction="rtl">المؤثرات</text>
+    <text x="665" y="430">(Effets sonores)</text>
+  </g>
+  <text x="400" y="452" text-anchor="middle" font-size="12" fill="#6b7280" direction="rtl">القاعدة الذهبية: فرق 12 إلى 15 dB بين الصوت والموسيقى أثناء الكلام</text>
+</svg>
