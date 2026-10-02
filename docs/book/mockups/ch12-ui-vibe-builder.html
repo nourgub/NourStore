@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}.chat{width:330px;border-right:1px solid #e5e7eb;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13px;background:#fafafa}
+.chat .bubble{max-width:95%;font-size:12.5px}
+.pv{flex:1;display:flex;flex-direction:column}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}
+.seg{display:flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden}.seg span{padding:4px 10px}.seg .on{background:#111827;color:#fff}
+.site{flex:1;background:#fffbeb;padding:16px;direction:rtl;font-size:13px}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;color:#78350f}
+.hero{background:linear-gradient(135deg,#b45309,#78350f);color:#fff;border-radius:14px;padding:22px;text-align:right}
+.hero h2{font-size:26px;margin-bottom:6px}
+.prods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.pc{background:#fff;border-radius:10px;padding:8px;border:1px solid #fde68a}.pc .thumb{aspect-ratio:4/3}
+.wa{display:block;text-align:center;background:#16a34a;color:#fff;border-radius:8px;padding:5px;margin-top:6px;font-weight:bold;font-size:12px}
+.done{font-size:12px;color:#16a34a}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">lovable.dev/projects/miel-atlas</div>Lovable</div>
+<div class="app" style="min-height:520px">
+ <div class="chat">
+  <div class="bubble user ltr">Objectif : une landing page pour vendre du miel naturel de Meknès. Utilisateurs : familles marocaines, sur mobile. Fonctionnalités : bouton « Commander sur WhatsApp ». Style : doré et brun, texte en arabe (RTL)…</div>
+  <div class="bubble ai ltr">J'ai créé la page : en-tête, héros, 3 produits avec bouton WhatsApp, avis, FAQ.<br><span class="done">✓ Edited Index.tsx · ✓ Edited Products.tsx</span></div>
+  <div class="bubble user ltr">Rends le bouton WhatsApp fixe en bas de l'écran sur mobile. Ne modifie rien d'autre.</div>
+  <div style="flex:1"></div>
+  <div class="rel"><div class="promptbox" style="font-size:13px"><span class="txt ltr">Ask Lovable…</span><span class="btn blue">↑</span></div><span class="m" style="top:-18px;left:-14px">1</span></div>
+ </div>
+ <div class="pv">
+  <div class="bar rel"><span class="seg"><span class="on">Preview</span><span>Code</span></span><span class="seg"><span class="on">Desktop</span><span>Mobile</span></span><span class="m" style="position:relative">3</span><span style="flex:1"></span><span class="btn gray">↺ History</span><span class="m" style="position:relative">4</span><span class="btn blue">Publish</span><span class="m" style="top:-14px;right:-14px">5</span></div>
+  <div class="site rel">
+   <div class="nav"><b style="font-size:16px">🍯 عسل الأطلس</b><span>المنتجات · الآراء · الأسئلة · تواصل</span></div>
+   <div class="hero"><h2>عسل حرّ من جبال الأطلس</h2>طبيعي 100%، يصلك حتى باب بيتك — الدفع عند الاستلام<br><span class="btn" style="background:#fff;color:#78350f;margin-top:10px">اطلب الآن</span></div>
+   <div class="prods">
+    <div class="pc"><div class="thumb sc-product"></div><b>عسل الزعتر</b><br><span class="label">500 غ</span><span class="wa">اطلب عبر واتساب</span></div>
+    <div class="pc"><div class="thumb sc-forest"></div><b>عسل الكاليتوس</b><br><span class="label">500 غ</span><span class="wa">اطلب عبر واتساب</span></div>
+    <div class="pc"><div class="thumb sc-sunset"></div><b>عسل السدر</b><br><span class="label">250 غ</span><span class="wa">اطلب عبر واتساب</span></div>
+   </div>
+   <span class="m" style="top:-14px;left:-14px">2</span>
+  </div>
+ </div>
+</div></div>
+<div class="legend"><div><span>1</span>المحادثة: صِف وعدّل طلباً واحداً كل مرة</div><div><span>2</span>المعاينة الحيّة للصفحة</div><div><span>3</span>تجربة العرض على الحاسوب أو الهاتف</div><div><span>4</span>سجل النسخ للرجوع إلى نسخة جيدة</div><div><span>5</span>النشر برابط</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>

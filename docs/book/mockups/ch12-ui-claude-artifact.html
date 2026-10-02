@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}.chat{width:400px;padding:16px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #e5e7eb;background:#faf9f5}
+.chat .bubble{max-width:95%;font-size:13px}.bubble.user{background:#e7e5e4;color:#1f2937}
+.art{flex:1;display:flex;flex-direction:column}
+.ah{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px}
+.calc{margin:20px auto;width:380px;direction:rtl;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.calc .field{font-size:16px;padding:10px}.res{background:#ecfdf5;border-radius:12px;padding:12px;font-size:15px}
+.cardref{border:1px solid #d6d3d1;border-radius:10px;padding:8px 10px;font-size:12px;background:#fff}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">claude.ai</div>Claude</div>
+<div class="app" style="min-height:520px">
+ <div class="chat">
+  <div class="bubble user ltr rel">Crée une petite application web en une seule page : un calculateur de prix de vente pour une boutique. Je saisis le prix d'achat, les frais de livraison et la marge en % ; l'application affiche le prix de vente conseillé et le bénéfice. Interface en arabe, grands champs pour mobile.<span class="m" style="top:-16px;left:-16px">1</span></div>
+  <div class="bubble ai ltr">Voici le calculateur. Tu peux le tester directement à droite.</div>
+  <div class="cardref">▣ <b>حاسبة سعر البيع</b><br><span class="label">Interactive artifact</span></div>
+  <div style="flex:1"></div>
+  <div class="promptbox"><span class="txt ltr">Ajoute un champ « remise »…</span><span class="btn orange">↑</span></div>
+ </div>
+ <div class="art">
+  <div class="ah rel"><b>حاسبة سعر البيع</b><span style="flex:1"></span><span class="seg"><span class="chip">Preview</span><span class="chip" style="background:#f3f4f6;color:#6b7280">Code</span></span><span class="btn gray">Copy</span><span class="btn gray">Publish</span><span class="m" style="top:-14px;right:-14px">3</span></div>
+  <div class="calc rel"><b style="font-size:18px">حاسبة سعر البيع</b>
+   <div><span class="label">سعر الشراء (درهم)</span><div class="field">120</div></div>
+   <div><span class="label">مصاريف التوصيل</span><div class="field">25</div></div>
+   <div><span class="label">الهامش المطلوب %</span><div class="field">40</div></div>
+   <div class="res">السعر المقترح: <b>203 درهم</b><br>الربح: <b>58 درهم</b></div>
+   <span class="m" style="top:-16px;left:-16px">2</span>
+  </div>
+ </div>
+</div></div>
+<div class="legend"><div><span>1</span>طلبك بالوصف</div><div><span>2</span>الأداة تعمل مباشرة (جرّبها)</div><div><span>3</span>نسخ الكود أو نشر رابط للمشاركة</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>
