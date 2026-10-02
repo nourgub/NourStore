@@ -1,7 +1,8 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
 .rel{position:relative}
-.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;font-size:13px;background:#fff;position:relative;white-space:nowrap}
 .seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span:first-child{border-radius:7px 0 0 7px}.seg span:last-child{border-radius:0 7px 7px 0}
 .seg span.on{background:#111827;color:#fff;font-weight:bold}
 .dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
 .row{display:flex;gap:12px;align-items:center}
@@ -35,7 +36,7 @@
    <div style="flex:1"><div class="lbl">Start frame</div><div class="thumb wide gift"></div></div>
    <div style="font-size:22px;color:#9ca3af;margin-top:16px">→</div>
    <div style="flex:1"><div class="lbl">End frame</div><div class="thumb wide sc-face"></div></div>
-   <span class="m" style="top:6px;left:-14px">1</span>
+   <span class="m" style="top:50px;left:-14px">1</span>
   </div>
   <div class="panel rel"><div class="lbl">Prompt</div><div class="ptxt">Un jeune homme ouvre une boîte cadeau, sourit et regarde la caméra, plan moyen, lumière chaude de salon, caméra fixe, style réaliste.</div><span class="m" style="top:-14px;right:-14px">2</span></div>
   <div class="panel rel"><div class="lbl">Negative prompt</div><div class="ptxt" style="color:#fca5a5">blurry, distorted face, deformed hands, extra fingers, text, watermark</div><span class="m" style="top:-14px;right:-14px">3</span></div>
