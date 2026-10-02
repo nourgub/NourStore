@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css">
+<style>.pr{position:relative}.m.tr{top:-16px;right:-16px}.m.tl{top:-16px;left:-16px}
+.ed{flex:1;border:1px solid #e5e7eb;border-radius:12px;padding:16px;font-size:17px;line-height:2;min-height:220px}
+.set{width:280px;border-left:1px solid #e5e7eb;padding:16px;font-size:13px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;justify-content:space-between}.hist{display:flex;gap:10px;align-items:center;font-size:13px;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px}
+.play{width:28px;height:28px;border-radius:50%;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px}
+.wave{flex:1;height:22px;background:repeating-linear-gradient(90deg,#9ca3af 0 3px,transparent 3px 6px);mask:linear-gradient(90deg,#000 0,#000 100%);opacity:.7;border-radius:4px}
+</style></head><body>
+<div class="window">
+ <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">elevenlabs.io/app/speech-synthesis</div>ElevenLabs</div>
+ <div class="app">
+  <div class="side"><div class="item">Home</div><div class="item active">Text to Speech</div><div class="item">Voice Library</div><div class="item">Sound Effects</div><div class="item">Voice Isolator</div><div class="item">Dubbing</div></div>
+  <div class="main">
+   <div class="ed rtl pr">متجر جديد… في قلب الدار البيضاء.<br>مئة وخمسون منتجاً، تنتظرك.<br>وخصم ثلاثين بالمئة؟ لفترة محدودة فقط!<br>لا تفوّت الفرصة.<span class="m tl">1</span></div>
+   <div class="hist"><span class="play">▶</span><span class="ltr">01_intro.mp3</span><div class="wave"></div><span class="label">0:07</span><span class="btn gray">⬇</span></div>
+   <div class="hist"><span class="play">▶</span><span class="ltr">02_offre.mp3</span><div class="wave"></div><span class="label">0:06</span><span class="btn gray">⬇</span></div>
+   <div style="display:flex;justify-content:flex-end"><span class="btn pr" style="background:#111827;padding:10px 26px">Generate speech<span class="m tr">4</span></span></div>
+  </div>
+  <div class="set">
+   <div class="pr"><div class="label">Voice</div><div class="field">Arabic · Warm female ▾</div><span class="m tr">2</span></div>
+   <div class="pr"><div class="label">Model</div><div class="field">Multilingual (high quality) ▾</div><span class="m tr">3</span></div>
+   <div><div class="row"><span>Stability</span><b>45%</b></div><div class="slider"><b style="width:45%"></b><i style="left:42%"></i></div></div>
+   <div><div class="row"><span>Similarity</span><b>75%</b></div><div class="slider"><b style="width:75%"></b><i style="left:72%"></i></div></div>
+   <div><div class="row"><span>Style exaggeration</span><b>15%</b></div><div class="slider"><b style="width:15%"></b><i style="left:12%"></i></div></div>
+   <div><div class="row"><span>Speed</span><b>1.0</b></div><div class="slider"><b style="width:50%"></b><i style="left:47%"></i></div></div>
+   <div class="row"><span>Speaker boost</span><span class="chip">ON</span></div>
+  </div>
+ </div>
+</div>
+<div class="legend"><div><span>1</span>النص مقسّم إلى جمل قصيرة بترقيم واضح</div><div><span>2</span>اختيار الصوت حسب الجمهور</div><div><span>3</span>النموذج متعدد اللغات + إعدادات الثبات والسرعة</div><div><span>4</span>التوليد، ثم التحميل من السجلّ بأسماء مرتّبة</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>

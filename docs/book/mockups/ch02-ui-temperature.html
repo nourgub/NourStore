@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rp{width:260px;border-left:1px solid #e5e7eb;padding:16px;background:#f9fafb;font-size:13px}
+.rp .label{margin-top:14px}.row{display:flex;justify-content:space-between;align-items:center}
+.out{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.out .panel{font-size:13px;line-height:1.6}
+.app{min-height:0}.out h4{font-size:12px;margin-bottom:6px}
+</style></head><body>
+<div class="window">
+  <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">platform.openai.com/playground</div>Playground</div>
+  <div class="app">
+    <div class="main">
+      <div class="label">User</div>
+      <div class="field ltr" style="font-size:14px">Propose un nom pour une pâtisserie artisanale à Fès.</div>
+      <div class="out">
+        <div class="panel ltr"><h4 style="color:#2563eb">Temperature 0.2</h4>« Pâtisserie de Fès »<br><span class="label">Essai 2 :</span> « Pâtisserie de Fès »<br><span class="label">Essai 3 :</span> « Pâtisserie de Fès »</div>
+        <div class="panel ltr"><h4 style="color:#db2777">Temperature 1.0</h4>« Miel &amp; Médina »<br><span class="label">Essai 2 :</span> « Le Comptoir des Amandes »<br><span class="label">Essai 3 :</span> « Douceurs du Zellige »</div>
+      </div>
+      
+      <div><span class="btn green">Run</span></div>
+    </div>
+    <div class="rp ltr">
+      <div class="label" style="margin-top:0">Model</div><div class="field">gpt-… ▾</div>
+      <div class="label row"><span>Temperature</span><b>0.2</b></div>
+      <div class="slider"><b style="width:10%"></b><i style="left:8%"></i></div>
+      <div class="label row"><span>Max tokens</span><b>256</b></div>
+      <div class="slider"><b style="width:25%;background:#9ca3af"></b><i style="left:23%;border-color:#9ca3af"></i></div>
+      <div class="label row"><span>Top P</span><b>1</b></div>
+      <div class="slider"><b style="width:100%;background:#9ca3af"></b></div>
+    </div>
+  </div>
+  <span class="m" style="top:60px;left:650px">1</span>
+  <span class="ring" style="top:122px;left:700px;width:240px;height:48px"></span><span class="m" style="top:108px;left:660px">2</span>
+  <span class="m" style="top:180px;left:660px">3</span>
+  <span class="m" style="top:266px;left:92px">4</span>
+  <span class="m" style="top:240px;left:330px">5</span>
+</div>
+<div class="legend"><div><span>1</span>اختيار النموذج</div><div><span>2</span>شريط الحرارة (Temperature)</div><div><span>3</span>الحد الأقصى للرموز (Max tokens)</div><div><span>4</span>زر التشغيل</div><div><span>5</span>حرارة منخفضة = نفس الجواب، مرتفعة = أجوبة متنوعة</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>

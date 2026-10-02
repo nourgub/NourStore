@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css">
+<style>
+.wrap{display:flex;gap:24px}.col{flex:1;display:flex;flex-direction:column;gap:10px}
+.tag{font-weight:bold;font-size:18px;direction:rtl;text-align:right}
+.tn{aspect-ratio:16/9;border-radius:12px;position:relative;overflow:hidden}
+.bad{background:linear-gradient(135deg,#a3a3a3,#d6d3d1 40%,#a8a29e)}
+.bad .t{position:absolute;top:10px;right:10px;left:10px;direction:rtl;font-size:13px;color:#e7e5e4;line-height:1.5}
+.bad .img{position:absolute;width:60px;height:60px;border-radius:8px}
+.good{background:linear-gradient(90deg,#0b1736 0,#0b1736 45%,#1e293b)}
+.door{position:absolute;left:6%;bottom:0;width:38%;height:88%;background:#3b1d0b;border-radius:50% 50% 0 0/30% 30% 0 0;border:8px solid #1d4ed8;border-bottom:none;box-shadow:inset 0 0 0 6px #92400e}
+.door::after{content:"";position:absolute;left:30%;right:30%;top:22%;bottom:0;background:radial-gradient(ellipse at 50% 60%,#fff7c2,#fbbf24 45%,#b45309 75%);border-radius:50% 50% 0 0/25% 25% 0 0;box-shadow:0 0 50px 20px rgba(251,191,36,.6)}
+.good .t{position:absolute;right:5%;top:18%;direction:rtl;text-align:right;font-weight:bold;color:#fff;font-size:46px;line-height:1.15;text-shadow:0 3px 0 #000,0 0 12px #000}
+.good .t b{color:#fde047;display:block;font-size:58px}
+.mini{display:flex;gap:10px;align-items:center;direction:rtl;font-size:13px;color:#6b7280}
+.mini .tn{width:168px;flex:none}
+ul{direction:rtl;font-size:15px;line-height:1.9;padding-right:20px}
+</style></head><body>
+<div class="wrap">
+ <div class="col">
+  <div class="tag" style="color:#dc2626">✗ قبل</div>
+  <div class="tn bad"><div class="t">وثائقي عن تاريخ مدينة فاس المغربية منذ التأسيس إلى اليوم مع جامعة القرويين والحرف التقليدية ودار الدباغة</div>
+   <div class="img sc-city" style="left:20px;bottom:20px"></div><div class="img sc-sea" style="left:95px;bottom:20px"></div><div class="img sc-forest" style="left:170px;bottom:20px"></div><div class="img sc-sunset" style="left:245px;bottom:20px"></div></div>
+  <ul style="color:#7f1d1d"><li>نص طويل وصغير لا يُقرأ على الهاتف</li><li>ألوان باهتة وتباين ضعيف</li><li>أربع صور صغيرة بلا عنصر رئيسي</li></ul>
+ </div>
+ <div class="col">
+  <div class="tag" style="color:#16a34a">✓ بعد</div>
+  <div class="tn good"><div class="door"></div><div class="t">فاس<b>1000 عام</b></div></div>
+  <ul style="color:#14532d"><li>عنصر واحد قوي: باب المدينة والضوء الذهبي</li><li>كلمتان بخط ضخم وتباين عالٍ</li><li>مساحة فارغة مقصودة للنص (يمين)</li></ul>
+ </div>
+</div>
+<div class="mini" style="margin-top:14px"><span style="font-weight:bold;color:#1f2937">اختبار الحجم الصغير:</span><div class="tn bad" style="width:120px"></div><span>غير مفهومة</span><div class="tn good" style="width:120px"><div class="door"></div><div class="t" style="font-size:12px">فاس<b style="font-size:16px">1000 عام</b></div></div><span>واضحة ✓</span></div>
+<p class="note">مثال توضيحي — الخلفية مولّدة بأداة صور، والنص العربي مضاف يدوياً في Canva أو CapCut</p>
+</body></html>

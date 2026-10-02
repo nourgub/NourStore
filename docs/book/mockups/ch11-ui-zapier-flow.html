@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}.canvas{flex:1;background:#f8fafc;background-image:radial-gradient(#d1d5db 1px,transparent 1px);background-size:18px 18px;padding:22px;display:flex;flex-direction:column;align-items:center}
+.step{width:360px;background:#fff;border:2px solid #e5e7eb;border-radius:12px;padding:10px 14px;font-size:13px;position:relative}
+.step.sel{border-color:#ea580c}.k{font-size:11px;color:#6b7280;font-weight:bold}
+.ic{display:inline-flex;width:24px;height:24px;border-radius:6px;color:#fff;font-size:12px;font-weight:bold;align-items:center;justify-content:center;margin-right:8px;vertical-align:middle}
+.ln{width:2px;height:20px;background:#9ca3af}
+.pane{width:340px;border-left:1px solid #e5e7eb;padding:16px;font-size:13px;display:flex;flex-direction:column;gap:10px}
+.pill{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:bold}
+.topb{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid #e5e7eb;font-size:14px}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">zapier.com/editor</div>Zapier</div>
+<div class="topb rel"><b>Nouvelle commande → Sheets + e-mail + alerte</b><span><span class="btn gray">Test</span> <span class="btn orange">Publish</span></span><span class="m" style="top:-2px;right:200px">5</span></div>
+<div class="app">
+ <div class="canvas">
+  <div class="step"><div class="k">1. TRIGGER</div><span class="ic" style="background:#7c3aed">W</span><b>WooCommerce</b> · New Order<span class="m" style="top:-14px;left:-44px">1</span></div><div class="ln"></div>
+  <div class="step"><div class="k">2. ACTION</div><span class="ic" style="background:#16a34a">S</span><b>Google Sheets</b> · Create Spreadsheet Row</div><div class="ln"></div>
+  <div class="step sel"><div class="k">3. ACTION</div><span class="ic" style="background:#111827">AI</span><b>AI step</b> · Write thank-you e-mail<span class="m" style="top:-14px;left:-44px">2</span></div><div class="ln"></div>
+  <div class="step"><div class="k">4. ACTION</div><span class="ic" style="background:#dc2626">G</span><b>Gmail</b> · Send Email</div><div class="ln"></div>
+  <div class="step"><div class="k">5. ACTION</div><span class="ic" style="background:#0ea5e9">T</span><b>Telegram</b> · Send Message to Karim<span class="m" style="top:-14px;left:-44px">4</span></div>
+ </div>
+ <div class="pane rel"><b>3. AI step — Prompt</b>
+  <div class="field ltr" style="line-height:1.6">Rédige un e-mail de remerciement court (80 mots maximum) pour <span class="pill">1. Billing First Name</span> qui vient de commander <span class="pill">1. Line Items Name</span>. Mentionne que la livraison prend 2 à 4 jours. Signe « L'équipe de la boutique ».</div>
+  <div class="label">Insert data from previous steps:</div>
+  <div><span class="chip">Billing Email</span><span class="chip">Order Total</span><span class="chip">Order Date</span></div>
+  <span class="m" style="top:30px;left:-18px">3</span>
+ </div>
+</div></div>
+<div class="legend"><div><span>1</span>المُشغِّل: طلبية جديدة</div><div><span>2</span>خطوة ذكاء اصطناعي تكتب بريد الشكر</div><div><span>3</span>ربط الحقول القادمة من الطلبية</div><div><span>4</span>الإجراء الأخير: تنبيه صاحب المتجر</div><div><span>5</span>اختبار ثم تفعيل (Publish)</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>
