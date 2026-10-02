@@ -1,0 +1,33 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css">
+<style>.pr{position:relative}.m.tr{top:-16px;right:-16px}.m.tl{top:-16px;left:-16px}
+.left{width:420px;border-right:1px solid #e5e7eb;padding:16px;display:flex;flex-direction:column;gap:12px;font-size:13px}
+.up{display:flex;gap:12px;align-items:center;border:2px dashed #c7d2fe;border-radius:12px;padding:10px}
+.up .thumb{width:70px;flex:none}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opt{border:1px solid #d1d5db;border-radius:8px;padding:6px 10px}.opt.on{border-color:#7c3aed;background:#f5f3ff;color:#5b21b6;font-weight:bold}
+.res{flex:1;padding:16px;display:flex;gap:14px;justify-content:center;align-items:flex-start}
+.res .thumb{width:170px}
+.ref{background:radial-gradient(circle at 50% 38%,#7c4a2d 0 17%,transparent 18%),radial-gradient(circle at 50% 44%,#c48a5f 0 16%,transparent 17%),radial-gradient(ellipse at 50% 100%,#9ca3af 0 42%,transparent 43%),linear-gradient(#e5e7eb,#d1d5db)}
+.night{background:radial-gradient(circle at 70% 18%,#fde68a 0 6%,rgba(253,230,138,.3) 7% 20%,transparent 21%),radial-gradient(ellipse at 50% 62%,#7c4a2d 0 12%,transparent 13%),linear-gradient(transparent 70%,#ea580c 70% 76%,#16a34a 76% 82%,#2563eb 82%),linear-gradient(#1e1b4b,#0f172a)}
+.tag{position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;border-radius:6px;padding:1px 6px}
+</style></head><body>
+<div class="window">
+ <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">klingai.com</div>Kling AI</div>
+ <div class="app" style="min-height:0">
+  <div class="left">
+   <div><span class="chip">Text to Video</span><span class="chip" style="background:#7c3aed;color:#fff">Image to Video</span></div>
+   <div class="up pr"><div class="thumb tall ref"></div><div><b>etudiant_ref.png</b><div class="label">Image de départ (même personnage)</div></div><span class="m tr">1</span></div>
+   <div class="pr"><div class="label">Prompt</div><div class="field ltr" style="line-height:1.55">Close-up shot, an exhausted 20-year-old North African student resting his head on a stack of books, small bedroom at night, warm desk lamp light, slow push-in camera, photorealistic, 4 seconds</div><span class="m tr">2</span></div>
+   <div class="pr"><div class="label">Aspect ratio</div><div class="opts"><span class="opt">16:9</span><span class="opt on">9:16</span><span class="opt">1:1</span></div><span class="m" style="top:6px;left:180px">3</span></div>
+   <div class="pr"><div class="label">Duration</div><div class="opts"><span class="opt on">5 s</span><span class="opt">10 s</span></div><span class="m" style="top:6px;left:130px">4</span></div>
+   <div class="pr"><span class="btn" style="display:block;text-align:center">Generate</span><span class="m tr">5</span></div>
+  </div>
+  <div class="res">
+   <div class="thumb tall night pr"><span class="tag">v1 · 0:05</span></div>
+   <div class="thumb tall night pr" style="outline:4px solid #16a34a"><span class="tag">v2 · 0:05 ✓</span></div>
+  </div>
+ </div>
+</div>
+<div class="legend"><div><span>1</span>الصورة المرجعية = نفس الطالب في المشهدين 1 و5</div><div><span>2</span>برومبت المشهد (صيغة الفصل 15)</div><div><span>3</span>النسبة 9:16</div><div><span>4</span>المدة: أقصر خيار</div><div><span>5</span>ولّد 2–3 نسخ واختر الأفضل</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>

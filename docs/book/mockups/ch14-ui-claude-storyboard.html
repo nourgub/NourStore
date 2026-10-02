@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+table.t{border-collapse:collapse;width:100%;font-size:11.5px;direction:ltr;background:#fff}
+.t td,.t th{border:1px solid #e5e7eb;padding:5px 6px;text-align:left;vertical-align:top}
+.t th{background:#f3f4f6}
+.t td.p{font-family:monospace;font-size:10.5px;color:#4b5563;background:#faf5ff}
+.fiche{border-left:4px solid #d97706;background:#fffbeb;padding:8px 10px;font-size:12.5px;direction:ltr;line-height:1.5}
+.bubble.user{background:#f3f4f6;color:#111}
+.copy{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:4px 10px;font-size:12px;color:#374151;background:#fff}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">claude.ai</div>Claude</div>
+<div class="app">
+ <div class="side"><div class="item">+ New chat</div><div class="item active">Storyboard Argan</div><div class="item">Script AIDA</div><div class="item">Accroches TikTok</div></div>
+ <div class="main" style="background:#fdfcf9">
+  <div class="bubble user ltr" style="max-width:85%;font-size:13px">Tu es réalisateur et storyboarder spécialisé en vidéos générées par IA. Voici mon script : « Ton huile d'argan est-elle pure ? … » Format 9:16, 30 secondes. Découpe en scènes de 3 à 6 secondes…</div>
+  <div class="rel" style="font-size:13px">
+   <div class="ltr" style="margin-bottom:8px">Voici le storyboard en 6 scènes :</div>
+   <table class="t">
+    <tr><th>Scène</th><th>Durée</th><th>Visuel</th><th>Mouvement de caméra</th><th>Texte à l'écran</th><th>Voix off</th><th class="rel">Prompt</th></tr>
+    <tr><td>1</td><td>0–3 s</td><td>Goutte d'huile qui tombe</td><td>Plan fixe, ralenti</td><td>Pure ?</td><td>Ton huile est-elle pure ?</td><td class="p">Extreme close-up of a golden drop of argan oil falling, slow motion, black background</td></tr>
+    <tr><td>2</td><td>3–8 s</td><td>Amina regarde un flacon au souk</td><td>Travelling avant</td><td>Comment savoir ?</td><td>3 signes en 10 secondes.</td><td class="p">Medium shot, Amina, 28, mustard linen shirt, looks at a small bottle in a souk, slow dolly in</td></tr>
+    <tr><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td><td class="p">…</td></tr>
+   </table>
+   <div class="fiche" style="margin-top:10px"><b>Fiche personnage — Amina :</b> 28 ans, cheveux noirs ondulés en chignon bas, grain de beauté joue gauche, chemise en lin moutarde.</div>
+   <div style="margin-top:8px"><span class="copy">⧉ Copy</span></div>
+   <span class="m" style="top:14px;left:-30px">1</span><span class="m" style="top:14px;right:-14px">2</span><span class="m" style="top:232px;right:-14px">3</span><span class="m" style="top:262px;left:80px">4</span>
+  </div>
+  <div class="promptbox"><span class="txt ltr">Reply to Claude…</span><span class="btn orange">↑</span></div>
+ </div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>رأس الجدول بالأعمدة السبعة</div><div><span>2</span>عمود Prompt بالإنجليزية لأدوات الفيديو</div><div><span>3</span>بطاقة الشخصية تحت الجدول</div><div><span>4</span>زر النسخ لنقل الجدول إلى Sheets</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

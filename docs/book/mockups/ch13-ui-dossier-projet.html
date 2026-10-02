@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.fold{display:inline-block;width:22px;height:16px;background:#fbbf24;border-radius:2px 4px 3px 3px;position:relative;vertical-align:middle;margin-right:10px}
+.fold::before{content:"";position:absolute;left:0;top:-4px;width:10px;height:5px;background:#f59e0b;border-radius:2px 2px 0 0}
+.file{display:inline-block;width:16px;height:20px;background:#e0e7ff;border:1px solid #6366f1;border-radius:2px;vertical-align:middle;margin-right:10px}
+.lst div{padding:7px 10px;border-radius:6px;font-size:14px;direction:ltr}
+.lst div.sel{background:#dbeafe}
+.ok{color:#16a34a;font-weight:bold;font-size:12px;margin-left:8px}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">C:\Utilisateurs\Salma\Documents\Projet_Argan_TikTok</div>Explorateur de fichiers</div>
+<div class="app" style="min-height:330px">
+ <div class="side"><div class="item">Accès rapide</div><div class="item">Bureau</div><div class="item active">Documents</div><div class="item">Téléchargements</div><div class="item">Vidéos</div></div>
+ <div class="main" style="flex-direction:row;gap:18px">
+  <div class="panel rel" style="flex:1">
+   <div class="label" style="margin-bottom:8px;direction:ltr">Projet_Argan_TikTok</div>
+   <div class="lst">
+    <div class="rel"><span class="fold"></span><b>01</b>_Script<span class="m" style="top:-2px;left:-30px">1</span></div>
+    <div><span class="fold"></span><b>02</b>_Storyboard</div>
+    <div><span class="fold"></span><b>03</b>_Images_cles</div>
+    <div class="sel rel"><span class="fold"></span><b>04</b>_Clips<span class="m" style="top:-1px;right:-8px">2</span></div>
+    <div><span class="fold"></span><b>05</b>_Audio</div>
+    <div><span class="fold"></span><b>06</b>_Montage</div>
+    <div><span class="fold"></span><b>07</b>_Export</div>
+   </div>
+  </div>
+  <div class="panel rel" style="flex:1.25">
+   <div class="label" style="margin-bottom:8px;direction:ltr">04_Clips</div>
+   <div class="lst">
+    <div><span class="file"></span>scene01_v1_kling.mp4</div>
+    <div><span class="file"></span>scene01_v2_kling.mp4<span class="ok">✓ retenu</span></div>
+    <div><span class="file"></span>scene02_v1_runway.mp4</div>
+    <div><span class="file"></span>scene02_v2_runway.mp4<span class="ok">✓ retenu</span></div>
+    <div class="sel rel"><span class="file"></span><b>scene03</b>_<b>v2</b>_<b>kling</b>.mp4<span class="m" style="top:-4px;right:-14px">3</span></div>
+    <div><span class="file"></span>scene04_v1_hailuo.mp4</div>
+   </div>
+  </div>
+ </div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>مجلدات مرقّمة حسب مراحل الإنتاج</div><div><span>2</span>مجلد اللقطات المولّدة</div><div><span>3</span>نمط التسمية: المشهد + النسخة + الأداة</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+table.sh{border-collapse:collapse;width:100%;font-size:13px;direction:ltr}
+.sh td,.sh th{border:1px solid #e5e7eb;padding:8px 10px;text-align:left}
+.sh th{background:#f3f4f6;color:#374151}
+.sh td.n{background:#f9fafb;color:#9ca3af;width:30px;text-align:center}
+.low{background:#fee2e2;color:#b91c1c;font-weight:bold}
+.mid{background:#fef3c7;color:#92400e}
+.good{background:#dcfce7;color:#166534}
+.fx{display:flex;gap:8px;align-items:center;border-bottom:1px solid #e5e7eb;padding:8px 14px;font-size:13px;direction:ltr}
+.fx b{color:#6b7280}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">docs.google.com/spreadsheets</div>Google Sheets</div>
+<div style="padding:10px 14px;font-size:16px;direction:ltr"><b>Suivi crédits vidéo IA</b> <span class="small">— octobre</span></div>
+<div class="fx rel"><b>fx</b><span class="field" style="margin:0;flex:1">=C2/E2</span></div>
+<div style="padding:14px">
+<table class="sh">
+<tr><th></th><th>A · Outil</th><th>B · Plan</th><th>C · Utilisés</th><th class="rel">D · Restants<span class="m" style="top:-16px;right:-10px">1</span></th><th>E · Vidéos</th><th class="rel">F · Par vidéo<span class="m" style="top:-16px;right:-10px">2</span></th><th class="rel">G · Échéance<span class="m" style="top:-16px;right:-10px">3</span></th></tr>
+<tr><td class="n">2</td><td>Kling</td><td>Mensuel</td><td>480</td><td class="low">40</td><td>4</td><td style="background:#eef2ff">120</td><td>28/10</td></tr>
+<tr><td class="n">3</td><td>Runway</td><td>Mensuel</td><td>300</td><td class="mid">325</td><td>3</td><td>100</td><td>15/10</td></tr>
+<tr><td class="n">4</td><td>Luma</td><td>Gratuit</td><td>20</td><td class="low">10</td><td>1</td><td>20</td><td>—</td></tr>
+<tr><td class="n">5</td><td>ElevenLabs</td><td>Mensuel</td><td>9 000</td><td class="good">21 000</td><td>6</td><td>1 500</td><td>02/11</td></tr>
+<tr><td class="n">6</td><td>CapCut</td><td>Gratuit</td><td>—</td><td class="good">—</td><td>6</td><td>—</td><td>—</td></tr>
+</table>
+</div>
+
+</div>
+<div class="legend"><div><span>1</span>الرصيد المتبقي: أحمر عند الانخفاض</div><div><span>2</span>الرصيد المستعمل ÷ عدد الفيديوهات: <bdi dir="ltr">=C2/E2</bdi></div><div><span>3</span>تاريخ تجديد الاشتراك</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

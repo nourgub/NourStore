@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.s-drop{background:radial-gradient(ellipse at 50% 58%,#fde68a 0 6%,#f59e0b 7% 10%,transparent 11%),radial-gradient(circle at 50% 20%,#78350f 0 12%,transparent 13%),linear-gradient(#0b0b0b,#1c1917)}
+.s-fridge{background:linear-gradient(90deg,#bfdbfe 0 30%,#e0f2fe 30% 32%,#bfdbfe 32%),linear-gradient(#93c5fd,#1e3a8a)}
+.s-fridge::after{content:"";position:absolute;left:38%;top:35%;width:24%;height:42%;border-radius:10px;background:linear-gradient(90deg,#92400e,#f59e0b,#92400e)}
+.s-hand{background:radial-gradient(ellipse at 50% 70%,#e8b48c 0 25%,transparent 26%),radial-gradient(circle at 48% 50%,#fde68a 0 3%,transparent 4%),radial-gradient(circle at 56% 58%,#fde68a 0 3%,transparent 4%),linear-gradient(#fef3c7,#d97706)}
+.s-sniff{background:radial-gradient(circle at 35% 40%,#fcd9b6 0 18%,transparent 19%),linear-gradient(transparent 0,transparent),linear-gradient(#fef3c7,#fdba74)}
+.s-sniff::after{content:"";position:absolute;left:58%;top:30%;width:16%;height:32%;border-radius:8px;background:linear-gradient(90deg,#92400e,#f59e0b,#92400e)}
+.s-table{background:radial-gradient(ellipse at 75% 30%,#166534 0 18%,transparent 19%),linear-gradient(#fde68a 0 62%,#92400e 62%)}
+.s-table::after{content:"";position:absolute;left:38%;top:36%;width:24%;height:30%;border-radius:10px 10px 6px 6px;background:linear-gradient(90deg,#92400e,#f59e0b,#92400e)}
+
+.sb{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.fr{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff}
+.fr .thumb{border-radius:0}
+.hd{display:flex;justify-content:space-between;padding:6px 8px;background:#111827;color:#fff;font-size:12px;direction:ltr}
+.ln{padding:4px 8px;font-size:12px;line-height:1.45;direction:rtl;text-align:right;border-top:1px solid #f3f4f6}
+.ln i{font-style:normal;color:#7c3aed;font-weight:bold}
+.cam{direction:ltr;text-align:left;color:#2563eb;font-weight:bold}
+.ttl{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:15px}
+</style></head><body>
+<div class="window" style="padding:16px">
+ <div class="ttl"><b style="direction:ltr">Storyboard — Salma Argan · TikTok 9:16 · 30 s</b><span class="chip">6 scènes</span></div>
+ <div class="sb rel"><div class="fr"><div class="hd"><b>Scène 1</b><span>0–3 s</span></div><div class="thumb tall s-drop"></div><div class="ln cam">🎥 Ralenti · fixe</div><div class="ln"><i>نص:</i> مغشوش؟</div><div class="ln"><i>صوت:</i> زيتك أصلي؟</div></div><div class="fr"><div class="hd"><b>Scène 2</b><span>3–8 s</span></div><div class="thumb tall sc-face"></div><div class="ln cam">🎥 Dolly in</div><div class="ln"><i>نص:</i> كيف تعرفين؟</div><div class="ln"><i>صوت:</i> 3 علامات في 10 ثوانٍ.</div></div><div class="fr"><div class="hd"><b>Scène 3</b><span>8–13 s</span></div><div class="thumb tall s-sniff"></div><div class="ln cam">🎥 Close-up fixe</div><div class="ln"><i>نص:</i> 1. الرائحة</div><div class="ln"><i>صوت:</i> رائحة خفيفة تشبه البندق.</div></div><div class="fr"><div class="hd"><b>Scène 4</b><span>13–19 s</span></div><div class="thumb tall s-hand"></div><div class="ln cam">🎥 Zoom in</div><div class="ln"><i>نص:</i> 2. الامتصاص</div><div class="ln"><i>صوت:</i> يُمتص بسرعة بلا أثر دهني.</div></div><div class="fr"><div class="hd"><b>Scène 5</b><span>19–25 s</span></div><div class="thumb tall s-fridge"></div><div class="ln cam">🎥 Plan fixe</div><div class="ln"><i>نص:</i> 3. البرودة</div><div class="ln"><i>صوت:</i> في البرد يتعكّر قليلاً.</div></div><div class="fr"><div class="hd"><b>Scène 6</b><span>25–30 s</span></div><div class="thumb tall s-table"></div><div class="ln cam">🎥 Orbit</div><div class="ln"><i>نص:</i> الرابط في البايو</div><div class="ln"><i>صوت:</i> اطلبيه الآن.</div></div>
+  <span class="m" style="top:130px;left:-34px">1</span><span class="m" style="top:262px;left:-34px">2</span><span class="m" style="top:294px;right:-34px">3</span><span class="m" style="top:326px;left:-34px">4</span>
+ </div>
+</div>
+<div class="legend"><div><span>1</span>الإطار البصري للمشهد (صيغة 9:16)</div><div><span>2</span>حركة الكاميرا: واحدة لكل مشهد</div><div><span>3</span>النص على الشاشة</div><div><span>4</span>التعليق الصوتي (≈ 2.5 كلمة/ثانية)</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

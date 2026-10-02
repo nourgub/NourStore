@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.wrap{display:flex;gap:40px;align-items:center;justify-content:center;padding:10px 0}
+.phone{width:310px;height:551px;border:12px solid #111;border-radius:40px;position:relative;overflow:hidden;background:linear-gradient(#fde68a,#f59e0b 55%,#78350f)}
+.bottle{position:absolute;left:85px;top:185px;width:70px;height:150px;background:linear-gradient(90deg,#b45309,#f59e0b,#b45309);border-radius:18px 18px 12px 12px}
+.bottle::before{content:"";position:absolute;left:22px;top:-30px;width:26px;height:32px;background:#1f2937;border-radius:4px}
+.safe{position:absolute;left:14px;top:60px;width:220px;height:300px;border:3px dashed #16a34a;border-radius:10px}
+.safe b{position:absolute;top:6px;left:8px;background:#16a34a;color:#fff;font-size:11px;padding:2px 6px;border-radius:6px;direction:ltr}
+.rightbar{position:absolute;right:0;top:170px;width:58px;bottom:90px;background:rgba(220,38,38,.28)}
+.ic{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.9);margin:12px auto;display:flex;align-items:center;justify-content:center;font-size:18px;color:#111}
+.botbar{position:absolute;left:0;right:0;bottom:0;height:90px;background:rgba(220,38,38,.28);padding:10px 14px;color:#fff;font-size:13px;direction:ltr}
+.cap{position:absolute;left:14px;top:95px;right:70px;text-align:center;color:#fff;font-weight:bold;font-size:24px;text-shadow:0 2px 6px rgba(0,0,0,.6);direction:rtl}
+.card{width:300px;border-radius:12px;padding:14px;font-size:15px;line-height:1.6;direction:rtl}
+</style></head><body>
+<div class="wrap">
+ <div class="col" style="gap:18px">
+  <div class="card" style="background:#dcfce7;border:2px solid #16a34a"><b>المنطقة الآمنة</b><br>ضع هنا النص المهم والوجه والمنتج.</div>
+  <div class="card" style="background:#fee2e2;border:2px solid #dc2626"><b>مناطق مغطّاة</b><br>أزرار المنصة واسم الحساب والوصف تغطيها.</div>
+ </div>
+ <div class="phone rel">
+  <div class="bottle"></div>
+  <div class="cap">زيتك أصلي؟</div>
+  <div class="safe"><b>Zone de sécurité</b></div>
+  <div class="rightbar"><div class="ic">♥</div><div class="ic">✎</div><div class="ic">↗</div></div>
+  <div class="botbar"><b>@salma.argan</b><br>3 signes d'une huile d'argan pure… #argan</div>
+ </div>
+ <div class="rel" style="width:1px;height:551px">
+  <span class="m" style="top:150px;left:-360px">1</span><span class="m" style="top:260px;left:-62px">2</span><span class="m" style="top:470px;left:-385px">3</span>
+ </div>
+</div>
+<div class="legend"><div><span>1</span>المنطقة الآمنة للنص والعناصر المهمة</div><div><span>2</span>أزرار الإعجاب والتعليق والمشاركة</div><div><span>3</span>اسم الحساب والوصف في الأسفل</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>
