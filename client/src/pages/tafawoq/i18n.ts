@@ -179,6 +179,20 @@ const ar = {
   adviceRecurring: (lesson: string, error: string) => `خطأ يتكرر في «${lesson}»: ${error}. الأستاذ الذكي يركز عليه في تمارينه.`,
   adviceProgress: (lesson: string, from: string, to: string) => `تقدم واضح في «${lesson}»: من ${from} إلى ${to}. شجّعه على هذا المجهود!`,
   adviceComplete: (lesson: string) => `أتقن ابنك درس «${lesson}» 🎉`,
+  liveButton: "حصة مباشرة بالصوت",
+  liveTitle: "حصة مباشرة مع أستاذك",
+  liveIdle: "اضغط على الميكروفون وتكلم",
+  liveListening: "أستمع إليك…",
+  liveThinking: "أستاذك يفكر…",
+  liveSpeaking: "أستاذك يتكلم — اضغط لمقاطعته",
+  liveHandsFree: "محادثة متواصلة (يستمع تلقائياً بعد كل رد)",
+  liveEnd: "إنهاء الحصة",
+  liveUnsupported: "متصفحك لا يدعم التحدث بالصوت. استعمل Chrome أو Edge أو Safari، أو اكتب سؤالك هنا وسيجيبك أستاذك بالصوت.",
+  liveMicDenied: "لم يُسمح باستعمال الميكروفون. اسمح به من إعدادات المتصفح ثم حاول مجدداً.",
+  liveNoSpeech: "لم أسمع شيئاً. اضغط على الميكروفون وتكلم.",
+  liveNoVoice: "لا يوجد صوت عربي مثبت في جهازك، سيظهر الرد مكتوباً.",
+  liveYou: "أنت",
+  liveTeacher: "الأستاذ",
   stream: "الشعبة",
   chooseStream: "اختر شعبتك",
   streams: {
@@ -362,6 +376,20 @@ const fr: TafawoqStrings = {
   adviceRecurring: (lesson, error) => `Erreur récurrente en « ${lesson} » : ${error}. Le professeur la cible dans ses exercices.`,
   adviceProgress: (lesson, from, to) => `Net progrès en « ${lesson} » : de ${from} à ${to}. Félicitez-le !`,
   adviceComplete: lesson => `Leçon « ${lesson} » maîtrisée 🎉`,
+  liveButton: "Séance en direct à la voix",
+  liveTitle: "Séance en direct avec ton professeur",
+  liveIdle: "Appuie sur le micro et parle",
+  liveListening: "Je t’écoute…",
+  liveThinking: "Ton professeur réfléchit…",
+  liveSpeaking: "Ton professeur parle — appuie pour l’interrompre",
+  liveHandsFree: "Conversation continue (écoute automatique après chaque réponse)",
+  liveEnd: "Terminer la séance",
+  liveUnsupported: "Ton navigateur ne gère pas la parole. Utilise Chrome, Edge ou Safari, ou écris ta question ici : le professeur te répondra à voix haute.",
+  liveMicDenied: "Micro refusé. Autorise-le dans les réglages du navigateur puis réessaie.",
+  liveNoSpeech: "Je n’ai rien entendu. Appuie sur le micro et parle.",
+  liveNoVoice: "Aucune voix arabe installée sur ton appareil : la réponse s’affichera par écrit.",
+  liveYou: "Toi",
+  liveTeacher: "Professeur",
   stream: "Filière",
   chooseStream: "Choisis ta filière",
   streams: {
@@ -543,6 +571,20 @@ const en: TafawoqStrings = {
   adviceRecurring: (lesson, error) => `Recurring mistake in “${lesson}”: ${error}. The teacher targets it in their exercises.`,
   adviceProgress: (lesson, from, to) => `Clear progress in “${lesson}”: from ${from} to ${to}. Praise the effort!`,
   adviceComplete: lesson => `“${lesson}” mastered 🎉`,
+  liveButton: "Live voice session",
+  liveTitle: "Live session with your teacher",
+  liveIdle: "Tap the microphone and speak",
+  liveListening: "Listening…",
+  liveThinking: "Your teacher is thinking…",
+  liveSpeaking: "Your teacher is speaking — tap to interrupt",
+  liveHandsFree: "Continuous conversation (listens again after each reply)",
+  liveEnd: "End session",
+  liveUnsupported: "Your browser doesn't support voice input. Use Chrome, Edge or Safari, or type your question here and the teacher will answer aloud.",
+  liveMicDenied: "Microphone blocked. Allow it in your browser settings and try again.",
+  liveNoSpeech: "I didn't hear anything. Tap the microphone and speak.",
+  liveNoVoice: "No Arabic voice is installed on this device; replies will be shown as text.",
+  liveYou: "You",
+  liveTeacher: "Teacher",
   stream: "Stream",
   chooseStream: "Choose your stream",
   streams: {
@@ -577,9 +619,18 @@ export function useTafawoqLang() {
 
 
 const StringsContext = createContext<TafawoqStrings>(ar);
+const LangContext = createContext<Lang>("ar");
 
 export function StringsProvider({ lang, children }: { lang: Lang; children: ReactNode }) {
-  return createElement(StringsContext.Provider, { value: STRINGS[lang] }, children);
+  return createElement(
+    LangContext.Provider,
+    { value: lang },
+    createElement(StringsContext.Provider, { value: STRINGS[lang] }, children)
+  );
+}
+
+export function useLang(): Lang {
+  return useContext(LangContext);
 }
 
 export function useT(): TafawoqStrings {

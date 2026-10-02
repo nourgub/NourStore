@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Languages,
   LogOut,
+  Mic,
   MessageCircle,
   PlayCircle,
   RefreshCw,
@@ -38,7 +39,8 @@ import {
   type ParentReportOutput,
   type WorkspaceOutput,
 } from "./components";
-import { Content, StringsProvider, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
+import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
+import { LiveTutor } from "./LiveTutor";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -543,6 +545,8 @@ function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
 
 function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
   const t = useT();
+  const lang = useLang();
+  const [live, setLive] = useState(false);
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -583,6 +587,10 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
 
   return (
     <div className="tfq-card">
+      {live && <LiveTutor lessonKey={lessonKey} lang={lang} onClose={() => setLive(false)} />}
+      <button type="button" className="tfq-btn tfq-live-open" onClick={() => setLive(true)}>
+        <Mic size={18} /> {t.liveButton}
+      </button>
       <div className="tfq-chat" aria-live="polite">
         {data.messages.map(message => (
           <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">

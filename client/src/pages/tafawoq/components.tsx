@@ -318,24 +318,33 @@ const ARABIC_RUN = /([\u0600-\u06FF\u0750-\u077F](?:[\u0600-\u06FF\u0750-\u077F�
  * they are; every other run is wrapped in an isolated LTR span.
  */
 export function M({ children }: { children: string }) {
-  const parts = children.split(ARABIC_RUN).filter(part => part !== "");
+  // Per line, so a formula never spans a line break.
+  const lines = children.split("\n");
   return (
     <>
-      {parts.map((part, index) =>
-        ARABIC_RUN.test(part) || !part.trim() ? (
-          part
-        ) : (
-          // Surrounding spaces stay outside the isolated span, so they
-          // separate the formula from the Arabic words on the correct side.
-          <span key={index}>
-            {/^\s/.test(part) ? " " : ""}
-            <span className="tfq-math" dir="ltr">
-              {part.trim()}
-            </span>
-            {/\s$/.test(part) ? " " : ""}
-          </span>
-        )
-      )}
+      {lines.map((line, lineIndex) => (
+        <span key={lineIndex}>
+          {lineIndex > 0 && "\n"}
+          {line
+            .split(ARABIC_RUN)
+            .filter(part => part !== "")
+            .map((part, index) =>
+              // Arabic, whitespace, and bare brackets/punctuation flow with
+              // the sentence; anything with a letter or digit is a formula.
+              ARABIC_RUN.test(part) || !/[0-9A-Za-z\u0370-\u03FF∞√π]/.test(part) ? (
+                part
+              ) : (
+                <span key={index}>
+                  {part.match(/^\s*/)![0]}
+                  <span className="tfq-math" dir="ltr">
+                    {part.trim()}
+                  </span>
+                  {part.match(/\s*$/)![0]}
+                </span>
+              )
+            )}
+        </span>
+      ))}
     </>
   );
 }

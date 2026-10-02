@@ -13,6 +13,7 @@ import {
 import type { VideoScene, VideoScript } from "@shared/tafawoq";
 import { useT } from "./i18n";
 import { M } from "./components";
+import { speakArabic } from "./speech";
 
 /**
  * Renders a generated personal video script as a narrated, animated video:
@@ -52,29 +53,23 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
       }
     };
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopSpeech: (() => void) | undefined;
     if (canSpeak && !muted) {
-      const synth = window.speechSynthesis;
-      synth.cancel();
-      const utterance = new SpeechSynthesisUtterance(scene.narration);
-      const voice = synth.getVoices().find(entry => entry.lang.toLowerCase().startsWith("ar"));
-      if (voice) utterance.voice = voice;
-      utterance.lang = voice?.lang ?? "ar-SA";
-      utterance.rate = 0.95;
-      utterance.onstart = () => token.current === current && setSpeaking(true);
-      utterance.onend = () => {
-        timer = setTimeout(advance, 700);
-      };
-      utterance.onerror = () => {
-        timer = setTimeout(advance, readingTime(scene));
-      };
-      synth.speak(utterance);
+      // Math is rewritten for the ear ("x²" → "إكس تربيع") and long
+      // narration is chunked so the browser doesn't cut it off.
+      stopSpeech = speakArabic(scene.narration, {
+        onStart: () => token.current === current && setSpeaking(true),
+        onEnd: () => {
+          timer = setTimeout(advance, 700);
+        },
+      });
     } else {
       timer = setTimeout(advance, readingTime(scene));
     }
     return () => {
       token.current += 1;
       if (timer) clearTimeout(timer);
-      if (canSpeak) window.speechSynthesis.cancel();
+      stopSpeech?.();
       setSpeaking(false);
     };
   }, [playing, index, muted, scene, script.scenes.length, canSpeak]);
