@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;font-size:13px;background:#fff;position:relative;white-space:nowrap}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span:first-child{border-radius:7px 0 0 7px}.seg span:last-child{border-radius:0 7px 7px 0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;white-space:nowrap;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.ptxt{font-size:13.5px;line-height:1.6}
+.av{background:radial-gradient(circle at 50% 38%,#c68e65 0 13%,transparent 14%),radial-gradient(ellipse at 50% 30%,#1f1b18 0 17%,transparent 18%),radial-gradient(ellipse at 50% 100%,#0f766e 0 36%,transparent 37%),linear-gradient(#f1f5f9,#cbd5e1)}
+.av2{background:radial-gradient(circle at 50% 40%,#e0ac80 0 14%,transparent 15%),radial-gradient(ellipse at 50% 31%,#3f2a1d 0 17%,transparent 18%),radial-gradient(ellipse at 50% 100%,#1e3a8a 0 38%,transparent 39%),linear-gradient(#e0e7ff,#a5b4fc)}
+.office{background:radial-gradient(circle at 50% 36%,#e8b48c 0 18%,transparent 19%),radial-gradient(ellipse at 50% 28%,#292524 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#334155 0 42%,transparent 43%),linear-gradient(#e7e5e4,#a8a29e)}
+.sel{display:flex;justify-content:space-between;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff}
+.lbl{font-size:12px;color:#6b7280;margin-bottom:4px}
+.scn{border:1px solid #e5e7eb;border-radius:8px;padding:6px;font-size:12px;background:#fff}
+.scn.on{border:2px solid #7c3aed}
+.scn .thumb{border-radius:6px}
+.wave{height:26px;background:repeating-linear-gradient(90deg,#7c3aed 0 3px,transparent 3px 7px);mask:linear-gradient(transparent 0,#000 30%,#000 70%,transparent);border-radius:4px;opacity:.6}
+
+.slide{border:1px solid #e5e7eb;border-radius:8px;padding:5px;font-size:11px;background:#fff;margin-bottom:8px}
+.slide.on{border:2px solid #2563eb}
+.canvas{border-radius:10px;height:300px;position:relative;overflow:hidden;background:linear-gradient(120deg,#1e3a8a,#2563eb)}
+.canvas .t{position:absolute;left:24px;top:28px;color:#fff;font-size:24px;font-weight:bold;direction:ltr}
+.canvas .s{position:absolute;left:24px;top:70px;color:#bfdbfe;font-size:14px;direction:ltr}
+.canvas .p{position:absolute;right:24px;bottom:0;width:42%;height:85%}
+.tool{display:flex;gap:6px}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.synthesia.io</div>Synthesia</div>
+<div class="app" style="min-height:0">
+ <div class="side rel" style="width:140px">
+  <div class="slide on"><div class="thumb wide" style="background:linear-gradient(120deg,#1e3a8a,#2563eb)"></div>1 · Bienvenue</div>
+  <div class="slide"><div class="thumb wide" style="background:linear-gradient(120deg,#065f46,#10b981)"></div>2 · Vos outils</div>
+  <div class="slide"><div class="thumb wide" style="background:linear-gradient(120deg,#7c2d12,#f97316)"></div>3 · Planning</div>
+  <div class="slide" style="text-align:center;color:#6b7280">＋ Scène</div>
+  <span class="m" style="top:4px;right:-14px">1</span>
+ </div>
+ <div class="main">
+  <div class="row rel" style="justify-content:space-between"><div class="tool"><span class="dd">Avatar</span><span class="dd">Texte</span><span class="dd">Média</span><span class="dd">Forme</span><span class="dd">Kit de marque</span></div><span class="btn blue">Generate</span><span class="m" style="top:-14px;left:560px">2</span></div>
+  <div class="canvas rel"><div class="t">Bienvenue chez Nour Call</div><div class="s">Votre premier jour · 6 scènes</div><div class="p thumb office" style="aspect-ratio:auto;border-radius:0"></div></div>
+  <div class="panel rel" style="background:#fff"><div class="row" style="justify-content:space-between"><div class="lbl">Script — scène 1</div><div class="row"><span class="dd">Français ▾</span><span class="dd">Voix : Hugo ▾</span></div></div>
+   <div class="ptxt ltr">Bienvenue dans l'équipe ! En trois minutes, vous allez découvrir vos outils, votre planning et les bonnes pratiques d'un appel réussi.</div><span class="m" style="top:-14px;right:-14px">3</span></div>
+ </div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>المشاهد على شكل شرائح</div><div><span>2</span>أدوات الإضافة وهوية المؤسسة وزر التوليد</div><div><span>3</span>نص المشهد واللغة والصوت</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

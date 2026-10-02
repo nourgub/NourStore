@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;font-size:13px;background:#fff;position:relative;white-space:nowrap}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span:first-child{border-radius:7px 0 0 7px}.seg span:last-child{border-radius:0 7px 7px 0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;white-space:nowrap;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.ptxt{font-size:13.5px;line-height:1.6}
+.av{background:radial-gradient(circle at 50% 38%,#c68e65 0 13%,transparent 14%),radial-gradient(ellipse at 50% 30%,#1f1b18 0 17%,transparent 18%),radial-gradient(ellipse at 50% 100%,#0f766e 0 36%,transparent 37%),linear-gradient(#f1f5f9,#cbd5e1)}
+.av2{background:radial-gradient(circle at 50% 40%,#e0ac80 0 14%,transparent 15%),radial-gradient(ellipse at 50% 31%,#3f2a1d 0 17%,transparent 18%),radial-gradient(ellipse at 50% 100%,#1e3a8a 0 38%,transparent 39%),linear-gradient(#e0e7ff,#a5b4fc)}
+.office{background:radial-gradient(circle at 50% 36%,#e8b48c 0 18%,transparent 19%),radial-gradient(ellipse at 50% 28%,#292524 0 22%,transparent 23%),radial-gradient(ellipse at 50% 100%,#334155 0 42%,transparent 43%),linear-gradient(#e7e5e4,#a8a29e)}
+.sel{display:flex;justify-content:space-between;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff}
+.lbl{font-size:12px;color:#6b7280;margin-bottom:4px}
+.scn{border:1px solid #e5e7eb;border-radius:8px;padding:6px;font-size:12px;background:#fff}
+.scn.on{border:2px solid #7c3aed}
+.scn .thumb{border-radius:6px}
+.wave{height:26px;background:repeating-linear-gradient(90deg,#7c3aed 0 3px,transparent 3px 7px);mask:linear-gradient(transparent 0,#000 30%,#000 70%,transparent);border-radius:4px;opacity:.6}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">studio.d-id.com</div>D-ID Studio</div>
+<div class="main" style="flex-direction:row;gap:18px;padding:18px">
+ <div class="col" style="width:260px">
+  <div class="rel"><div class="lbl">Présentateur — image importée</div><div class="thumb office" style="border-radius:12px"></div><span class="m" style="top:14px;right:-14px">1</span></div>
+  <div class="small" style="direction:rtl">✓ وجه أمامي · فم مغلق · إضاءة ناعمة</div>
+ </div>
+ <div class="col" style="flex:1">
+  <span class="seg"><span class="on">Script</span><span>Audio</span></span>
+  <div class="panel rel" style="background:#fff;min-height:150px"><div class="ptxt ltr">Bonjour et bienvenue à l'agence ! Je suis Salma, votre conseillère virtuelle. Dites-moi votre destination et je vous aide à préparer votre voyage.</div><div class="small" style="margin-top:8px;text-align:right">156 / 1000</div><span class="m" style="top:-14px;right:-14px">2</span></div>
+  <div class="row rel" style="gap:10px">
+   <div style="flex:1"><div class="lbl">Langue</div><div class="sel"><span>Français (France)</span><span>▾</span></div></div>
+   <div style="flex:1"><div class="lbl">Voix</div><div class="sel"><span>Salma — chaleureuse</span><span>▾</span></div></div>
+   <span class="m" style="top:-10px;right:-14px">3</span>
+  </div>
+  <div class="row" style="justify-content:space-between"><span class="dd">▶ Écouter</span><span class="btn rel">Generate video<span class="m" style="top:-4px;left:-46px">4</span></span></div>
+ </div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>صورة الوجه المرفوعة (بموافقة صاحبها)</div><div><span>2</span>النص الذي سينطقه المتحدث</div><div><span>3</span>اللغة والصوت</div><div><span>4</span>زر توليد الفيديو</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>
