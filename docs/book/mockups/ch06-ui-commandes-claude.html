@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css">
+<style>.bubble.user{background:#e7e1d6;color:#1f2937}.side{background:#f5f2ec}
+.instr{font-family:"DejaVu Sans Mono",monospace;font-size:11px;line-height:1.55;background:#fff;border:1px solid #d6cfc2;border-radius:8px;padding:9px;color:#374151;height:205px;overflow:hidden}
+.instr b{color:#c2410c}.ttl{font-weight:bold;font-size:14px;margin-bottom:6px}
+.calc{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;font-size:13px}
+.row{display:flex;justify-content:space-between;align-items:center;margin:6px 0}.in{border:1px solid #d1d5db;border-radius:6px;padding:3px 8px;width:90px;text-align:right;direction:ltr}
+.res{margin-top:10px;background:#ecfdf5;border-radius:8px;padding:8px;text-align:center;font-weight:bold;color:#166534;font-size:16px}</style></head><body>
+<div class="window">
+ <div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">claude.ai</div>Claude</div>
+ <div class="app">
+  <div class="side" style="width:270px">
+   <div class="ttl">📁 Mes commandes</div>
+   <div class="label" style="margin-bottom:4px">Instructions du projet</div>
+   <div class="instr">Tu reconnais les commandes suivantes…<br><b># Études</b><br>/Learn = m'apprendre un sujet…<br>/Quiz = quiz interactif…<br>…<br><b># Commandes Claude</b><br>/Artifact = crée le résultat dans un artifact…<br>/App = mini-application interactive…<br>/ReadDoc = lire mon fichier joint…<br>/Critique = critique honnête…</div>
+   <div class="label" style="margin:10px 0 4px">Connaissances du projet</div>
+   <div class="field">📄 catalogue_produits.pdf</div>
+  </div>
+  <div class="main" style="flex:1">
+   <div class="bubble user ltr"><b>/App</b> calculateur de prix de vente : coût d'achat, livraison, marge en %</div>
+   <div class="bubble ai ltr" style="max-width:90%">Voici le calculateur dans le panneau à droite. Modifie les chiffres, le prix se met à jour. →</div>
+   <div style="flex:1"></div>
+   <div class="promptbox" style="border-color:#e7d3bf"><span class="txt ltr">Reply to Claude…</span><span class="btn orange">↑</span></div>
+  </div>
+  <div class="main" style="flex:0.85;background:#faf8f4;border-left:1px solid #e5e7eb">
+   <div style="display:flex;justify-content:space-between;font-size:13px"><b>Calculateur de prix</b><span style="color:#9ca3af">Copy · Publish</span></div>
+   <div class="calc rtl">
+    <div class="row"><span>سعر الشراء</span><span class="in"><span style="unicode-bidi:isolate">1200 DA</span></span></div>
+    <div class="row"><span>التوصيل</span><span class="in"><span style="unicode-bidi:isolate">300 DA</span></span></div>
+    <div class="row"><span>هامش الربح</span><span class="in"><span style="unicode-bidi:isolate">40 %</span></span></div>
+    <div class="res">سعر البيع: <span style="unicode-bidi:isolate;direction:ltr">2100 DA</span></div>
+   </div>
+  </div>
+ </div>
+ <span class="m" style="top:150px;left:-14px">1</span>
+ <span class="m" style="top:44px;left:300px">2</span>
+ <span class="m" style="top:215px;left:612px">3</span>
+</div>
+<div class="legend"><div><span>1</span>القاموس + أوامر Claude في تعليمات المشروع</div><div><span>2</span>الأمر + الطلب</div><div><span>3</span>النتيجة تطبيق تفاعلي في اللوحة الجانبية</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p>
+</body></html>
