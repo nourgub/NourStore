@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>الواجب المنزلي - التمارين والتصحيح</title>
+<link rel="stylesheet" href="katex/katex.min.css">
+
+<script src="katex/katex.min.js"></script>
+<script src="katex/contrib/auto-render.min.js"></script>
+<style>
+  @font-face { font-family: "Amiri"; src: url(fonts/Amiri-Regular.ttf); font-weight: 400; }
+  @font-face { font-family: "Amiri"; src: url(fonts/Amiri-Bold.ttf); font-weight: 700; }
+  @page { size: A4; margin: 16mm 15mm; }
+  body { font-family: 'Amiri', serif; font-size: 15px; line-height: 1.75; color: #111; margin: 0; }
+  .katex { direction: ltr; unicode-bidi: isolate; font-size: 1.05em; display: inline-block; }
+  .katex-display .katex { display: block; }
+  .katex-display { direction: ltr; margin: .4em 0; overflow: hidden; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  p, li, div { overflow-wrap: break-word; }
+  h1 { text-align: center; font-size: 26px; margin: 0 0 4px; }
+  .sub { text-align: center; color: #555; margin-bottom: 14px; }
+  h2 { background: #1f3b73; color: #fff; padding: 3px 14px; border-radius: 6px; font-size: 20px; margin: 18px 0 8px; display: inline-block; }
+  h3 { color: #1f3b73; font-size: 18px; border-bottom: 2px solid #1f3b73; padding-bottom: 2px; margin: 16px 0 6px; }
+  .q { font-weight: 700; color: #8a1c1c; }
+  .box { border: 1.5px solid #1f3b73; border-radius: 8px; padding: 8px 14px; margin: 8px 0; background: #f5f8ff; }
+  .res { border: 1.5px solid #8a1c1c; border-radius: 5px; padding: 0 6px; display: inline-block; }
+  ol, ul { margin: 4px 0; padding-right: 24px; }
+  table.t { direction: ltr; border-collapse: collapse; margin: 8px auto; }
+  table.t td, table.t th { border: 1px solid #333; padding: 3px 12px; text-align: center; min-width: 34px; }
+  table.t th { background: #eef2fb; }
+  .vt td { height: 26px; }
+  .dbl { border-left: 4px double #333 !important; }
+  .page-break { page-break-before: always; }
+  table, .row, svg, .box, .katex-display { break-inside: avoid; }
+  h3, .q { break-after: avoid; }
+  .row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .note { color: #444; font-size: 14px; }
+  .center { text-align: center; }
+  svg text { font-family: 'DejaVu Sans', sans-serif; }
+  .footer { text-align: center; margin-top: 22px; font-size: 18px; font-weight: 700; color: #1f3b73; }
+</style>
+</head>
+<body>
+
+<h1>الواجب المنزلي في الرياضيات</h1>
+<div class="sub">نص التمارين مع التصحيح المفصّل – السنة الدراسية 2022 / 2023</div>
+
+<!-- ======================= النص ======================= -->
+<h2>نص التمارين</h2>
+
+<h3>التمرين الأول</h3>
+<p>احسب النهايات التالية:</p>
+<div class="box center">
+$\displaystyle \lim_{x\to 3}\frac{3x-9}{x^2-9}$ &nbsp;؛&nbsp;
+$\displaystyle \lim_{x\to -\infty}\left(\sqrt{x^2+7}+x\right)$ &nbsp;؛&nbsp;
+$\displaystyle \lim_{x\to 2}\frac{x^2-3x+8}{x-2}$ &nbsp;؛&nbsp;
+$\displaystyle \lim_{x\to 3}\frac{x-3}{\sqrt{x+6}-3}$
+</div>
+
+<h3>التمرين الثاني</h3>
+<p><b>(I)</b> لتكن الدالة $f$ المعرفة على $\mathbb{R}-\{2\}$ كما يلي: $\displaystyle f(x)=\frac{x^2+x-2}{2-x}$،
+وليكن $(C_f)$ تمثيلها البياني في المستوي المنسوب إلى المعلم المتعامد والمتجانس $(O;\vec i,\vec j)$.</p>
+<ol>
+  <li>أ- احسب نهايتي الدالة $f$ عند $2$ ثم فسّر النتائج هندسيًا.<br>
+      ب- احسب نهايتي الدالة $f$ عند $+\infty$ و $-\infty$.</li>
+  <li>أ- عيّن الأعداد الحقيقية $a$، $b$ و $c$ بحيث يكون من أجل كل عدد حقيقي $x$ يختلف عن $2$: $\displaystyle f(x)=ax+b+\frac{c}{2-x}$.<br>
+      ب- استنتج أن المستقيم $(\Delta)$ ذا المعادلة $y=-x-3$ مستقيم مقارب مائل للمنحنى $(C_f)$ بجوار $+\infty$ و $-\infty$.<br>
+      ج- ادرس الوضع النسبي بين المنحنى $(C_f)$ والمستقيم $(\Delta)$.</li>
+  <li>أ- بيّن أنه من أجل كل عدد حقيقي $x$ من $\mathbb{R}-\{2\}$ فإن: $\displaystyle f'(x)=\frac{-x^2+4x}{(2-x)^2}$.<br>
+      ب- استنتج اتجاه تغير الدالة $f$ ثم شكّل جدول تغيراتها.</li>
+  <li>أ- بيّن أن المستقيم $(T)$ ذا المعادلة $y=3x-3$ هو مماس المنحنى $(C_f)$ عند النقطة ذات الفاصلة $1$.<br>
+      ب- بيّن أنه يوجد مستقيم $(T')$ يوازي $(T)$ ومماس للمنحنى $(C_f)$ يُطلب تعيين معادلته.</li>
+  <li>بيّن أنه من أجل كل $x\in\mathbb{R}-\{2\}$ فإن $4-x\in\mathbb{R}-\{2\}$ و $f(4-x)+f(x)=-10$، ثم فسّر هذه النتيجة هندسيًا.</li>
+  <li>عيّن نقط تقاطع $(C_f)$ مع محوري الإحداثيات.</li>
+  <li>أنشئ $(T)$ و $(T')$ ثم أنشئ $(C_f)$.<br>
+      – ناقش بيانيًا حسب قيم العدد الحقيقي $m$ عدد وإشارة حلول المعادلة: $f(x)=m$.</li>
+</ol>
+<p><b>(II)</b> لتكن الدالة $g$ المعرفة على $\mathbb{R}-\{-2;2\}$ كما يلي: $\displaystyle g(x)=\frac{x^2+|x|-2}{2-|x|}$.</p>
+<ul>
+  <li>أثبت أن الدالة $g$ زوجية.</li>
+  <li>اشرح كيفية إنشاء التمثيل البياني $(C_g)$ للدالة $g$ انطلاقًا من $(C_f)$.</li>
+</ul>
+
+<!-- ======================= التصحيح ======================= -->
+<div class="page-break"></div>
+<h2>التصحيح</h2>
+
+<h3>حل التمرين الأول</h3>
+
+<p class="q">① حساب $\displaystyle \lim_{x\to 3}\frac{3x-9}{x^2-9}$ :</p>
+<p>لدينا حالة عدم تعيين من الشكل $\frac{0}{0}$. نستعمل المتطابقة الشهيرة $a^2-b^2=(a-b)(a+b)$:</p>
+$$\lim_{x\to 3}\frac{3x-9}{x^2-9}=\lim_{x\to 3}\frac{3(x-3)}{(x-3)(x+3)}=\lim_{x\to 3}\frac{3}{x+3}=\frac{3}{6}=\boxed{\tfrac12}$$
+
+<p class="q">② حساب $\displaystyle \lim_{x\to -\infty}\left(\sqrt{x^2+7}+x\right)$ :</p>
+<p>لدينا $\lim\limits_{x\to-\infty}(x^2+7)=+\infty$ إذن $\lim\limits_{x\to-\infty}\sqrt{x^2+7}=+\infty$، و $\lim\limits_{x\to-\infty}x=-\infty$: حالة عدم تعيين من الشكل $+\infty-\infty$.</p>
+<p class="note">(تذكير: إذا كانت $\lim\limits_{x\to x_0}f(x)=+\infty$ فإن $\lim\limits_{x\to x_0}\sqrt{f(x)}=+\infty$.)</p>
+<p>نضرب في المرافق:</p>
+$$\begin{aligned}\lim_{x\to -\infty}\left(\sqrt{x^2+7}+x\right)&=\lim_{x\to -\infty}\frac{\left(\sqrt{x^2+7}+x\right)\left(\sqrt{x^2+7}-x\right)}{\sqrt{x^2+7}-x}\\
+&=\lim_{x\to -\infty}\frac{x^2+7-x^2}{\sqrt{x^2+7}-x}=\lim_{x\to -\infty}\frac{7}{\sqrt{x^2+7}-x}=\boxed{0}\end{aligned}$$
+<p>لأن $\lim\limits_{x\to-\infty}\sqrt{x^2+7}=+\infty$ و $\lim\limits_{x\to-\infty}(-x)=+\infty$ (نهاية المقام $+\infty$ والبسط عدد حقيقي ثابت).</p>
+
+<p class="q">③ حساب $\displaystyle \lim_{x\to 2}\frac{x^2-3x+8}{x-2}$ :</p>
+<p>لدينا $\lim\limits_{x\to2}(x^2-3x+8)=4-6+8=6>0$ و $\lim\limits_{x\to2}(x-2)=0$، وإشارة $x-2$ :</p>
+$$\lim_{\substack{x\to 2\\ x>2}}\frac{x^2-3x+8}{x-2}=+\infty \qquad ; \qquad \lim_{\substack{x\to 2\\ x<2}}\frac{x^2-3x+8}{x-2}=-\infty$$
+
+<p class="q">④ حساب $\displaystyle \lim_{x\to 3}\frac{x-3}{\sqrt{x+6}-3}$ :</p>
+<p>حالة عدم تعيين من الشكل $\frac{0}{0}$. نضرب البسط والمقام في المرافق $\sqrt{x+6}+3$:</p>
+$$\begin{aligned}\lim_{x\to 3}\frac{x-3}{\sqrt{x+6}-3}&=\lim_{x\to 3}\frac{(x-3)\left(\sqrt{x+6}+3\right)}{\left(\sqrt{x+6}-3\right)\left(\sqrt{x+6}+3\right)}
+=\lim_{x\to 3}\frac{(x-3)\left(\sqrt{x+6}+3\right)}{x+6-9}\\&=\lim_{x\to 3}\left(\sqrt{x+6}+3\right)=3+3=\boxed{6}\end{aligned}$$
+<p class="note">(تذكير: إذا كانت $\lim\limits_{x\to x_0}f(x)=\ell$ مع $\ell\ge 0$ فإن $\lim\limits_{x\to x_0}\sqrt{f(x)}=\sqrt{\ell}$؛ لدينا $\lim\limits_{x\to3}(x+6)=9$ ومنه $\lim\limits_{x\to3}\sqrt{x+6}=\sqrt9=3$.)</p>
+
+<h3>حل التمرين الثاني</h3>
+<p><b>(I)</b></p>
+
+<p class="q">1) أ- نهايتا $f$ عند $2$:</p>
+<p>لدينا $\lim\limits_{x\to2}(x^2+x-2)=4>0$، وإشارة المقام $2-x$:</p>
+<table class="t"><tr><th>$x$</th><td>$-\infty$</td><td>$2$</td><td>$+\infty$</td></tr>
+<tr><th>$2-x$</th><td colspan="1">$+$</td><td>$0$</td><td>$-$</td></tr></table>
+$$\lim_{\substack{x\to 2\\ x<2}}f(x)=+\infty \qquad ; \qquad \lim_{\substack{x\to 2\\ x>2}}f(x)=-\infty$$
+<p><b>التفسير الهندسي:</b> المستقيم ذو المعادلة $x=2$ مستقيم مقارب عمودي للمنحنى $(C_f)$.</p>
+
+<p class="q">ب- نهايتا $f$ عند $+\infty$ و $-\infty$:</p>
+$$\lim_{x\to+\infty}f(x)=\lim_{x\to+\infty}\frac{x^2}{-x}=\lim_{x\to+\infty}(-x)=-\infty \qquad ; \qquad \lim_{x\to-\infty}f(x)=\lim_{x\to-\infty}(-x)=+\infty$$
+
+<p class="q">2) أ- تعيين $a$، $b$ و $c$:</p>
+<p><b>الطريقة 1 (المطابقة):</b> من أجل $x\neq 2$:</p>
+$$ax+b+\frac{c}{2-x}=\frac{(ax+b)(2-x)+c}{2-x}=\frac{-ax^2+(2a-b)x+2b+c}{2-x}$$
+<p>بالمطابقة مع $\dfrac{x^2+x-2}{2-x}$ نجد:</p>
+$$\begin{cases}-a=1\\ 2a-b=1\\ 2b+c=-2\end{cases}\iff\begin{cases}a=-1\\ -2-b=1\\ 2b+c=-2\end{cases}\iff\begin{cases}a=-1\\ b=-3\\ c=4\end{cases}$$
+<p><b>الطريقة 2 (القسمة الإقليدية):</b> $x^2+x-2=(2-x)(-x-3)+4$.</p>
+<div class="box center">إذن: $\displaystyle f(x)=-x-3+\frac{4}{2-x}$ &nbsp; مع &nbsp; $a=-1$ ، $b=-3$ ، $c=4$</div>
+
+<p class="q">ب- المستقيم المقارب المائل:</p>
+<p>من أجل $x\neq2$: $\displaystyle f(x)-(-x-3)=\frac{4}{2-x}$، ومنه:</p>
+$$\lim_{|x|\to+\infty}\left[f(x)-(-x-3)\right]=\lim_{|x|\to+\infty}\frac{4}{2-x}=0$$
+<p>وعليه المستقيم $(\Delta)$ ذو المعادلة $y=-x-3$ مستقيم مقارب مائل للمنحنى $(C_f)$ بجوار $+\infty$ و $-\infty$.</p>
+
+<p class="q">ج- الوضع النسبي بين $(C_f)$ و $(\Delta)$:</p>
+<p>ندرس إشارة الفرق $f(x)-(-x-3)=\dfrac{4}{2-x}$، وهي من إشارة $(2-x)$ لأن $4>0$:</p>
+<table class="t">
+<tr><th>$x$</th><td>$-\infty$ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td class="dbl">$2$</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; $+\infty$</td></tr>
+<tr><th>$f(x)-(-x-3)$</th><td>$+$</td><td class="dbl"></td><td>$-$</td></tr>
+<tr><th>الوضع النسبي</th><td>$(C_f)$ يقع فوق $(\Delta)$</td><td class="dbl"></td><td>$(C_f)$ يقع تحت $(\Delta)$</td></tr>
+</table>
+
+<p class="q">3) أ- حساب المشتقة:</p>
+<p>الدالة $f$ قابلة للاشتقاق على $\mathbb{R}-\{2\}$ (دالة ناطقة)، ومن أجل كل $x\neq2$:</p>
+$$f'(x)=\frac{(2x+1)(2-x)-(-1)(x^2+x-2)}{(2-x)^2}=\frac{4x-2x^2+2-x+x^2+x-2}{(2-x)^2}$$
+<div class="box center">بعد الحساب والتبسيط نجد: $\displaystyle f'(x)=\frac{-x^2+4x}{(2-x)^2}$</div>
+
+<p class="q">ب- اتجاه التغير وجدول التغيرات:</p>
+<p>بما أن $(2-x)^2>0$ من أجل $x\neq2$، فإن إشارة $f'(x)$ من إشارة $-x^2+4x=-x(x-4)$.</p>
+<p>$f'(x)=0$ يعني $-x(x-4)=0$ يعني $x=0$ أو $x=4$.</p>
+<table class="t">
+<tr><th>$x$</th><td>$-\infty$</td><td></td><td>$0$</td><td></td><td class="dbl">$2$</td><td></td><td>$4$</td><td></td><td>$+\infty$</td></tr>
+<tr><th>$f'(x)$</th><td></td><td>$-$</td><td>$0$</td><td>$+$</td><td class="dbl"></td><td>$+$</td><td>$0$</td><td>$-$</td><td></td></tr>
+</table>
+<p>إذن: الدالة $f$ متناقصة تمامًا على كل من المجالين $]{-\infty};0]$ و $[4;+\infty[$ &lrm;، ومتزايدة تمامًا على كل من المجالين $[0;2[$ و $]2;4]$.</p>
+<p>لدينا: $f(0)=\dfrac{-2}{2}=-1$ و $f(4)=\dfrac{16+4-2}{2-4}=-9$.</p>
+<p><b>جدول التغيرات:</b></p>
+<div class="center" id="vartable"></div>
+
+<p class="q">4) أ- المماس $(T)$ عند النقطة ذات الفاصلة $1$:</p>
+<p>معادلة المماس: $y=f'(1)(x-1)+f(1)$، ولدينا $f(1)=0$ و $f'(1)=\dfrac{-1+4}{1}=3$.</p>
+<p>ومنه $y=3(x-1)+0$ أي: <span class="res">$(T):\ y=3x-3$</span></p>
+
+<p class="q">ب- المماس $(T')$ الموازي لـ $(T)$:</p>
+<p>$(T')\parallel(T)$ يعني أن لهما نفس معامل التوجيه، أي نحل المعادلة $f'(x)=3$:</p>
+$$\frac{-x^2+4x}{(2-x)^2}=3\iff -x^2+4x=3(x^2-4x+4)\iff 4x^2-16x+12=0\iff x^2-4x+3=0$$
+<p>المميز $\Delta=16-12=4$، ومنه $x=1$ أو $x=3$؛ أي $S=\{1;3\}$.</p>
+<p>المماس عند النقطة ذات الفاصلة $1$ هو $(T)$، والمماس عند النقطة ذات الفاصلة $3$ هو $(T')$. لدينا $f(3)=-10$ و $f'(3)=3$:</p>
+$$y=f'(3)(x-3)+f(3)=3(x-3)-10=3x-9-10$$
+<p>إذن: <span class="res">$(T'):\ y=3x-19$</span></p>
+
+<p class="q">5) إثبات أن $f(4-x)+f(x)=-10$:</p>
+<p>لدينا $x\in\mathbb{R}-\{2\}$ يعني $x\neq2$، أي $-x\neq-2$، أي $4-x\neq2$؛ ومنه $(4-x)\in\mathbb{R}-\{2\}$.</p>
+$$\begin{aligned}f(4-x)+f(x)&=-(4-x)-3+\frac{4}{2-(4-x)}-x-3+\frac{4}{2-x}\\&=-7+x+\frac{4}{x-2}-x-3-\frac{4}{x-2}\end{aligned}$$
+<div class="box center">وعليه: $f(4-x)+f(x)=-10$</div>
+<p><b>التفسير الهندسي:</b> لدينا $f(2\times2-x)+f(x)=2\times(-5)$، إذن النقطة $\Omega(2;-5)$ مركز تناظر للمنحنى $(C_f)$.</p>
+
+<p class="q">6) نقط تقاطع $(C_f)$ مع محوري الإحداثيات:</p>
+<p><b>مع محور الفواصل:</b> نحل $f(x)=0$ يعني $x^2+x-2=0$ مع $x\neq2$، ومنه $x=1$ أو $x=-2$؛ أي $S=\{-2;1\}$.</p>
+<p class="center"><span class="res">$(C_f)\cap(x'x)=\{A(-2;0)\ ;\ B(1;0)\}$</span></p>
+<p><b>مع محور التراتيب:</b> لدينا $f(0)=-1$.</p>
+<p class="center"><span class="res">$(C_f)\cap(y'y)=\{C(0;-1)\}$</span></p>
+
+<p class="q">7) الإنشاء:</p>
+<div class="row">
+<table class="t"><tr><th colspan="3">$(T):\ y=3x-3$</th></tr><tr><th>$x$</th><td>$0$</td><td>$1$</td></tr><tr><th>$y$</th><td>$-3$</td><td>$0$</td></tr></table>
+<table class="t"><tr><th colspan="3">$(T'):\ y=3x-19$</th></tr><tr><th>$x$</th><td>$3$</td><td>$4$</td></tr><tr><th>$y$</th><td>$-10$</td><td>$-7$</td></tr></table>
+<table class="t"><tr><th colspan="3">$(\Delta):\ y=-x-3$</th></tr><tr><th>$x$</th><td>$-3$</td><td>$0$</td></tr><tr><th>$y$</th><td>$0$</td><td>$-3$</td></tr></table>
+</div>
+<p class="center">قيم مساعدة: $f(-2)=0$ ، $f(1)=0$ ، $f(0)=-1$ ، $f(4)=-9$ ، $\Omega(2;-5)$</p>
+<div class="center" id="graphF"></div>
+
+<p class="q">المناقشة البيانية لعدد وإشارة حلول المعادلة $f(x)=m$ … (1):</p>
+<p>حلول المعادلة $f(x)=m$ هي فواصل نقط تقاطع المنحنى $(C_f)$ مع المستقيم ذي المعادلة $y=m$ (الموازي لمحور الفواصل).</p>
+<ul>
+  <li>إذا كان $m\in\,]{-\infty};-9[$ : المعادلة (1) تقبل حلّين موجبين.</li>
+  <li>إذا كان $m=-9$ : المعادلة (1) تقبل حلًّا مضاعفًا هو $x=4$.</li>
+  <li>إذا كان $m\in\,]{-9};-1[$ : المعادلة (1) لا تقبل حلولًا في $\mathbb{R}$.</li>
+  <li>إذا كان $m=-1$ : المعادلة (1) تقبل حلًّا مضاعفًا معدومًا ($x=0$).</li>
+  <li>إذا كان $m\in\,]{-1};+\infty[$ : المعادلة (1) تقبل حلّين مختلفين في الإشارة.</li>
+</ul>
+
+<p><b>(II)</b></p>
+<p class="q">• إثبات أن الدالة $g$ زوجية:</p>
+<p>من أجل كل $x\in\mathbb{R}-\{-2;2\}$ لدينا $x\neq2$ و $x\neq-2$، ومنه $-x\neq-2$ و $-x\neq2$؛ أي $-x\in\mathbb{R}-\{-2;2\}$. ولدينا:</p>
+$$g(-x)=\frac{(-x)^2+|-x|-2}{2-|-x|}=\frac{x^2+|x|-2}{2-|x|}=g(x)$$
+<p>وعليه الدالة $g$ زوجية.</p>
+
+<p class="q">• كيفية إنشاء $(C_g)$ انطلاقًا من $(C_f)$:</p>
+<p>لدينا:</p>
+$$g(x)=\begin{cases} f(x) & ;\ x\in[0;2[\,\cup\,]2;+\infty[ \\[2pt] f(-x) & ;\ x\in\,]{-\infty};-2[\,\cup\,]{-2};0] \end{cases}$$
+<p>لإنشاء $(C_g)$: نعيد إنشاء جزء $(C_f)$ المرسوم في المجالين $[0;2[$ و $]2;+\infty[$، ثم نناظر هذا الجزء بالنسبة لمحور التراتيب لأن $g$ دالة زوجية.</p>
+<div class="center" id="graphG"></div>
+
+<div class="footer">بالتوفيق</div>
+<p class="center note">إذا أردت ألا تتعب، فاتعب لئلا تتعب.</p>
+
+<script>
+const f = x => (x*x + x - 2) / (2 - x);
+function graph(id, opt) {
+  const W = opt.W, H = opt.H, xmin = opt.xmin, xmax = opt.xmax, ymin = opt.ymin, ymax = opt.ymax;
+  const sx = x => (x - xmin) / (xmax - xmin) * W, sy = y => (ymax - y) / (ymax - ymin) * H;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="direction:ltr">`;
+  s += `<defs><clipPath id="c${id}"><rect width="${W}" height="${H}"/></clipPath>
+        <marker id="ar${id}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker></defs>`;
+  for (let x = Math.ceil(xmin); x <= xmax; x++) s += `<line x1="${sx(x)}" y1="0" x2="${sx(x)}" y2="${H}" stroke="#e3e3e3"/>`;
+  for (let y = Math.ceil(ymin); y <= ymax; y++) s += `<line x1="0" y1="${sy(y)}" x2="${W}" y2="${sy(y)}" stroke="#e3e3e3"/>`;
+  s += `<line x1="0" y1="${sy(0)}" x2="${W-2}" y2="${sy(0)}" stroke="#000" stroke-width="1.2" marker-end="url(#ar${id})"/>`;
+  s += `<line x1="${sx(0)}" y1="${H}" x2="${sx(0)}" y2="2" stroke="#000" stroke-width="1.2" marker-end="url(#ar${id})"/>`;
+  for (let x = Math.ceil(xmin); x <= xmax - 0.5; x++) if (x) s += `<line x1="${sx(x)}" y1="${sy(0)-3}" x2="${sx(x)}" y2="${sy(0)+3}" stroke="#000"/><text x="${sx(x)}" y="${sy(0)+14}" font-size="10" text-anchor="middle">${x}</text>`;
+  for (let y = Math.ceil(ymin); y <= ymax - 0.5; y++) if (y) s += `<line x1="${sx(0)-3}" y1="${sy(y)}" x2="${sx(0)+3}" y2="${sy(y)}" stroke="#000"/><text x="${sx(0)-5}" y="${sy(y)+3}" font-size="10" text-anchor="end">${y}</text>`;
+  s += `<text x="${sx(0)-5}" y="${sy(0)+14}" font-size="10" text-anchor="end">O</text>`;
+  s += `<g clip-path="url(#c${id})">`;
+  const line = (m, p, col, dash) => s += `<line x1="${sx(xmin)}" y1="${sy(m*xmin+p)}" x2="${sx(xmax)}" y2="${sy(m*xmax+p)}" stroke="${col}" stroke-width="1.4" ${dash ? 'stroke-dasharray="6 4"' : ''}/>`;
+  (opt.lines || []).forEach(l => line(...l));
+  (opt.vlines || []).forEach(v => s += `<line x1="${sx(v)}" y1="0" x2="${sx(v)}" y2="${H}" stroke="#555" stroke-width="1.3" stroke-dasharray="6 4"/>`);
+  opt.branches.forEach(([fn, a, b, col]) => {
+    let pts = [];
+    for (let i = 0; i <= 600; i++) { const x = a + (b - a) * i / 600; const y = fn(x); if (y > ymin - 5 && y < ymax + 5) pts.push(`${sx(x).toFixed(1)},${sy(y).toFixed(1)}`); }
+    s += `<polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="2.3"/>`;
+  });
+  (opt.points || []).forEach(([x, y, lab]) => s += `<circle cx="${sx(x)}" cy="${sy(y)}" r="3" fill="#000"/><text x="${sx(x)+5}" y="${sy(y)-5}" font-size="11" font-weight="bold">${lab}</text>`);
+  (opt.labels || []).forEach(([x, y, t, col]) => s += `<text x="${sx(x)}" y="${sy(y)}" font-size="13" font-weight="bold" fill="${col}">${t}</text>`);
+  s += `</g></svg>`;
+  document.getElementById(id).innerHTML = s;
+}
+graph('graphF', { W: 560, H: 620, xmin: -5, xmax: 8.5, ymin: -14, ymax: 5,
+  lines: [[3, -3, '#1a7f37'], [3, -19, '#b35900'], [-1, -3, '#6a2c91', true]], vlines: [2],
+  branches: [[f, -5, 1.995, '#c00000'], [f, 2.005, 8.5, '#c00000']],
+  points: [[-2, 0, 'A'], [1, 0, 'B'], [0, -1, 'C'], [2, -5, 'Ω'], [4, -9, ''], [3, -10, '']],
+  labels: [[-4.6, 3.6, '(Cf)', '#c00000'], [5.6, -10.6, '(Cf)', '#c00000'], [1.9, 4.2, '(T)', '#1a7f37'], [6.6, 2.5, "(T')", '#b35900'],
+           [3.2, -6.3, '(Δ): y = −x − 3', '#6a2c91'], [2.1, -13.5, 'x = 2', '#555']] });
+const g = x => (x*x + Math.abs(x) - 2) / (2 - Math.abs(x));
+graph('graphG', { W: 520, H: 420, xmin: -8, xmax: 8, ymin: -14, ymax: 5, vlines: [2, -2],
+  branches: [[g, -8, -2.005, '#0b5cad'], [g, -1.995, 1.995, '#0b5cad'], [g, 2.005, 8, '#0b5cad']],
+  points: [[-1, 0, ''], [1, 0, ''], [0, -1, ''], [4, -9, ''], [-4, -9, '']],
+  labels: [[4.5, 3, '(Cg)', '#0b5cad']] });
+
+// جدول التغيرات
+document.getElementById('vartable').innerHTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="190" viewBox="0 0 640 190" style="direction:ltr;font-family:'DejaVu Sans',sans-serif">
+ <defs><marker id="va" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z"/></marker></defs>
+ <rect x="1" y="1" width="638" height="188" fill="none" stroke="#000"/>
+ <line x1="1" y1="36" x2="639" y2="36" stroke="#000"/><line x1="1" y1="72" x2="639" y2="72" stroke="#000"/>
+ <line x1="70" y1="1" x2="70" y2="189" stroke="#000"/>
+ <text x="35" y="24" text-anchor="middle" font-size="15" font-style="italic">x</text>
+ <text x="35" y="60" text-anchor="middle" font-size="15" font-style="italic">f'(x)</text>
+ <text x="35" y="135" text-anchor="middle" font-size="15" font-style="italic">f(x)</text>
+ <text x="95" y="24" text-anchor="middle" font-size="14">−∞</text>
+ <text x="240" y="24" text-anchor="middle" font-size="14">0</text>
+ <text x="380" y="24" text-anchor="middle" font-size="14">2</text>
+ <text x="510" y="24" text-anchor="middle" font-size="14">4</text>
+ <text x="615" y="24" text-anchor="middle" font-size="14">+∞</text>
+ <text x="170" y="60" text-anchor="middle" font-size="15">−</text><text x="240" y="60" text-anchor="middle" font-size="14">0</text>
+ <text x="310" y="60" text-anchor="middle" font-size="15">+</text>
+ <text x="445" y="60" text-anchor="middle" font-size="15">+</text><text x="510" y="60" text-anchor="middle" font-size="14">0</text>
+ <text x="570" y="60" text-anchor="middle" font-size="15">−</text>
+ <line x1="377" y1="36" x2="377" y2="189" stroke="#000"/><line x1="383" y1="36" x2="383" y2="189" stroke="#000"/>
+ <text x="95" y="92" text-anchor="middle" font-size="14">+∞</text>
+ <text x="240" y="180" text-anchor="middle" font-size="14">−1</text>
+ <text x="355" y="92" text-anchor="middle" font-size="14">+∞</text>
+ <text x="405" y="180" text-anchor="middle" font-size="14">−∞</text>
+ <text x="510" y="92" text-anchor="middle" font-size="14">−9</text>
+ <text x="615" y="180" text-anchor="middle" font-size="14">−∞</text>
+ <line x1="110" y1="98" x2="225" y2="165" stroke="#000" marker-end="url(#va)"/>
+ <line x1="255" y1="165" x2="345" y2="98" stroke="#000" marker-end="url(#va)"/>
+ <line x1="420" y1="165" x2="500" y2="98" stroke="#000" marker-end="url(#va)"/>
+ <line x1="525" y1="98" x2="605" y2="165" stroke="#000" marker-end="url(#va)"/>
+</svg>`;
+
+renderMathInElement(document.body, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}] });
+document.querySelectorAll('.katex').forEach(e => { const b = document.createElement('bdi'); b.setAttribute('dir', 'ltr'); e.parentNode.insertBefore(b, e); b.appendChild(e); });
+window.__done = true;
+</script>
+</body>
+</html>
