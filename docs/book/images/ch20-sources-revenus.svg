@@ -13,27 +13,27 @@
   <text x="400" y="296" text-anchor="middle" font-size="13" fill="#ffffff">Compétences IA</text>
   <!-- top right: freelance -->
   <rect x="470" y="95" width="300" height="125" rx="14" fill="#2563eb"/>
-  <text x="755" y="127" text-anchor="end" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">① العمل الحر (Freelance)</text>
-  <text x="755" y="155" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">Fiverr · Upwork · خمسات · مستقل</text>
-  <text x="755" y="179" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">دخل سريع، مقابل وقتك</text>
-  <text x="755" y="203" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">مثال: فيديو إعلاني قصير لمطعم</text>
+  <text x="755" y="127" text-anchor="start" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">① العمل الحر (Freelance)</text>
+  <text x="755" y="155" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">Fiverr · Upwork · خمسات · مستقل</text>
+  <text x="755" y="179" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">دخل سريع، مقابل وقتك</text>
+  <text x="755" y="203" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">مثال: فيديو إعلاني قصير لمطعم</text>
   <!-- top left: content -->
   <rect x="30" y="95" width="300" height="125" rx="14" fill="#7c3aed"/>
-  <text x="315" y="127" text-anchor="end" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">② صناعة المحتوى</text>
-  <text x="315" y="155" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">Création de contenu</text>
-  <text x="315" y="179" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">يوتيوب، تيك توك، إنستغرام</text>
-  <text x="315" y="203" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">دخل بطيء البداية، يتراكم</text>
+  <text x="315" y="127" text-anchor="start" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">② صناعة المحتوى</text>
+  <text x="315" y="155" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">Création de contenu</text>
+  <text x="315" y="179" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">يوتيوب، تيك توك، إنستغرام</text>
+  <text x="315" y="203" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">دخل بطيء البداية، يتراكم</text>
   <!-- bottom right: local businesses -->
   <rect x="470" y="340" width="300" height="125" rx="14" fill="#16a34a"/>
-  <text x="755" y="372" text-anchor="end" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">③ خدمات للمحلات المحلية</text>
-  <text x="755" y="400" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">Services pour commerces locaux</text>
-  <text x="755" y="424" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">اشتراك شهري: منشورات + فيديوهات</text>
-  <text x="755" y="448" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">دخل منتظم وعلاقة طويلة</text>
+  <text x="755" y="372" text-anchor="start" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">③ خدمات للمحلات المحلية</text>
+  <text x="755" y="400" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">Services pour commerces locaux</text>
+  <text x="755" y="424" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">اشتراك شهري: منشورات + فيديوهات</text>
+  <text x="755" y="448" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">دخل منتظم وعلاقة طويلة</text>
   <!-- bottom left: digital products -->
   <rect x="30" y="340" width="300" height="125" rx="14" fill="#ea580c"/>
-  <text x="315" y="372" text-anchor="end" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">④ المنتجات الرقمية</text>
-  <text x="315" y="400" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">Produits numériques</text>
-  <text x="315" y="424" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">قوالب، حزم برومبتات، دورات</text>
-  <text x="315" y="448" text-anchor="end" font-size="13" fill="#ffffff" direction="rtl">تُصنع مرة وتُباع مرات</text>
+  <text x="315" y="372" text-anchor="start" font-size="17" font-weight="bold" fill="#ffffff" direction="rtl">④ المنتجات الرقمية</text>
+  <text x="315" y="400" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">Produits numériques</text>
+  <text x="315" y="424" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">قوالب، حزم برومبتات، دورات</text>
+  <text x="315" y="448" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">تُصنع مرة وتُباع مرات</text>
   <text x="400" y="502" text-anchor="middle" font-size="13" fill="#1f2937" direction="rtl">ابدأ بمصدر واحد، ثم أضف مصدراً ثانياً بعد أن يستقر الأول</text>
 </svg>

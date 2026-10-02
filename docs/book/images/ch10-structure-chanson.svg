@@ -27,16 +27,16 @@
   <!-- explanations -->
   <g font-size="14" direction="rtl" text-anchor="end">
     <rect x="420" y="220" width="340" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed"/>
-    <text x="745" y="248" fill="#7c3aed" font-weight="bold">اللازمة [Chorus]</text>
-    <text x="745" y="272" fill="#1f2937">نفس الكلمات تتكرر، وهي الجزء الذي يُحفظ.</text>
-    <text x="745" y="292" fill="#1f2937">اجعلها قصيرة وجذابة.</text>
+    <text x="745" y="248" fill="#7c3aed" font-weight="bold" text-anchor="start">اللازمة [Chorus]</text>
+    <text x="745" y="272" fill="#1f2937" text-anchor="start">نفس الكلمات تتكرر، وهي الجزء الذي يُحفظ.</text>
+    <text x="745" y="292" fill="#1f2937" text-anchor="start">اجعلها قصيرة وجذابة.</text>
     <rect x="40" y="220" width="360" height="80" rx="10" fill="#dbeafe" stroke="#2563eb"/>
-    <text x="385" y="248" fill="#2563eb" font-weight="bold">المقطع [Verse]</text>
-    <text x="385" y="272" fill="#1f2937">يحكي القصة؛ كلمات مختلفة في كل مقطع.</text>
-    <text x="385" y="292" fill="#1f2937">4 إلى 8 أسطر عادةً.</text>
+    <text x="385" y="248" fill="#2563eb" font-weight="bold" text-anchor="start">المقطع [Verse]</text>
+    <text x="385" y="272" fill="#1f2937" text-anchor="start">يحكي القصة؛ كلمات مختلفة في كل مقطع.</text>
+    <text x="385" y="292" fill="#1f2937" text-anchor="start">4 إلى 8 أسطر عادةً.</text>
     <rect x="40" y="315" width="720" height="85" rx="10" fill="#ffffff" stroke="#ea580c" stroke-dasharray="6 4"/>
-    <text x="745" y="343" fill="#ea580c" font-weight="bold">برومبت الأسلوب (Style prompt) منفصل عن الكلمات:</text>
-    <text x="745" y="370" fill="#1f2937">النوع + المزاج + الآلات + الإيقاع + نوع الصوت</text>
+    <text x="745" y="343" fill="#ea580c" font-weight="bold" text-anchor="start">برومبت الأسلوب (Style prompt) منفصل عن الكلمات:</text>
+    <text x="745" y="370" fill="#1f2937" text-anchor="start">النوع + المزاج + الآلات + الإيقاع + نوع الصوت</text>
   </g>
   <text x="60" y="388" font-size="13" fill="#1f2937" text-anchor="start">ex: raï pop, joyful, mandole, darbuka, 100 bpm, male vocals</text>
 </svg>

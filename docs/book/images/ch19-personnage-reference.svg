@@ -37,7 +37,7 @@
     <text x="660" y="312" text-anchor="middle" font-size="13" fill="#16a34a">Expressions</text>
   </g>
   <!-- palette -->
-  <text x="760" y="356" text-anchor="end" font-size="15" font-weight="bold" fill="#1f2937" direction="rtl">لوحة الألوان الثابتة (Palette)</text>
+  <text x="760" y="356" text-anchor="start" font-size="15" font-weight="bold" fill="#1f2937" direction="rtl">لوحة الألوان الثابتة (Palette)</text>
   <g font-size="11" fill="#1f2937" text-anchor="middle">
     <rect x="700" y="370" width="60" height="34" fill="#fde68a" stroke="#1f2937"/><text x="730" y="420" direction="rtl">البشرة</text>
     <rect x="630" y="370" width="60" height="34" fill="#7c2d12"/><text x="660" y="420" direction="rtl">الشعر</text>
@@ -47,12 +47,12 @@
   <!-- traits -->
   <rect x="40" y="345" width="420" height="160" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
   <g font-size="13" fill="#1f2937" text-anchor="end" direction="rtl">
-    <text x="445" y="372" font-weight="bold">العلامات الثابتة (Traits fixes):</text>
-    <text x="445" y="398">• بنت 7 سنوات، شعر بنّي مجعّد بشريط أصفر</text>
-    <text x="445" y="422">• عينان كبيرتان بنيّتان، نمش خفيف</text>
-    <text x="445" y="446">• قميص برتقالي بنجمة بيضاء، سروال أزرق</text>
-    <text x="445" y="470">• حذاء رياضي أبيض، حقيبة ظهر خضراء</text>
-    <text x="445" y="494">• الأسلوب: ثلاثي الأبعاد كرتوني، ألوان دافئة</text>
+    <text x="445" y="372" font-weight="bold" text-anchor="start">العلامات الثابتة (Traits fixes):</text>
+    <text x="445" y="398" text-anchor="start">• بنت 7 سنوات، شعر بنّي مجعّد بشريط أصفر</text>
+    <text x="445" y="422" text-anchor="start">• عينان كبيرتان بنيّتان، نمش خفيف</text>
+    <text x="445" y="446" text-anchor="start">• قميص برتقالي بنجمة بيضاء، سروال أزرق</text>
+    <text x="445" y="470" text-anchor="start">• حذاء رياضي أبيض، حقيبة ظهر خضراء</text>
+    <text x="445" y="494" text-anchor="start">• الأسلوب: ثلاثي الأبعاد كرتوني، ألوان دافئة</text>
   </g>
   <text x="625" y="470" text-anchor="middle" font-size="12" fill="#6b7280" direction="rtl">انسخ هذه الأوصاف حرفياً</text>
   <text x="625" y="490" text-anchor="middle" font-size="12" fill="#6b7280" direction="rtl">في كل برومبت لكل مشهد</text>

@@ -48,7 +48,7 @@
     <rect x="268" y="369" width="22" height="36" rx="3"/><rect x="410" y="369" width="22" height="36" rx="3"/>
     <rect x="522" y="369" width="22" height="36" rx="3"/><rect x="655" y="369" width="40" height="36" rx="3"/>
   </g>
-  <text x="560" y="392" font-size="12" fill="#16a34a" direction="rtl">Whoosh</text>
+  <text x="560" y="392" font-size="12" fill="#16a34a" direction="rtl" text-anchor="end">Whoosh</text>
   <!-- playhead -->
   <line x1="460" y1="52" x2="460" y2="420" stroke="#dc2626" stroke-width="2"/>
   <polygon points="452,52 468,52 460,62" fill="#dc2626"/>

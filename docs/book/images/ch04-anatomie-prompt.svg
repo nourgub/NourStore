@@ -3,28 +3,28 @@
   <text x="400" y="40" font-size="24" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">تشريح البرومبت الجيد: ست قطع</text>
   <g font-size="16">
     <rect x="40" y="70" width="720" height="62" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-    <text x="740" y="98" font-weight="bold" fill="#2563eb" text-anchor="end" direction="rtl">١. الدور (Rôle)</text>
-    <text x="740" y="121" fill="#1f2937" text-anchor="end" direction="rtl">من يتكلم؟  «أنت خبير تسويق للمتاجر الصغيرة»</text>
+    <text x="740" y="98" font-weight="bold" fill="#2563eb" text-anchor="start" direction="rtl">١. الدور (Rôle)</text>
+    <text x="740" y="121" fill="#1f2937" text-anchor="start" direction="rtl">من يتكلم؟  «أنت خبير تسويق للمتاجر الصغيرة»</text>
     <text x="60" y="110" fill="#2563eb" font-size="14">Tu es un expert en marketing…</text>
     <rect x="40" y="142" width="720" height="62" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-    <text x="740" y="170" font-weight="bold" fill="#7c3aed" text-anchor="end" direction="rtl">٢. المهمة (Tâche)</text>
-    <text x="740" y="193" fill="#1f2937" text-anchor="end" direction="rtl">ماذا تريد بالضبط؟ فعل واضح</text>
+    <text x="740" y="170" font-weight="bold" fill="#7c3aed" text-anchor="start" direction="rtl">٢. المهمة (Tâche)</text>
+    <text x="740" y="193" fill="#1f2937" text-anchor="start" direction="rtl">ماذا تريد بالضبط؟ فعل واضح</text>
     <text x="60" y="182" fill="#7c3aed" font-size="14">Rédige 3 descriptions produit…</text>
     <rect x="40" y="214" width="720" height="62" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-    <text x="740" y="242" font-weight="bold" fill="#16a34a" text-anchor="end" direction="rtl">٣. السياق (Contexte)</text>
-    <text x="740" y="265" fill="#1f2937" text-anchor="end" direction="rtl">لمن؟ لماذا؟ ما الخلفية؟</text>
+    <text x="740" y="242" font-weight="bold" fill="#16a34a" text-anchor="start" direction="rtl">٣. السياق (Contexte)</text>
+    <text x="740" y="265" fill="#1f2937" text-anchor="start" direction="rtl">لمن؟ لماذا؟ ما الخلفية؟</text>
     <text x="60" y="254" fill="#16a34a" font-size="14">Boutique de savon artisanal à Fès…</text>
     <rect x="40" y="286" width="720" height="62" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
-    <text x="740" y="314" font-weight="bold" fill="#ea580c" text-anchor="end" direction="rtl">٤. الشكل (Format)</text>
-    <text x="740" y="337" fill="#1f2937" text-anchor="end" direction="rtl">كيف تريد الجواب؟ جدول، قائمة، فقرات</text>
+    <text x="740" y="314" font-weight="bold" fill="#ea580c" text-anchor="start" direction="rtl">٤. الشكل (Format)</text>
+    <text x="740" y="337" fill="#1f2937" text-anchor="start" direction="rtl">كيف تريد الجواب؟ جدول، قائمة، فقرات</text>
     <text x="60" y="326" fill="#ea580c" font-size="14">Sous forme de tableau…</text>
     <rect x="40" y="358" width="720" height="62" rx="10" fill="#f3f4f6" stroke="#1f2937" stroke-width="2"/>
-    <text x="740" y="386" font-weight="bold" fill="#1f2937" text-anchor="end" direction="rtl">٥. القيود (Contraintes)</text>
-    <text x="740" y="409" fill="#1f2937" text-anchor="end" direction="rtl">الطول، النبرة، الممنوعات</text>
+    <text x="740" y="386" font-weight="bold" fill="#1f2937" text-anchor="start" direction="rtl">٥. القيود (Contraintes)</text>
+    <text x="740" y="409" fill="#1f2937" text-anchor="start" direction="rtl">الطول، النبرة، الممنوعات</text>
     <text x="60" y="398" fill="#1f2937" font-size="14">80 mots max, ton chaleureux…</text>
     <rect x="40" y="430" width="720" height="62" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4"/>
-    <text x="740" y="458" font-weight="bold" fill="#2563eb" text-anchor="end" direction="rtl">٦. الأمثلة (Exemples) — اختيارية لكن قوية</text>
-    <text x="740" y="481" fill="#1f2937" text-anchor="end" direction="rtl">أرِه نموذجاً لما تريد</text>
+    <text x="740" y="458" font-weight="bold" fill="#2563eb" text-anchor="start" direction="rtl">٦. الأمثلة (Exemples) — اختيارية لكن قوية</text>
+    <text x="740" y="481" fill="#1f2937" text-anchor="start" direction="rtl">أرِه نموذجاً لما تريد</text>
     <text x="60" y="470" fill="#2563eb" font-size="14">Exemple de ton style : « … »</text>
   </g>
   <text x="400" y="530" font-size="16" fill="#1f2937" text-anchor="middle" direction="rtl">كلما أضفت قطعة، قلّ تخمين النموذج وزادت دقة النتيجة</text>

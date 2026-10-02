@@ -18,9 +18,9 @@
     <rect x="550" y="245" width="70" height="44" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/><text x="585" y="274" fill="#ea580c">artis</text>
     <rect x="625" y="245" width="70" height="44" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/><text x="660" y="274" fill="#2563eb">anaux</text>
   </g>
-  <text x="720" y="274" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">= ٩ رموز</text>
+  <text x="720" y="274" font-size="15" fill="#1f2937" text-anchor="end" direction="rtl">= ٩ رموز</text>
   <rect x="60" y="320" width="680" height="115" rx="12" fill="#f9fafb" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4"/>
-  <text x="710" y="352" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• الرمز قطعة من كلمة، وليس دائماً كلمة كاملة.</text>
-  <text x="710" y="382" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• الكلمات النادرة والعربية غالباً تُقطَّع إلى رموز أكثر.</text>
-  <text x="710" y="412" font-size="16" fill="#1f2937" text-anchor="end" direction="rtl">• تقريب مفيد: ١٠٠ رمز ≈ ٧٥ كلمة إنجليزية (التقطيع الفعلي يختلف حسب النموذج).</text>
+  <text x="710" y="352" font-size="16" fill="#1f2937" text-anchor="start" direction="rtl">• الرمز قطعة من كلمة، وليس دائماً كلمة كاملة.</text>
+  <text x="710" y="382" font-size="16" fill="#1f2937" text-anchor="start" direction="rtl">• الكلمات النادرة والعربية غالباً تُقطَّع إلى رموز أكثر.</text>
+  <text x="710" y="412" font-size="16" fill="#1f2937" text-anchor="start" direction="rtl">• تقريب مفيد: ١٠٠ رمز ≈ ٧٥ كلمة إنجليزية (التقطيع الفعلي يختلف حسب النموذج).</text>
 </svg>

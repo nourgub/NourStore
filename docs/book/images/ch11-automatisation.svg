@@ -37,6 +37,6 @@
   <line x1="318" y1="240" x2="264" y2="320" stroke="#1f2937" stroke-width="2" marker-end="url(#arr)"/>
   <!-- footer -->
   <rect x="30" y="385" width="740" height="55" rx="10" fill="#dcfce7" stroke="#16a34a"/>
-  <text x="755" y="410" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="end" direction="rtl">القاعدة: «عندما يحدث X ← افعل Y». البيانات (الاسم، المبلغ، البريد) تنتقل من خطوة لأخرى.</text>
-  <text x="755" y="430" font-size="12" fill="#1f2937" text-anchor="end" direction="rtl">في Zapier يُسمّى المسار «Zap»، وفي Make يُسمّى «Scénario».</text>
+  <text x="755" y="410" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="start" direction="rtl">القاعدة: «عندما يحدث X ← افعل Y». البيانات (الاسم، المبلغ، البريد) تنتقل من خطوة لأخرى.</text>
+  <text x="755" y="430" font-size="12" fill="#1f2937" text-anchor="start" direction="rtl">في Zapier يُسمّى المسار «Zap»، وفي Make يُسمّى «Scénario».</text>
 </svg>

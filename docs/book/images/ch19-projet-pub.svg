@@ -14,12 +14,12 @@
     <path d="M90 170 Q175 80 260 170" fill="none" stroke="#16a34a" stroke-width="2"/>
     <text x="175" y="130" text-anchor="middle" fill="#16a34a">Plan large</text>
     <!-- captions row 1 -->
-    <text x="760" y="212" text-anchor="end" font-weight="bold" direction="rtl">1 · 0–4ث: زهرة ياسمين بقطرة ندى</text>
-    <text x="760" y="230" text-anchor="end" direction="rtl">صوت: «كلّ صباح يبدأ بعطر…»</text>
-    <text x="520" y="212" text-anchor="end" font-weight="bold" direction="rtl">2 · 4–9ث: القارورة على رخام</text>
-    <text x="520" y="230" text-anchor="end" direction="rtl">كاميرا تدور ببطء حولها</text>
-    <text x="280" y="212" text-anchor="end" font-weight="bold" direction="rtl">3 · 9–14ث: فناء رياض مغربي</text>
-    <text x="280" y="230" text-anchor="end" direction="rtl">امرأة تمشي، ضوء الغروب</text>
+    <text x="760" y="212" text-anchor="start" font-weight="bold" direction="rtl">1 · 0–4ث: زهرة ياسمين بقطرة ندى</text>
+    <text x="760" y="230" text-anchor="start" direction="rtl">صوت: «كلّ صباح يبدأ بعطر…»</text>
+    <text x="520" y="212" text-anchor="start" font-weight="bold" direction="rtl">2 · 4–9ث: القارورة على رخام</text>
+    <text x="520" y="230" text-anchor="start" direction="rtl">كاميرا تدور ببطء حولها</text>
+    <text x="280" y="212" text-anchor="start" font-weight="bold" direction="rtl">3 · 9–14ث: فناء رياض مغربي</text>
+    <text x="280" y="230" text-anchor="start" direction="rtl">امرأة تمشي، ضوء الغروب</text>
     <!-- row 2 -->
     <rect x="540" y="260" width="230" height="130" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
     <circle cx="655" cy="320" r="22" fill="#ffffff" stroke="#ea580c"/>
@@ -31,12 +31,12 @@
     <text x="175" y="318" text-anchor="middle" font-size="18" font-weight="bold" fill="#ffffff">-20%</text>
     <text x="175" y="345" text-anchor="middle" font-size="13" fill="#ffffff" direction="rtl">اطلبيه الآن</text>
     <!-- captions row 2 -->
-    <text x="760" y="412" text-anchor="end" font-weight="bold" direction="rtl">4 · 14–18ث: رشّة على المعصم</text>
-    <text x="760" y="430" text-anchor="end" direction="rtl">رذاذ يلمع بالضوء</text>
-    <text x="520" y="412" text-anchor="end" font-weight="bold" direction="rtl">5 · 18–22ث: لقطة المنتج النهائية</text>
-    <text x="520" y="430" text-anchor="end" direction="rtl">الاسم + الشعار يظهران</text>
-    <text x="280" y="412" text-anchor="end" font-weight="bold" direction="rtl">6 · 22–25ث: دعوة للفعل (CTA)</text>
-    <text x="280" y="430" text-anchor="end" direction="rtl">العرض + رابط المتجر</text>
+    <text x="760" y="412" text-anchor="start" font-weight="bold" direction="rtl">4 · 14–18ث: رشّة على المعصم</text>
+    <text x="760" y="430" text-anchor="start" direction="rtl">رذاذ يلمع بالضوء</text>
+    <text x="520" y="412" text-anchor="start" font-weight="bold" direction="rtl">5 · 18–22ث: لقطة المنتج النهائية</text>
+    <text x="520" y="430" text-anchor="start" direction="rtl">الاسم + الشعار يظهران</text>
+    <text x="280" y="412" text-anchor="start" font-weight="bold" direction="rtl">6 · 22–25ث: دعوة للفعل (CTA)</text>
+    <text x="280" y="430" text-anchor="start" direction="rtl">العرض + رابط المتجر</text>
   </g>
   <!-- flow arrows -->
   <g stroke="#1f2937" stroke-width="2" fill="#1f2937">

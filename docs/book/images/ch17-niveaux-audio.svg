@@ -22,7 +22,7 @@
   </g>
   <!-- danger zone -->
   <rect x="120" y="70" width="640" height="10" fill="#ea580c" opacity="0.25"/>
-  <text x="755" y="66" text-anchor="end" font-size="12" fill="#ea580c" direction="rtl">منطقة التشبّع (Saturation) — لا تتجاوز -1 dB</text>
+  <text x="755" y="66" text-anchor="start" font-size="12" fill="#ea580c" direction="rtl">منطقة التشبّع (Saturation) — لا تتجاوز -1 dB</text>
   <!-- bars: top at peak, bottom at 390 -->
   <!-- voix: -6 to -3 => draw to -6 (y=130) -->
   <rect x="160" y="130" width="110" height="260" fill="#2563eb" rx="4"/>

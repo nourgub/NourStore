@@ -21,7 +21,7 @@
   <text x="60" y="170" text-anchor="middle" font-size="16" font-weight="bold" fill="#ffffff" direction="rtl">السعر</text>
   <text x="60" y="194" text-anchor="middle" font-size="12" fill="#ffffff">Prix</text>
   <rect x="40" y="280" width="720" height="110" rx="12" fill="#ffffff" stroke="#1f2937" stroke-width="2"/>
-  <text x="740" y="312" text-anchor="end" font-size="14" font-weight="bold" fill="#1f2937" direction="rtl">ثلاث باقات (Forfaits) تسهّل القرار على الزبون:</text>
-  <text x="740" y="342" text-anchor="end" font-size="13" fill="#2563eb" direction="rtl">أساسية (Basique): الحد الأدنى المفيد  ·  قياسية (Standard): الأكثر طلباً  ·  مميزة (Premium): كل شيء + سرعة</text>
-  <text x="740" y="372" text-anchor="end" font-size="13" fill="#1f2937" direction="rtl">لا تبِع «ساعات الأداة»، بِع «النتيجة»: زبائن أكثر، وقت أقل، صورة أجمل للمحل.</text>
+  <text x="740" y="312" text-anchor="start" font-size="14" font-weight="bold" fill="#1f2937" direction="rtl">ثلاث باقات (Forfaits) تسهّل القرار على الزبون:</text>
+  <text x="740" y="342" text-anchor="start" font-size="13" fill="#2563eb" direction="rtl">أساسية (Basique): الحد الأدنى المفيد  ·  قياسية (Standard): الأكثر طلباً  ·  مميزة (Premium): كل شيء + سرعة</text>
+  <text x="740" y="372" text-anchor="start" font-size="13" fill="#1f2937" direction="rtl">لا تبِع «ساعات الأداة»، بِع «النتيجة»: زبائن أكثر، وقت أقل، صورة أجمل للمحل.</text>
 </svg>

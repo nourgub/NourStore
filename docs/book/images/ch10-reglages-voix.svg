@@ -3,14 +3,14 @@
   <text x="400" y="38" font-size="22" font-weight="bold" fill="#1f2937" text-anchor="middle" direction="rtl">إعدادات الصوت في ElevenLabs: أين تضع المؤشر؟</text>
   <text x="400" y="62" font-size="14" fill="#1f2937" text-anchor="middle">Réglages de voix — Stabilité / Similarité</text>
   <!-- slider 1 -->
-  <text x="760" y="110" font-size="16" font-weight="bold" fill="#2563eb" text-anchor="end" direction="rtl">الثبات (Stabilité / Stability)</text>
+  <text x="760" y="110" font-size="16" font-weight="bold" fill="#2563eb" text-anchor="start" direction="rtl">الثبات (Stabilité / Stability)</text>
   <line x1="80" y1="140" x2="720" y2="140" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
   <line x1="80" y1="140" x2="420" y2="140" stroke="#2563eb" stroke-width="10" stroke-linecap="round"/>
   <circle cx="420" cy="140" r="13" fill="#ffffff" stroke="#2563eb" stroke-width="4"/>
   <text x="230" y="175" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">منخفض: معبّر وعاطفي، لكن قد يتذبذب</text>
   <text x="560" y="175" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">مرتفع: ثابت ومتّزن، لكن قد يصبح رتيباً</text>
   <!-- slider 2 -->
-  <text x="760" y="230" font-size="16" font-weight="bold" fill="#7c3aed" text-anchor="end" direction="rtl">التشابه (Similarité / Similarity)</text>
+  <text x="760" y="230" font-size="16" font-weight="bold" fill="#7c3aed" text-anchor="start" direction="rtl">التشابه (Similarité / Similarity)</text>
   <line x1="80" y1="260" x2="720" y2="260" stroke="#e5e7eb" stroke-width="10" stroke-linecap="round"/>
   <line x1="80" y1="260" x2="520" y2="260" stroke="#7c3aed" stroke-width="10" stroke-linecap="round"/>
   <circle cx="520" cy="260" r="13" fill="#ffffff" stroke="#7c3aed" stroke-width="4"/>
@@ -18,6 +18,6 @@
   <text x="560" y="295" font-size="13" fill="#1f2937" text-anchor="middle" direction="rtl">مرتفع: أقرب للأصل، وقد ينقل ضجيج التسجيل</text>
   <!-- tips -->
   <rect x="40" y="320" width="720" height="62" rx="10" fill="#dcfce7" stroke="#16a34a"/>
-  <text x="745" y="346" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="end" direction="rtl">نقطة بداية آمنة: ابدأ من الإعدادات الافتراضية، ثم عدّل مؤشراً واحداً في كل تجربة.</text>
-  <text x="745" y="370" font-size="13" fill="#1f2937" text-anchor="end" direction="rtl">كتاب صوتي ← ثبات أعلى  |  إعلان حماسي أو قصة ← ثبات أقل</text>
+  <text x="745" y="346" font-size="14" fill="#16a34a" font-weight="bold" text-anchor="start" direction="rtl">نقطة بداية آمنة: ابدأ من الإعدادات الافتراضية، ثم عدّل مؤشراً واحداً في كل تجربة.</text>
+  <text x="745" y="370" font-size="13" fill="#1f2937" text-anchor="start" direction="rtl">كتاب صوتي ← ثبات أعلى  |  إعلان حماسي أو قصة ← ثبات أقل</text>
 </svg>

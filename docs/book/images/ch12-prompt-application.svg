@@ -4,29 +4,29 @@
   <text x="400" y="62" font-size="14" fill="#1f2937" text-anchor="middle">Anatomie d'un prompt d'application (Lovable, Bolt, v0, Replit...)</text>
   <g direction="rtl" text-anchor="end">
     <rect x="410" y="85" width="360" height="100" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-    <text x="755" y="115" font-size="17" font-weight="bold" fill="#2563eb">① الهدف (Objectif)</text>
-    <text x="755" y="142" font-size="13" fill="#1f2937">ماذا يفعل التطبيق في جملة واحدة؟</text>
-    <text x="755" y="165" font-size="12" fill="#1f2937">«صفحة هبوط لبيع زيت الأرغان»</text>
+    <text x="755" y="115" font-size="17" font-weight="bold" fill="#2563eb" text-anchor="start">① الهدف (Objectif)</text>
+    <text x="755" y="142" font-size="13" fill="#1f2937" text-anchor="start">ماذا يفعل التطبيق في جملة واحدة؟</text>
+    <text x="755" y="165" font-size="12" fill="#1f2937" text-anchor="start">«صفحة هبوط لبيع زيت الأرغان»</text>
     <rect x="30" y="85" width="360" height="100" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
-    <text x="375" y="115" font-size="17" font-weight="bold" fill="#7c3aed">② المستخدمون (Utilisateurs)</text>
-    <text x="375" y="142" font-size="13" fill="#1f2937">من سيستعمله؟ ما حاجته؟</text>
-    <text x="375" y="165" font-size="12" fill="#1f2937">«نساء 25–45، يتسوّقن من الهاتف»</text>
+    <text x="375" y="115" font-size="17" font-weight="bold" fill="#7c3aed" text-anchor="start">② المستخدمون (Utilisateurs)</text>
+    <text x="375" y="142" font-size="13" fill="#1f2937" text-anchor="start">من سيستعمله؟ ما حاجته؟</text>
+    <text x="375" y="165" font-size="12" fill="#1f2937" text-anchor="start">«نساء 25–45، يتسوّقن من الهاتف»</text>
     <rect x="410" y="200" width="360" height="100" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
-    <text x="755" y="230" font-size="17" font-weight="bold" fill="#ea580c">③ الصفحات (Pages)</text>
-    <text x="755" y="257" font-size="13" fill="#1f2937">قائمة الصفحات أو الأقسام بالترتيب</text>
-    <text x="755" y="280" font-size="12" fill="#1f2937">«رئيسية، منتجات، آراء، تواصل»</text>
+    <text x="755" y="230" font-size="17" font-weight="bold" fill="#ea580c" text-anchor="start">③ الصفحات (Pages)</text>
+    <text x="755" y="257" font-size="13" fill="#1f2937" text-anchor="start">قائمة الصفحات أو الأقسام بالترتيب</text>
+    <text x="755" y="280" font-size="12" fill="#1f2937" text-anchor="start">«رئيسية، منتجات، آراء، تواصل»</text>
     <rect x="30" y="200" width="360" height="100" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-    <text x="375" y="230" font-size="17" font-weight="bold" fill="#16a34a">④ الوظائف (Fonctionnalités)</text>
-    <text x="375" y="257" font-size="13" fill="#1f2937">ماذا يستطيع المستخدم أن يفعل؟</text>
-    <text x="375" y="280" font-size="12" fill="#1f2937">«زر طلب عبر واتساب، نموذج تواصل»</text>
+    <text x="375" y="230" font-size="17" font-weight="bold" fill="#16a34a" text-anchor="start">④ الوظائف (Fonctionnalités)</text>
+    <text x="375" y="257" font-size="13" fill="#1f2937" text-anchor="start">ماذا يستطيع المستخدم أن يفعل؟</text>
+    <text x="375" y="280" font-size="12" fill="#1f2937" text-anchor="start">«زر طلب عبر واتساب، نموذج تواصل»</text>
     <rect x="410" y="315" width="360" height="100" rx="12" fill="#fce7f3" stroke="#7c3aed" stroke-width="2"/>
-    <text x="755" y="345" font-size="17" font-weight="bold" fill="#7c3aed">⑤ الأسلوب (Style)</text>
-    <text x="755" y="372" font-size="13" fill="#1f2937">الألوان، الخطوط، الإحساس العام</text>
-    <text x="755" y="395" font-size="12" fill="#1f2937">«أخضر زيتوني، أنيق، عربي RTL»</text>
+    <text x="755" y="345" font-size="17" font-weight="bold" fill="#7c3aed" text-anchor="start">⑤ الأسلوب (Style)</text>
+    <text x="755" y="372" font-size="13" fill="#1f2937" text-anchor="start">الألوان، الخطوط، الإحساس العام</text>
+    <text x="755" y="395" font-size="12" fill="#1f2937" text-anchor="start">«أخضر زيتوني، أنيق، عربي RTL»</text>
     <rect x="30" y="315" width="360" height="100" rx="12" fill="#f3f4f6" stroke="#1f2937" stroke-width="2"/>
-    <text x="375" y="345" font-size="17" font-weight="bold" fill="#1f2937">⑥ البيانات (Données)</text>
-    <text x="375" y="372" font-size="13" fill="#1f2937">ما المعلومات التي تُحفظ أو تُعرض؟</text>
-    <text x="375" y="395" font-size="12" fill="#1f2937">«منتج: اسم، سعر، صورة، وصف»</text>
+    <text x="375" y="345" font-size="17" font-weight="bold" fill="#1f2937" text-anchor="start">⑥ البيانات (Données)</text>
+    <text x="375" y="372" font-size="13" fill="#1f2937" text-anchor="start">ما المعلومات التي تُحفظ أو تُعرض؟</text>
+    <text x="375" y="395" font-size="12" fill="#1f2937" text-anchor="start">«منتج: اسم، سعر، صورة، وصف»</text>
   </g>
   <text x="400" y="450" font-size="14" fill="#1f2937" text-anchor="middle" direction="rtl">كلما كانت الكتل أوضح، قلّت جولات التصحيح وقلّ استهلاك الرصيد.</text>
 </svg>

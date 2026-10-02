@@ -8,7 +8,7 @@
   <text x="595" y="178" font-size="14" fill="#1f2937" text-anchor="middle" direction="rtl">+ توصيل ٢٠ درهم. كم المجموع؟</text>
   <path d="M595 200 L595 280" stroke="#ea580c" stroke-width="3"/>
   <path d="M585 268 L595 284 L605 268" fill="none" stroke="#ea580c" stroke-width="3"/>
-  <text x="610" y="245" font-size="13" fill="#ea580c" direction="rtl">قفزة مباشرة</text>
+  <text x="610" y="245" font-size="13" fill="#ea580c" direction="rtl" text-anchor="end">قفزة مباشرة</text>
   <rect x="470" y="290" width="250" height="60" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
   <text x="595" y="327" font-size="16" fill="#1f2937" text-anchor="middle" direction="rtl">الجواب: ١٣٣ درهم ؟</text>
   <text x="595" y="400" font-size="15" fill="#ea580c" text-anchor="middle" direction="rtl">خطر الخطأ أكبر</text>
@@ -17,13 +17,13 @@
   <text x="215" y="102" font-size="18" font-weight="bold" fill="#16a34a" text-anchor="middle" direction="rtl">مع سلسلة تفكير</text>
   <g font-size="14" fill="#1f2937">
     <rect x="55" y="120" width="320" height="50" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
-    <text x="360" y="151" text-anchor="end" direction="rtl">الخطوة ١: ٣ × ٤٥ = ١٣٥ درهم</text>
+    <text x="360" y="151" text-anchor="start" direction="rtl">الخطوة ١: ٣ × ٤٥ = ١٣٥ درهم</text>
     <rect x="55" y="190" width="320" height="50" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
-    <text x="360" y="221" text-anchor="end" direction="rtl">الخطوة ٢: الخصم ١٠٪ = ١٣٫٥ درهم</text>
+    <text x="360" y="221" text-anchor="start" direction="rtl">الخطوة ٢: الخصم ١٠٪ = ١٣٫٥ درهم</text>
     <rect x="55" y="260" width="320" height="50" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
-    <text x="360" y="291" text-anchor="end" direction="rtl">الخطوة ٣: ١٣٥ − ١٣٫٥ = ١٢١٫٥ درهم</text>
+    <text x="360" y="291" text-anchor="start" direction="rtl">الخطوة ٣: ١٣٥ − ١٣٫٥ = ١٢١٫٥ درهم</text>
     <rect x="55" y="330" width="320" height="50" rx="10" fill="#ffffff" stroke="#16a34a" stroke-width="1.5"/>
-    <text x="360" y="361" text-anchor="end" direction="rtl">الخطوة ٤: + ٢٠ توصيل = ١٤١٫٥ درهم</text>
+    <text x="360" y="361" text-anchor="start" direction="rtl">الخطوة ٤: + ٢٠ توصيل = ١٤١٫٥ درهم</text>
   </g>
   <path d="M215 170 L215 190 M215 240 L215 260 M215 310 L215 330" stroke="#16a34a" stroke-width="3"/>
   <rect x="85" y="400" width="260" height="50" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>

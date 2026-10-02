@@ -12,13 +12,13 @@
     <text x="420" y="200">bleu</text><rect x="530" y="185" width="8" height="20" fill="#ea580c"/><text x="548" y="201">3%</text>
   </g>
   <rect x="40" y="240" width="350" height="150" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
-  <text x="370" y="272" font-size="18" font-weight="bold" fill="#16a34a" text-anchor="end" direction="rtl">حرارة منخفضة (0.2)</text>
-  <text x="370" y="304" font-size="15" fill="#1f2937" text-anchor="end" direction="rtl">يختار دائماً الأكثر احتمالاً:</text>
+  <text x="370" y="272" font-size="18" font-weight="bold" fill="#16a34a" text-anchor="start" direction="rtl">حرارة منخفضة (0.2)</text>
+  <text x="370" y="304" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">يختار دائماً الأكثر احتمالاً:</text>
   <text x="370" y="332" font-size="15" fill="#1f2937" text-anchor="end">« délicieux »</text>
-  <text x="370" y="364" font-size="15" fill="#1f2937" text-anchor="end" direction="rtl">مناسبة للوقائع والملخصات والكود</text>
+  <text x="370" y="364" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">مناسبة للوقائع والملخصات والكود</text>
   <rect x="410" y="240" width="350" height="150" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
-  <text x="740" y="272" font-size="18" font-weight="bold" fill="#ea580c" text-anchor="end" direction="rtl">حرارة مرتفعة (1.0)</text>
-  <text x="740" y="304" font-size="15" fill="#1f2937" text-anchor="end" direction="rtl">يجرّب أحياناً خيارات أقل احتمالاً:</text>
+  <text x="740" y="272" font-size="18" font-weight="bold" fill="#ea580c" text-anchor="start" direction="rtl">حرارة مرتفعة (1.0)</text>
+  <text x="740" y="304" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">يجرّب أحياناً خيارات أقل احتمالاً:</text>
   <text x="740" y="332" font-size="15" fill="#1f2937" text-anchor="end">« sucré » ، « chaud » …</text>
-  <text x="740" y="364" font-size="15" fill="#1f2937" text-anchor="end" direction="rtl">مناسبة للأفكار والشعر والإبداع</text>
+  <text x="740" y="364" font-size="15" fill="#1f2937" text-anchor="start" direction="rtl">مناسبة للأفكار والشعر والإبداع</text>
 </svg>
