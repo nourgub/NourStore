@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.ptxt{font-size:13.5px;line-height:1.55;direction:ltr;text-align:left}
+.lbl{font-size:12px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.upl{border:2px dashed #4b5563;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:13px}
+.gen{display:inline-block;padding:10px 22px;border-radius:10px;background:#fff;color:#111;font-weight:bold;font-size:14px}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#312e81;color:#c7d2fe;font-family:monospace;font-size:13px}
+
+.card{border:1px solid #e5e7eb;border-radius:14px;padding:12px;background:#fff}
+.say{font-size:13.5px;direction:ltr;background:#f3f4f6;border-radius:10px;padding:8px 12px;display:inline-block}
+.sand{background:radial-gradient(ellipse at 50% 55%,#b45309 0 10%,#f59e0b 11% 14%,transparent 15%),linear-gradient(#fdba74,#fb7185 45%,#fde68a 46%,#fcd34d 70%,#38bdf8 71%)}
+.sandn{background:radial-gradient(ellipse at 50% 55%,#b45309 0 10%,#f59e0b 11% 14%,transparent 15%),radial-gradient(circle at 80% 20%,#fde68a 0 5%,transparent 6%),linear-gradient(#0f172a,#312e81 45%,#a16207 46%,#713f12 70%,#1e3a8a 71%)}
+</style></head><body>
+<div class="window">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">dream-machine.lumalabs.ai</div>Dream Machine</div>
+<div style="padding:18px;background:#fafaf9" class="col">
+ <div class="small ltr">Board : Parfum ambré</div>
+ <div class="card rel"><div class="say">Plan produit, un flacon de parfum ambré sur du sable, une vague l'entoure, ralenti, orbite lente, lumière de coucher de soleil.</div><span class="m" style="top:-14px;right:-14px">1</span>
+  <div class="row rel" style="margin-top:10px"><div class="thumb wide sand rel" style="width:200px"><div class="play"></div></div><div class="thumb wide sand rel" style="width:200px;filter:hue-rotate(-15deg)"><div class="play"></div></div><span class="m" style="top:40px;left:414px">2</span></div>
+ </div>
+ <div class="card rel"><div class="say">De nuit, et plus lent.</div><span class="m" style="top:-14px;right:-14px">3</span>
+  <div class="row" style="margin-top:10px"><div class="thumb wide sandn rel" style="width:200px"><div class="play"></div></div><div class="thumb wide sandn rel" style="width:200px;filter:brightness(1.15)"><div class="play"></div></div></div>
+ </div>
+ <div class="promptbox rel"><span class="txt ltr">Décris une modification… (ex. « ajoute une orbite »)</span><span class="dd">＋ Image</span><span class="dd">Loop</span><span class="btn">→</span><span class="m" style="top:-14px;left:-14px">4</span></div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>البرومبت الأول داخل اللوحة</div><div><span>2</span>النتائج المقترحة</div><div><span>3</span>تعديل بجملة قصيرة بدل إعادة الكتابة</div><div><span>4</span>خانة الحوار + إرفاق صورة + حلقة متكررة</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>
+.rel{position:relative}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;font-size:13px;background:#fff}
+.seg span{padding:6px 12px;border-left:1px solid #e5e7eb}.seg span:first-child{border-left:0}
+.seg span.on{background:#111827;color:#fff;font-weight:bold}
+.dd{display:inline-block;border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;font-size:13px;background:#fff}
+.row{display:flex;gap:12px;align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.small{font-size:12px;color:#6b7280}
+.play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.45)}
+.play::after{content:"";position:absolute;left:14px;top:10px;border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.dk{background:#0f1115;color:#e5e7eb}
+.dk .panel{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .field{background:#11141a;border-color:#2a2f3a;color:#e5e7eb}
+.dk .small,.dk .label{color:#9ca3af}
+.dk .dd{background:#181b22;border-color:#2a2f3a;color:#e5e7eb}
+.dk .seg{background:#181b22;border-color:#2a2f3a}.dk .seg span{border-color:#2a2f3a}.dk .seg span.on{background:#e5e7eb;color:#111}
+
+.ptxt{font-size:13.5px;line-height:1.55;direction:ltr;text-align:left}
+.lbl{font-size:12px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.upl{border:2px dashed #4b5563;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:13px}
+.gen{display:inline-block;padding:10px 22px;border-radius:10px;background:#fff;color:#111;font-weight:bold;font-size:14px}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#312e81;color:#c7d2fe;font-family:monospace;font-size:13px}
+
+.mode span{padding:7px 12px}
+.clip2{height:62px;border-radius:8px;position:relative;overflow:hidden;flex:0 0 120px}
+</style></head><body>
+<div class="window dk" style="background:#0f1115;border-color:#2a2f3a">
+<div class="titlebar"><div class="dots"><i></i><i></i><i></i></div><div class="url">labs.google/flow</div>Flow</div>
+<div style="padding:18px" class="col">
+ <div class="row" style="justify-content:space-between">
+  <div class="dd" style="font-size:14px">Projet : Boulangerie du quartier</div>
+  <span class="dd rel">Veo 3 · Quality ▾<span class="m" style="top:-14px;right:-14px">3</span></span>
+ </div>
+ <div class="row" style="align-items:stretch;gap:16px">
+  <div class="thumb wide sc-product rel" style="width:430px"><div class="play"></div><div class="dur">0:08</div></div>
+  <div class="panel rel" style="flex:1">
+   <span class="seg mode rel" style="margin-bottom:12px"><span class="on">Text to Video</span><span>Frames to Video</span><span>Ingredients</span><span class="m" style="top:-14px;right:-14px">1</span></span>
+   <div class="ptxt rel">Gros plan, une grand-mère algérienne au foulard vert dit doucement : <span style="color:#fcd34d">« La patience, c'est le secret du bon pain. »</span> Elle pétrit la pâte, lumière chaude d'une fenêtre, plan fixe. <span style="color:#a5b4fc">Effets sonores : oiseaux dehors.</span><span class="m" style="top:-6px;right:-14px">2</span></div>
+   <div style="text-align:right;margin-top:12px"><span class="gen">Generate →</span></div>
+  </div>
+ </div>
+ <div class="panel rel" style="padding:10px">
+  <div class="lbl">Scene builder</div>
+  <div class="row" style="gap:8px">
+   <div class="clip2 sc-product"></div><div class="clip2 sc-sunset"></div><div class="clip2 sc-city"></div>
+   <div class="clip2 upl" style="border-color:#4b5563">＋ Extend</div>
+   <div style="flex:1"></div><span class="dd">⬇ Download</span>
+  </div>
+  <span class="m" style="top:-14px;left:380px">4</span>
+ </div>
+</div>
+</div>
+<div class="legend"><div><span>1</span>اختيار الوضع: نص، إطارات، مكوّنات</div><div><span>2</span>برومبت بحوار بين علامتي تنصيص + مؤثرات</div><div><span>3</span>اختيار النموذج والجودة</div><div><span>4</span>منشئ المشاهد: ترتيب اللقطات وتمديدها</div></div>
+<p class="note">واجهة توضيحية مبسّطة — قد يختلف الشكل الفعلي للأداة</p></body></html>
