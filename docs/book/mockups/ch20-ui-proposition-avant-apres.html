@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css">
+<style>
+h2{direction:rtl;font-size:22px;margin-bottom:14px;text-align:center}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;direction:rtl}
+.col{border-radius:14px;padding:16px;border:2px solid}
+.bad{border-color:#fca5a5;background:#fef2f2}.good{border-color:#86efac;background:#f0fdf4}
+.hd{font-weight:bold;font-size:18px;margin-bottom:10px}
+.bad .hd{color:#b91c1c}.good .hd{color:#15803d}
+.msg{background:#fff;border-radius:12px;padding:12px 14px;font-size:15px;line-height:1.9;border:1px solid #e5e7eb}
+.why{margin-top:12px;font-size:14px;line-height:1.9}
+.why div::before{margin-left:6px}
+.bad .why div::before{content:"✗";color:#b91c1c;font-weight:bold}
+.good .why div::before{content:"✓";color:#15803d;font-weight:bold}
+mark{background:#bbf7d0;border-radius:4px;padding:0 3px}
+</style></head><body>
+<h2>الرد على طلب زبون: قبل وبعد</h2>
+<div class="two">
+ <div class="col bad"><div class="hd">❌ عرض عام</div>
+  <div class="msg">مرحباً، أنا خبير في كل شيء ولديّ خبرة كبيرة في الذكاء الاصطناعي. أرجو أن تختارني، وسأقدّم لك أفضل عمل.</div>
+  <div class="why"><div>لا يذكر طلب الزبون</div><div>لا خطة ولا مثال</div><div>وعود فارغة</div></div>
+ </div>
+ <div class="col good"><div class="hd">✅ عرض مخصّص</div>
+  <div class="msg"><mark>فهمت أنك تحتاج 4 فيديوهات قصيرة لإطلاق مخبزتك.</mark> أقترح: سكريبت لكل فيديو توافق عليه، ثم التوليد والمونتاج، ثم تعديلين. <mark>هذا مثال لفيديو صنعته لمقهى.</mark> <mark>هل لديك صور حقيقية لمنتجاتك؟</mark></div>
+  <div class="why"><div>يعيد صياغة الحاجة في جملة</div><div>خطة من 3 خطوات + مثال</div><div>ينتهي بسؤال يفتح الحوار</div></div>
+ </div>
+</div>
+</body></html>
