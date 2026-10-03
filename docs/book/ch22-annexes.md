@@ -27,7 +27,7 @@
 | حقوق المؤلف | Droits d'auteur | Copyright |
 | الموافقة | Consentement | Consent |
 | شروط الاستعمال | Conditions d'utilisation | Terms of use |
-| البرومبت | Prompt / Requête | Prompt |
+| البرومبت | Prompt | Prompt |
 | هندسة البرومبت | Ingénierie de prompt | Prompt engineering |
 | الدور | Rôle | Role |
 | السياق | Contexte | Context |
