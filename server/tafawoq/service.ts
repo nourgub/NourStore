@@ -273,6 +273,159 @@ export async function generateProblem(userId: number, lessonKey: string) {
   return { assessmentId, source: "template" as ContentSource, questions: items.map(toPublicQuestion) };
 }
 
+// ---------------------------------------------------------------------------
+// Mock BAC exam ("بكالوريا تجريبية"): a full paper for the student's stream —
+// short exercises plus the long problem, out of 20, like the real exam.
+// Each exercise is a problem stored as a practice assessment of its own
+// lesson (so it updates that lesson's student model); its points are
+// stored on its items, and part points are proportional to difficulty.
+// ---------------------------------------------------------------------------
+
+type ExamSlot = { lessons: string[]; points: number };
+
+/** The paper's structure per stream, after the official BAC papers. */
+const EXAM_BLUEPRINTS: Record<"scientific" | "gestion" | "literary", { minutes: number; slots: ExamSlot[] }> = {
+  scientific: {
+    minutes: 210,
+    slots: [
+      { lessons: ["math-probability"], points: 4 },
+      { lessons: ["math-complex", "math-space-geometry"], points: 4 },
+      { lessons: ["math-sequences", "math-integrals", "math-arithmetic"], points: 5 },
+      { lessons: ["math-exponential", "math-logarithm"], points: 7 },
+    ],
+  },
+  gestion: {
+    minutes: 180,
+    slots: [
+      { lessons: ["math-probability", "math-statistics"], points: 4 },
+      { lessons: ["math-sequences"], points: 5 },
+      { lessons: ["math-integrals", "math-limits"], points: 4 },
+      { lessons: ["math-exponential", "math-logarithm", "math-derivatives"], points: 7 },
+    ],
+  },
+  literary: {
+    minutes: 150,
+    slots: [
+      { lessons: ["math-arithmetic"], points: 6 },
+      { lessons: ["math-sequences"], points: 7 },
+      { lessons: ["math-probability"], points: 7 },
+    ],
+  },
+};
+
+function examBlueprint(stream: string | null) {
+  if (stream === "gestion") return EXAM_BLUEPRINTS.gestion;
+  if (stream === "lettres" || stream === "langues") return EXAM_BLUEPRINTS.literary;
+  return EXAM_BLUEPRINTS.scientific;
+}
+
+/** Algerian BAC mentions. */
+export function examMention(score: number): string {
+  if (score >= 18) return "ممتاز";
+  if (score >= 16) return "جيد جداً";
+  if (score >= 14) return "جيد";
+  if (score >= 12) return "قريب من الجيد";
+  if (score >= 10) return "مقبول";
+  return "غير ناجح بعد";
+}
+
+/** Points of each part: the exercise's points shared by difficulty, to the quarter point. */
+export function partPoints(points: number, difficulties: number[]): number[] {
+  const total = difficulties.reduce((sum, value) => sum + value, 0) || 1;
+  const shares = difficulties.map(value => Math.round(((points * value) / total) * 4) / 4);
+  // Give the rounding remainder to the last (hardest) part so they sum exactly.
+  shares[shares.length - 1] += points - shares.reduce((sum, value) => sum + value, 0);
+  return shares;
+}
+
+export async function generateExam(userId: number) {
+  const student = await studentOrThrow(userId);
+  const blueprint = examBlueprint(student.stream);
+  const rng = createRng(randomSeed());
+  const chosen = blueprint.slots
+    .map(slot => {
+      const available = slot.lessons
+        .map(key => getLesson(key))
+        .filter((lesson): lesson is Lesson => !!lesson && lesson.skills.length > 0 && problemsFor(lesson, student.stream).length > 0)
+        .filter(lesson => !student.stream || !lesson.streams || lesson.streams.includes(student.stream as never));
+      return available.length ? { lesson: rng.pick(available), points: slot.points } : null;
+    })
+    .filter((entry): entry is { lesson: Lesson; points: number } => entry !== null);
+  if (!chosen.length) throw new TRPCError({ code: "NOT_FOUND", message: "No exam for this stream yet" });
+  // Missing slots (a lesson not written yet): scale the rest back to 20.
+  const raw = chosen.reduce((sum, entry) => sum + entry.points, 0);
+  const exercises: Array<{
+    assessmentId: number;
+    lessonKey: string;
+    lessonTitle: string;
+    points: number;
+    questions: PublicQuestion[];
+  }> = [];
+  let given = 0;
+  for (let index = 0; index < chosen.length; index += 1) {
+    const entry = chosen[index];
+    const points: number = index === chosen.length - 1 ? 20 - given : Math.round((entry.points * 20) / raw);
+    given += points;
+    const problem = rng.pick(problemsFor(entry.lesson, student.stream));
+    const items = instantiateProblem(problem, rng.int(1, 2 ** 30)).map(item => ({
+      ...item,
+      problem: { ...item.problem!, points },
+    }));
+    const assessmentId = await store.createAssessment({
+      studentId: student.id,
+      lessonKey: entry.lesson.key,
+      kind: "practice",
+      itemsJson: JSON.stringify(items),
+      source: "template",
+    });
+    exercises.push({
+      assessmentId,
+      lessonKey: entry.lesson.key,
+      lessonTitle: entry.lesson.title,
+      points,
+      questions: items.map(toPublicQuestion),
+    });
+  }
+  return { minutes: blueprint.minutes, exercises };
+}
+
+export async function submitExam(
+  userId: number,
+  papers: Array<{ assessmentId: number; answers: SubmittedAnswer[] }>
+) {
+  // Check the whole paper first, so it is graded entirely or not at all.
+  const student = await studentOrThrow(userId);
+  for (const paper of papers) {
+    const assessment = await store.getAssessment(paper.assessmentId);
+    if (!assessment || assessment.studentId !== student.id) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Assessment not found" });
+    }
+    if (assessment.status !== "open") {
+      throw new TRPCError({ code: "CONFLICT", message: "Assessment already graded" });
+    }
+  }
+  const exercises = [];
+  for (const paper of papers) {
+    const result = await submitAssessment(userId, paper.assessmentId, paper.answers);
+    const assessment = await store.getAssessment(paper.assessmentId);
+    const items = JSON.parse(assessment!.itemsJson) as StoredItem[];
+    const points = items[0]?.problem?.points ?? 0;
+    const shares = partPoints(points, items.map(item => item.difficulty));
+    const earned = result.items.reduce((sum, item, index) => sum + (item.correct ? shares[index] : 0), 0);
+    exercises.push({
+      lessonKey: assessment!.lessonKey,
+      lessonTitle: getLesson(assessment!.lessonKey)?.title ?? assessment!.lessonKey,
+      title: items[0]?.problem?.title ?? "",
+      points,
+      earned,
+      shares,
+      items: result.items,
+    });
+  }
+  const score = Math.round(exercises.reduce((sum, exercise) => sum + exercise.earned, 0) * 4) / 4;
+  return { score, outOf: 20, mention: examMention(score), exercises };
+}
+
 export type SubmittedAnswer = { questionId: string; answer: string; responseMs?: number };
 
 export async function submitAssessment(

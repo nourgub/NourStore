@@ -78,7 +78,7 @@ export type BankQuestion = {
   /** Worked solution (generated items). */
   steps?: string[];
   /** Part of a multi-part problem: the shared statement it refers to. */
-  problem?: { title: string; statement: string };
+  problem?: { title: string; statement: string; /** Mock exam: the exercise's points out of 20. */ points?: number };
 };
 
 export type Lesson = {
@@ -1863,6 +1863,8 @@ const LESSON_ORDER = [
   "math-integrals",
   "math-probability",
   "math-space-geometry",
+  "math-arithmetic",
+  "math-statistics",
 ];
 export const LESSONS: Lesson[] = [
   ...[...BAC_LESSONS, derivatives].sort(
@@ -1890,6 +1892,8 @@ const STREAMS_BY_LESSON: Record<string, BacStream[]> = {
   "math-space-geometry": ["sciences", "math", "techmath"],
   "math-sequences": ["sciences", "math", "techmath", "gestion", "lettres", "langues"],
   "math-probability": ["sciences", "math", "techmath", "gestion", "lettres", "langues"],
+  "math-arithmetic": ["math", "lettres", "langues"],
+  "math-statistics": ["gestion"],
 };
 for (const lesson of LESSONS) {
   if (STREAMS_BY_LESSON[lesson.key]) lesson.streams = STREAMS_BY_LESSON[lesson.key];

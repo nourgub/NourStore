@@ -261,6 +261,25 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const stranger = appRouter.createCaller(ctxFor({ ...strangerParent, role: "parent" }));
       await expect(stranger.tafawoq.parentReport()).resolves.toEqual([]);
       await expect(caller.tafawoq.parentReport()).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+      // Mock BAC exam: a full paper out of 20, graded on hand-in, once.
+      const exam = await caller.tafawoq.generateExam();
+      expect(exam.exercises.length).toBeGreaterThanOrEqual(3);
+      expect(exam.exercises.reduce((sum, exercise) => sum + exercise.points, 0)).toBe(20);
+      expect(JSON.stringify(exam.exercises)).not.toContain('"answer"');
+      const papers = [];
+      for (const [position, exercise] of exam.exercises.entries()) {
+        const items = await storedItems(exercise.assessmentId);
+        // Everything right except the first exercise, left blank.
+        papers.push({
+          assessmentId: exercise.assessmentId,
+          answers: items.map(item => ({ questionId: item.id, answer: position === 0 ? "" : item.answer })),
+        });
+      }
+      const marked = await caller.tafawoq.submitExam({ papers });
+      expect(marked.score).toBe(20 - exam.exercises[0].points);
+      expect(marked.exercises[0].earned).toBe(0);
+      await expect(caller.tafawoq.submitExam({ papers })).rejects.toMatchObject({ code: "CONFLICT" });
     });
   }
 );

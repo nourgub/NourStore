@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   ClipboardCheck,
+  FileText,
   GraduationCap,
   Languages,
   LogOut,
@@ -44,6 +45,7 @@ import {
 import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
 import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
+import { ExamView } from "./ExamView";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -103,6 +105,8 @@ export default function TafawoqApp() {
               <h2>{t.staffOnly}</h2>
               <p className="tfq-muted">{t.staffOnlyDesc}</p>
             </div>
+          ) : params?.lessonKey === "exam" ? (
+            <ExamView />
           ) : params?.lessonKey ? (
             <LessonPage lessonKey={params.lessonKey} />
           ) : (
@@ -180,6 +184,15 @@ function Home() {
           {t.editProfile}
         </button>
       </div>
+      {student.schoolLevel === "bac" && lessons.length > 0 && (
+        <Link href="/tafawoq/exam" className="tfq-card tfq-exam-card">
+          <FileText size={26} />
+          <div>
+            <h3 style={{ margin: 0 }}>{t.examTitle}</h3>
+            <p className="tfq-muted" style={{ margin: "4px 0 0" }}>{t.examCard}</p>
+          </div>
+        </Link>
+      )}
       {subjects.map(subject => {
         const subjectLessons = lessons.filter(lesson => lesson.subject === subject.key);
         if (!subjectLessons.length) return null;

@@ -234,3 +234,18 @@
   line-height: 1.9;
 }
 .tfq-empty .tfq-btn + .tfq-btn { margin-inline-start: 8px; }
+
+/* Mock BAC exam */
+.tfq-exam-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  border-color: rgba(240, 180, 80, 0.5);
+  background: linear-gradient(135deg, rgba(240, 180, 80, 0.14), rgba(240, 180, 80, 0.03));
+  color: inherit;
+  text-decoration: none;
+}
+.tfq-exam-card svg { color: #f0b450; flex-shrink: 0; }
+.tfq-exam-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.tfq-exam-score strong { font-size: 42px; color: #f0b450; }

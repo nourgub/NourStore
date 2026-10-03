@@ -38,9 +38,26 @@ function normalizeWords(text: string): string {
 
 const hasLetters = (text: string) => /[؀-ۿ]|[a-z]{3,}/i.test(text);
 
+const INFINITY_WORDS = /ما\s*لا\s*نهاي[ةه]|مالانهاي[ةه]|لا\s*نهاي[ةه]|l['’]?infini|infinity|infini|\binf\b/i;
+const NEGATIVE_WORDS = /ناقص|سالب|moins|minus/i;
+
+/** +1 / −1 for "+∞", "−∞", "ناقص ما لا نهاية"…; null when no infinity is named. */
+export function infinitySign(text: string): 1 | -1 | null {
+  const symbol = text.match(/([+−-]?)\s*∞/);
+  if (symbol) return symbol[1] === "−" || symbol[1] === "-" ? -1 : 1;
+  const words = text.match(INFINITY_WORDS);
+  if (!words) return null;
+  const before = text.slice(0, words.index);
+  return NEGATIVE_WORDS.test(before) || /[−-]\s*$/.test(before) ? -1 : 1;
+}
+
 /** True when the student's reply (typed or spoken) gives this step's answer. */
 export function dialogueAnswerMatches(step: DialogueStep, message: string): boolean {
   const forms = [step.answer, ...(step.accept ?? [])];
+  const infinity = infinitySign(message);
+  if (forms.some(form => /^\s*[+−-]?\s*∞\s*$/.test(form))) {
+    return infinity !== null && forms.some(form => infinitySign(form) === infinity);
+  }
   const converted = spokenToAnswer(message);
   const mathCandidates = [converted, converted.replace(/[؀-ۿ]+/g, " ").replace(/\s+/g, " ").trim(), message.trim()];
   const words = ` ${normalizeWords(message)} `;

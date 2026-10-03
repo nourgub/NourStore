@@ -11,6 +11,16 @@ import * as tafawoq from "../tafawoq/service";
 const lessonKey = z.string().min(1).max(64);
 const HOUR = 60 * 60 * 1000;
 
+const answersInput = z
+  .array(
+    z.object({
+      questionId: z.string().max(64),
+      answer: z.string().max(500),
+      responseMs: z.number().int().min(0).optional(),
+    })
+  )
+  .max(50);
+
 export const tafawoqRouter = router({
   catalog: publicProcedure.query(() => tafawoq.catalog()),
 
@@ -34,20 +44,7 @@ export const tafawoqRouter = router({
 
   submitAssessment: learnerProcedure
     .use(rateLimit("tafawoq-submit", 60, HOUR))
-    .input(
-      z.object({
-        assessmentId: z.number().int().positive(),
-        answers: z
-          .array(
-            z.object({
-              questionId: z.string().max(64),
-              answer: z.string().max(500),
-              responseMs: z.number().int().min(0).optional(),
-            })
-          )
-          .max(50),
-      })
-    )
+    .input(z.object({ assessmentId: z.number().int().positive(), answers: answersInput }))
     .mutation(({ ctx, input }) =>
       tafawoq.submitAssessment(ctx.user.id, input.assessmentId, input.answers)
     ),
@@ -71,6 +68,20 @@ export const tafawoqRouter = router({
     .use(rateLimit("tafawoq-problem", 30, HOUR))
     .input(z.object({ lessonKey }))
     .mutation(({ ctx, input }) => tafawoq.generateProblem(ctx.user.id, input.lessonKey)),
+
+  /** Mock BAC exam for the student's stream, out of 20. */
+  generateExam: learnerProcedure
+    .use(rateLimit("tafawoq-exam", 10, HOUR))
+    .mutation(({ ctx }) => tafawoq.generateExam(ctx.user.id)),
+
+  submitExam: learnerProcedure
+    .use(rateLimit("tafawoq-submit", 60, HOUR))
+    .input(
+      z.object({
+        papers: z.array(z.object({ assessmentId: z.number().int().positive(), answers: answersInput })).min(1).max(6),
+      })
+    )
+    .mutation(({ ctx, input }) => tafawoq.submitExam(ctx.user.id, input.papers)),
 
   generateVideo: learnerProcedure
     .use(rateLimit("tafawoq-video", 10, HOUR))

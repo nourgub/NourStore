@@ -51,7 +51,7 @@ export type PublicQuestion = {
   prompt: string;
   options?: string[];
   /** Part of a BAC-style multi-part problem: its shared statement. */
-  problem?: { title: string; statement: string };
+  problem?: { title: string; statement: string; points?: number };
 };
 
 export type LessonExample = {

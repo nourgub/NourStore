@@ -16,6 +16,7 @@ import {
   type SkillState,
 } from "./studentModel";
 import { buildStudentContext } from "./context";
+import { examMention, partPoints } from "./service";
 import {
   buildExercisePlan,
   templateExercises,
@@ -316,5 +317,23 @@ describe("phone-call lesson texts", () => {
     const text = callSummaryText({ name: "سارة", correct: 0, total: 3, skillName: "مشتقة xⁿ", before: 0.2, after: 0.24, nextSkillName: null });
     expect(text).not.toContain("أحسنت");
     expect(text).toContain("سنحتاج إلى مراجعة");
+  });
+});
+
+describe("mock BAC exam marking", () => {
+  it("shares an exercise's points by difficulty, to the quarter, summing exactly", () => {
+    expect(partPoints(4, [1, 1, 2])).toEqual([1, 1, 2]);
+    const shares = partPoints(7, [1, 2, 2, 3, 3, 3]);
+    expect(shares.reduce((sum, value) => sum + value, 0)).toBe(7);
+    for (const share of shares) expect(share * 4).toBe(Math.round(share * 4));
+  });
+
+  it("gives the Algerian BAC mentions", () => {
+    expect(examMention(9.75)).toBe("غير ناجح بعد");
+    expect(examMention(10)).toBe("مقبول");
+    expect(examMention(12.5)).toBe("قريب من الجيد");
+    expect(examMention(14)).toBe("جيد");
+    expect(examMention(16)).toBe("جيد جداً");
+    expect(examMention(18)).toBe("ممتاز");
   });
 });

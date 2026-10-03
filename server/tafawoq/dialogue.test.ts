@@ -36,6 +36,15 @@ describe("teaching by dialogue", () => {
     expect(dialogueAnswerMatches(step, "خمسة إكس أس أربعة")).toBe(true);
     expect(dialogueAnswerMatches(step, "أظن 5x^4")).toBe(true);
     expect(dialogueAnswerMatches(step, "4x^5")).toBe(false);
+    const plusInfinity = { ask: "?", answer: "+∞", hint: "…" };
+    expect(dialogueAnswerMatches(plusInfinity, "+∞")).toBe(true);
+    expect(dialogueAnswerMatches(plusInfinity, "زائد ما لا نهاية")).toBe(true);
+    expect(dialogueAnswerMatches(plusInfinity, "−∞")).toBe(false);
+    expect(dialogueAnswerMatches(plusInfinity, "ناقص ما لا نهاية")).toBe(false);
+    expect(dialogueAnswerMatches(plusInfinity, "5")).toBe(false);
+    const minusInfinity = { ask: "?", answer: "−∞", hint: "…" };
+    expect(dialogueAnswerMatches(minusInfinity, "-inf")).toBe(true);
+    expect(dialogueAnswerMatches(minusInfinity, "ناقص ما لا نهاية")).toBe(true);
     const word = { ask: "?", answer: "متزايدة", accept: ["تتزايد", "تزداد"], hint: "…" };
     expect(dialogueAnswerMatches(word, "الدالة متزايدة")).toBe(true);
     expect(dialogueAnswerMatches(word, "تزداد")).toBe(true);
