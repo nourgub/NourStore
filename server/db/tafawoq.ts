@@ -337,3 +337,15 @@ export async function getLastActivity(studentId: number) {
     .limit(1);
   return rows[0]?.createdAt ?? null;
 }
+
+/** Highest assessment id for a student so far (0 if none) — marks "after this point". */
+export async function lastAssessmentId(studentId: number) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ id: tafawoqAssessments.id })
+    .from(tafawoqAssessments)
+    .where(eq(tafawoqAssessments.studentId, studentId))
+    .orderBy(desc(tafawoqAssessments.id))
+    .limit(1);
+  return rows[0]?.id ?? 0;
+}

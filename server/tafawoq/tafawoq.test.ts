@@ -22,6 +22,8 @@ import {
   templateLesson,
   templateOpening,
   templateVideoScript,
+  callIntroText,
+  callSummaryText,
 } from "./templates";
 
 const derivatives = getLesson("math-derivatives")!;
@@ -271,5 +273,38 @@ describe("BAC streams", () => {
     // No stream chosen yet: everything at the level is offered.
     expect(keys(null).length).toBeGreaterThanOrEqual(keys("math").length);
     expect(lessonsFor({ schoolLevel: "middle", stream: null }).map(lesson => lesson.key)).toContain("math-linear-equations");
+  });
+});
+
+describe("phone-call lesson texts", () => {
+  const context = buildStudentContext({
+    student: { displayName: "سارة", age: 17, schoolLevel: "bac", goals: null },
+    lesson: derivatives,
+    states: statesFor({ function_values: 0.95, derivative_meaning: 0.9, power_rule: 0.2 }),
+    attempts: [
+      { correct: false, difficulty: 1, responseMs: 1000, misconception: "power_no_decrement" },
+      { correct: false, difficulty: 1, responseMs: 1000, misconception: "power_no_decrement" },
+    ],
+  });
+
+  it("opens by name, on the focus skill, naming the recurring mistake, with a worked example", () => {
+    const text = callIntroText(derivatives, context, 7);
+    expect(text).toContain("سارة");
+    expect(text).toContain("مشتقة xⁿ");
+    expect(text).toContain(derivatives.misconceptions.power_no_decrement);
+    expect(text).toContain("مثال");
+  });
+
+  it("closes with the score, the mastery change and what comes next", () => {
+    const text = callSummaryText({ name: "سارة", correct: 3, total: 3, skillName: "مشتقة xⁿ", before: 0.2, after: 0.55, nextSkillName: "مشتقة الثابت والمجموع" });
+    expect(text).toContain("3 من 3");
+    expect(text).toContain("من 20% إلى 55%");
+    expect(text).toContain("مشتقة الثابت والمجموع");
+  });
+
+  it("never praises a call with mostly wrong answers", () => {
+    const text = callSummaryText({ name: "سارة", correct: 0, total: 3, skillName: "مشتقة xⁿ", before: 0.2, after: 0.24, nextSkillName: null });
+    expect(text).not.toContain("أحسنت");
+    expect(text).toContain("سنحتاج إلى مراجعة");
   });
 });

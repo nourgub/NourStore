@@ -368,3 +368,61 @@ export function templateTutorReply(
       return `${skill.name}: ${skill.explanation}\n\nمثال:\n${formatExample(example(context.tier))}\n\nهل تريد مثالاً آخر أو شرحاً أبسط؟`;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phone-call lesson: what the teacher says when the call opens and when it
+// ends. Written to be heard (short sentences); the client speaks it with
+// math rewritten for the ear (client/src/pages/tafawoq/speech.ts).
+// ---------------------------------------------------------------------------
+
+export function callIntroText(lesson: Lesson, context: StudentContext, seed: number = randomSeed()): string {
+  const focus =
+    context.focusSkills[0] ?? [...context.skills].sort((a, b) => a.mastery - b.mastery)[0];
+  const skill = lesson.skills.find(entry => entry.key === focus?.key) ?? lesson.skills[0];
+  const firstIdea = skill.explanation.split(/(?<=[.:])\s+/).slice(0, 2).join(" ");
+  const example = generatedExamples(lesson, skill.key, "weak", seed)?.[0] ?? skill.example;
+  const error = context.recurringErrors[0];
+  return [
+    `السلام عليكم يا ${context.name}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+    `اليوم سنعمل معاً على «${skill.name}» في درس ${lesson.title}.`,
+    error ? `لاحظت أنك تقع أحياناً في هذا الخطأ: ${error.label}. سنصححه معاً.` : "",
+    `لنبدأ بفكرة سريعة: ${firstIdea}`,
+    `مثال: ${example.problem}`,
+    example.steps.join(" ثم "),
+    `إذن الجواب: ${example.answer}.`,
+    "الآن دورك! سأطرح عليك ثلاثة أسئلة قصيرة. وفي أي وقت قل «اشرح» أو «أعد».",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function callSummaryText(input: {
+  name: string;
+  correct: number;
+  total: number;
+  skillName: string | null;
+  before: number | null;
+  after: number | null;
+  nextSkillName: string | null;
+}): string {
+  const { name, correct, total, skillName, before, after, nextSkillName } = input;
+  const lines = [`انتهت حصتنا يا ${name}.`];
+  if (total) lines.push(`أجبت إجابة صحيحة عن ${correct} من ${total} أسئلة.`);
+  if (skillName && total) {
+    const rose = before !== null && after !== null && Math.round(after * 100) > Math.round(before * 100);
+    // Praise only real success: with few correct answers the estimate can
+    // still creep up from practice alone, which is not worth a "well done".
+    if (rose && correct * 2 >= total) {
+      lines.push(`إتقانك لـ «${skillName}» ارتفع من ${Math.round(before! * 100)}% إلى ${Math.round(after! * 100)}%. أحسنت!`);
+    } else if (correct * 2 < total) {
+      lines.push(`سنحتاج إلى مراجعة «${skillName}» مرة أخرى، وهذا طبيعي — كل خطأ اليوم درس لك.`);
+    }
+  }
+  if (total && correct === total) {
+    lines.push(nextSkillName ? `ممتاز! في المكالمة القادمة ننتقل إلى «${nextSkillName}».` : "ممتاز! أنت جاهز لتمارين أصعب.");
+  } else if (total) {
+    lines.push("أنصحك بحل التمارين الخاصة بك في قسم «تماريني» قبل مكالمتنا القادمة.");
+  }
+  lines.push("إلى اللقاء، وبالتوفيق!");
+  return lines.join(" ");
+}

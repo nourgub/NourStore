@@ -46,6 +46,8 @@ import {
 } from "./studentModel";
 import {
   buildExercisePlan,
+  callIntroText,
+  callSummaryText,
   detectIntent,
   templateExercises,
   templateLesson,
@@ -578,7 +580,7 @@ function pickOralItem(lesson: Lesson, context: StudentContext): StoredItem {
 function oralQuestionText(item: StoredItem): string {
   const options =
     item.type === "mcq" && item.options
-      ? "\n" + item.options.map((option, index) => `${OPTION_LETTERS[index]}) ${option}`).join("\n") + "\nقل حرف الجواب (أ، ب، ج أو د)."
+      ? "\n" + item.options.map((option, index) => `${OPTION_LETTERS[index]}: ${option}`).join("\n") + "\nقل حرف الجواب (أ، ب، ج أو د)."
       : "\nقل جوابك أو اكتبه.";
   return `سؤال: ${item.prompt}${options}`;
 }
@@ -640,7 +642,7 @@ async function oralTurn(
   const misconceptionKey = Object.entries(lesson.misconceptions).find(([, label]) => label === graded.misconception)?.[0];
   const remedy = misconceptionKey ? lesson.remedies?.[misconceptionKey] : undefined;
   return [
-    intent === "giveUp" ? "لا بأس، هذا هو الحل:" : `ليس تماماً. الجواب الصحيح: ${graded.correctAnswer}.`,
+    intent === "giveUp" ? `لا بأس. الجواب الصحيح: ${graded.correctAnswer}.` : `ليس تماماً. الجواب الصحيح: ${graded.correctAnswer}.`,
     graded.misconception ? `الخطأ: ${graded.misconception}.` : null,
     remedy ? `✅ ${remedy}` : null,
     `الحل:\n${graded.explanation}`,
@@ -648,6 +650,50 @@ async function oralTurn(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Phone-call lesson: the client drives the call (intro → oral questions via
+// sendMessage → summary); these two give it what the teacher says.
+// ---------------------------------------------------------------------------
+
+export async function callIntro(userId: number, lessonKey: string) {
+  const student = await studentOrThrow(userId);
+  const lesson = lessonOrThrow(lessonKey);
+  const context = await loadContext(student, lesson);
+  const text = callIntroText(lesson, context);
+  await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
+  // Questions asked during the call are the assessments created after this
+  // id (ids, not timestamps: those only have one-second precision).
+  return { text, afterId: await store.lastAssessmentId(student.id) };
+}
+
+export async function callSummary(userId: number, lessonKey: string, afterId: number) {
+  const student = await studentOrThrow(userId);
+  const lesson = lessonOrThrow(lessonKey);
+  const oral = (await store.listGradedAssessments(student.id, lesson.key)).filter(
+    entry => entry.kind === "oral" && entry.id > afterId
+  );
+  const context = await loadContext(student, lesson);
+  const focus = context.focusSkills[0] ?? null;
+  const correct = oral.filter(entry => (entry.score ?? 0) === 100).length;
+  const text = callSummaryText({
+    name: student.displayName,
+    correct,
+    total: oral.length,
+    skillName: focus?.name ?? null,
+    before: oral[0]?.masteryBefore ?? null,
+    after: oral.at(-1)?.masteryAfter ?? null,
+    nextSkillName: context.focusSkills[1]?.name ?? null,
+  });
+  await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
+  return {
+    text,
+    correct,
+    total: oral.length,
+    masteryBefore: oral[0]?.masteryBefore ?? context.mastery,
+    masteryAfter: context.mastery,
+  };
 }
 
 export async function sendTutorMessage(userId: number, lessonKey: string, message: string) {

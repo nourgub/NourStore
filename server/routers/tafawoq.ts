@@ -83,6 +83,16 @@ export const tafawoqRouter = router({
   /** Report on the caller's own actively linked children only. */
   parentReport: parentProcedure.query(({ ctx }) => tafawoq.parentReport(ctx.user.id)),
 
+  /** Phone-call lesson: what the teacher says when the call opens / ends. */
+  callIntro: learnerProcedure
+    .use(rateLimit("tafawoq-call", 30, HOUR))
+    .input(z.object({ lessonKey }))
+    .mutation(({ ctx, input }) => tafawoq.callIntro(ctx.user.id, input.lessonKey)),
+
+  callSummary: learnerProcedure
+    .input(z.object({ lessonKey, afterId: z.number().int().min(0) }))
+    .mutation(({ ctx, input }) => tafawoq.callSummary(ctx.user.id, input.lessonKey, input.afterId)),
+
   sendMessage: learnerProcedure
     .use(rateLimit("tafawoq-chat", 60, HOUR))
     .input(z.object({ lessonKey, message: z.string().trim().min(1).max(2000) }))

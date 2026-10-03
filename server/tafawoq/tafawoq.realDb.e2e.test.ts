@@ -186,6 +186,20 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const givenUp = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "لا أعرف" });
       expect(givenUp.reply).toContain("الحل");
 
+      // Phone-call lesson: intro → one oral question answered → summary.
+      const call = await caller.tafawoq.callIntro({ lessonKey: lesson.key });
+      expect(call.text).toContain("أحمد");
+      expect(call.text).toContain("مثال");
+      await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "اختبرني" });
+      const [callItem] = JSON.parse((await latestOral(ahmed.id)).itemsJson) as BankQuestion[];
+      await caller.tafawoq.sendMessage({
+        lessonKey: lesson.key,
+        message: callItem.type === "mcq" ? `${"أبجد"[callItem.options!.indexOf(callItem.answer)]}` : callItem.answer,
+      });
+      const callEnd = await caller.tafawoq.callSummary({ lessonKey: lesson.key, afterId: call.afterId });
+      expect(callEnd).toMatchObject({ correct: 1, total: 1 });
+      expect(callEnd.text).toContain("أجبت إجابة صحيحة عن 1 من 1");
+
       const overview = await caller.tafawoq.overview();
       expect(overview.student?.displayName).toBe("أحمد");
       expect(overview.lessons.map(entry => entry.key)).toEqual([lesson.key]);
@@ -210,9 +224,9 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const [child] = await parentCaller.tafawoq.parentReport();
       expect(child.profile?.displayName).toBe("أحمد");
       expect(child.lessons.map(entry => entry.key)).toEqual([lesson.key]);
-      expect(child.lessons[0].sessions).toBe(4); // placement, practice, 2 oral questions
+      expect(child.lessons[0].sessions).toBe(5); // placement, practice, 3 oral questions
       expect(child.lessons[0].weaknesses.length).toBeGreaterThan(0);
-      expect(child.week?.answered).toBe(17);
+      expect(child.week?.answered).toBe(18);
       expect(child.advice.some(item => item.kind === "focus" || item.kind === "progress")).toBe(true);
 
       // A parent sees only children who shared a code with them.

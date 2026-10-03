@@ -40,7 +40,8 @@ function spokenExponent(raw: string): string {
 
 /** Rewrites unicode math inside Arabic text into spoken Arabic. */
 export function toSpokenArabic(text: string): string {
-  let out = text;
+  // Lettered choices ("ب: 9x") are read as "الخيار ب: …" with a pause.
+  let out = text.replace(/(^|\n)\s*([أبجد])[):]\s*/g, "$1الخيار $2: ");
   // Exponents: x², xⁿ⁻¹, e^(2x+1), 2^n
   out = out.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻ⁿ⁺]+/g, run =>
     spokenExponent(Array.from(run).map(char => SUPERSCRIPT_DIGITS[char]).join(""))

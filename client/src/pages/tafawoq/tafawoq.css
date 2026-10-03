@@ -192,3 +192,33 @@
 .tfq-live-mic:disabled { opacity: .5; cursor: not-allowed; }
 @keyframes tfq-listen { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 @keyframes tfq-think { 0% { filter: brightness(1); } 50% { filter: brightness(.75); } 100% { filter: brightness(1); } }
+
+/* Phone-call lesson */
+.tfq-call-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.tfq-call-row .tfq-live-open { margin-bottom: 0; }
+.tfq-call-open { background: linear-gradient(135deg, #3aa56b, #4fbf7f); color: #fff; }
+@media (max-width: 560px) { .tfq-call-row { grid-template-columns: 1fr; } }
+.tfq-call .tfq-call-panel { width: min(440px, 100%); max-height: 94vh; overflow-y: auto; display: grid; gap: 12px; padding: 26px 20px; border-radius: 28px; background: linear-gradient(180deg, #14181a, #0b0d0e); border: 1px solid rgba(255,255,255,.08); color: #f7f4ec; }
+.tfq-call .tfq-muted, .tfq-call .tfq-live-status { color: #a6a29a; }
+.tfq-call-avatar { justify-self: center; width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; }
+.tfq-call-avatar.ringing { animation: tfq-ring 1.4s ease-in-out infinite; }
+.tfq-face { width: 140px; height: 140px; }
+.tfq-face.speaking .tfq-face-mouth { animation: tfq-talk .28s ease-in-out infinite alternate; transform-origin: 60px 84px; }
+.tfq-face.listening { filter: drop-shadow(0 0 14px rgba(79, 191, 127, .65)); }
+.tfq-face-eye { animation: tfq-blink 4s infinite; transform-origin: center; transform-box: fill-box; }
+.tfq-call-name { text-align: center; font-size: 22px; font-weight: 700; }
+.tfq-call-clock { font-variant-numeric: tabular-nums; }
+.tfq-call .tfq-bubble.tutor { background: rgba(255,255,255,.07); color: #f7f4ec; }
+.tfq-call .tfq-bubble.student { background: rgba(79,191,127,.16); color: #bdf0d1; }
+.tfq-call .tfq-banner { background: rgba(255,255,255,.06); color: #f7f4ec; }
+.tfq-call-actions { display: flex; justify-content: center; gap: 44px; margin-top: 6px; }
+.tfq-call-btn { display: grid; justify-items: center; gap: 6px; background: none; border: 0; color: #f7f4ec; font: inherit; font-size: 12px; cursor: pointer; }
+.tfq-call-btn > svg { width: 64px; height: 64px; padding: 18px; border-radius: 50%; box-sizing: border-box; }
+.tfq-call-btn.accept > svg { background: #3aa56b; animation: tfq-listen 1.2s ease-in-out infinite; }
+.tfq-call-btn.decline > svg { background: #d85c5c; }
+.tfq-call-btn.neutral > svg { background: rgba(255,255,255,.12); }
+.tfq-call-btn.neutral.on > svg { background: #f7f4ec; color: #0b0d0e; }
+.tfq-call-btn:disabled { opacity: .45; cursor: not-allowed; }
+@keyframes tfq-ring { 0%, 100% { transform: rotate(0); } 10% { transform: rotate(-8deg); } 20% { transform: rotate(8deg); } 30% { transform: rotate(-6deg); } 40% { transform: rotate(0); } }
+@keyframes tfq-talk { from { transform: scaleY(.4); } to { transform: scaleY(1.6); } }
+@keyframes tfq-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }

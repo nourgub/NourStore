@@ -11,6 +11,7 @@ import {
   Languages,
   LogOut,
   Mic,
+  Phone,
   MessageCircle,
   PlayCircle,
   RefreshCw,
@@ -41,6 +42,7 @@ import {
 } from "./components";
 import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
 import { LiveTutor } from "./LiveTutor";
+import { CallScreen } from "./CallScreen";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -547,6 +549,8 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   const t = useT();
   const lang = useLang();
   const [live, setLive] = useState(false);
+  const [call, setCall] = useState(false);
+  const teacherName = `أستاذ ${data.analysis.subjectName}`;
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -588,9 +592,15 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   return (
     <div className="tfq-card">
       {live && <LiveTutor lessonKey={lessonKey} lang={lang} onClose={() => setLive(false)} />}
-      <button type="button" className="tfq-btn tfq-live-open" onClick={() => setLive(true)}>
-        <Mic size={18} /> {t.liveButton}
-      </button>
+      {call && <CallScreen lessonKey={lessonKey} lang={lang} teacherName={teacherName} onClose={() => setCall(false)} />}
+      <div className="tfq-call-row">
+        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => setCall(true)}>
+          <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>
+        </button>
+        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => setLive(true)}>
+          <Mic size={18} /> {t.liveButton}
+        </button>
+      </div>
       <div className="tfq-chat" aria-live="polite">
         {data.messages.map(message => (
           <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">
