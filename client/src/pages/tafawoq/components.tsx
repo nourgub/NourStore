@@ -322,6 +322,45 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
 
 const ARABIC_RUN = /([\u0600-\u06FF\u0750-\u077F](?:[\u0600-\u06FF\u0750-\u077F،؛؟«»ـ.:!]|\s+(?=[\u0600-\u06FF\u0750-\u077F«]))*)/;
 
+const count = (text: string, char: string) => text.split(char).length - 1;
+
+/**
+ * One non-Arabic run, isolated left-to-right. Leading icons and bullets
+ * ("❓", "•", "✔") and a bracket left open or closed by the surrounding
+ * Arabic ("(f غير معرفة)") stay outside, flowing with the sentence.
+ */
+function Formula({ part }: { part: string }) {
+  let core = part.trim();
+  let lead = core.match(/^[^0-9A-Za-z\u0370-\u03FF∞√π([{|‖−+\-]*/)![0];
+  core = core.slice(lead.length);
+  let tail = "";
+  // Sentence punctuation after a formula belongs to the sentence.
+  const punctuation = core.match(/[.,،؛:!?؟]+$/);
+  if (punctuation) {
+    tail = punctuation[0];
+    core = core.slice(0, -tail.length);
+  }
+  if (core.startsWith("(") && count(core, "(") > count(core, ")")) {
+    lead += "(";
+    core = core.slice(1);
+  }
+  if (core.endsWith(")") && count(core, ")") > count(core, "(")) {
+    tail = ")" + tail;
+    core = core.slice(0, -1);
+  }
+  return (
+    <span>
+      {part.match(/^\s*/)![0]}
+      {lead}
+      <span className="tfq-math" dir="ltr">
+        {core.trim()}
+      </span>
+      {tail}
+      {part.match(/\s*$/)![0]}
+    </span>
+  );
+}
+
 /**
  * Renders mixed Arabic + math text so each formula keeps its own
  * left-to-right order inside a right-to-left sentence: without this,
@@ -345,13 +384,7 @@ export function M({ children }: { children: string }) {
               ARABIC_RUN.test(part) || !/[0-9A-Za-z\u0370-\u03FF∞√π]/.test(part) ? (
                 part
               ) : (
-                <span key={index}>
-                  {part.match(/^\s*/)![0]}
-                  <span className="tfq-math" dir="ltr">
-                    {part.trim()}
-                  </span>
-                  {part.match(/\s*$/)![0]}
-                </span>
+                <Formula key={index} part={part} />
               )
             )}
         </span>

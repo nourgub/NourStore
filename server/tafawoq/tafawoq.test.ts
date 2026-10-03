@@ -287,11 +287,21 @@ describe("phone-call lesson texts", () => {
     ],
   });
 
-  it("opens by name, on the focus skill, naming the recurring mistake, with a worked example", () => {
+  it("opens by name, on the focus skill, naming the recurring mistake, and teaches by dialogue", () => {
     const text = callIntroText(derivatives, context, 7);
     expect(text).toContain("سارة");
     expect(text).toContain("مشتقة xⁿ");
     expect(text).toContain(derivatives.misconceptions.power_no_decrement);
+    expect(text).toContain("أسئلة صغيرة");
+    expect(text).not.toContain("مثال:"); // the rule is discovered, not handed over
+  });
+
+  it("falls back to a worked example for a skill without a dialogue", () => {
+    const withoutDialogue = {
+      ...derivatives,
+      skills: derivatives.skills.map(skill => ({ ...skill, dialogue: undefined })),
+    };
+    const text = callIntroText(withoutDialogue, context, 7);
     expect(text).toContain("مثال");
   });
 

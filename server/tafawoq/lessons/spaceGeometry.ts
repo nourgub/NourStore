@@ -7,10 +7,11 @@
 // of those is a multiple choice; typed items always ask for a single number
 // (a dot product, a distance, d, m, t), written exactly or in √-form.
 import type { Lesson } from "../curriculum";
+import { spaceGeometryProblems } from "./spaceGeometryProblems";
 import { frac, gcd, join, mul, num, paren, type Generator, type Rng } from "../generators/core";
 
 /** Re-draws until `valid` holds — keeps generators free of degenerate cases. */
-function draw<T>(rng: Rng, make: (rng: Rng) => T, valid: (value: T) => boolean): T {
+export function draw<T>(rng: Rng, make: (rng: Rng) => T, valid: (value: T) => boolean): T {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const value = make(rng);
     if (valid(value)) return value;
@@ -18,29 +19,29 @@ function draw<T>(rng: Rng, make: (rng: Rng) => T, valid: (value: T) => boolean):
   throw new Error("generator could not find valid parameters");
 }
 
-const distinct = (...values: string[]) => new Set(values).size === values.length;
+export const distinct = (...values: string[]) => new Set(values).size === values.length;
 
 /** Numeric values pairwise different (so no option can be equivalent to another). */
 const distinctValues = (...values: number[]) =>
   values.every((value, i) => values.every((other, j) => i === j || Math.abs(value - other) > 1e-9));
 
-type V = readonly [number, number, number];
+export type V = readonly [number, number, number];
 
-const AXES = ["x", "y", "z"] as const;
+export const AXES = ["x", "y", "z"] as const;
 
 /** (2 ; −1 ; 3) */
-const tri = (v: readonly (number | string)[]) =>
+export const tri = (v: readonly (number | string)[]) =>
   `(${v.map(c => (typeof c === "number" ? num(c) : c)).join(" ; ")})`;
-const vec = (name: string, v: V) => `${name}⃗${tri(v)}`;
-const pt = (name: string, v: V) => `${name}${tri(v)}`;
+export const vec = (name: string, v: V) => `${name}⃗${tri(v)}`;
+export const pt = (name: string, v: V) => `${name}${tri(v)}`;
 
-const add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const scale = (k: number, a: V): V => [k * a[0], k * a[1], k * a[2]];
-const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm2 = (a: V) => dot(a, a);
+export const add = (a: V, b: V): V => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+export const sub = (a: V, b: V): V => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+export const scale = (k: number, a: V): V => [k * a[0], k * a[1], k * a[2]];
+export const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+export const norm2 = (a: V) => dot(a, a);
 const same = (a: V, b: V) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
-const collinear = (a: V, b: V) =>
+export const collinear = (a: V, b: V) =>
   a[1] * b[2] - a[2] * b[1] === 0 && a[2] * b[0] - a[0] * b[2] === 0 && a[0] * b[1] - a[1] * b[0] === 0;
 /** Line P + t·u equals line Q + t·v. */
 const sameLine = (p: V, u: V, q: V, v: V) => collinear(u, v) && collinear(sub(q, p), u);
@@ -74,18 +75,18 @@ function pointsWhere(max: number, keep: (w: V) => boolean): V[] {
 }
 
 /** "2×3 − 1×(−4) + 5×2" — the written form of a·b component by component. */
-const productsText = (a: V, b: readonly number[]) =>
+export const productsText = (a: V, b: readonly number[]) =>
   a.map((c, i) => `${paren(num(c))}×${paren(num(b[i]))}`).join(" + ");
 
 /** "(−2)² + 3² + 1²" */
-const squaresText = (a: readonly number[]) => a.map(c => `${paren(num(c))}²`).join(" + ");
+export const squaresText = (a: readonly number[]) => a.map(c => `${paren(num(c))}²`).join(" + ");
 
 /** "x_B − x_A = 4 − (−1) = 5" style differences, one per axis. */
-const differenceText = (to: V, from: V, b: string, a: string) =>
+export const differenceText = (to: V, from: V, b: string, a: string) =>
   AXES.map((axis, i) => `${axis}_${b} − ${axis}_${a} = ${num(to[i])} − ${paren(num(from[i]))} = ${num(to[i] - from[i])}`).join(" ، ");
 
 /** √n simplified: 5, √13, 2√7. */
-function sqrtText(n: number): string {
+export function sqrtText(n: number): string {
   let k = 1;
   for (let d = 2; d * d <= n; d += 1) if (n % (d * d) === 0) k = d;
   const m = n / (k * k);
@@ -94,10 +95,10 @@ function sqrtText(n: number): string {
 }
 
 /** "√n = 2√7" or just "√n" when it does not simplify. */
-const sqrtChain = (n: number) => (sqrtText(n) === `√${n}` ? `√${n}` : `√${n} = ${sqrtText(n)}`);
+export const sqrtChain = (n: number) => (sqrtText(n) === `√${n}` ? `√${n}` : `√${n} = ${sqrtText(n)}`);
 
 /** p/√k in simplest form with a rational denominator: "5/3", "√6", "4√3/3", "−(2√6/3)". */
-function overSqrt(p: number, k: number): string {
+export function overSqrt(p: number, k: number): string {
   if (p < 0) {
     return `−${overSqrt(-p, k)}`;
   }
@@ -112,7 +113,7 @@ function overSqrt(p: number, k: number): string {
 }
 
 /** "4/9", "9/3 = 3" or "7/√6 = 7√6/6" — the last step of a point–plane distance. */
-function quotientText(p: number, k: number): string {
+export function quotientText(p: number, k: number): string {
   const root = sqrtText(k);
   const written = root.includes("√") ? `${p}/√${k}` : `${p}/${root}`;
   const result = overSqrt(p, k);
@@ -120,12 +121,12 @@ function quotientText(p: number, k: number): string {
 }
 
 /** a·x + b·y + c·z + d */
-const planeLhs = (n: V, d: number | string) =>
+export const planeLhs = (n: V, d: number | string) =>
   join(mul(n[0], "x"), mul(n[1], "y"), mul(n[2], "z"), typeof d === "number" ? num(d) : d);
-const planeText = (n: V, d: number) => `${planeLhs(n, d)} = 0`;
+export const planeText = (n: V, d: number) => `${planeLhs(n, d)} = 0`;
 
 /** Parametric system of the line through p directed by u. */
-const lineText = (p: V, u: V) =>
+export const lineText = (p: V, u: V) =>
   `${AXES.map((axis, i) => `${axis} = ${join(num(p[i]), u[i] === 0 ? "0" : mul(u[i], "t"))}`).join(" ; ")} ; t ∈ ℝ`;
 
 /** Normals for clean distances: integer norms, plus a few √-norms. */
@@ -145,7 +146,7 @@ const SQRT_NORMALS: V[] = [
 ];
 
 /** A random signed permutation of a base normal. */
-function shuffleSigns(rng: Rng, base: V): V {
+export function shuffleSigns(rng: Rng, base: V): V {
   const [x, y, z] = rng.shuffle(base);
   return [x * rng.pick([1, -1]), y * rng.pick([1, -1]), z * rng.pick([1, -1])];
 }
@@ -795,6 +796,42 @@ export const spaceGeometryLesson: Lesson = {
         steps: ["x_B − x_A = 4 − 1 = 3", "y_B − y_A = 0 − (−2) = 2", "z_B − z_A = −1 − 3 = −4"],
         answer: "AB⃗(3 ; 2 ; −4)",
       },
+      dialogue: {
+        opening: "نبدأ بشيء بسيط تعرفه جيداً: مستقيم مدرّج. للانتقال من نقطة إلى أخرى نعدّ الخطوات. لنرَ ماذا يحدث في الفضاء.",
+        steps: [
+          {
+            ask: "على مستقيم مدرّج، A فاصلتها 2 و B فاصلتها 7. كم خطوة نتقدم للذهاب من A إلى B؟",
+            answer: "5",
+            hint: "انطلق من A وعدّ الخطوات حتى تصل إلى B.",
+            then: "حصلنا عليها بطرح فاصلة البداية من فاصلة النهاية.",
+          },
+          {
+            ask: "والآن A فاصلتها 7 و B فاصلتها 2. كم يكون الانتقال من A إلى B بإشارته؟",
+            answer: "−5",
+            accept: ["-5"],
+            hint: "هذه المرة نرجع إلى الوراء: النهاية ناقص البداية دائماً.",
+            then: "الترتيب مهم: النهاية ناقص البداية.",
+          },
+          {
+            ask: "في الفضاء نفعل الشيء نفسه على كل محور. A(1 ; 2 ; 3) و B(4 ; 0 ; 5). ما هي الإحداثية الأولى للشعاع AB⃗؟",
+            answer: "3",
+            hint: "فاصلة النهاية B ناقص فاصلة البداية A.",
+          },
+          {
+            ask: "وما هي إحداثيته الثانية (على y)؟",
+            answer: "−2",
+            accept: ["-2"],
+            hint: "ترتيب النهاية B ناقص ترتيب البداية A، انتبه للإشارة.",
+          },
+          {
+            ask: "وأخيراً، ما هي إحداثيته الثالثة (على z)؟",
+            answer: "2",
+            hint: "طبّق القاعدة نفسها على الراقم z: النهاية ناقص البداية.",
+            then: "إذن AB⃗(3 ; −2 ; 2).",
+          },
+        ],
+        rule: "AB⃗(x_B − x_A ; y_B − y_A ; z_B − z_A): إحداثيات النهاية ناقص إحداثيات البداية، في الإحداثيات الثلاث.",
+      },
     },
     {
       key: "dot_product",
@@ -806,6 +843,36 @@ export const spaceGeometryLesson: Lesson = {
         problem: "u⃗(2 ; −1 ; 3) و v⃗(1 ; 5 ; 1). هل الشعاعان متعامدان؟",
         steps: ["u⃗·v⃗ = 2×1 + (−1)×5 + 3×1", "u⃗·v⃗ = 2 − 5 + 3 = 0"],
         answer: "u⃗·v⃗ = 0 إذن u⃗ ⊥ v⃗",
+      },
+      dialogue: {
+        opening: "في المستوي، تعرف أن الشعاعين u⃗(x ; y) و v⃗(x′ ; y′) متعامدان عندما يكون xx′ + yy′ = 0. لنرَ كيف تمتد هذه الفكرة إلى الفضاء.",
+        steps: [
+          {
+            ask: "في المستوي: u⃗(2 ; 3) و v⃗(3 ; −2). احسب 2×3 + 3×(−2).",
+            answer: "0",
+            hint: "اضرب الفاصلتين، ثم الترتيبين، واجمع الناتجين بإشارتيهما.",
+            then: "النتيجة معدومة: الشعاعان متعامدان.",
+          },
+          {
+            ask: "في الفضاء يظهر حد ثالث zz′. u⃗(1 ; 2 ; 3) و v⃗(4 ; −1 ; 2). احسب 1×4 + 2×(−1) + 3×2.",
+            answer: "8",
+            hint: "احسب كل جداء على حدة، ثم اجمع النواتج الثلاثة بإشاراتها.",
+            then: "هذا هو الجداء السلمي u⃗·v⃗: عدد حقيقي وليس شعاعاً.",
+          },
+          {
+            ask: "الآن u⃗(2 ; −3 ; 1) و w⃗(1 ; 1 ; m). اكتب u⃗·w⃗ بدلالة m.",
+            answer: "m − 1",
+            accept: ["m-1", "-1 + m"],
+            hint: "اضرب الإحداثيات المتناظرة مثنى مثنى، والحد الأخير يحتوي على m.",
+          },
+          {
+            ask: "ما قيمة m التي تجعل u⃗ و w⃗ متعامدين؟",
+            answer: "1",
+            hint: "في المستوي كان التعامد يعني أن الجداء معدوم؛ في الفضاء الأمر نفسه.",
+            then: "التعامد في الفضاء: الجداء السلمي معدوم.",
+          },
+        ],
+        rule: "u⃗(x ; y ; z)·v⃗(x′ ; y′ ; z′) = xx′ + yy′ + zz′، وهو عدد حقيقي. ويكون u⃗ ⊥ v⃗ إذا وفقط إذا كان u⃗·v⃗ = 0.",
       },
     },
     {
@@ -819,6 +886,34 @@ export const spaceGeometryLesson: Lesson = {
         steps: ["AB⃗(2 ; −3 ; 6)", "AB = √(2² + (−3)² + 6²) = √(4 + 9 + 36)", "AB = √49"],
         answer: "AB = 7",
       },
+      dialogue: {
+        opening: "في المستوي، طول الشعاع u⃗(3 ; 4) يُحسب بفيثاغورس: √(3² + 4²). هل تمتد الفكرة إلى الفضاء؟ لنجرّب.",
+        steps: [
+          {
+            ask: "احسب √(3² + 4²).",
+            answer: "5",
+            hint: "ربّع كل إحداثية، اجمع المربعين، ثم خذ الجذر التربيعي.",
+          },
+          {
+            ask: "في الفضاء، u⃗(2 ; 3 ; 6). احسب مجموع مربعات إحداثياته الثلاث 2² + 3² + 6².",
+            answer: "49",
+            hint: "ثلاثة مربعات هذه المرة: احسب كلاً منها ثم اجمعها.",
+            then: "هذا العدد هو مربع الطول، وليس الطول نفسه.",
+          },
+          {
+            ask: "فما هي إذن الطويلة ‖u⃗‖؟",
+            answer: "7",
+            hint: "الطول هو الجذر التربيعي للعدد الذي وجدته للتو.",
+          },
+          {
+            ask: "A(1 ; 0 ; 2) و B(3 ; 1 ; 4). المسافة AB هي طويلة الشعاع AB⃗. احسب AB.",
+            answer: "3",
+            hint: "احسب أولاً إحداثيات AB⃗ (النهاية ناقص البداية)، ثم طبّق ما اكتشفته.",
+            then: "AB⃗(2 ; 1 ; 2) و AB = √9.",
+          },
+        ],
+        rule: "‖u⃗‖ = √(x² + y² + z²)، و AB = ‖AB⃗‖ = √((x_B − x_A)² + (y_B − y_A)² + (z_B − z_A)²). لا تنسَ الجذر.",
+      },
     },
     {
       key: "plane_equation",
@@ -830,6 +925,37 @@ export const spaceGeometryLesson: Lesson = {
         problem: "عيّن معادلة للمستوي (P) الذي يشمل A(1 ; 0 ; 2) و n⃗(2 ; −1 ; 3) ناظمي له.",
         steps: ["(P): 2x − y + 3z + d = 0", "A ∈ (P): 2×1 − 0 + 3×2 + d = 0", "8 + d = 0 إذن d = −8"],
         answer: "(P): 2x − y + 3z − 8 = 0",
+      },
+      dialogue: {
+        opening: "في المستوي، المستقيم ax + by + c = 0 شعاعه الناظمي n⃗(a ; b): نقرؤه من معاملات x و y. في الفضاء نضيف البعد الثالث z.",
+        steps: [
+          {
+            ask: "المستوي (P): 2x − y + 3z − 5 = 0. شعاعه الناظمي يُقرأ من معاملات x و y و z. ما هي الإحداثية الثانية لـ n⃗؟",
+            answer: "−1",
+            accept: ["-1"],
+            hint: "انظر إلى المعامل الذي أمام y، بإشارته.",
+            then: "إذن n⃗(2 ; −1 ; 3)، والثابت لا يدخل فيه.",
+          },
+          {
+            ask: "لنختبر النقطة A(1 ; 0 ; 1): عوّض إحداثياتها في الطرف الأول 2x − y + 3z − 5. ماذا تجد؟",
+            answer: "0",
+            hint: "ضع مكان x فاصلة A، ومكان y ترتيبها، ومكان z راقمها، ثم احسب.",
+            then: "النتيجة معدومة: إذن A ∈ (P).",
+          },
+          {
+            ask: "الآن نبحث عن مستو (Q) شعاعه الناظمي n⃗(1 ; 2 ; −1) ويشمل B(2 ; 1 ; 3). معادلته من الشكل x + 2y − z + d = 0. كم يساوي x + 2y − z عند النقطة B؟",
+            answer: "1",
+            hint: "عوّض إحداثيات B في x + 2y − z، وانتبه لإشارة الحد الأخير.",
+          },
+          {
+            ask: "بما أن B ∈ (Q) فإن 1 + d = 0. ما قيمة d؟",
+            answer: "−1",
+            accept: ["-1"],
+            hint: "انقل العدد إلى الطرف الآخر مع تغيير إشارته.",
+            then: "(Q): x + 2y − z − 1 = 0.",
+          },
+        ],
+        rule: "المستوي الذي شعاعه الناظمي n⃗(a ; b ; c) معادلته ax + by + cz + d = 0، ونجد d بتعويض إحداثيات نقطة منه. تنتمي نقطة إلى المستوي إذا وفقط إذا حققت المعادلة.",
       },
     },
     {
@@ -843,6 +969,34 @@ export const spaceGeometryLesson: Lesson = {
         steps: ["|1 + 4 − 2 − 6| = |−3| = 3", "√(1 + 4 + 4) = √9 = 3", "d(A ; (P)) = 3/3"],
         answer: "d(A ; (P)) = 1",
       },
+      dialogue: {
+        opening: "نبدأ بالمستوي الأفقي (xOy) الذي معادلته z = 0. المسافة إليه هي «الارتفاع» فوقه أو تحته.",
+        steps: [
+          {
+            ask: "ما المسافة بين النقطة A(1 ; 2 ; 5) والمستوي z = 0؟",
+            answer: "5",
+            hint: "المسافة إلى المستوي الأفقي هي الارتفاع: انظر إلى الراقم z.",
+          },
+          {
+            ask: "والنقطة B(1 ; 2 ; −4)؟ المسافة لا تكون سالبة، فكم هي؟",
+            answer: "4",
+            hint: "النقطة تحت المستوي، لكن المسافة تؤخذ دائماً موجبة: خذ القيمة المطلقة.",
+            then: "لهذا نضع قيمة مطلقة في البسط.",
+          },
+          {
+            ask: "المعادلة 2z = 0 تمثل المستوي نفسه. تعويض A فيها يعطي 2×5 = 10، والمسافة تبقى 5. على أي عدد يجب أن نقسم 10؟",
+            answer: "2",
+            hint: "الشعاع الناظمي لهذه المعادلة هو (0 ; 0 ; 2): ما طويلته؟",
+            then: "نقسم على طويلة الشعاع الناظمي.",
+          },
+          {
+            ask: "طبّق: (P): x + 2y + 2z − 6 = 0 و C(1 ; 2 ; −1). البسط |1 + 4 − 2 − 6| = 3 و ‖n⃗‖ = √(1 + 4 + 4). ما هي المسافة d(C ; (P))؟",
+            answer: "1",
+            hint: "احسب طويلة الشعاع الناظمي أولاً، ثم اقسم البسط عليها.",
+          },
+        ],
+        rule: "d(A ; (P)) = |ax_A + by_A + cz_A + d| / √(a² + b² + c²): قيمة مطلقة في البسط، وطويلة الشعاع الناظمي في المقام.",
+      },
     },
     {
       key: "parametric_line",
@@ -854,6 +1008,36 @@ export const spaceGeometryLesson: Lesson = {
         problem: "اكتب تمثيلاً وسيطياً للمستقيم الذي يشمل A(2 ; −1 ; 0) و u⃗(1 ; 3 ; −2) شعاع توجيه له.",
         steps: ["x = x_A + t·a = 2 + t", "y = y_A + t·b = −1 + 3t", "z = z_A + t·c = −2t"],
         answer: "x = 2 + t ; y = −1 + 3t ; z = −2t ; t ∈ ℝ",
+      },
+      dialogue: {
+        opening: "تخيّل نقطة M تنطلق من A(1 ; 2 ; 0) وتتحرك في اتجاه الشعاع u⃗(2 ; −1 ; 3). بعد «زمن» t يكون AM⃗ = t·u⃗.",
+        steps: [
+          {
+            ask: "عند t = 1 نضيف u⃗ مرة واحدة إلى A. ما هي فاصلة M؟",
+            answer: "3",
+            hint: "أضف الإحداثية الأولى لـ u⃗ إلى فاصلة A.",
+          },
+          {
+            ask: "وعند t = 2، ما هي فاصلة M؟",
+            answer: "5",
+            hint: "هذه المرة نضيف u⃗ مرتين: ضاعف الإحداثية الأولى لـ u⃗ قبل الإضافة.",
+            then: "لأي t: x = 1 + 2t.",
+          },
+          {
+            ask: "اكتب بالطريقة نفسها عبارة الترتيب y بدلالة t.",
+            answer: "2 − t",
+            accept: ["2-t", "-t + 2"],
+            hint: "الحد الثابت هو ترتيب A، ومعامل t هو الإحداثية الثانية لـ u⃗.",
+            then: "وبالمثل z = 3t.",
+          },
+          {
+            ask: "هل تقع N(7 ; −1 ; 9) على هذا المستقيم؟ ابدأ بالفاصلة: ما قيمة t التي تجعل x = 7؟",
+            answer: "3",
+            hint: "حل المعادلة التي تجعل عبارة x تساوي فاصلة N.",
+            then: "ونتحقق: y = 2 − 3 = −1 و z = 9، إذن N على المستقيم.",
+          },
+        ],
+        rule: "المستقيم الذي يشمل A(x_A ; y_A ; z_A) و u⃗(a ; b ; c) شعاع توجيه له: x = x_A + at ، y = y_A + bt ، z = z_A + ct مع t ∈ ℝ. الحدود الثابتة من النقطة، ومعاملات t من الشعاع.",
       },
     },
   ],
@@ -905,4 +1089,5 @@ export const spaceGeometryLesson: Lesson = {
   },
   bank: [],
   generators: spaceGenerators,
+  problems: spaceGeometryProblems,
 };
