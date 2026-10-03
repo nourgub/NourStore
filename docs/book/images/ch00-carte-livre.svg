@@ -16,11 +16,11 @@
   <text x="755" y="230" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">3. الأخلاقيات والحدود</text>
   <!-- Part 2 -->
   <rect x="295" y="100" width="210" height="150" rx="14" fill="#7c3aed"/>
-  <text x="400" y="132" text-anchor="middle" font-size="18" font-weight="bold" fill="#ffffff" direction="rtl">الجزء 2: هندسة البرومبت</text>
+  <text x="400" y="132" text-anchor="middle" font-size="18" font-weight="bold" fill="#ffffff" direction="rtl">الجزء 2: فن كتابة البرومبت</text>
   <text x="400" y="156" text-anchor="middle" font-size="13" fill="#ffffff">Ingénierie de prompt</text>
   <text x="490" y="186" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">4. تشريح البرومبت الجيد</text>
   <text x="490" y="208" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">5. تقنيات متقدمة</text>
-  <text x="490" y="230" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">6. مكتبة 50 قالباً</text>
+  <text x="490" y="230" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">6. مكتبة 20 قالباً والأوامر</text>
   <!-- Part 3 -->
   <rect x="30" y="100" width="210" height="190" rx="14" fill="#16a34a"/>
   <text x="135" y="132" text-anchor="middle" font-size="18" font-weight="bold" fill="#ffffff" direction="rtl">الجزء 3: الأدوات</text>
@@ -29,8 +29,8 @@
   <text x="225" y="200" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">8. توليد الصور</text>
   <text x="225" y="218" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">9. تعديل الصور والتصميم</text>
   <text x="225" y="236" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">10. الصوت والموسيقى</text>
-  <text x="225" y="254" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">11. الإنتاجية والأتمتة</text>
-  <text x="225" y="272" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">12. تطبيقات بدون برمجة</text>
+  <text x="225" y="254" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">11. الإنتاجية والعمل</text>
+  <text x="225" y="272" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">12. مواقع وتطبيقات بدون برمجة</text>
   <!-- arrows row 1 (RTL: right to left) -->
   <line x1="558" y1="175" x2="510" y2="175" stroke="#1f2937" stroke-width="3" marker-end="url(#fl)"/>
   <line x1="293" y1="175" x2="245" y2="175" stroke="#1f2937" stroke-width="3" marker-end="url(#fl)"/>
@@ -49,7 +49,7 @@
   <rect x="580" y="320" width="190" height="200" rx="14" fill="#1f2937"/>
   <text x="675" y="352" text-anchor="middle" font-size="18" font-weight="bold" fill="#ffffff" direction="rtl">الجزء 5: الاحتراف</text>
   <text x="675" y="376" text-anchor="middle" font-size="13" fill="#ffffff">Pro &amp; revenus</text>
-  <text x="755" y="410" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">20. الربح من الذكاء الاصطناعي</text>
+  <text x="755" y="410" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">20. كيف تربح من مهاراتك</text>
   <text x="755" y="436" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">21. خطة تعلّم 30 يوماً</text>
   <text x="755" y="462" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">الملاحق: قاموس، روابط،</text>
   <text x="755" y="482" text-anchor="start" font-size="13" fill="#ffffff" direction="rtl">ورقة مرجعية، قائمة تحقق</text>

@@ -1,4 +1,4 @@
-# الفصل 22: الملاحق
+# الملاحق (**Annexes**)
 
 > أربع أدوات مرجعية تعود إليها في كل مشروع: (أ) قاموس، (ب) روابط الأدوات، (ج) صيغ البرومبت، (د) قائمة تحقق قبل النشر.
 
@@ -14,7 +14,7 @@
 | الذكاء الاصطناعي التوليدي | IA générative | Generative AI |
 | بيانات التدريب | Données d'entraînement | Training data |
 | الضبط الدقيق | Ajustement fin | Fine-tuning |
-| الوحدة النصية (التوكن) | Jeton | Token |
+| الرمز | Jeton | Token |
 | نافذة السياق | Fenêtre de contexte | Context window |
 | الهلوسة | Hallucination | Hallucination |
 | التحيّز | Biais | Bias |
@@ -24,7 +24,7 @@
 | التزييف العميق | Hypertrucage | Deepfake |
 | العلامة المائية | Filigrane | Watermark |
 | وسم المحتوى المولَّد | Étiquetage du contenu IA | AI content labeling |
-| حقوق النشر | Droit d'auteur | Copyright |
+| حقوق المؤلف | Droits d'auteur | Copyright |
 | الموافقة | Consentement | Consent |
 | شروط الاستعمال | Conditions d'utilisation | Terms of use |
 | البرومبت | Prompt / Requête | Prompt |
@@ -32,9 +32,9 @@
 | الدور | Rôle | Role |
 | السياق | Contexte | Context |
 | القيود | Contraintes | Constraints |
-| أمثلة قليلة | Quelques exemples | Few-shot |
-| التفكير خطوة بخطوة | Raisonnement étape par étape | Chain of thought |
-| تسلسل البرومبتات | Chaînage de prompts | Prompt chaining |
+| الأمثلة القليلة | Few-shot | Few-shot |
+| سلسلة التفكير | Chaîne de pensée | Chain of thought |
+| البرومبت المتسلسل | Enchaînement de prompts | Prompt chaining |
 | البرومبت السلبي | Prompt négatif | Negative prompt |
 | التكرار والتحسين | Itération | Iteration |
 | القالب | Modèle de prompt | Prompt template |
@@ -75,9 +75,9 @@
 
 - **نص وبحث:** ChatGPT `chatgpt.com` · Claude `claude.ai` · Gemini `gemini.google.com` · Copilot `copilot.microsoft.com` · Perplexity `perplexity.ai` · NotebookLM `notebooklm.google.com` · DeepL `deepl.com`
 - **صور وتصميم:** Midjourney `midjourney.com` · Ideogram `ideogram.ai` · Leonardo `leonardo.ai` · Adobe Firefly `firefly.adobe.com` · Canva `canva.com` · remove.bg `remove.bg`
-- **صوت وموسيقى:** ElevenLabs `elevenlabs.io` · Suno `suno.com` · Udio `udio.com`
-- **فيديو وأفاتار ومونتاج:** Runway `runwayml.com` · Kling `klingai.com` · Luma `lumalabs.ai` · Pika `pika.art` · HeyGen `heygen.com` · Synthesia `synthesia.io` · CapCut `capcut.com` · Descript `descript.com`
-- **إنتاجية وبدون برمجة:** Notion `notion.com` · Zapier `zapier.com` · Make `make.com` · n8n `n8n.io` · Gamma `gamma.app` · Framer `framer.com` · Lovable `lovable.dev`
+- **صوت وموسيقى:** ElevenLabs `elevenlabs.io` · Suno `suno.com` · Udio `udio.com` (شروطه تغيّرت مؤخراً؛ تحقّق قبل الاعتماد عليه)
+- **فيديو وأفاتار ومونتاج:** Runway `runwayml.com` · Kling `klingai.com` · Luma `lumalabs.ai` · Pika `pika.art` · HeyGen `heygen.com` · Synthesia `synthesia.io` · CapCut `capcut.com` · Descript `descript.com` · Opus Clip `opus.pro` · Sora وVeo وHailuo: ابحث عن الموقع الرسمي من صفحة الشركة (OpenAI، Google، MiniMax)
+- **إنتاجية وبدون برمجة:** Notion `notion.com` · Zapier `zapier.com` · Make `make.com` · n8n `n8n.io` · Gamma `gamma.app` · Framer `framer.com` · Lovable `lovable.dev` · Bolt `bolt.new` · Replit `replit.com` · v0 `v0.app`
 - **عمل حر:** Fiverr `fiverr.com` · Upwork `upwork.com` · خمسات `khamsat.com` · مستقل `mostaql.com`
 
 ## (ج) ورقة مرجعية: صيغ البرومبت (Aide-mémoire)
@@ -107,7 +107,7 @@ Exemple : [un exemple du résultat attendu].
 **3. الفيديو (Vidéo)** — 🇬🇧 بالإنجليزية: السطر الثاني. حركة كاميرا **واحدة** لكل لقطة.
 
 ```
-[Gros plan / Plan large] de [sujet] qui [action], dans [lieu]. Caméra : [travelling avant lent / panoramique / plan fixe]. Éclairage [naturel / néon / coucher de soleil]. Style [cinématographique / publicitaire]. Durée : [5 s].
+[Gros plan / Plan large] de [sujet] qui [action], dans [décor]. Éclairage [naturel / néon / coucher de soleil]. Caméra : [travelling avant lent / panoramique / plan fixe]. Style [cinématographique / publicitaire]. Ambiance [calme / énergique]. Durée : [5 s].
 [Close-up / Wide shot] of [subject] [action], in [location]. Camera: [slow dolly in / pan / static shot]. [Natural / neon / sunset] lighting. [Cinematic / commercial] style. Duration: [5 s].
 ```
 

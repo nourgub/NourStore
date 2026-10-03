@@ -102,7 +102,7 @@
 <circle cx="70" cy="382" r="7" fill="#16a34a"/>
 <circle cx="90" cy="382" r="7" fill="#e5e7eb"/>
 <circle cx="150" cy="382" r="7" fill="#ea580c"/>
-<circle cx="170" cy="382" r="7" fill="#ea580c"/>
+<circle cx="170" cy="382" r="7" fill="#e5e7eb"/>
 <circle cx="190" cy="382" r="7" fill="#e5e7eb"/>
 <circle cx="250" cy="382" r="7" fill="#2563eb"/>
 <circle cx="270" cy="382" r="7" fill="#2563eb"/>
@@ -117,9 +117,11 @@
 <circle cx="570" cy="382" r="7" fill="#1d4ed8"/>
 <circle cx="590" cy="382" r="7" fill="#1d4ed8"/>
 <line x1="630" y1="80" x2="630" y2="410" stroke="#d1d5db" stroke-width="1"/>
-<circle cx="560" cy="440" r="7" fill="#1f2937"/><circle cx="580" cy="440" r="7" fill="#1f2937"/><circle cx="600" cy="440" r="7" fill="#1f2937"/>
+<circle cx="590" cy="440" r="7" fill="#1f2937"/><circle cx="610" cy="440" r="7" fill="#1f2937"/><circle cx="630" cy="440" r="7" fill="#1f2937"/>
 <text x="700" y="445" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">= ممتاز</text>
-<circle cx="390" cy="440" r="7" fill="#1f2937"/><circle cx="410" cy="440" r="7" fill="#e5e7eb"/><circle cx="430" cy="440" r="7" fill="#e5e7eb"/>
-<text x="500" y="445" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">= محدود</text>
-<text x="180" y="445" font-size="12" fill="#6b7280" font-weight="normal" direction="rtl" text-anchor="middle">تقدير عام في أكتوبر 2026، يتغير بسرعة</text>
+<circle cx="420" cy="440" r="7" fill="#1f2937"/><circle cx="440" cy="440" r="7" fill="#1f2937"/><circle cx="460" cy="440" r="7" fill="#e5e7eb"/>
+<text x="520" y="445" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">= جيد</text>
+<circle cx="260" cy="440" r="7" fill="#1f2937"/><circle cx="280" cy="440" r="7" fill="#e5e7eb"/><circle cx="300" cy="440" r="7" fill="#e5e7eb"/>
+<text x="360" y="445" font-size="13" fill="#1f2937" font-weight="normal" direction="rtl" text-anchor="middle">= محدود</text>
+<text x="118" y="445" font-size="12" fill="#6b7280" font-weight="normal" direction="rtl" text-anchor="middle">تقدير عام في أكتوبر 2026، يتغير بسرعة</text>
 </svg>

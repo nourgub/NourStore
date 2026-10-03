@@ -23,7 +23,7 @@
 <line x1="50" y1="85" x2="260" y2="190" stroke="#16a34a" stroke-opacity="0.3"/><line x1="260" y1="85" x2="50" y2="190" stroke="#16a34a" stroke-opacity="0.3"/>
 <text x="155" y="143" text-anchor="middle" font-size="12" fill="#16a34a" font-weight="bold">Travelling avant</text>
 <text x="260" y="213" text-anchor="start" direction="rtl" font-size="14" font-weight="bold" fill="#1f2937">المشهد 3 — الحل</text>
-<text x="260" y="233" text-anchor="end" font-size="12" fill="#16a34a">Solution · 8–15 s</text>
+<text x="260" y="233" text-anchor="end" font-size="12" fill="#16a34a">Solution · 8–13 s</text>
 <text x="260" y="253" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">الصوت: ..................</text>
 <text x="260" y="271" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">النص على الشاشة: ..........</text>
 <rect x="540" y="295" width="230" height="205" rx="10" fill="#ffffff" stroke="#1f2937" stroke-width="1.5"/>
@@ -31,7 +31,7 @@
 <line x1="550" y1="305" x2="760" y2="410" stroke="#ea580c" stroke-opacity="0.3"/><line x1="760" y1="305" x2="550" y2="410" stroke="#ea580c" stroke-opacity="0.3"/>
 <text x="655" y="363" text-anchor="middle" font-size="12" fill="#ea580c" font-weight="bold">Plan large</text>
 <text x="760" y="433" text-anchor="start" direction="rtl" font-size="14" font-weight="bold" fill="#1f2937">المشهد 4 — الإثبات</text>
-<text x="760" y="453" text-anchor="end" font-size="12" fill="#ea580c">Preuve · 15–22 s</text>
+<text x="760" y="453" text-anchor="end" font-size="12" fill="#ea580c">Preuve · 13–19 s</text>
 <text x="760" y="473" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">الصوت: ..................</text>
 <text x="760" y="491" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">النص على الشاشة: ..........</text>
 <rect x="290" y="295" width="230" height="205" rx="10" fill="#ffffff" stroke="#1f2937" stroke-width="1.5"/>
@@ -39,7 +39,7 @@
 <line x1="300" y1="305" x2="510" y2="410" stroke="#7c3aed" stroke-opacity="0.3"/><line x1="510" y1="305" x2="300" y2="410" stroke="#7c3aed" stroke-opacity="0.3"/>
 <text x="405" y="363" text-anchor="middle" font-size="12" fill="#7c3aed" font-weight="bold">Orbite</text>
 <text x="510" y="433" text-anchor="start" direction="rtl" font-size="14" font-weight="bold" fill="#1f2937">المشهد 5 — الفائدة</text>
-<text x="510" y="453" text-anchor="end" font-size="12" fill="#7c3aed">Bénéfice · 22–27 s</text>
+<text x="510" y="453" text-anchor="end" font-size="12" fill="#7c3aed">Bénéfice · 19–25 s</text>
 <text x="510" y="473" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">الصوت: ..................</text>
 <text x="510" y="491" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">النص على الشاشة: ..........</text>
 <rect x="40" y="295" width="230" height="205" rx="10" fill="#ffffff" stroke="#1f2937" stroke-width="1.5"/>
@@ -47,7 +47,7 @@
 <line x1="50" y1="305" x2="260" y2="410" stroke="#2563eb" stroke-opacity="0.3"/><line x1="260" y1="305" x2="50" y2="410" stroke="#2563eb" stroke-opacity="0.3"/>
 <text x="155" y="363" text-anchor="middle" font-size="12" fill="#2563eb" font-weight="bold">Plan fixe</text>
 <text x="260" y="433" text-anchor="start" direction="rtl" font-size="14" font-weight="bold" fill="#1f2937">المشهد 6 — الدعوة</text>
-<text x="260" y="453" text-anchor="end" font-size="12" fill="#2563eb">Appel à l'action · 27–30 s</text>
+<text x="260" y="453" text-anchor="end" font-size="12" fill="#2563eb">Appel à l'action · 25–30 s</text>
 <text x="260" y="473" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">الصوت: ..................</text>
 <text x="260" y="491" text-anchor="start" direction="rtl" font-size="11" fill="#1f2937">النص على الشاشة: ..........</text>
 </svg>
