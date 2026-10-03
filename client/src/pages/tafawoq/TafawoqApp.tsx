@@ -886,7 +886,7 @@ function ProgressTab({ data }: { data: WorkspaceData }) {
         {data.history.map((entry, index) => (
           <div className="tfq-skill-row" key={entry.id}>
             <span>
-              {entry.kind === "placement" ? t.historyPlacement : t.historyPractice(index)}
+              {entry.kind === "placement" ? t.historyPlacement : entry.kind === "oral" ? t.historyOral : t.historyPractice(index)}
               <span className="tfq-muted" style={{ fontSize: 12 }}>
                 {" "}
                 · {entry.gradedAt ? new Date(entry.gradedAt).toLocaleDateString() : ""}

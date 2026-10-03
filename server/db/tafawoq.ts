@@ -110,7 +110,7 @@ export async function saveSkillStates(studentId: number, lessonKey: string, stat
 export async function createAssessment(input: {
   studentId: number;
   lessonKey: string;
-  kind: "placement" | "practice";
+  kind: "placement" | "practice" | "oral";
   itemsJson: string;
   source: "ai" | "template" | "bank";
 }) {
@@ -132,7 +132,7 @@ export async function getAssessment(assessmentId: number) {
 export async function getOpenAssessment(
   studentId: number,
   lessonKey: string,
-  kind: "placement" | "practice"
+  kind: "placement" | "practice" | "oral"
 ) {
   const db = await requireDb();
   const rows = await db

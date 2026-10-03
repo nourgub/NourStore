@@ -1229,7 +1229,8 @@ export const tafawoqAssessments = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
     lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
-    kind: mysqlEnum("kind", ["placement", "practice"]).notNull(),
+    // "oral": a one-question quiz asked by the tutor in conversation (often by voice).
+    kind: mysqlEnum("kind", ["placement", "practice", "oral"]).notNull(),
     // Full items INCLUDING answer keys — never returned to the browser as-is.
     itemsJson: mediumtext("itemsJson").notNull(),
     source: mysqlEnum("source", ["ai", "template", "bank"]).notNull(),

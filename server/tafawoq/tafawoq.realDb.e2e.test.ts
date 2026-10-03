@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { appRouter } from "../routers";
 import type { TrpcContext } from "../_core/context";
 import { getDb } from "../db/shared";
@@ -33,6 +33,19 @@ async function storedItems(assessmentId: number): Promise<BankQuestion[]> {
   const db = await getDb();
   const [row] = await db!.select().from(tafawoqAssessments).where(eq(tafawoqAssessments.id, assessmentId));
   return JSON.parse(row.itemsJson);
+}
+
+async function latestOral(userId: number) {
+  const db = await getDb();
+  const { tafawoqStudents } = await import("../../drizzle/schema");
+  const [student] = await db!.select().from(tafawoqStudents).where(eq(tafawoqStudents.userId, userId));
+  const rows = await db!
+    .select()
+    .from(tafawoqAssessments)
+    .where(and(eq(tafawoqAssessments.studentId, student.id), eq(tafawoqAssessments.kind, "oral")))
+    .orderBy(desc(tafawoqAssessments.id))
+    .limit(1);
+  return rows[0];
 }
 
 async function fixtureUser(label: string): Promise<User> {
@@ -155,6 +168,24 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       expect(workspace.videos).toHaveLength(1);
       expect(workspace.messages.at(-1)!.content).toContain("صححت تمارينك");
 
+      // Oral quiz: ask, get a question, answer it (as speech would arrive).
+      const quiz = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "اختبرني" });
+      expect(quiz.reply.startsWith("سؤال:")).toBe(true);
+      const oral = await latestOral(ahmed.id);
+      const [oralItem] = JSON.parse(oral.itemsJson) as BankQuestion[];
+      // A lesson question while the quiz is pending is answered, not graded.
+      const aside = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "اشرح لي القاعدة من فضلك" });
+      expect(aside.reply.startsWith("✔")).toBe(false);
+      expect((await latestOral(ahmed.id)).status).toBe("open");
+      const spokenAnswer =
+        oralItem.type === "mcq" ? `الجواب ${"أبجد"[oralItem.options!.indexOf(oralItem.answer)]}` : oralItem.answer;
+      const graded = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: spokenAnswer });
+      expect(graded.reply).toContain("صحيح");
+      expect((await latestOral(ahmed.id)).status).toBe("graded");
+      await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "اختبرني" });
+      const givenUp = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "لا أعرف" });
+      expect(givenUp.reply).toContain("الحل");
+
       const overview = await caller.tafawoq.overview();
       expect(overview.student?.displayName).toBe("أحمد");
       expect(overview.lessons.map(entry => entry.key)).toEqual([lesson.key]);
@@ -179,9 +210,9 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const [child] = await parentCaller.tafawoq.parentReport();
       expect(child.profile?.displayName).toBe("أحمد");
       expect(child.lessons.map(entry => entry.key)).toEqual([lesson.key]);
-      expect(child.lessons[0].sessions).toBe(2);
+      expect(child.lessons[0].sessions).toBe(4); // placement, practice, 2 oral questions
       expect(child.lessons[0].weaknesses.length).toBeGreaterThan(0);
-      expect(child.week?.answered).toBe(15);
+      expect(child.week?.answered).toBe(17);
       expect(child.advice.some(item => item.kind === "focus" || item.kind === "progress")).toBe(true);
 
       // A parent sees only children who shared a code with them.

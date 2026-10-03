@@ -12,7 +12,7 @@ import { RECOGNITION_LANG, canListen, canSpeak, listenOnce, speakArabic } from "
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
-const OPENING = "أنا معك الآن. اسألني عن أي نقطة في الدرس، أو قل «أعطني مثالاً».";
+const OPENING = "أنا معك الآن. اسألني عن أي نقطة في الدرس، أو قل «أعطني مثالاً»، أو قل «اختبرني» لأطرح عليك سؤالاً.";
 
 export function LiveTutor({
   lessonKey,

@@ -27,8 +27,11 @@ import {
   type Lesson,
 } from "./curriculum";
 import { buildStudentContext, type StudentContext } from "./context";
-import { randomSeed } from "./generators/core";
-import { gradeDeterministic } from "./grading";
+import { createRng, randomSeed } from "./generators/core";
+import { instantiate } from "./generators/instantiate";
+import { OPTION_LETTERS, pickOption, spokenToAnswer } from "./spokenAnswer";
+import { answersMatch, gradeDeterministic } from "./grading";
+import { parseExpression } from "./mathExpr";
 import * as ai from "./ai";
 import {
   applyObservations,
@@ -37,11 +40,13 @@ import {
   observedErrors,
   overallMastery,
   skillName,
+  targetDifficulty,
   tierFor,
   type Observation,
 } from "./studentModel";
 import {
   buildExercisePlan,
+  detectIntent,
   templateExercises,
   templateLesson,
   templateOpening,
@@ -293,7 +298,7 @@ export async function submitAssessment(
     optionsCount: entry.item.options?.length,
   }));
   const nextStates = applyObservations(lesson, previousStates, observations, {
-    learning: assessment.kind === "practice",
+    learning: assessment.kind !== "placement",
   });
   const before = previousStates.length ? previousStates : null;
   const masteryBefore = before ? overallMastery(before) : 0;
@@ -543,6 +548,108 @@ export async function startTutor(userId: number, lessonKey: string) {
   return { started: true };
 }
 
+// ---------------------------------------------------------------------------
+// Oral quiz: "اختبرني" → the tutor asks one generated question in the
+// conversation; the student's next message (typed or spoken) is graded as
+// the answer, through submitAssessment, so it updates mastery like any
+// exercise. Free: deterministic generators + equivalence grading.
+// ---------------------------------------------------------------------------
+
+const ORAL_WINDOW_MS = 30 * 60 * 1000;
+
+function pickOralItem(lesson: Lesson, context: StudentContext): StoredItem {
+  const focus =
+    context.focusSkills[0] ?? [...context.skills].sort((a, b) => a.mastery - b.mastery)[0];
+  const target = targetDifficulty(focus?.mastery ?? 0.3);
+  const rng = createRng(randomSeed());
+  const generators = (lesson.generators ?? []).filter(generator => generator.skill === focus?.key);
+  if (generators.length) {
+    // Prefer typed answers — easiest to say aloud — at the right difficulty.
+    const score = (generator: (typeof generators)[number]) =>
+      Math.abs(generator.difficulty - target) * 2 + (generator.generate(createRng(1)).type === "short" ? 0 : 1);
+    const best = Math.min(...generators.map(score));
+    return instantiate(rng.pick(generators.filter(generator => score(generator) === best)), rng.int(1, 2 ** 30));
+  }
+  const bank = lesson.bank.filter(question => question.skill === focus?.key);
+  const pool = bank.length ? bank : lesson.bank;
+  return [...pool].sort((a, b) => Math.abs(a.difficulty - target) - Math.abs(b.difficulty - target))[0];
+}
+
+function oralQuestionText(item: StoredItem): string {
+  const options =
+    item.type === "mcq" && item.options
+      ? "\n" + item.options.map((option, index) => `${OPTION_LETTERS[index]}) ${option}`).join("\n") + "\nقل حرف الجواب (أ، ب، ج أو د)."
+      : "\nقل جوابك أو اكتبه.";
+  return `سؤال: ${item.prompt}${options}`;
+}
+
+async function oralTurn(
+  userId: number,
+  student: Awaited<ReturnType<typeof studentOrThrow>>,
+  lesson: Lesson,
+  context: StudentContext,
+  message: string
+): Promise<string | null> {
+  const intent = detectIntent(message);
+  const open = await store.getOpenAssessment(student.id, lesson.key, "oral");
+  const pending = open && Date.now() - open.createdAt.getTime() < ORAL_WINDOW_MS ? open : undefined;
+
+  if (intent === "quiz") {
+    const item = pickOralItem(lesson, context);
+    await store.createAssessment({
+      studentId: student.id,
+      lessonKey: lesson.key,
+      kind: "oral",
+      itemsJson: JSON.stringify([item]),
+      source: item.id.startsWith("g-") ? "template" : "bank",
+    });
+    return oralQuestionText(item);
+  }
+  // Any other request ("مثال", "لماذا"…) is answered normally; the pending
+  // question stays open for a while.
+  if (!pending || (intent !== "explain" && intent !== "giveUp")) return null;
+
+  const [item] = JSON.parse(pending.itemsJson) as StoredItem[];
+  // A question about the lesson ("اشرح لي…") is not an answer: only treat
+  // the message as one when it reads as a choice or as math.
+  if (intent !== "giveUp") {
+    const choice = item.type === "mcq" && item.options ? pickOption(message, item.options) : null;
+    const asMath = spokenToAnswer(message);
+    const looksLikeAnswer =
+      choice !== null ||
+      (message.length <= 60 && parseExpression(asMath) !== null) ||
+      (item.options ?? []).some(option => answersMatch(option, asMath));
+    if (!looksLikeAnswer) return null;
+  }
+  const given =
+    intent === "giveUp"
+      ? ""
+      : item.type === "mcq" && item.options
+        ? pickOption(message, item.options) ?? spokenToAnswer(message)
+        : spokenToAnswer(message);
+  const result = await submitAssessment(userId, pending.id, [{ questionId: item.id, answer: given }]);
+  const graded = result.items[0];
+  const change = result.skillChanges.find(entry => entry.skill === item.skill);
+  const progress =
+    change && change.before !== null
+      ? ` (${skillName(lesson, item.skill)}: ${Math.round(change.before * 100)}% ← ${Math.round(change.after * 100)}%)`
+      : "";
+  if (graded.correct) {
+    return `✔ صحيح، أحسنت يا ${student.displayName}! الجواب: ${graded.correctAnswer}.${progress}\nقل «اختبرني» لسؤال آخر.`;
+  }
+  const misconceptionKey = Object.entries(lesson.misconceptions).find(([, label]) => label === graded.misconception)?.[0];
+  const remedy = misconceptionKey ? lesson.remedies?.[misconceptionKey] : undefined;
+  return [
+    intent === "giveUp" ? "لا بأس، هذا هو الحل:" : `ليس تماماً. الجواب الصحيح: ${graded.correctAnswer}.`,
+    graded.misconception ? `الخطأ: ${graded.misconception}.` : null,
+    remedy ? `✅ ${remedy}` : null,
+    `الحل:\n${graded.explanation}`,
+    "قل «اختبرني» لسؤال آخر.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export async function sendTutorMessage(userId: number, lessonKey: string, message: string) {
   const student = await studentOrThrow(userId);
   const lesson = lessonOrThrow(lessonKey);
@@ -557,6 +664,11 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     content: message,
     source: null,
   });
+  const oral = await oralTurn(userId, student, lesson, context, message);
+  if (oral !== null) {
+    await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
+    return { reply: oral, source: "template" as ContentSource };
+  }
   const { text, source } = await tutorText(context, lesson, history, message);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
   return { reply: text, source };

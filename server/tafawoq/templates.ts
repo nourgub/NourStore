@@ -279,9 +279,11 @@ export function templateOpening(context: StudentContext): string {
   return parts.join(" ");
 }
 
-type TutorIntent = "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
+export type TutorIntent = "quiz" | "giveUp" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
+  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|interroge|teste-moi|pose-moi|quiz|test me|ask me/],
+  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up/],
   ["thanks", /شكر|merci|thank/],
   ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|pourquoi|erreur|faute|why|mistake|wrong/],
   ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
