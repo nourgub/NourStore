@@ -498,9 +498,15 @@ describe("role permissions", () => {
     await expect(
       learner.auth.chooseRole({ role: "admin" as any })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("lets a parent pick the parent account type (it grants nothing until a child shares a code)", async () => {
+    const learner = appRouter.createCaller(contextFor("learner"));
+    // Valid input now — it gets past Zod and reaches the business rule
+    // (which, with no database in this suite, reports "already chosen").
     await expect(
-      learner.auth.chooseRole({ role: "parent" as any })
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      learner.auth.chooseRole({ role: "parent" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("requires authentication to choose an account type", async () => {

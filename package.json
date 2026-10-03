@@ -11,14 +11,15 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:unit": "vitest run --exclude '**/realDb.e2e.test.ts'",
-    "test:db": "vitest run server/realDb.e2e.test.ts",
+    "test:unit": "vitest run --exclude '**/*realDb.e2e.test.ts'",
+    "test:db": "vitest run server/realDb.e2e.test.ts server/tafawoq/tafawoq.realDb.e2e.test.ts",
     "test:db:repeat": "node scripts/test-db-repeat.mjs",
     "test:all": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.130.0",
     "@aws-sdk/client-s3": "^3.907.0",
     "@aws-sdk/s3-request-presigner": "^3.907.0",
     "@radix-ui/react-accordion": "^1.2.12",

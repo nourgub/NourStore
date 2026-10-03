@@ -165,9 +165,19 @@ export default function AuthPage({
   );
   const t = copy[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
+  // Optional ?next=/some/path so a feature page (e.g. /tafawoq) can send a
+  // visitor through sign-in and back. Same-origin paths only — never an
+  // absolute or protocol-relative URL (open redirect).
+  const next = (() => {
+    const value =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("next")
+        : null;
+    return value && /^\/(?!\/)/.test(value) && !value.includes("\\") ? value : "/workspace";
+  })();
   useEffect(() => {
-    if (!loading && isAuthenticated) window.location.href = "/workspace";
-  }, [isAuthenticated, loading]);
+    if (!loading && isAuthenticated) window.location.href = next;
+  }, [isAuthenticated, loading, next]);
   const register = mode === "register";
   const queryError =
     typeof window !== "undefined"
@@ -185,14 +195,14 @@ export default function AuthPage({
   const registerMutation = trpc.auth.registerWithEmail.useMutation({
     onSuccess: () => {
       refresh();
-      window.location.href = "/workspace";
+      window.location.href = next;
     },
     onError: err => setFormError(err.message),
   });
   const loginMutation = trpc.auth.loginWithEmail.useMutation({
     onSuccess: () => {
       refresh();
-      window.location.href = "/workspace";
+      window.location.href = next;
     },
     onError: err => setFormError(err.message),
   });
@@ -356,7 +366,7 @@ export default function AuthPage({
 
           <div className="auth-switch">
             {register ? t.already : t.new}{" "}
-            <Link href={register ? "/login" : "/register"}>
+            <Link href={`${register ? "/login" : "/register"}${next !== "/workspace" ? `?next=${encodeURIComponent(next)}` : ""}`}>
               {register ? t.login : t.register}
             </Link>
           </div>

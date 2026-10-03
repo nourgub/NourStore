@@ -1,0 +1,23 @@
+// BAC mathematics (Algerian curriculum), in teaching order. Each file is
+// one lesson: skill graph + misconceptions + parametric generators.
+import type { Lesson } from "../curriculum";
+import { limitsLesson } from "./limits";
+import { sequencesLesson } from "./sequences";
+import { exponentialLesson } from "./exponential";
+import { logarithmLesson } from "./logarithm";
+import { complexLesson } from "./complex";
+import { integralsLesson } from "./integrals";
+import { probabilityLesson } from "./probability";
+import { spaceGeometryLesson } from "./spaceGeometry";
+
+export const BAC_LESSONS: Lesson[] = [
+  limitsLesson,
+  exponentialLesson,
+  logarithmLesson,
+  sequencesLesson,
+  complexLesson,
+  integralsLesson,
+  probabilityLesson,
+  spaceGeometryLesson,
+  // Lessons still being written have no skills yet and are not offered.
+].filter(lesson => lesson.skills.length > 0);
