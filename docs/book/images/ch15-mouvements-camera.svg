@@ -24,13 +24,13 @@
 <circle cx="650" cy="415" r="16" fill="#16a34a"/><ellipse cx="650" cy="415" rx="85" ry="50" fill="none" stroke="#ea580c" stroke-width="3" stroke-dasharray="8,5"/><path d="M710,451 L680,463" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
 <g transform="translate(565,415) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
 <rect x="290" y="315" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
-<text x="400" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">التقريب البصري</text>
+<text x="400" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">تقريب العدسة</text>
 <text x="400" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Zoom</text>
 <g transform="translate(340,415) rotate(0)"><rect x="-22" y="-14" width="34" height="28" rx="4" fill="#1f2937"/><path d="M12,-8 L26,-16 L26,16 L12,8 z" fill="#1f2937"/><circle cx="-8" cy="-20" r="7" fill="#1f2937"/><circle cx="6" cy="-20" r="7" fill="#1f2937"/></g>
 <rect x="410" y="370" width="80" height="90" fill="none" stroke="#1f2937" stroke-width="2"/><rect x="430" y="393" width="40" height="45" fill="none" stroke="#ea580c" stroke-width="2.5"/><line x1="412" y1="372" x2="428" y2="391" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/><line x1="488" y1="458" x2="472" y2="440" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/>
 <rect x="40" y="315" width="220" height="225" rx="12" fill="#2563eb" fill-opacity="0.05" stroke="#2563eb" stroke-width="1.5"/>
 <text x="150" y="510" text-anchor="middle" direction="rtl" font-size="15" font-weight="bold" fill="#1f2937">لقطة الدرون</text>
-<text x="150" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Plan drone</text>
+<text x="150" y="530" text-anchor="middle" font-size="12" fill="#7c3aed">Vue aérienne</text>
 <g transform="translate(110,375)"><rect x="-14" y="-6" width="28" height="12" rx="3" fill="#1f2937"/><line x1="-30" y1="-12" x2="30" y2="-12" stroke="#1f2937" stroke-width="3"/><circle cx="-30" cy="-12" r="5" fill="#1f2937"/><circle cx="30" cy="-12" r="5" fill="#1f2937"/></g>
 <path d="M60,475 L90,435 L120,460 L160,420 L200,465 L245,475 z" fill="#16a34a" fill-opacity="0.35"/><path d="M140,375 Q190,360 230,390" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#a)"/>
 </svg>

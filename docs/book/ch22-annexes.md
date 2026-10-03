@@ -129,7 +129,7 @@ Ton : [dynamique / chaleureux]. Langue : [darija / arabe standard / français].
 Format : tableau Temps | Visuel | Voix off | Texte à l'écran | Son.
 ```
 
-**المقاسات:** `--ar 1:1` منشور مربع · `--ar 4:5` إنستغرام · `--ar 9:16` ريلز وتيك توك · `--ar 16:9` يوتيوب.
+**المقاسات:** `--ar 1:1` منشور مربع · `--ar 4:5` Instagram · `--ar 9:16` Reels وTikTok · `--ar 16:9` YouTube.
 
 ## (د) قائمة تحقق قبل النشر
 

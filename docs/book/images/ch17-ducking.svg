@@ -18,8 +18,8 @@
   <circle cx="390" cy="295" r="5" fill="#ea580c"/>
   <circle cx="410" cy="240" r="5" fill="#ea580c"/>
   <text x="105" y="235" text-anchor="middle" font-size="13" fill="#7c3aed">-10 dB</text>
-  <text x="290" y="288" text-anchor="middle" font-size="13" fill="#7c3aed">-22 dB</text>
-  <text x="565" y="288" text-anchor="middle" font-size="13" fill="#7c3aed">-22 dB</text>
+  <text x="290" y="288" text-anchor="middle" font-size="13" fill="#7c3aed">-20 dB</text>
+  <text x="565" y="288" text-anchor="middle" font-size="13" fill="#7c3aed">-20 dB</text>
   <text x="720" y="235" text-anchor="middle" font-size="13" fill="#7c3aed">-10 dB</text>
   <!-- annotations -->
   <line x1="180" y1="330" x2="180" y2="345" stroke="#ea580c" stroke-width="2"/>
