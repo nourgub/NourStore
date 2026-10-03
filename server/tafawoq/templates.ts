@@ -279,11 +279,12 @@ export function templateOpening(context: StudentContext): string {
   return parts.join(" ");
 }
 
-export type TutorIntent = "quiz" | "giveUp" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
+export type TutorIntent = "quiz" | "giveUp" | "dialogue" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
   ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|interroge|teste-moi|pose-moi|quiz|test me|ask me/],
   ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up/],
+  ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me/],
   ["thanks", /شكر|merci|thank/],
   ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|pourquoi|erreur|faute|why|mistake|wrong/],
   ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
@@ -296,7 +297,7 @@ export function detectIntent(message: string): TutorIntent {
   return INTENT_WORDS.find(([, pattern]) => pattern.test(text))?.[0] ?? "explain";
 }
 
-function mentionedSkill(lesson: Lesson, message: string) {
+export function mentionedSkill(lesson: Lesson, message: string) {
   const text = message.toLowerCase();
   let mentioned: Lesson["skills"][number] | undefined;
   let best = 0;
@@ -382,6 +383,18 @@ export function callIntroText(lesson: Lesson, context: StudentContext, seed: num
   const firstIdea = skill.explanation.split(/(?<=[.:])\s+/).slice(0, 2).join(" ");
   const example = generatedExamples(lesson, skill.key, "weak", seed)?.[0] ?? skill.example;
   const error = context.recurringErrors[0];
+  if (skill.dialogue) {
+    // The call teaches this skill by dialogue: no rule handed over up front.
+    return [
+      `السلام عليكم يا ${context.name}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+      `اليوم سنعمل معاً على «${skill.name}» في درس ${lesson.title}.`,
+      error ? `لاحظت أنك تقع أحياناً في هذا الخطأ: ${error.label}. سنصححه معاً.` : "",
+      "لن أعطيك القاعدة جاهزة: سأطرح عليك أسئلة صغيرة، وأنت من سيكتشفها. ثم أختبرك بثلاثة أسئلة قصيرة.",
+      "في أي وقت قل «أعد» لأكرر، أو «لا أعرف» لأساعدك.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
   return [
     `السلام عليكم يا ${context.name}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
     `اليوم سنعمل معاً على «${skill.name}» في درس ${lesson.title}.`,

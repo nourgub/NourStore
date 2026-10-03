@@ -42,6 +42,11 @@ function spokenExponent(raw: string): string {
 export function toSpokenArabic(text: string): string {
   // Lettered choices ("ب: 9x") are read as "الخيار ب: …" with a pause.
   let out = text.replace(/(^|\n)\s*([أبجد])[):]\s*/g, "$1الخيار $2: ");
+  // Dialogue markers: "❓ (2/4)" → "السؤال 2:", "💡" → "تلميح:", other icons silent.
+  out = out
+    .replace(/❓\s*\((\d+)\/\d+\)\s*/g, "السؤال $1: ")
+    .replace(/💡\s*/g, "تلميح: ")
+    .replace(/(?:🎯|✔|✅|🎉)\s*/g, "");
   // Exponents: x², xⁿ⁻¹, e^(2x+1), 2^n
   out = out.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻ⁿ⁺]+/g, run =>
     spokenExponent(Array.from(run).map(char => SUPERSCRIPT_DIGITS[char]).join(""))

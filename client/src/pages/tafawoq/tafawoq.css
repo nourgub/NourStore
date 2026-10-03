@@ -222,3 +222,15 @@
 @keyframes tfq-ring { 0%, 100% { transform: rotate(0); } 10% { transform: rotate(-8deg); } 20% { transform: rotate(8deg); } 30% { transform: rotate(-6deg); } 40% { transform: rotate(0); } }
 @keyframes tfq-talk { from { transform: scaleY(.4); } to { transform: scaleY(1.6); } }
 @keyframes tfq-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+
+/* BAC-style problem: the shared statement stays above every part. */
+.tfq-problem {
+  border: 1px solid rgba(240, 180, 80, 0.45);
+  background: rgba(240, 180, 80, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 10px 0 12px;
+  white-space: pre-line;
+  line-height: 1.9;
+}
+.tfq-empty .tfq-btn + .tfq-btn { margin-inline-start: 8px; }

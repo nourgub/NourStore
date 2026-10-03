@@ -191,7 +191,18 @@ export function QuestionRunner({
           ))}
         </div>
       </div>
-      <Content className="tfq-question"><M>{question.prompt}</M></Content>
+      {question.problem && (
+        <Content className="tfq-problem">
+          <div className="tfq-kicker">
+            {t.problemStatement} — {question.problem.title}
+          </div>
+          <M>{question.problem.statement}</M>
+        </Content>
+      )}
+      <Content className="tfq-question">
+        {question.problem && <strong>{index + 1}) </strong>}
+        <M>{question.prompt}</M>
+      </Content>
       {question.type === "mcq" ? (
         <Content className="tfq-options">
           {question.options?.map(option => (

@@ -66,6 +66,12 @@ export const tafawoqRouter = router({
     .input(z.object({ lessonKey }))
     .mutation(({ ctx, input }) => tafawoq.generatePractice(ctx.user.id, input.lessonKey)),
 
+  /** A BAC-style multi-part problem ("موضوع") on this lesson. */
+  generateProblem: learnerProcedure
+    .use(rateLimit("tafawoq-problem", 30, HOUR))
+    .input(z.object({ lessonKey }))
+    .mutation(({ ctx, input }) => tafawoq.generateProblem(ctx.user.id, input.lessonKey)),
+
   generateVideo: learnerProcedure
     .use(rateLimit("tafawoq-video", 10, HOUR))
     .input(z.object({ lessonKey }))

@@ -1,6 +1,7 @@
 // A phone-call lesson with the subject teacher. Unlike the open live
 // session (LiveTutor), the teacher leads: rings, greets the student by
-// name, explains the priority skill with a worked example, asks three oral
+// name, teaches the priority skill by dialogue (small questions that lead
+// the student to the rule) or with a worked example, asks three oral
 // questions (each graded and adapting difficulty through the student
 // model), handles "اشرح"/"أعد" interruptions, and hangs up with a summary.
 // Browser speech APIs only — free, no call service, nothing recorded.
@@ -18,9 +19,13 @@ const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|ag
 const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح)/;
 const NOT_HEARD = "لم أسمعك جيداً. أعد جوابك من فضلك.";
 
-/** The tutor's "say «اختبرني» for another" tail makes no sense mid-call. */
+/** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
+const DIALOGUE_DONE = "🎯";
+const DIALOGUE_STEP = "❓ (";
+
+/** The tutor's "say «اختبرني»…" tails make no sense mid-call. */
 function forCall(text: string) {
-  return text.replace(/\n?قل «اختبرني» لسؤال آخر\.?/g, "").trim();
+  return text.replace(/\n?قل «اختبرني»[^\n]*/g, "").trim();
 }
 
 /** Two-tone ring, synthesised (no audio file). Returns a stop function. */
@@ -111,6 +116,8 @@ export function CallScreen({
   const askedRef = useRef(0);
   const mutedRef = useRef(false);
   const misses = useRef(0);
+  /** "dialogue" while the teacher leads the student to the rule, then "quiz". */
+  const mode = useRef<"dialogue" | "quiz">("dialogue");
   mutedRef.current = muted;
 
   const stopAll = () => {
@@ -175,6 +182,20 @@ export function CallScreen({
     });
   };
 
+  const startDialogue = async () => {
+    if (closedRef.current) return;
+    setPhase("thinking");
+    const { reply } = await send.mutateAsync({ lessonKey, message: "علّمني بالحوار" });
+    if (!reply.includes(DIALOGUE_STEP)) {
+      // No dialogue for this skill: straight to the questions.
+      mode.current = "quiz";
+      await askNext();
+      return;
+    }
+    lastQuestion.current = reply.slice(reply.lastIndexOf(DIALOGUE_STEP));
+    say(reply, listen);
+  };
+
   const askNext = async () => {
     if (closedRef.current) return;
     if (askedRef.current >= QUESTIONS_PER_CALL) {
@@ -200,6 +221,20 @@ export function CallScreen({
     setPhase("thinking");
     const { reply } = await send.mutateAsync({ lessonKey, message: text });
     void utils.tafawoq.workspace.invalidate({ lessonKey });
+    if (mode.current === "dialogue") {
+      if (reply.includes(DIALOGUE_DONE)) {
+        mode.current = "quiz";
+        say(`${forCall(reply)}\nوالآن لنتأكد أنك فهمت.`, () => void askNext());
+      } else if (reply.includes(DIALOGUE_STEP)) {
+        lastQuestion.current = reply.slice(reply.lastIndexOf(DIALOGUE_STEP));
+        say(reply, listen);
+      } else {
+        // The dialogue was left (should not happen in a call): go on with the questions.
+        mode.current = "quiz";
+        say(forCall(reply), () => void askNext());
+      }
+      return;
+    }
     if (GRADED.test(reply)) {
       say(forCall(reply), () => void askNext());
     } else {
@@ -229,7 +264,8 @@ export function CallScreen({
     try {
       const data = await intro.mutateAsync({ lessonKey });
       callStart.current = data.afterId;
-      say(data.text, () => void askNext());
+      mode.current = "dialogue";
+      say(data.text, () => void startDialogue());
     } catch {
       setCaption(t.errors.generic);
       setPhase("ended");

@@ -50,6 +50,8 @@ export type PublicQuestion = {
   type: "mcq" | "short";
   prompt: string;
   options?: string[];
+  /** Part of a BAC-style multi-part problem: its shared statement. */
+  problem?: { title: string; statement: string };
 };
 
 export type LessonExample = {

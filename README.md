@@ -166,6 +166,9 @@ and migration `drizzle/0025_add_tafawoq_ai_teacher.sql`.
 | Learning analytics | tier, strengths, weaknesses, recurring errors, learning speed (timing + accuracy), completion |
 | Recommendation / plan | next skills to teach, respecting each lesson's prerequisite graph |
 | Tutor | understands "explain / example / why do I make this mistake / simpler / challenge me" (ar/fr/en) and answers from the student model, the lesson's remedies and freshly generated worked examples |
+| Teaching by dialogue | "علّمني بالحوار": instead of handing over the rule, the teacher asks a chain of small questions the student can answer (`Skill.dialogue`, `dialogue.ts`), hints after a miss without giving the answer, reveals after a second miss, and lets the student reach the rule. Works in the chat, the live voice session and the phone call |
+| BAC-style problems | "موضوع بكالوريا": one statement and 4–6 chained questions like a real BAC exercise, ending with the discriminating question (`Lesson.problems`, `problems.ts`); numbers drawn and every answer computed, each part graded on its own skill |
+| Phone-call lesson | the teacher "calls" the student: greeting by name, dialogue on the weakest skill, three graded oral questions, spoken summary |
 | Personal lesson & video | built from the student model with generated examples; the video is rendered in the browser as animated slides narrated by the browser's own speech synthesis |
 
 Curriculum: BAC mathematics — limits & continuity, derivatives,
@@ -184,6 +187,9 @@ student model (`ai.ts`); anything that fails or doesn't validate falls back
 to the free path. Leave it unset and nothing is ever sent to any AI service.
 
 Tests: `server/tafawoq/tafawoq.test.ts`, `server/tafawoq/generators.test.ts`,
+`server/tafawoq/dialogue.test.ts` (every skill has a dialogue whose answers
+are accepted and whose hints don't give them away; full dialogues replayed),
+`server/tafawoq/problems.test.ts` (200 draws of every BAC problem),
 and `server/tafawoq/tafawoq.realDb.e2e.test.ts` (the full loop against real
 MySQL, part of `npm run test:db`).
 

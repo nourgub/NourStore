@@ -18,6 +18,7 @@ import {
   Send,
   Sparkles,
   Target,
+  Trophy,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -791,6 +792,25 @@ function PracticeTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDa
     },
     onError: error => toast.error(errorMessage(t, error)),
   });
+  const problem = trpc.tafawoq.generateProblem.useMutation({
+    onSuccess: async () => {
+      setResult(null);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const problemButton =
+    data.problemsCount > 0 ? (
+      <button
+        type="button"
+        className="tfq-btn ghost"
+        title={t.bacProblemHint}
+        disabled={problem.isPending || generate.isPending}
+        onClick={() => problem.mutate({ lessonKey })}
+      >
+        <Trophy size={16} /> {problem.isPending ? t.loading : t.bacProblem}
+      </button>
+    ) : null;
   const submit = trpc.tafawoq.submitAssessment.useMutation({
     onSuccess: async graded => {
       setResult(graded);
@@ -841,6 +861,7 @@ function PracticeTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDa
           <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
             <Sparkles size={16} /> {generate.isPending ? t.loading : t.newExercises}
           </button>
+          {problemButton}
         </div>
       </>
     );
@@ -857,6 +878,12 @@ function PracticeTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDa
         <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
           <Sparkles size={16} /> {generate.isPending ? t.preparingExercises : t.createExercises}
         </button>
+        {problemButton && (
+          <>
+            {problemButton}
+            <p className="tfq-muted" style={{ fontSize: 13 }}>{t.bacProblemHint}</p>
+          </>
+        )}
       </div>
     );
   }

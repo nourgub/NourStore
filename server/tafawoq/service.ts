@@ -29,6 +29,8 @@ import {
 import { buildStudentContext, type StudentContext } from "./context";
 import { createRng, randomSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
+import { instantiateProblem } from "./problems";
+import { dialogueReply, dialogueSkills, dialogueState, resumeLine, startDialogue } from "./dialogue";
 import { OPTION_LETTERS, pickOption, spokenToAnswer } from "./spokenAnswer";
 import { answersMatch, gradeDeterministic } from "./grading";
 import { parseExpression } from "./mathExpr";
@@ -49,6 +51,7 @@ import {
   callIntroText,
   callSummaryText,
   detectIntent,
+  mentionedSkill,
   templateExercises,
   templateLesson,
   templateOpening,
@@ -102,6 +105,7 @@ function toPublicQuestion(item: StoredItem): PublicQuestion {
     type: item.type,
     prompt: item.prompt,
     options: item.type === "mcq" ? item.options : undefined,
+    problem: item.problem,
   };
 }
 
@@ -237,6 +241,36 @@ export async function generatePractice(userId: number, lessonKey: string) {
     source,
   });
   return { assessmentId, source, questions: items.map(toPublicQuestion) };
+}
+
+// ---------------------------------------------------------------------------
+// BAC-style problems ("مواضيع"): one statement, 4–6 chained questions, each
+// graded on its own (a practice assessment whose items share a statement).
+// ---------------------------------------------------------------------------
+
+function problemsFor(lesson: Lesson, stream: string | null) {
+  return (lesson.problems ?? []).filter(
+    problem => !problem.streams || !stream || problem.streams.includes(stream as never)
+  );
+}
+
+export async function generateProblem(userId: number, lessonKey: string) {
+  const student = await studentOrThrow(userId);
+  const lesson = lessonOrThrow(lessonKey);
+  const problems = problemsFor(lesson, student.stream);
+  if (!problems.length) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "No BAC problem for this lesson yet" });
+  }
+  const rng = createRng(randomSeed());
+  const items = instantiateProblem(rng.pick(problems), rng.int(1, 2 ** 30));
+  const assessmentId = await store.createAssessment({
+    studentId: student.id,
+    lessonKey: lesson.key,
+    kind: "practice",
+    itemsJson: JSON.stringify(items),
+    source: "template",
+  });
+  return { assessmentId, source: "template" as ContentSource, questions: items.map(toPublicQuestion) };
 }
 
 export type SubmittedAnswer = { questionId: string; answer: string; responseMs?: number };
@@ -421,6 +455,7 @@ export async function workspace(userId: number, lessonKey: string) {
     lessonTitle: lesson.title,
     analysis: context,
     complete: isLessonComplete(states),
+    problemsCount: problemsFor(lesson, student.stream).length,
     aiConfigured: ai.isAiConfigured(),
     personalLesson: latestLesson
       ? {
@@ -653,6 +688,27 @@ async function oralTurn(
 }
 
 // ---------------------------------------------------------------------------
+// Teaching by dialogue ("علّمني بالحوار"): see ./dialogue.ts.
+// ---------------------------------------------------------------------------
+
+function dialogueTurn(
+  lesson: Lesson,
+  context: StudentContext,
+  name: string,
+  lastTutor: string | undefined,
+  message: string
+): string | null {
+  const intent = detectIntent(message);
+  if (intent === "dialogue") {
+    const mentioned = mentionedSkill(lesson, message);
+    const skill = mentioned?.dialogue ? mentioned : dialogueSkills(lesson, context)[0];
+    return skill ? startDialogue(skill) : null;
+  }
+  const state = dialogueState(lesson, lastTutor);
+  return state ? dialogueReply(state, message, intent, name, randomSeed()) : null;
+}
+
+// ---------------------------------------------------------------------------
 // Phone-call lesson: the client drives the call (intro → oral questions via
 // sendMessage → summary); these two give it what the teacher says.
 // ---------------------------------------------------------------------------
@@ -710,12 +766,23 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     content: message,
     source: null,
   });
+  const lastTutor = [...history].reverse().find(entry => entry.role === "tutor")?.content;
+  const dialogue = dialogueTurn(lesson, context, student.displayName, lastTutor, message);
+  if (dialogue !== null) {
+    await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: dialogue, source: "template" });
+    return { reply: dialogue, source: "template" as ContentSource };
+  }
   const oral = await oralTurn(userId, student, lesson, context, message);
   if (oral !== null) {
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
     return { reply: oral, source: "template" as ContentSource };
   }
-  const { text, source } = await tutorText(context, lesson, history, message);
+  const answered = await tutorText(context, lesson, history, message);
+  // A question in the middle of a dialogue is answered, then the dialogue
+  // picks up where it was (unless the student moved on to a quiz).
+  const paused = detectIntent(message) !== "quiz" ? dialogueState(lesson, lastTutor) : null;
+  const text = paused ? `${answered.text}\n\n${resumeLine(paused)}` : answered.text;
+  const source = answered.source;
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
   return { reply: text, source };
 }

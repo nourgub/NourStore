@@ -8,6 +8,7 @@ import { hashPassword, emailOpenId } from "../_core/emailAuth";
 import { users, type User } from "../../drizzle/schema";
 import { getLesson, type BankQuestion } from "./curriculum";
 import { tafawoqAssessments } from "../../drizzle/schema";
+import { DIALOGUE_DONE, dialogueState } from "./dialogue";
 
 /**
  * REAL DATABASE end-to-end run of the Tafawoq AI Teacher loop:
@@ -189,7 +190,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       // Phone-call lesson: intro → one oral question answered → summary.
       const call = await caller.tafawoq.callIntro({ lessonKey: lesson.key });
       expect(call.text).toContain("أحمد");
-      expect(call.text).toContain("مثال");
+      expect(call.text).toContain("أسئلة صغيرة"); // the call teaches by dialogue
       await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "اختبرني" });
       const [callItem] = JSON.parse((await latestOral(ahmed.id)).itemsJson) as BankQuestion[];
       await caller.tafawoq.sendMessage({
@@ -199,6 +200,33 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const callEnd = await caller.tafawoq.callSummary({ lessonKey: lesson.key, afterId: call.afterId });
       expect(callEnd).toMatchObject({ correct: 1, total: 1 });
       expect(callEnd.text).toContain("أجبت إجابة صحيحة عن 1 من 1");
+
+      // Teaching by dialogue: hint after a miss, a question pauses it, the
+      // right answers lead to the rule. No assessment is created.
+      let turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "علّمني بالحوار" });
+      expect(turn.reply).toContain("❓ (1/");
+      turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "123456" });
+      expect(turn.reply).toContain("💡");
+      turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "أعطني مثالاً" });
+      expect(turn.reply).toContain("لنعد إلى سؤالنا");
+      for (let step = 0; step < 6 && !turn.reply.includes(DIALOGUE_DONE); step += 1) {
+        const state = dialogueState(lesson, turn.reply)!;
+        expect(state).not.toBeNull();
+        turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: state.dialogue.steps[state.index].answer });
+      }
+      expect(turn.reply).toContain(DIALOGUE_DONE);
+
+      // A BAC-style problem: one statement, chained parts, graded part by part.
+      const problem = await caller.tafawoq.generateProblem({ lessonKey: lesson.key });
+      expect(problem.questions.length).toBeGreaterThanOrEqual(4);
+      expect(problem.questions[0].problem?.statement).toContain("f(x)");
+      expect(JSON.stringify(problem.questions)).not.toContain('"answer"');
+      const parts = await storedItems(problem.assessmentId);
+      const problemResult = await caller.tafawoq.submitAssessment({
+        assessmentId: problem.assessmentId,
+        answers: parts.map(item => ({ questionId: item.id, answer: item.answer })),
+      });
+      expect(problemResult).toMatchObject({ correct: parts.length, total: parts.length });
 
       const overview = await caller.tafawoq.overview();
       expect(overview.student?.displayName).toBe("أحمد");
@@ -224,9 +252,9 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const [child] = await parentCaller.tafawoq.parentReport();
       expect(child.profile?.displayName).toBe("أحمد");
       expect(child.lessons.map(entry => entry.key)).toEqual([lesson.key]);
-      expect(child.lessons[0].sessions).toBe(5); // placement, practice, 3 oral questions
+      expect(child.lessons[0].sessions).toBe(6); // placement, practice, 3 oral questions, 1 BAC problem
       expect(child.lessons[0].weaknesses.length).toBeGreaterThan(0);
-      expect(child.week?.answered).toBe(18);
+      expect(child.week?.answered).toBe(18 + parts.length);
       expect(child.advice.some(item => item.kind === "focus" || item.kind === "progress")).toBe(true);
 
       // A parent sees only children who shared a code with them.
