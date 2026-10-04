@@ -11,6 +11,7 @@ import { probabilityLesson } from "./probability";
 import { spaceGeometryLesson } from "./spaceGeometry";
 import { arithmeticLesson } from "./arithmetic";
 import { statisticsLesson } from "./statistics";
+import { differentialEquationsLesson } from "./differentialEquations";
 
 export const BAC_LESSONS: Lesson[] = [
   limitsLesson,
@@ -23,5 +24,6 @@ export const BAC_LESSONS: Lesson[] = [
   spaceGeometryLesson,
   arithmeticLesson,
   statisticsLesson,
+  differentialEquationsLesson,
   // Lessons still being written have no skills yet and are not offered.
 ].filter(lesson => lesson.skills.length > 0);
