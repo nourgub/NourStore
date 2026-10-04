@@ -29,9 +29,51 @@ const clock = (seconds: number) => {
   return `${hours}:${String(minutes).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
 };
 
+type History = Outputs["myExams"];
+
+/** Marks over time (bars out of 20) and the lesson that costs the most points. */
+export function ExamHistory({ exams }: { exams: History }) {
+  const t = useT();
+  if (!exams.length) return null;
+  const lost = new Map<string, { title: string; lost: number; points: number }>();
+  for (const exam of exams) {
+    for (const exercise of exam.exercises) {
+      const entry = lost.get(exercise.lessonKey) ?? { title: exercise.lessonTitle, lost: 0, points: 0 };
+      entry.lost += exercise.points - exercise.earned;
+      entry.points += exercise.points;
+      lost.set(exercise.lessonKey, entry);
+    }
+  }
+  const weakest = Array.from(lost.values()).sort((a, b) => b.lost / b.points - a.lost / a.points)[0];
+  const best = Math.max(...exams.map(exam => exam.score));
+  return (
+    <div className="tfq-exam-history">
+      <h3 style={{ margin: "0 0 8px" }}>{t.examHistory}</h3>
+      <div className="tfq-exam-bars" role="img" aria-label={exams.map(exam => `${exam.score}/20`).join(", ")}>
+        {exams.map(exam => (
+          <div key={exam.id} className="tfq-exam-bar" title={`${exam.score} / 20 — ${new Date(exam.date).toLocaleDateString()}`}>
+            <span className="tfq-exam-bar-value">{exam.score}</span>
+            <span className={`tfq-exam-bar-fill ${exam.score >= 10 ? "pass" : ""}`} style={{ height: `${Math.max(4, (exam.score / 20) * 100)}%` }} />
+          </div>
+        ))}
+      </div>
+      <p className="tfq-muted" style={{ margin: "8px 0 0", fontSize: 14 }}>
+        {t.examLastMark(exams[exams.length - 1].score)} · {t.examBest(best)}
+        {weakest && weakest.lost > 0 ? (
+          <>
+            {" · "}
+            <Content as="span">{t.examWeakest(weakest.title)}</Content>
+          </>
+        ) : null}
+      </p>
+    </div>
+  );
+}
+
 export function ExamView() {
   const t = useT();
   const utils = trpc.useUtils();
+  const history = trpc.tafawoq.myExams.useQuery();
   const [exam, setExam] = useState<Exam | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Answer[]>>({});
@@ -54,6 +96,7 @@ export function ExamView() {
       setResult(data);
       window.scrollTo({ top: 0 });
       await utils.tafawoq.overview.invalidate();
+      await utils.tafawoq.myExams.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -92,6 +135,11 @@ export function ExamView() {
             </div>
           ))}
         </div>
+        {history.data && history.data.length > 1 && (
+          <div className="tfq-card">
+            <ExamHistory exams={history.data} />
+          </div>
+        )}
         {result.exercises.map((exercise, position) => (
           <div className="tfq-card" key={position}>
             <Content>
@@ -123,6 +171,11 @@ export function ExamView() {
         <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate()}>
           {generate.isPending ? t.examPreparing : t.examStart}
         </button>
+        {history.data && history.data.length > 0 && (
+          <div style={{ marginTop: 22, textAlign: "start" }}>
+            <ExamHistory exams={history.data} />
+          </div>
+        )}
       </div>
     );
   }
@@ -173,6 +226,7 @@ export function ExamView() {
           const missing = exam.exercises.findIndex(entry => !next[entry.assessmentId]);
           if (missing === -1) {
             submit.mutate({
+              examId: exam.examId,
               papers: exam.exercises.map(entry => ({ assessmentId: entry.assessmentId, answers: next[entry.assessmentId] })),
             });
           } else {

@@ -1250,6 +1250,27 @@ export const tafawoqAssessments = mysqlTable(
   })
 );
 
+// Mock BAC exam: a full paper (one practice assessment per exercise), marked
+// out of 20 once on hand-in.
+export const tafawoqExams = mysqlTable(
+  "tafawoqExams",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    stream: varchar("stream", { length: 16 }),
+    // [{ assessmentId, lessonKey, points }] in paper order.
+    paperJson: mediumtext("paperJson").notNull(),
+    status: mysqlEnum("status", ["open", "graded"]).default("open").notNull(),
+    score: double("score"),
+    resultJson: mediumtext("resultJson"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    gradedAt: timestamp("gradedAt"),
+  },
+  table => ({
+    studentIdx: index("tafawoqExams_student_idx").on(table.studentId, table.createdAt),
+  })
+);
+
 export const tafawoqAttempts = mysqlTable(
   "tafawoqAttempts",
   {

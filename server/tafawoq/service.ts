@@ -290,7 +290,7 @@ const EXAM_BLUEPRINTS: Record<"scientific" | "gestion" | "literary", { minutes: 
     slots: [
       { lessons: ["math-probability"], points: 4 },
       { lessons: ["math-complex", "math-space-geometry"], points: 4 },
-      { lessons: ["math-sequences", "math-integrals", "math-arithmetic"], points: 5 },
+      { lessons: ["math-sequences", "math-integrals", "math-arithmetic", "math-differential-equations"], points: 5 },
       { lessons: ["math-exponential", "math-logarithm"], points: 7 },
     ],
   },
@@ -386,44 +386,86 @@ export async function generateExam(userId: number) {
       questions: items.map(toPublicQuestion),
     });
   }
-  return { minutes: blueprint.minutes, exercises };
+  const examId = await store.createExam({
+    studentId: student.id,
+    stream: student.stream,
+    paperJson: JSON.stringify(
+      exercises.map(exercise => ({ assessmentId: exercise.assessmentId, lessonKey: exercise.lessonKey, points: exercise.points }))
+    ),
+  });
+  return { examId, minutes: blueprint.minutes, exercises };
 }
+
+type ExamPaper = Array<{ assessmentId: number; lessonKey: string; points: number }>;
+type ExamExerciseResult = { lessonKey: string; lessonTitle: string; title: string; points: number; earned: number };
 
 export async function submitExam(
   userId: number,
+  examId: number,
   papers: Array<{ assessmentId: number; answers: SubmittedAnswer[] }>
 ) {
-  // Check the whole paper first, so it is graded entirely or not at all.
   const student = await studentOrThrow(userId);
-  for (const paper of papers) {
-    const assessment = await store.getAssessment(paper.assessmentId);
-    if (!assessment || assessment.studentId !== student.id) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Assessment not found" });
-    }
-    if (assessment.status !== "open") {
-      throw new TRPCError({ code: "CONFLICT", message: "Assessment already graded" });
-    }
+  const exam = await store.getExam(examId);
+  // Same NOT_FOUND for "doesn't exist" and "belongs to someone else".
+  if (!exam || exam.studentId !== student.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Exam not found" });
+  }
+  const paper = JSON.parse(exam.paperJson) as ExamPaper;
+  const byId = new Map(papers.map(entry => [entry.assessmentId, entry.answers]));
+  if (papers.length !== paper.length || paper.some(entry => !byId.has(entry.assessmentId))) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The answers do not match this exam" });
+  }
+  // Marked once: a second hand-in (double click, two tabs) is refused.
+  if (!(await store.claimExam(exam.id))) {
+    throw new TRPCError({ code: "CONFLICT", message: "Exam already marked" });
   }
   const exercises = [];
-  for (const paper of papers) {
-    const result = await submitAssessment(userId, paper.assessmentId, paper.answers);
-    const assessment = await store.getAssessment(paper.assessmentId);
+  for (const entry of paper) {
+    const result = await submitAssessment(userId, entry.assessmentId, byId.get(entry.assessmentId)!);
+    const assessment = await store.getAssessment(entry.assessmentId);
     const items = JSON.parse(assessment!.itemsJson) as StoredItem[];
-    const points = items[0]?.problem?.points ?? 0;
-    const shares = partPoints(points, items.map(item => item.difficulty));
+    const shares = partPoints(entry.points, items.map(item => item.difficulty));
     const earned = result.items.reduce((sum, item, index) => sum + (item.correct ? shares[index] : 0), 0);
     exercises.push({
-      lessonKey: assessment!.lessonKey,
-      lessonTitle: getLesson(assessment!.lessonKey)?.title ?? assessment!.lessonKey,
+      lessonKey: entry.lessonKey,
+      lessonTitle: getLesson(entry.lessonKey)?.title ?? entry.lessonKey,
       title: items[0]?.problem?.title ?? "",
-      points,
+      points: entry.points,
       earned,
       shares,
       items: result.items,
     });
   }
   const score = Math.round(exercises.reduce((sum, exercise) => sum + exercise.earned, 0) * 4) / 4;
+  const summary: ExamExerciseResult[] = exercises.map(({ lessonKey, lessonTitle, title, points, earned }) => ({
+    lessonKey,
+    lessonTitle,
+    title,
+    points,
+    earned,
+  }));
+  await store.saveExamResult(exam.id, score, JSON.stringify(summary));
   return { score, outOf: 20, mention: examMention(score), exercises };
+}
+
+/** Marked mock exams, oldest first (for a trend), with points per exercise. */
+export async function examHistory(studentId: number, limit = 10) {
+  const rows = await store.listMarkedExams(studentId, limit);
+  return rows
+    .filter(row => row.score !== null)
+    .reverse()
+    .map(row => ({
+      id: row.id,
+      score: row.score!,
+      mention: examMention(row.score!),
+      date: row.gradedAt ?? row.createdAt,
+      exercises: row.resultJson ? (JSON.parse(row.resultJson) as ExamExerciseResult[]) : [],
+    }));
+}
+
+export async function myExams(userId: number) {
+  const student = await studentOrThrow(userId);
+  return examHistory(student.id);
 }
 
 export type SubmittedAnswer = { questionId: string; answer: string; responseMs?: number };
@@ -974,7 +1016,16 @@ export async function parentReport(parentUserId: number) {
     links.map(async link => {
       const student = await store.getTafawoqStudentByUser(link.childId);
       if (!student) {
-        return { linkId: link.id, childName: link.childName, profile: null, lessons: [], week: null, lastActivityAt: null, advice: [] as ParentAdvice[] };
+        return {
+          linkId: link.id,
+          childName: link.childName,
+          profile: null,
+          lessons: [],
+          week: null,
+          lastActivityAt: null,
+          advice: [] as ParentAdvice[],
+          exams: [] as Awaited<ReturnType<typeof examHistory>>,
+        };
       }
       const allStates = await store.getAllSkillStates(student.id);
       const lessonKeys = Array.from(new Set(allStates.map(row => row.lessonKey)));
@@ -1051,6 +1102,7 @@ export async function parentReport(parentUserId: number) {
         week,
         lastActivityAt,
         advice,
+        exams: await examHistory(student.id, 5),
       };
     })
   );

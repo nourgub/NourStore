@@ -78,10 +78,14 @@ export const tafawoqRouter = router({
     .use(rateLimit("tafawoq-submit", 60, HOUR))
     .input(
       z.object({
+        examId: z.number().int().positive(),
         papers: z.array(z.object({ assessmentId: z.number().int().positive(), answers: answersInput })).min(1).max(6),
       })
     )
-    .mutation(({ ctx, input }) => tafawoq.submitExam(ctx.user.id, input.papers)),
+    .mutation(({ ctx, input }) => tafawoq.submitExam(ctx.user.id, input.examId, input.papers)),
+
+  /** The student's marked mock exams, oldest first. */
+  myExams: learnerProcedure.query(({ ctx }) => tafawoq.myExams(ctx.user.id)),
 
   generateVideo: learnerProcedure
     .use(rateLimit("tafawoq-video", 10, HOUR))

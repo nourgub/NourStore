@@ -45,7 +45,7 @@ import {
 import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
 import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
-import { ExamView } from "./ExamView";
+import { ExamHistory, ExamView } from "./ExamView";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -155,6 +155,9 @@ function Home() {
   const t = useT();
   const overview = trpc.tafawoq.overview.useQuery();
   const catalog = trpc.tafawoq.catalog.useQuery();
+  const exams = trpc.tafawoq.myExams.useQuery(undefined, {
+    enabled: overview.data?.student?.schoolLevel === "bac",
+  });
   const [editing, setEditing] = useState(false);
   if (overview.isLoading || catalog.isLoading) return <p className="tfq-muted">{t.loading}</p>;
   if (overview.error) return <div className="tfq-card">{errorMessage(t, overview.error)}</div>;
@@ -190,6 +193,11 @@ function Home() {
           <div>
             <h3 style={{ margin: 0 }}>{t.examTitle}</h3>
             <p className="tfq-muted" style={{ margin: "4px 0 0" }}>{t.examCard}</p>
+            {exams.data && exams.data.length > 0 && (
+              <strong style={{ display: "block", marginTop: 6 }}>
+                {t.examLastMark(exams.data[exams.data.length - 1].score)}
+              </strong>
+            )}
           </div>
         </Link>
       )}
@@ -1090,6 +1098,11 @@ function ChildReport({ child }: { child: ChildReportData }) {
                 <span className="tfq-kicker">{t.lastActivity}</span>
                 <strong>{child.lastActivityAt ? new Date(child.lastActivityAt).toLocaleDateString() : t.never}</strong>
               </div>
+            </div>
+          )}
+          {child.exams.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <ExamHistory exams={child.exams} />
             </div>
           )}
           {child.advice.length > 0 && (

@@ -276,10 +276,27 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
           answers: items.map(item => ({ questionId: item.id, answer: position === 0 ? "" : item.answer })),
         });
       }
-      const marked = await caller.tafawoq.submitExam({ papers });
+      // Answers must be exactly this exam's exercises.
+      await expect(
+        caller.tafawoq.submitExam({ examId: exam.examId, papers: papers.slice(1) })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      // Nobody else can hand in this paper.
+      const examStranger = await fixtureUser("other-student");
+      const otherCaller = appRouter.createCaller(ctxFor(examStranger));
+      await otherCaller.tafawoq.register({ displayName: "سمير", age: 17, schoolLevel: "bac", stream: "sciences" });
+      await expect(otherCaller.tafawoq.submitExam({ examId: exam.examId, papers })).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+      const marked = await caller.tafawoq.submitExam({ examId: exam.examId, papers });
       expect(marked.score).toBe(20 - exam.exercises[0].points);
       expect(marked.exercises[0].earned).toBe(0);
-      await expect(caller.tafawoq.submitExam({ papers })).rejects.toMatchObject({ code: "CONFLICT" });
+      await expect(caller.tafawoq.submitExam({ examId: exam.examId, papers })).rejects.toMatchObject({ code: "CONFLICT" });
+      // The mark is kept: the student and the parent see it.
+      const history = await caller.tafawoq.myExams();
+      expect(history.map(entry => entry.score)).toEqual([marked.score]);
+      expect(history[0].exercises[0].earned).toBe(0);
+      const [childAfterExam] = await parentCaller.tafawoq.parentReport();
+      expect(childAfterExam.exams.map(entry => entry.score)).toEqual([marked.score]);
     });
   }
 );

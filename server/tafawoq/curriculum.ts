@@ -1858,6 +1858,7 @@ const LESSON_ORDER = [
   "math-derivatives",
   "math-exponential",
   "math-logarithm",
+  "math-differential-equations",
   "math-sequences",
   "math-complex",
   "math-integrals",
@@ -1894,6 +1895,7 @@ const STREAMS_BY_LESSON: Record<string, BacStream[]> = {
   "math-probability": ["sciences", "math", "techmath", "gestion", "lettres", "langues"],
   "math-arithmetic": ["math", "lettres", "langues"],
   "math-statistics": ["gestion"],
+  "math-differential-equations": ["sciences", "math", "techmath"],
 };
 for (const lesson of LESSONS) {
   if (STREAMS_BY_LESSON[lesson.key]) lesson.streams = STREAMS_BY_LESSON[lesson.key];

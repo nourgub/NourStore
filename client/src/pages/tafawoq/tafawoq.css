@@ -249,3 +249,8 @@
 .tfq-exam-card svg { color: #f0b450; flex-shrink: 0; }
 .tfq-exam-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .tfq-exam-score strong { font-size: 42px; color: #f0b450; }
+.tfq-exam-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.tfq-exam-bar { flex: 0 1 42px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.tfq-exam-bar-value { font-size: 12px; color: var(--tfq-muted, #a9a9a9); }
+.tfq-exam-bar-fill { width: 100%; border-radius: 6px 6px 0 0; background: #e07b7b; }
+.tfq-exam-bar-fill.pass { background: #4fbf7f; }

@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import {
   tafawoqAssessments,
   tafawoqAttempts,
+  tafawoqExams,
   tafawoqLessons,
   tafawoqMessages,
   tafawoqSkillStates,
@@ -117,6 +118,44 @@ export async function createAssessment(input: {
   const db = await requireDb();
   const result = await db.insert(tafawoqAssessments).values(input).$returningId();
   return result[0].id;
+}
+
+export async function createExam(input: { studentId: number; stream: string | null; paperJson: string }) {
+  const db = await requireDb();
+  const result = await db.insert(tafawoqExams).values(input).$returningId();
+  return result[0].id;
+}
+
+export async function getExam(examId: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(tafawoqExams).where(eq(tafawoqExams.id, examId)).limit(1);
+  return rows[0];
+}
+
+/** Claims an open exam for marking; false if it was already marked. */
+export async function claimExam(examId: number) {
+  const db = await requireDb();
+  const [result] = await db
+    .update(tafawoqExams)
+    .set({ status: "graded", gradedAt: new Date() })
+    .where(and(eq(tafawoqExams.id, examId), eq(tafawoqExams.status, "open")));
+  return result.affectedRows === 1;
+}
+
+export async function saveExamResult(examId: number, score: number, resultJson: string) {
+  const db = await requireDb();
+  await db.update(tafawoqExams).set({ score, resultJson }).where(eq(tafawoqExams.id, examId));
+}
+
+/** Marked exams, newest first. */
+export async function listMarkedExams(studentId: number, limit = 20) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(tafawoqExams)
+    .where(and(eq(tafawoqExams.studentId, studentId), eq(tafawoqExams.status, "graded")))
+    .orderBy(desc(tafawoqExams.id))
+    .limit(limit);
 }
 
 export async function getAssessment(assessmentId: number) {
