@@ -84,6 +84,13 @@ export const tafawoqRouter = router({
     )
     .mutation(({ ctx, input }) => tafawoq.submitExam(ctx.user.id, input.examId, input.papers)),
 
+  /** "Your road to your mark": prediction, countdown and today's task (BAC students). */
+  roadmap: learnerProcedure.query(({ ctx }) => tafawoq.roadmap(ctx.user.id)),
+
+  setTarget: learnerProcedure
+    .input(z.object({ targetMark: z.number().min(10).max(20).multipleOf(0.5) }))
+    .mutation(({ ctx, input }) => tafawoq.setTarget(ctx.user.id, input.targetMark)),
+
   /** The student's marked mock exams, oldest first. */
   myExams: learnerProcedure.query(({ ctx }) => tafawoq.myExams(ctx.user.id)),
 

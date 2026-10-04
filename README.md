@@ -168,6 +168,7 @@ and migration `drizzle/0025_add_tafawoq_ai_teacher.sql`.
 | Tutor | understands "explain / example / why do I make this mistake / simpler / challenge me" (ar/fr/en) and answers from the student model, the lesson's remedies and freshly generated worked examples |
 | Teaching by dialogue | "علّمني بالحوار": instead of handing over the rule, the teacher asks a chain of small questions the student can answer (`Skill.dialogue`, `dialogue.ts`), hints after a miss without giving the answer, reveals after a second miss, and lets the student reach the rule. Works in the chat, the live voice session and the phone call |
 | BAC-style problems | "موضوع بكالوريا": one statement and 4–6 chained questions like a real BAC exercise, ending with the discriminating question (`Lesson.problems`, `problems.ts`); numbers drawn and every answer computed, each part graded on its own skill |
+| Mock BAC & road to the mark | a full paper out of 20 per stream (`bac.ts`), marked once and kept; a predicted maths mark from mastery and mock exams with its range, the student's target, the BAC countdown (`TAFAWOQ_BAC_DATE`, else estimated), the weekly pace and today's most valuable task |
 | Phone-call lesson | the teacher "calls" the student: greeting by name, dialogue on the weakest skill, three graded oral questions, spoken summary |
 | Personal lesson & video | built from the student model with generated examples; the video is rendered in the browser as animated slides narrated by the browser's own speech synthesis |
 

@@ -46,6 +46,7 @@ import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqSt
 import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
+import { RoadmapCard } from "./RoadmapCard";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -187,6 +188,7 @@ function Home() {
           {t.editProfile}
         </button>
       </div>
+      {student.schoolLevel === "bac" && lessons.length > 0 && <RoadmapCard />}
       {student.schoolLevel === "bac" && lessons.length > 0 && (
         <Link href="/tafawoq/exam" className="tfq-card tfq-exam-card">
           <FileText size={26} />
@@ -1099,6 +1101,11 @@ function ChildReport({ child }: { child: ChildReportData }) {
                 <strong>{child.lastActivityAt ? new Date(child.lastActivityAt).toLocaleDateString() : t.never}</strong>
               </div>
             </div>
+          )}
+          {child.roadmap && (
+            <p style={{ marginTop: 12 }}>
+              <strong>{t.roadTitle}:</strong> {t.roadParent(child.roadmap.target, child.roadmap.predicted, child.roadmap.daysLeft)}
+            </p>
           )}
           {child.exams.length > 0 && (
             <div style={{ marginTop: 16 }}>

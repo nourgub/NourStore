@@ -297,6 +297,22 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       expect(history[0].exercises[0].earned).toBe(0);
       const [childAfterExam] = await parentCaller.tafawoq.parentReport();
       expect(childAfterExam.exams.map(entry => entry.score)).toEqual([marked.score]);
+
+      // Road to the mark: a target, a predicted mark, today's task.
+      const road = await caller.tafawoq.roadmap();
+      expect(road).not.toBeNull();
+      expect(road!.target).toBeNull();
+      expect(road!.predicted).toBeGreaterThanOrEqual(0);
+      expect(road!.predicted).toBeLessThanOrEqual(20);
+      expect(road!.low).toBeLessThanOrEqual(road!.predicted);
+      expect(road!.today?.lessonKey).toBeTruthy();
+      await expect(caller.tafawoq.setTarget({ targetMark: 25 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      const aimed = await caller.tafawoq.setTarget({ targetMark: 16 });
+      expect(aimed!.target).toBe(16);
+      expect(aimed!.sessionsPerWeek).toBeGreaterThanOrEqual(2);
+      expect((await caller.tafawoq.roadmap())!.target).toBe(16);
+      const [childWithRoad] = await parentCaller.tafawoq.parentReport();
+      expect(childWithRoad.roadmap?.target).toBe(16);
     });
   }
 );

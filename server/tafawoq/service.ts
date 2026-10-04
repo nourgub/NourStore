@@ -30,6 +30,17 @@ import { buildStudentContext, type StudentContext } from "./context";
 import { createRng, randomSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
+import {
+  bestNextLesson,
+  examBlueprint,
+  examMention,
+  nextBacDate,
+  partPoints,
+  predictMark,
+  sessionsPerWeek,
+} from "./bac";
+
+export { examMention, partPoints } from "./bac";
 import { dialogueReply, dialogueSkills, dialogueState, resumeLine, startDialogue } from "./dialogue";
 import { OPTION_LETTERS, pickOption, spokenToAnswer } from "./spokenAnswer";
 import { answersMatch, gradeDeterministic } from "./grading";
@@ -281,63 +292,6 @@ export async function generateProblem(userId: number, lessonKey: string) {
 // stored on its items, and part points are proportional to difficulty.
 // ---------------------------------------------------------------------------
 
-type ExamSlot = { lessons: string[]; points: number };
-
-/** The paper's structure per stream, after the official BAC papers. */
-const EXAM_BLUEPRINTS: Record<"scientific" | "gestion" | "literary", { minutes: number; slots: ExamSlot[] }> = {
-  scientific: {
-    minutes: 210,
-    slots: [
-      { lessons: ["math-probability"], points: 4 },
-      { lessons: ["math-complex", "math-space-geometry"], points: 4 },
-      { lessons: ["math-sequences", "math-integrals", "math-arithmetic", "math-differential-equations"], points: 5 },
-      { lessons: ["math-exponential", "math-logarithm"], points: 7 },
-    ],
-  },
-  gestion: {
-    minutes: 180,
-    slots: [
-      { lessons: ["math-probability", "math-statistics"], points: 4 },
-      { lessons: ["math-sequences"], points: 5 },
-      { lessons: ["math-integrals", "math-limits"], points: 4 },
-      { lessons: ["math-exponential", "math-logarithm", "math-derivatives"], points: 7 },
-    ],
-  },
-  literary: {
-    minutes: 150,
-    slots: [
-      { lessons: ["math-arithmetic"], points: 6 },
-      { lessons: ["math-sequences"], points: 7 },
-      { lessons: ["math-probability"], points: 7 },
-    ],
-  },
-};
-
-function examBlueprint(stream: string | null) {
-  if (stream === "gestion") return EXAM_BLUEPRINTS.gestion;
-  if (stream === "lettres" || stream === "langues") return EXAM_BLUEPRINTS.literary;
-  return EXAM_BLUEPRINTS.scientific;
-}
-
-/** Algerian BAC mentions. */
-export function examMention(score: number): string {
-  if (score >= 18) return "ممتاز";
-  if (score >= 16) return "جيد جداً";
-  if (score >= 14) return "جيد";
-  if (score >= 12) return "قريب من الجيد";
-  if (score >= 10) return "مقبول";
-  return "غير ناجح بعد";
-}
-
-/** Points of each part: the exercise's points shared by difficulty, to the quarter point. */
-export function partPoints(points: number, difficulties: number[]): number[] {
-  const total = difficulties.reduce((sum, value) => sum + value, 0) || 1;
-  const shares = difficulties.map(value => Math.round(((points * value) / total) * 4) / 4);
-  // Give the rounding remainder to the last (hardest) part so they sum exactly.
-  shares[shares.length - 1] += points - shares.reduce((sum, value) => sum + value, 0);
-  return shares;
-}
-
 export async function generateExam(userId: number) {
   const student = await studentOrThrow(userId);
   const blueprint = examBlueprint(student.stream);
@@ -446,6 +400,64 @@ export async function submitExam(
   }));
   await store.saveExamResult(exam.id, score, JSON.stringify(summary));
   return { score, outOf: 20, mention: examMention(score), exercises };
+}
+
+// ---------------------------------------------------------------------------
+// "Your road to your mark" (طريقك إلى علامتك): target, predicted mark,
+// countdown to the BAC, and today's most valuable task. See ./bac.ts.
+// ---------------------------------------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+async function roadmapFor(student: NonNullable<Awaited<ReturnType<typeof store.getTafawoqStudentByUser>>>) {
+  if (student.schoolLevel !== "bac") return null;
+  const [allStates, exams] = await Promise.all([store.getAllSkillStates(student.id), examHistory(student.id, 3)]);
+  const standings = LESSONS.map(lesson => {
+    const states = allStates
+      .filter(row => row.lessonKey === lesson.key)
+      .map(row => ({ skill: row.skillKey, pKnown: row.pKnown, attempts: row.attempts, correct: row.correct }));
+    return { key: lesson.key, mastery: states.length ? overallMastery(states) : null };
+  });
+  const prediction = predictMark(student.stream, standings, exams.map(exam => exam.score));
+  const now = new Date();
+  const bac = nextBacDate(now);
+  const daysLeft = Math.max(0, Math.ceil((bac.date.getTime() - now.getTime()) / DAY_MS));
+  const target = student.targetMark ?? null;
+  const next = bestNextLesson(prediction.lessons);
+  let focusSkill: string | null = null;
+  if (next && !next.needsPlacement) {
+    const states = allStates.filter(row => row.lessonKey === next.lessonKey).sort((a, b) => a.pKnown - b.pKnown);
+    const lesson = getLesson(next.lessonKey);
+    focusSkill = lesson && states[0] ? skillName(lesson, states[0].skillKey) : null;
+  }
+  return {
+    bacDate: bac.date,
+    bacDateOfficial: bac.official,
+    daysLeft,
+    target,
+    predicted: prediction.predicted,
+    low: prediction.low,
+    high: prediction.high,
+    examsTaken: exams.length,
+    lessons: prediction.lessons.map(entry => ({
+      ...entry,
+      points: Math.round(entry.points * 100) / 100,
+      expected: Math.round(entry.expected * 100) / 100,
+    })),
+    today: next ? { ...next, skillName: focusSkill } : null,
+    sessionsPerWeek: target === null ? null : sessionsPerWeek(target - prediction.predicted, daysLeft),
+  };
+}
+
+export async function roadmap(userId: number) {
+  const student = await studentOrThrow(userId);
+  return roadmapFor(student);
+}
+
+export async function setTarget(userId: number, targetMark: number) {
+  const student = await studentOrThrow(userId);
+  await store.setTargetMark(student.id, targetMark);
+  return roadmapFor({ ...student, targetMark });
 }
 
 /** Marked mock exams, oldest first (for a trend), with points per exercise. */
@@ -1025,6 +1037,7 @@ export async function parentReport(parentUserId: number) {
           lastActivityAt: null,
           advice: [] as ParentAdvice[],
           exams: [] as Awaited<ReturnType<typeof examHistory>>,
+          roadmap: null as Awaited<ReturnType<typeof roadmapFor>>,
         };
       }
       const allStates = await store.getAllSkillStates(student.id);
@@ -1103,6 +1116,7 @@ export async function parentReport(parentUserId: number) {
         lastActivityAt,
         advice,
         exams: await examHistory(student.id, 5),
+        roadmap: await roadmapFor(student),
       };
     })
   );

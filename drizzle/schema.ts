@@ -1196,6 +1196,8 @@ export const tafawoqStudents = mysqlTable("tafawoqStudents", {
   // BAC stream (شعبة); null below BAC, or for a BAC student who hasn't chosen.
   stream: mysqlEnum("stream", ["sciences", "math", "techmath", "gestion", "lettres", "langues"]),
   goals: text("goals"),
+  // BAC maths mark aimed for (out of 20); null until the student sets it.
+  targetMark: double("targetMark"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

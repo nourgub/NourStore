@@ -17,6 +17,7 @@ import {
 } from "./studentModel";
 import { buildStudentContext } from "./context";
 import { examMention, partPoints } from "./service";
+import { bestNextLesson, nextBacDate, paperLessons, predictMark, sessionsPerWeek } from "./bac";
 import {
   buildExercisePlan,
   templateExercises,
@@ -335,5 +336,57 @@ describe("mock BAC exam marking", () => {
     expect(examMention(14)).toBe("جيد");
     expect(examMention(16)).toBe("جيد جداً");
     expect(examMention(18)).toBe("ممتاز");
+  });
+});
+
+describe("road to the mark", () => {
+  it("estimates the BAC on the second Sunday of June, or uses the official date", () => {
+    expect(nextBacDate(new Date("2026-10-04T10:00:00Z"), undefined)).toEqual({
+      date: new Date("2027-06-13T08:00:00Z"),
+      official: false,
+    });
+    // During the exam week it is still this year's BAC.
+    expect(nextBacDate(new Date("2027-06-15T10:00:00Z"), undefined).date.getUTCFullYear()).toBe(2027);
+    expect(nextBacDate(new Date("2027-07-01T10:00:00Z"), undefined).date.getUTCFullYear()).toBe(2028);
+    expect(nextBacDate(new Date("2026-10-04T10:00:00Z"), "2027-06-08")).toEqual({
+      date: new Date("2027-06-08T08:00:00Z"),
+      official: true,
+    });
+  });
+
+  it("shares the 20 points among the lessons of each stream's paper", () => {
+    for (const stream of ["sciences", "math", "techmath", "gestion", "lettres", "langues"]) {
+      const total = paperLessons(stream).reduce((sum, entry) => sum + entry.points, 0);
+      expect(total, stream).toBeCloseTo(20, 6);
+    }
+    expect(paperLessons("lettres").map(entry => entry.lesson.key).sort()).toEqual(
+      ["math-arithmetic", "math-probability", "math-sequences"]
+    );
+  });
+
+  it("predicts from mastery, blends in mock exams, and narrows with evidence", () => {
+    const unknown = predictMark("sciences", [], []);
+    expect(unknown.predicted).toBe(6); // 20 × assumed 0.3
+    expect(unknown.high - unknown.low).toBeGreaterThan(8);
+    const keys = paperLessons("sciences").map(entry => entry.lesson.key);
+    const perfect = predictMark("sciences", keys.map(key => ({ key, mastery: 1 })), []);
+    expect(perfect.predicted).toBe(20);
+    const half = predictMark("sciences", keys.map(key => ({ key, mastery: 0.5 })), [16, 16, 16]);
+    expect(half.predicted).toBe(13.5); // 10 × 0.4 + 16 × 0.6 = 13.6, to the quarter
+    expect(half.high - half.low).toBeLessThan(unknown.high - unknown.low);
+  });
+
+  it("sends the student where the most points are, and paces the plan", () => {
+    const keys = paperLessons("sciences").map(entry => entry.lesson.key);
+    const standings = keys.map(key => ({ key, mastery: key === "math-exponential" ? 0.1 : 0.9 }));
+    const next = bestNextLesson(predictMark("sciences", standings, []).lessons)!;
+    expect(next.lessonKey).toBe("math-exponential"); // worth the most (the 7-point problem) and weakest
+    expect(next.needsPlacement).toBe(false);
+    expect(next.gain).toBeGreaterThan(0);
+    const fresh = bestNextLesson(predictMark("sciences", [], []).lessons)!;
+    expect(fresh.needsPlacement).toBe(true);
+    expect(sessionsPerWeek(-1, 200)).toBe(2);
+    expect(sessionsPerWeek(6, 245)).toBeGreaterThanOrEqual(2);
+    expect(sessionsPerWeek(10, 14)).toBe(7);
   });
 });

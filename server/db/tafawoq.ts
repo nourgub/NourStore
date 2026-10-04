@@ -68,6 +68,11 @@ export async function upsertTafawoqStudent(input: {
   return (await getTafawoqStudentByUser(input.userId))!;
 }
 
+export async function setTargetMark(studentId: number, targetMark: number) {
+  const db = await requireDb();
+  await db.update(tafawoqStudents).set({ targetMark }).where(eq(tafawoqStudents.id, studentId));
+}
+
 export async function getSkillStates(studentId: number, lessonKey: string): Promise<SkillState[]> {
   const db = await requireDb();
   const rows = await db
