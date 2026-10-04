@@ -158,7 +158,7 @@ export default function CourseCatalog() {
     >
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between gap-6">
-          <Link href="/" className="brand-lockup">
+          <Link href="/academy" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
               N
             </span>
@@ -167,7 +167,7 @@ export default function CourseCatalog() {
             </span>
           </Link>
           <div className="catalog-header-actions">
-            <Link href="/" className="catalog-home-link">
+            <Link href="/academy" className="catalog-home-link">
               {t.home}
             </Link>
             <Link href="/lab" className="catalog-home-link">

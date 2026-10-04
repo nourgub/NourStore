@@ -81,7 +81,10 @@ function Router() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Switch>
-        <Route path="/" component={Home} />
+        {/* The maths teacher (Tafawoq) is the front page; the Nourix Academy
+            computer-science platform keeps its home at /academy. */}
+        <Route path="/" component={TafawoqApp} />
+        <Route path="/academy" component={Home} />
         <Route path="/login" component={() => <AuthPage mode="login" />} />
         <Route
           path="/register"

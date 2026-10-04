@@ -278,3 +278,16 @@
 }
 
 .tfq-style-switch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 13px; }
+
+/* The call, on the home page */
+.tfq-home-call {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 18px;
+  border-color: rgba(79, 191, 127, 0.55);
+  background: linear-gradient(135deg, rgba(79, 191, 127, 0.16), rgba(79, 191, 127, 0.03));
+}
+.tfq-home-call-icon {
+  width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center;
+  background: #3fa86d; color: #fff; animation: tfq-home-ring 2.4s ease-in-out infinite;
+}
+@keyframes tfq-home-ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
+@media (prefers-reduced-motion: reduce) { .tfq-home-call-icon { animation: none; } }

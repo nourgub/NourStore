@@ -149,6 +149,80 @@ function Landing() {
           </div>
         ))}
       </div>
+      <p style={{ marginTop: 18, fontSize: 13 }}>
+        <a className="tfq-muted" href="/academy" style={{ textDecoration: "underline" }}>
+          {t.academyLink}
+        </a>
+      </p>
+    </section>
+  );
+}
+
+/**
+ * The phone call, front and centre: the teacher calls on the lesson where
+ * today's work is worth the most (or the last lesson worked on). Before
+ * any placement the teacher can't know the student yet, so the card
+ * starts the short placement test instead.
+ */
+function HomeCallCard({
+  lessons,
+  placedKeys,
+  bac,
+}: {
+  lessons: Array<{ key: string; title: string }>;
+  placedKeys: string[];
+  bac: boolean;
+}) {
+  const t = useT();
+  const lang = useLang();
+  const [style, setStyle] = useTeacherStyle();
+  const [calling, setCalling] = useState(false);
+  const road = trpc.tafawoq.roadmap.useQuery(undefined, { enabled: bac });
+  const today = road.data?.today?.lessonKey;
+  const lessonKey = today && placedKeys.includes(today) ? today : placedKeys.find(key => lessons.some(lesson => lesson.key === key));
+  const lesson = lessons.find(entry => entry.key === lessonKey);
+  return (
+    <section className="tfq-card tfq-home-call">
+      {calling && lesson && (
+        <CallScreen
+          lessonKey={lesson.key}
+          lang={lang}
+          style={style}
+          teacherName="أستاذ الرياضيات"
+          onClose={() => setCalling(false)}
+        />
+      )}
+      <div className="tfq-home-call-icon" aria-hidden>
+        <Phone size={30} />
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <h2 style={{ margin: 0 }}>{t.homeCallTitle}</h2>
+        <Content className="tfq-muted">{lesson ? t.homeCallText(lesson.title) : t.homeCallFirst}</Content>
+        <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
+          <span className="tfq-muted">{t.teacherStyle}</span>
+          {(["fusha", "darja"] as const).map(option => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={style === option}
+              className={`tfq-btn small ${style === option ? "" : "ghost"}`}
+              onClick={() => setStyle(option)}
+            >
+              {option === "fusha" ? t.styleFusha : t.styleDarja}
+            </button>
+          ))}
+        </div>
+      </div>
+      {lesson ? (
+        <button type="button" className="tfq-btn tfq-call-open" onClick={() => setCalling(true)}>
+          <Phone size={18} /> {t.homeCallGo}
+        </button>
+      ) : (
+        <Link href={`/tafawoq/${lessons[0].key}`} className="tfq-btn">
+          {t.homeCallPlacement}
+        </Link>
+      )}
     </section>
   );
 }
@@ -189,6 +263,13 @@ function Home() {
           {t.editProfile}
         </button>
       </div>
+      {lessons.length > 0 && (
+        <HomeCallCard
+          lessons={lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))}
+          placedKeys={(overview.data?.lessons ?? []).map(entry => entry.key)}
+          bac={student.schoolLevel === "bac"}
+        />
+      )}
       {student.schoolLevel === "bac" && lessons.length > 0 && <RoadmapCard />}
       {student.schoolLevel === "bac" && lessons.length > 0 && (
         <Link href="/tafawoq/exam" className="tfq-card tfq-exam-card">
