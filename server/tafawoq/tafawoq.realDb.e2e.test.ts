@@ -215,6 +215,12 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
         turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: state.dialogue.steps[state.index].answer });
       }
       expect(turn.reply).toContain(DIALOGUE_DONE);
+      // The same dialogue, asked and answered in Darja.
+      turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "فهمني بالحوار", style: "darja" });
+      expect(turn.reply).toContain("يالاه نكتشفو");
+      turn = await caller.tafawoq.sendMessage({ lessonKey: lesson.key, message: "ما نعرفش", style: "darja" });
+      expect(turn.reply).toContain("خمّم معايا");
+      expect(turn.reply).toContain("💡");
 
       // A BAC-style problem: one statement, chained parts, graded part by part.
       const problem = await caller.tafawoq.generateProblem({ lessonKey: lesson.key });

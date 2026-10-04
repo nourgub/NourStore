@@ -47,6 +47,7 @@ import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
 import { RoadmapCard } from "./RoadmapCard";
+import { darjaSuggestions, useTeacherStyle } from "./teacherStyle";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -575,6 +576,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   const [live, setLive] = useState(false);
   const [call, setCall] = useState(false);
   const teacherName = `أستاذ ${data.analysis.subjectName}`;
+  const [style, setStyle] = useTeacherStyle();
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -593,7 +595,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   useEffect(() => {
     if (!data.messages.length && !started.current) {
       started.current = true;
-      startTutor.mutate({ lessonKey });
+      startTutor.mutate({ lessonKey, style });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.messages.length, lessonKey]);
@@ -602,21 +604,41 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   }, [data.messages.length, pending]);
 
   const suggestions = useMemo(
-    () => t.suggestions(data.analysis.focusSkills[0]?.name),
-    [t, data.analysis.focusSkills]
+    () =>
+      style === "darja"
+        ? darjaSuggestions(data.analysis.focusSkills[0]?.name)
+        : t.suggestions(data.analysis.focusSkills[0]?.name),
+    [t, data.analysis.focusSkills, style]
   );
 
   const submit = (message: string) => {
     if (!message.trim() || send.isPending) return;
     setPending(message.trim());
     setDraft("");
-    send.mutate({ lessonKey, message: message.trim() });
+    send.mutate({ lessonKey, message: message.trim(), style });
   };
 
   return (
     <div className="tfq-card">
-      {live && <LiveTutor lessonKey={lessonKey} lang={lang} onClose={() => setLive(false)} />}
-      {call && <CallScreen lessonKey={lessonKey} lang={lang} teacherName={teacherName} onClose={() => setCall(false)} />}
+      {live && <LiveTutor lessonKey={lessonKey} lang={lang} style={style} onClose={() => setLive(false)} />}
+      {call && (
+        <CallScreen lessonKey={lessonKey} lang={lang} style={style} teacherName={teacherName} onClose={() => setCall(false)} />
+      )}
+      <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
+        <span className="tfq-muted">{t.teacherStyle}</span>
+        {(["fusha", "darja"] as const).map(option => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={style === option}
+            className={`tfq-btn small ${style === option ? "" : "ghost"}`}
+            onClick={() => setStyle(option)}
+          >
+            {option === "fusha" ? t.styleFusha : t.styleDarja}
+          </button>
+        ))}
+      </div>
       <div className="tfq-call-row">
         <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => setCall(true)}>
           <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>

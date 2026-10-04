@@ -17,6 +17,7 @@ import type { StudentContext } from "./context";
 import { answersMatch } from "./grading";
 import { expressionsEquivalent, parseExpression } from "./mathExpr";
 import { spokenToAnswer } from "./spokenAnswer";
+import { toDarja } from "./darja";
 
 /** Starts every message that closes a dialogue (the phone call looks for it). */
 export const DIALOGUE_DONE = "🎯";
@@ -85,8 +86,16 @@ export function dialogueState(lesson: Lesson, lastTutorMessage: string | null | 
     const dialogue = skill.dialogue;
     if (!dialogue) continue;
     for (let index = dialogue.steps.length - 1; index >= 0; index -= 1) {
-      if (lastTutorMessage.includes(stepLine(dialogue, index))) {
-        return { skill, dialogue, index, hinted: lastTutorMessage.includes(`💡 ${dialogue.steps[index].hint}`) };
+      // The teacher may have said it in Fusha or in Darja (./darja.ts).
+      const line = stepLine(dialogue, index);
+      if (lastTutorMessage.includes(line) || lastTutorMessage.includes(toDarja(line))) {
+        const hint = `💡 ${dialogue.steps[index].hint}`;
+        return {
+          skill,
+          dialogue,
+          index,
+          hinted: lastTutorMessage.includes(hint) || lastTutorMessage.includes(toDarja(hint)),
+        };
       }
     }
   }

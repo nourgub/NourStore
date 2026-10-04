@@ -5,6 +5,7 @@
 // from the same student model as the AI path (tier, focus skills,
 // recurring errors, name), so the experience stays personal — just less
 // rich — rather than silently degrading to a generic lesson.
+import { translateFrenchTerms } from "./darja";
 import type { LessonExample, PersonalLesson, VideoScene, VideoScript } from "@shared/tafawoq";
 import { TIER_LABELS_AR } from "@shared/tafawoq";
 import type { BankQuestion, Lesson } from "./curriculum";
@@ -282,14 +283,14 @@ export function templateOpening(context: StudentContext): string {
 export type TutorIntent = "quiz" | "giveUp" | "dialogue" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
-  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|interroge|teste-moi|pose-moi|quiz|test me|ask me/],
-  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up/],
+  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me/],
+  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up/],
   ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me/],
-  ["thanks", /شكر|merci|thank/],
-  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|pourquoi|erreur|faute|why|mistake|wrong/],
-  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
-  ["challenge", /تحد|أصعب|اصعب|متقدم|défi|difficile|challenge|harder/],
-  ["example", /مثال|أمثلة|امثلة|exemple|example/],
+  ["thanks", /شكر|merci|thank|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
+  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong/],
+  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
+  ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder/],
+  ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example/],
 ];
 
 export function detectIntent(message: string): TutorIntent {
@@ -298,7 +299,7 @@ export function detectIntent(message: string): TutorIntent {
 }
 
 export function mentionedSkill(lesson: Lesson, message: string) {
-  const text = message.toLowerCase();
+  const text = translateFrenchTerms(message).toLowerCase();
   let mentioned: Lesson["skills"][number] | undefined;
   let best = 0;
   for (const candidate of lesson.skills) {

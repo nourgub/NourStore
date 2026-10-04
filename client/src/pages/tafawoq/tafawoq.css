@@ -276,3 +276,5 @@
   .tfq-road-details .tfq-skill-row,
   .tfq-exam-mark .tfq-skill-row { grid-template-columns: 1fr auto; }
 }
+
+.tfq-style-switch { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; font-size: 13px; }

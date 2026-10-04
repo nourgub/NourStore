@@ -8,19 +8,25 @@ import { GraduationCap, Mic, MicOff, Send, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { M } from "./components";
 import { useT } from "./i18n";
+import type { TeacherStyle } from "./teacherStyle";
 import { RECOGNITION_LANG, canListen, canSpeak, listenOnce, speakArabic } from "./speech";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
-const OPENING = "أنا معك الآن. اسألني عن أي نقطة في الدرس، أو قل «أعطني مثالاً»، أو قل «اختبرني» لأطرح عليك سؤالاً.";
+const OPENING = {
+  fusha: "أنا معك الآن. اسألني عن أي نقطة في الدرس، أو قل «أعطني مثالاً»، أو قل «اختبرني» لأطرح عليك سؤالاً.",
+  darja: "راني معاك دوك. سقسيني على أي نقطة في الدرس، ولا قول «عطيني مثال»، ولا قول «سقسيني» نعطيك سؤال.",
+};
 
 export function LiveTutor({
   lessonKey,
   lang,
+  style,
   onClose,
 }: {
   lessonKey: string;
   lang: "ar" | "fr" | "en";
+  style: TeacherStyle;
   onClose: () => void;
 }) {
   const t = useT();
@@ -29,7 +35,7 @@ export function LiveTutor({
   const [phase, setPhase] = useState<Phase>("idle");
   const [handsFree, setHandsFree] = useState(true);
   const [heard, setHeard] = useState("");
-  const [reply, setReply] = useState(OPENING);
+  const [reply, setReply] = useState(OPENING[style]);
   const [notice, setNotice] = useState<string | null>(canListen() ? null : t.liveUnsupported);
   const [typed, setTyped] = useState("");
   const stopRef = useRef<() => void>(() => {});
@@ -60,7 +66,7 @@ export function LiveTutor({
     setHeard(message);
     setPhase("thinking");
     try {
-      const result = await send.mutateAsync({ lessonKey, message });
+      const result = await send.mutateAsync({ lessonKey, message, style });
       if (closedRef.current) return;
       setReply(result.reply);
       void utils.tafawoq.workspace.invalidate({ lessonKey });
@@ -106,7 +112,7 @@ export function LiveTutor({
           }
         }, 1200);
       }
-      speak(OPENING);
+      speak(OPENING[style]);
     } else if (canListen()) {
       listen();
     }

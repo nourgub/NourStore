@@ -21,6 +21,9 @@ const answersInput = z
   )
   .max(50);
 
+/** How the teacher speaks: Fusha (default) or Algerian Darja. */
+const style = z.enum(["fusha", "darja"]).optional();
+
 export const tafawoqRouter = router({
   catalog: publicProcedure.query(() => tafawoq.catalog()),
 
@@ -100,8 +103,8 @@ export const tafawoqRouter = router({
     .mutation(({ ctx, input }) => tafawoq.generateVideo(ctx.user.id, input.lessonKey)),
 
   startTutor: learnerProcedure
-    .input(z.object({ lessonKey }))
-    .mutation(({ ctx, input }) => tafawoq.startTutor(ctx.user.id, input.lessonKey)),
+    .input(z.object({ lessonKey, style }))
+    .mutation(({ ctx, input }) => tafawoq.startTutor(ctx.user.id, input.lessonKey, input.style)),
 
   /** A one-time code the student gives a parent (redeemed via parent.acceptInvite). */
   createParentCode: learnerProcedure
@@ -114,17 +117,17 @@ export const tafawoqRouter = router({
   /** Phone-call lesson: what the teacher says when the call opens / ends. */
   callIntro: learnerProcedure
     .use(rateLimit("tafawoq-call", 30, HOUR))
-    .input(z.object({ lessonKey }))
-    .mutation(({ ctx, input }) => tafawoq.callIntro(ctx.user.id, input.lessonKey)),
+    .input(z.object({ lessonKey, style }))
+    .mutation(({ ctx, input }) => tafawoq.callIntro(ctx.user.id, input.lessonKey, input.style)),
 
   callSummary: learnerProcedure
-    .input(z.object({ lessonKey, afterId: z.number().int().min(0) }))
-    .mutation(({ ctx, input }) => tafawoq.callSummary(ctx.user.id, input.lessonKey, input.afterId)),
+    .input(z.object({ lessonKey, afterId: z.number().int().min(0), style }))
+    .mutation(({ ctx, input }) => tafawoq.callSummary(ctx.user.id, input.lessonKey, input.afterId, input.style)),
 
   sendMessage: learnerProcedure
     .use(rateLimit("tafawoq-chat", 60, HOUR))
-    .input(z.object({ lessonKey, message: z.string().trim().min(1).max(2000) }))
+    .input(z.object({ lessonKey, message: z.string().trim().min(1).max(2000), style }))
     .mutation(({ ctx, input }) =>
-      tafawoq.sendTutorMessage(ctx.user.id, input.lessonKey, input.message)
+      tafawoq.sendTutorMessage(ctx.user.id, input.lessonKey, input.message, input.style)
     ),
 });

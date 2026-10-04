@@ -10,14 +10,27 @@ import { Mic, MicOff, Phone, PhoneOff, RotateCcw, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { M } from "./components";
 import { useT } from "./i18n";
+import type { TeacherStyle } from "./teacherStyle";
 import { RECOGNITION_LANG, canListen, listenOnce, speakArabic } from "./speech";
 
 type Phase = "ringing" | "connecting" | "speaking" | "listening" | "thinking" | "ended";
 
 const QUESTIONS_PER_CALL = 3;
 const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again/i;
-const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح)/;
-const NOT_HEARD = "لم أسمعك جيداً. أعد جوابك من فضلك.";
+// Graded-answer openings, in Fusha and in Darja (server/tafawoq/darja.ts).
+const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح)/;
+const SAY = {
+  fusha: {
+    notHeard: "لم أسمعك جيداً. أعد جوابك من فضلك.",
+    askAgain: "والآن، أعيد السؤال.",
+    checkUnderstood: "والآن لنتأكد أنك فهمت.",
+  },
+  darja: {
+    notHeard: "ما سمعتكش مليح. عاود جوابك من فضلك.",
+    askAgain: "ودوك، نعاودلك السؤال.",
+    checkUnderstood: "ودوك نشوفو إذا فهمت.",
+  },
+};
 
 /** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
 const DIALOGUE_DONE = "🎯";
@@ -25,7 +38,7 @@ const DIALOGUE_STEP = "❓ (";
 
 /** The tutor's "say «اختبرني»…" tails make no sense mid-call. */
 function forCall(text: string) {
-  return text.replace(/\n?قل «اختبرني»[^\n]*/g, "").trim();
+  return text.replace(/\n?(قل|قول) «اختبرني»[^\n]*/g, "").trim();
 }
 
 /** Two-tone ring, synthesised (no audio file). Returns a stop function. */
@@ -85,11 +98,13 @@ function TeacherFace({ speaking, listening }: { speaking: boolean; listening: bo
 export function CallScreen({
   lessonKey,
   lang,
+  style,
   teacherName,
   onClose,
 }: {
   lessonKey: string;
   lang: "ar" | "fr" | "en";
+  style: TeacherStyle;
   teacherName: string;
   onClose: () => void;
 }) {
@@ -171,7 +186,7 @@ export function CallScreen({
       onEnd: () => {
         if (got || closedRef.current) return;
         misses.current += 1;
-        if (misses.current <= 2) say(NOT_HEARD, listen);
+        if (misses.current <= 2) say(SAY[style].notHeard, listen);
         else {
           // Still nothing: switch to typing until the student unmutes.
           mutedRef.current = true;
@@ -185,7 +200,7 @@ export function CallScreen({
   const startDialogue = async () => {
     if (closedRef.current) return;
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: "علّمني بالحوار" });
+    const { reply } = await send.mutateAsync({ lessonKey, message: "علّمني بالحوار", style });
     if (!reply.includes(DIALOGUE_STEP)) {
       // No dialogue for this skill: straight to the questions.
       mode.current = "quiz";
@@ -203,7 +218,7 @@ export function CallScreen({
       return;
     }
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: "اختبرني" });
+    const { reply } = await send.mutateAsync({ lessonKey, message: "اختبرني", style });
     lastQuestion.current = reply;
     askedRef.current += 1;
     setAsked(askedRef.current);
@@ -219,12 +234,12 @@ export function CallScreen({
       return;
     }
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: text });
+    const { reply } = await send.mutateAsync({ lessonKey, message: text, style });
     void utils.tafawoq.workspace.invalidate({ lessonKey });
     if (mode.current === "dialogue") {
       if (reply.includes(DIALOGUE_DONE)) {
         mode.current = "quiz";
-        say(`${forCall(reply)}\nوالآن لنتأكد أنك فهمت.`, () => void askNext());
+        say(`${forCall(reply)}\n${SAY[style].checkUnderstood}`, () => void askNext());
       } else if (reply.includes(DIALOGUE_STEP)) {
         lastQuestion.current = reply.slice(reply.lastIndexOf(DIALOGUE_STEP));
         say(reply, listen);
@@ -240,7 +255,7 @@ export function CallScreen({
     } else {
       // An explanation or example in the middle of a question: answer it,
       // then put the same question back.
-      say(`${reply}\nوالآن، أعيد السؤال.`, () => say(lastQuestion.current, listen));
+      say(`${reply}\n${SAY[style].askAgain}`, () => say(lastQuestion.current, listen));
     }
   };
 
@@ -251,7 +266,7 @@ export function CallScreen({
       return;
     }
     setPhase("thinking");
-    const data = await summary.mutateAsync({ lessonKey, afterId: callStart.current });
+    const data = await summary.mutateAsync({ lessonKey, afterId: callStart.current, style });
     setResult({ correct: data.correct, total: data.total });
     void utils.tafawoq.workspace.invalidate({ lessonKey });
     void utils.tafawoq.overview.invalidate();
@@ -262,7 +277,7 @@ export function CallScreen({
     ringRef.current();
     setPhase("connecting");
     try {
-      const data = await intro.mutateAsync({ lessonKey });
+      const data = await intro.mutateAsync({ lessonKey, style });
       callStart.current = data.afterId;
       mode.current = "dialogue";
       say(data.text, () => void startDialogue());

@@ -8,12 +8,16 @@
 const UNITS: Record<string, number> = {
   صفر: 0, واحد: 1, واحدة: 1, اثنان: 2, اثنين: 2, إثنين: 2, اثنتان: 2, ثلاثة: 3, ثلاث: 3, أربعة: 4, اربعة: 4, أربع: 4,
   خمسة: 5, خمس: 5, ستة: 6, ست: 6, سبعة: 7, سبع: 7, ثمانية: 8, ثمان: 8, تسعة: 9, تسع: 9, عشرة: 10, عشر: 10,
+  // Darja
+  زوج: 2, جوج: 2, ربعة: 4, ثمنية: 8, تمنية: 8,
   zero: 0, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10,
   one: 1, two: 2, three: 3, four: 4, five: 5, seven: 7, eight: 8, nine: 9, ten: 10,
 };
 const TEENS: Record<string, number> = {
   "أحد عشر": 11, "احدى عشر": 11, "اثنا عشر": 12, "اثني عشر": 12, "ثلاثة عشر": 13, "أربعة عشر": 14, "اربعة عشر": 14,
   "خمسة عشر": 15, "ستة عشر": 16, "سبعة عشر": 17, "ثمانية عشر": 18, "تسعة عشر": 19,
+  // Darja: حداش، طناش، تلطاش…
+  حداش: 11, حضاش: 11, طناش: 12, تناش: 12, تلطاش: 13, ربعطاش: 14, خمسطاش: 15, سطاش: 16, سبعطاش: 17, ثمنطاش: 18, تسعطاش: 19,
 };
 const TENS: Record<string, number> = {
   عشرون: 20, عشرين: 20, ثلاثون: 30, ثلاثين: 30, أربعون: 40, أربعين: 40, اربعين: 40, خمسون: 50, خمسين: 50,
@@ -57,7 +61,8 @@ function wordsToNumbers(text: string): string {
 export function spokenToAnswer(raw: string): string {
   let text = raw
     .toLowerCase()
-    .replace(/^(الجواب|الإجابة|الاجابة|جوابي|النتيجة|هو|هي|la réponse est|c'est|the answer is|it's)\s+/g, "")
+    .replace(/^(الجواب|الإجابة|الاجابة|جوابي|النتيجة|هو|هي|راهو|راهي|راه|نقول|la réponse est|c'est|ça fait|the answer is|it's)\s+/g, "")
+    .replace(/^(هو|هي|يساوي|تساوي)\s+/g, "")
     .replace(/[؟?!.،,]$/g, "");
   text = wordsToNumbers(text);
   for (const [pattern, replacement] of OPERATORS) text = text.replace(pattern, replacement);

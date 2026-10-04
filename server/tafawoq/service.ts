@@ -30,6 +30,7 @@ import { buildStudentContext, type StudentContext } from "./context";
 import { createRng, randomSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
+import { inStyle, type TeacherStyle } from "./darja";
 import {
   bestNextLesson,
   examBlueprint,
@@ -781,14 +782,15 @@ async function tutorText(
 }
 
 /** Opens the tutoring session with an analysis-based greeting, once. */
-export async function startTutor(userId: number, lessonKey: string) {
+export async function startTutor(userId: number, lessonKey: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
   const lesson = lessonOrThrow(lessonKey);
   const existing = await store.listMessages(student.id, lesson.key);
   if (existing.length) return { started: false };
   const context = await loadContext(student, lesson);
-  const { text, source } = await tutorText(context, lesson, [], null);
-  await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
+  const opening = await tutorText(context, lesson, [], null);
+  const text = opening.source === "ai" ? opening.text : inStyle(opening.text, style);
+  await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: opening.source });
   return { started: true };
 }
 
@@ -920,18 +922,18 @@ function dialogueTurn(
 // sendMessage → summary); these two give it what the teacher says.
 // ---------------------------------------------------------------------------
 
-export async function callIntro(userId: number, lessonKey: string) {
+export async function callIntro(userId: number, lessonKey: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
   const lesson = lessonOrThrow(lessonKey);
   const context = await loadContext(student, lesson);
-  const text = callIntroText(lesson, context);
+  const text = inStyle(callIntroText(lesson, context), style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
   // Questions asked during the call are the assessments created after this
   // id (ids, not timestamps: those only have one-second precision).
   return { text, afterId: await store.lastAssessmentId(student.id) };
 }
 
-export async function callSummary(userId: number, lessonKey: string, afterId: number) {
+export async function callSummary(userId: number, lessonKey: string, afterId: number, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
   const lesson = lessonOrThrow(lessonKey);
   const oral = (await store.listGradedAssessments(student.id, lesson.key)).filter(
@@ -940,7 +942,7 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
   const context = await loadContext(student, lesson);
   const focus = context.focusSkills[0] ?? null;
   const correct = oral.filter(entry => (entry.score ?? 0) === 100).length;
-  const text = callSummaryText({
+  const summaryText = callSummaryText({
     name: student.displayName,
     correct,
     total: oral.length,
@@ -949,6 +951,7 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
     after: oral.at(-1)?.masteryAfter ?? null,
     nextSkillName: context.focusSkills[1]?.name ?? null,
   });
+  const text = inStyle(summaryText, style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
   return {
     text,
@@ -959,7 +962,7 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
   };
 }
 
-export async function sendTutorMessage(userId: number, lessonKey: string, message: string) {
+export async function sendTutorMessage(userId: number, lessonKey: string, message: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
   const lesson = lessonOrThrow(lessonKey);
   const context = await loadContext(student, lesson);
@@ -974,12 +977,14 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     source: null,
   });
   const lastTutor = [...history].reverse().find(entry => entry.role === "tutor")?.content;
-  const dialogue = dialogueTurn(lesson, context, student.displayName, lastTutor, message);
+  const dialogueText = dialogueTurn(lesson, context, student.displayName, lastTutor, message);
+  const dialogue = dialogueText === null ? null : inStyle(dialogueText, style);
   if (dialogue !== null) {
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: dialogue, source: "template" });
     return { reply: dialogue, source: "template" as ContentSource };
   }
-  const oral = await oralTurn(userId, student, lesson, context, message);
+  const oralText = await oralTurn(userId, student, lesson, context, message);
+  const oral = oralText === null ? null : inStyle(oralText, style);
   if (oral !== null) {
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
     return { reply: oral, source: "template" as ContentSource };
@@ -988,7 +993,8 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
   // A question in the middle of a dialogue is answered, then the dialogue
   // picks up where it was (unless the student moved on to a quiz).
   const paused = detectIntent(message) !== "quiz" ? dialogueState(lesson, lastTutor) : null;
-  const text = paused ? `${answered.text}\n\n${resumeLine(paused)}` : answered.text;
+  const said = answered.source === "ai" ? answered.text : inStyle(answered.text, style);
+  const text = paused ? `${said}\n\n${inStyle(resumeLine(paused), style)}` : said;
   const source = answered.source;
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
   return { reply: text, source };
