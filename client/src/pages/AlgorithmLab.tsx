@@ -280,7 +280,7 @@ export default function AlgorithmLab() {
     >
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between gap-6">
-          <Link href="/academy" className="brand-lockup">
+          <Link href="/" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
               N
             </span>

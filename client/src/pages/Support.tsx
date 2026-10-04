@@ -117,7 +117,7 @@ export default function Support() {
     >
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between gap-6">
-          <Link href="/academy" className="brand-lockup">
+          <Link href="/" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
               N
             </span>
@@ -126,7 +126,7 @@ export default function Support() {
             </span>
           </Link>
           <div className="catalog-header-actions">
-            <Link href="/academy" className="catalog-home-link">
+            <Link href="/" className="catalog-home-link">
               <BackArrow dir={dir} size={14} />
               {t.back}
             </Link>

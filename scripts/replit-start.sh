@@ -21,6 +21,11 @@ set -uo pipefail
 DATA_DIR="$(pwd)/.replit-data"
 MYSQL_DATA_DIR="$DATA_DIR/mysql"
 MYSQL_SOCKET="$DATA_DIR/mysqld.sock"
+# mysqld refuses a socket path longer than 107 characters; a deeply nested
+# project folder would hit that, so fall back to a short path in /tmp.
+if [ "${#MYSQL_SOCKET}" -gt 100 ]; then
+  MYSQL_SOCKET="/tmp/mysqld-$(id -u)-$(printf '%s' "$DATA_DIR" | cksum | cut -d' ' -f1).sock"
+fi
 SECRETS_FILE="$DATA_DIR/generated.env"
 MYSQL_PORT=3306
 DB_READY=0

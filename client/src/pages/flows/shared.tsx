@@ -162,7 +162,7 @@ export function Shell({
     >
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between gap-6">
-          <Link href="/academy" className="brand-lockup">
+          <Link href="/" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
               N
             </span>
@@ -171,7 +171,7 @@ export function Shell({
             </span>
           </Link>
           <div className="catalog-header-actions">
-            <Link href="/academy" className="catalog-home-link">
+            <Link href="/" className="catalog-home-link">
               {t.home}
             </Link>
             <Link href="/courses" className="catalog-home-link">

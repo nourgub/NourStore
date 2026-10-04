@@ -150,7 +150,7 @@ function Landing() {
         ))}
       </div>
       <p style={{ marginTop: 18, fontSize: 13 }}>
-        <a className="tfq-muted" href="/academy" style={{ textDecoration: "underline" }}>
+        <a className="tfq-muted" href="/" style={{ textDecoration: "underline" }}>
           {t.academyLink}
         </a>
       </p>
