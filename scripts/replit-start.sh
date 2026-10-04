@@ -94,7 +94,11 @@ start_mysqld_from() {
   done
 
   if [ "$DB_READY" -eq 1 ]; then
-    "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS nourix_academy;"
+    # Via Node (mysql2) first: the downloaded binary's `mysql` client needs
+    # libncurses.so.5, absent on recent images, while mysqld runs fine.
+    if ! node scripts/create-database.mjs "$MYSQL_PORT" nourix_academy; then
+      "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS nourix_academy;" || true
+    fi
     export DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/nourix_academy"
     echo "[replit-start] Applying database migrations..."
     if ! node scripts/migrate.mjs; then

@@ -4,6 +4,22 @@ Everything runs inside the Repl itself: the app **and** a real MySQL
 server. No external database account, no `corepack`, no separate
 sign-ups. Import the repo, click **Run**.
 
+## Node version
+
+Node **22** (`nodejs-22` in `.replit`, `pkgs.nodejs_22` in `replit.nix`,
+`"engines": { "node": ">=22.12.0" }` in `package.json`): Vite 7 needs
+Node ≥ 20.19, and Vitest 5 — the first release without the critical
+GHSA-5xrq-8626-4rwp / GHSA-82fw-gwwq-j7x9 advisories — needs ≥ 22.12.
+
+## Creating the database
+
+`scripts/replit-start.sh` creates `nourix_academy` with
+`scripts/create-database.mjs` (the app's own `mysql2` driver), falling
+back to the `mysql` client only if that fails. The downloaded MySQL
+binary's client needs `libncurses.so.5`, which recent images lack — before
+this, the server started but the database was never created and every
+migration failed with "Unknown database 'nourix_academy'".
+
 ## How it boots (`.replit` → `scripts/replit-start.sh`)
 
 1. `npm install` — plain npm, no corepack. `pnpm` remains the documented
@@ -39,7 +55,7 @@ given Repl environment will actually support.
 
 ```nix
 { pkgs }: {
-  deps = [ pkgs.nodejs_20 pkgs.mariadb pkgs.libaio ];
+  deps = [ pkgs.nodejs_22 pkgs.mariadb pkgs.libaio ];
 }
 ```
 
