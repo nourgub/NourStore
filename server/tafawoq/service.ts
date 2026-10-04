@@ -22,6 +22,7 @@ import {
   LESSONS,
   SUBJECTS,
   getLesson,
+  lessonForStream,
   selectPlacementQuestions,
   type BankQuestion,
   type Lesson,
@@ -77,10 +78,11 @@ function logAiFailure(what: string, error: unknown) {
   console.warn(`[tafawoq] ${what} fell back to template:`, error instanceof Error ? error.message : error);
 }
 
-function lessonOrThrow(lessonKey: string): Lesson {
+/** The lesson as this student studies it (skills of their BAC stream only). */
+function lessonOrThrow(lessonKey: string, stream: BacStream | null): Lesson {
   const lesson = getLesson(lessonKey);
   if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
-  return lesson;
+  return lessonForStream(lesson, stream);
 }
 
 async function studentOrThrow(userId: number) {
@@ -180,7 +182,7 @@ export async function register(
 
 export async function startPlacement(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const open = await store.getOpenAssessment(student.id, lesson.key, "placement");
   const items: StoredItem[] = open
     ? JSON.parse(open.itemsJson)
@@ -199,7 +201,7 @@ export async function startPlacement(userId: number, lessonKey: string) {
 
 export async function generatePractice(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const plan = buildExercisePlan(context, 5);
   // Avoid repeating bank items the student has already answered.
@@ -268,7 +270,7 @@ function problemsFor(lesson: Lesson, stream: string | null) {
 
 export async function generateProblem(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const problems = problemsFor(lesson, student.stream);
   if (!problems.length) {
     throw new TRPCError({ code: "NOT_FOUND", message: "No BAC problem for this lesson yet" });
@@ -301,6 +303,7 @@ export async function generateExam(userId: number) {
     .map(slot => {
       const available = slot.lessons
         .map(key => getLesson(key))
+        .map(lesson => (lesson ? lessonForStream(lesson, student.stream) : undefined))
         .filter((lesson): lesson is Lesson => !!lesson && lesson.skills.length > 0 && problemsFor(lesson, student.stream).length > 0)
         .filter(lesson => !student.stream || !lesson.streams || lesson.streams.includes(student.stream as never));
       return available.length ? { lesson: rng.pick(available), points: slot.points } : null;
@@ -497,7 +500,7 @@ export async function submitAssessment(
   if (assessment.status !== "open") {
     throw new TRPCError({ code: "CONFLICT", message: "Assessment already graded" });
   }
-  const lesson = lessonOrThrow(assessment.lessonKey);
+  const lesson = lessonOrThrow(assessment.lessonKey, student.stream);
   const items: StoredItem[] = JSON.parse(assessment.itemsJson);
   const byId = new Map(answers.map(answer => [answer.questionId, answer]));
   const misconceptionKeys = Object.keys(lesson.misconceptions);
@@ -645,7 +648,7 @@ export async function submitAssessment(
 
 export async function workspace(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const states = await store.getSkillStates(student.id, lesson.key);
   if (!states.length) {
     return { placed: false as const, lessonTitle: lesson.title };
@@ -713,7 +716,7 @@ async function buildPersonalLesson(context: StudentContext, lesson: Lesson) {
 
 export async function generateLesson(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const { content, source } = await buildPersonalLesson(context, lesson);
   const id = await store.saveLesson({
@@ -728,7 +731,7 @@ export async function generateLesson(userId: number, lessonKey: string) {
 
 export async function generateVideo(userId: number, lessonKey: string) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   // The video narrates the student's current personal lesson; make one
   // first if they haven't generated it yet (or it predates a tier change).
@@ -784,7 +787,7 @@ async function tutorText(
 /** Opens the tutoring session with an analysis-based greeting, once. */
 export async function startTutor(userId: number, lessonKey: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const existing = await store.listMessages(student.id, lesson.key);
   if (existing.length) return { started: false };
   const context = await loadContext(student, lesson);
@@ -924,7 +927,7 @@ function dialogueTurn(
 
 export async function callIntro(userId: number, lessonKey: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const text = inStyle(callIntroText(lesson, context), style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
@@ -935,7 +938,7 @@ export async function callIntro(userId: number, lessonKey: string, style?: Teach
 
 export async function callSummary(userId: number, lessonKey: string, afterId: number, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const oral = (await store.listGradedAssessments(student.id, lesson.key)).filter(
     entry => entry.kind === "oral" && entry.id > afterId
   );
@@ -964,7 +967,7 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
 
 export async function sendTutorMessage(userId: number, lessonKey: string, message: string, style?: TeacherStyle) {
   const student = await studentOrThrow(userId);
-  const lesson = lessonOrThrow(lessonKey);
+  const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const history = (await store.listMessages(student.id, lesson.key))
     .slice(-20)
@@ -1051,8 +1054,9 @@ export async function parentReport(parentUserId: number) {
       const lessons = (
         await Promise.all(
           lessonKeys.map(async key => {
-            const lesson = getLesson(key);
-            if (!lesson) return null;
+            const found = getLesson(key);
+            if (!found) return null;
+            const lesson = lessonForStream(found, student.stream);
             const context = await loadContext(student, lesson);
             const history = await store.listGradedAssessments(student.id, lesson.key);
             return {

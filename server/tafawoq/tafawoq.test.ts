@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LESSONS, getLesson, lessonsFor, selectPlacementQuestions } from "./curriculum";
+import { LESSONS, getLesson, lessonForStream, lessonsFor, selectPlacementQuestions } from "./curriculum";
 import { answersMatch, gradeDeterministic, normalizeAnswer } from "./grading";
 import {
   MASTERED,
@@ -388,5 +388,30 @@ describe("road to the mark", () => {
     expect(sessionsPerWeek(-1, 200)).toBe(2);
     expect(sessionsPerWeek(6, 245)).toBeGreaterThanOrEqual(2);
     expect(sessionsPerWeek(10, 14)).toBe(7);
+  });
+});
+
+describe("skills per BAC stream", () => {
+  const diffeq = getLesson("math-differential-equations")!;
+
+  it("removes y″ + ω²y = 0 from the sciences stream, keeps it for math", () => {
+    const sciences = lessonForStream(diffeq, "sciences");
+    expect(sciences.skills.map(skill => skill.key)).not.toContain("second_order");
+    expect(sciences.generators?.some(generator => generator.skill === "second_order")).toBe(false);
+    for (const skill of sciences.skills) {
+      for (const prerequisite of skill.prerequisites) {
+        expect(sciences.skills.some(entry => entry.key === prerequisite), `${skill.key} → ${prerequisite}`).toBe(true);
+      }
+    }
+    expect(sciences.problems?.length).toBeGreaterThan(0);
+    expect(lessonForStream(diffeq, "math").skills.map(skill => skill.key)).toContain("second_order");
+    expect(lessonForStream(diffeq, null)).toBe(diffeq);
+  });
+
+  it("builds a placement test from the stream's skills only", () => {
+    const sciences = lessonForStream(diffeq, "sciences");
+    const questions = selectPlacementQuestions(sciences, 10, 7);
+    expect(questions.length).toBeGreaterThan(0);
+    expect(questions.some(question => question.skill === "second_order")).toBe(false);
   });
 });

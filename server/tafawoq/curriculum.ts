@@ -29,6 +29,8 @@ export type Skill = {
   example: { problem: string; steps: string[]; answer: string };
   /** Discovery dialogue: the teacher leads the student to the rule (./dialogue.ts). */
   dialogue?: Dialogue;
+  /** BAC streams whose programme includes this skill; omitted = every stream of the lesson. */
+  streams?: BacStream[];
 };
 
 /**
@@ -1908,6 +1910,32 @@ export function lessonsFor(student: { schoolLevel: SchoolLevel; stream: BacStrea
       lesson.levels.includes(student.schoolLevel) &&
       (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream))
   );
+}
+
+const streamViews = new Map<string, Lesson>();
+
+/**
+ * The lesson as a student of this stream studies it: skills outside their
+ * programme (Skill.streams) are removed, with their generators, bank
+ * items, problems and prerequisite links. Same object when nothing is cut.
+ */
+export function lessonForStream(lesson: Lesson, stream: BacStream | null): Lesson {
+  if (!stream || !lesson.skills.some(skill => skill.streams && !skill.streams.includes(stream))) return lesson;
+  const cacheKey = `${lesson.key}:${stream}`;
+  const cached = streamViews.get(cacheKey);
+  if (cached) return cached;
+  const skills = lesson.skills.filter(skill => !skill.streams || skill.streams.includes(stream));
+  const keep = new Set(skills.map(skill => skill.key));
+  const view: Lesson = {
+    ...lesson,
+    skills: skills.map(skill => ({ ...skill, prerequisites: skill.prerequisites.filter(key => keep.has(key)) })),
+    bank: lesson.bank.filter(question => keep.has(question.skill)),
+    generators: lesson.generators?.filter(generator => keep.has(generator.skill)),
+    // A problem is kept when every part measures a kept skill.
+    problems: lesson.problems?.filter(problem => problem.generate(createRng(1)).parts.every(part => keep.has(part.skill))),
+  };
+  streamViews.set(cacheKey, view);
+  return view;
 }
 
 export function getLesson(lessonKey: string): Lesson | undefined {

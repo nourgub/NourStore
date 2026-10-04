@@ -716,6 +716,8 @@ export const differentialEquationsLesson: Lesson = {
       key: "second_order",
       name: "المعادلة y″ + ω²y = 0",
       prerequisites: ["check_solution", "initial_condition"],
+      // Only in the math and technical-math programmes.
+      streams: ["math", "techmath"],
       explanation:
         "حلول المعادلة التفاضلية y″ + ω²y = 0 (ω عدد حقيقي موجب) هي الدوال y = A cos(ωx) + B sin(ωx) حيث A و B عددان حقيقيان. نستخرج ω من المعامل: y″ + 9y = 0 تعطي ω = 3 (جذر المعامل وليس المعامل). الشرطان y(0) و y′(0) يعيّنان A و B: y(0) = A و y′(0) = ωB.",
       example: {
