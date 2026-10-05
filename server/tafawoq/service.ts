@@ -933,7 +933,16 @@ export async function callIntro(userId: number, lessonKey: string, style?: Teach
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
   // Questions asked during the call are the assessments created after this
   // id (ids, not timestamps: those only have one-second precision).
-  return { text, afterId: await store.lastAssessmentId(student.id) };
+  // The call speaks in short turns (greeting, "how are you", today's topic)
+  // and waits for the student between them: these are its pieces.
+  const focus = context.focusSkills[0] ?? [...context.skills].sort((a, b) => a.mastery - b.mastery)[0];
+  return {
+    text,
+    afterId: await store.lastAssessmentId(student.id),
+    name: student.displayName,
+    skillName: focus?.name ?? lesson.title,
+    mistake: context.recurringErrors[0]?.label ?? null,
+  };
 }
 
 export async function callSummary(userId: number, lessonKey: string, afterId: number, style?: TeacherStyle) {

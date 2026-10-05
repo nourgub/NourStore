@@ -291,3 +291,4 @@
 }
 @keyframes tfq-home-ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
 @media (prefers-reduced-motion: reduce) { .tfq-home-call-icon { animation: none; } }
+.tfq-call-talk { align-self: center; margin: 6px auto; }

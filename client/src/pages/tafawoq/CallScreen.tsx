@@ -1,9 +1,11 @@
-// A phone-call lesson with the subject teacher. Unlike the open live
-// session (LiveTutor), the teacher leads: rings, greets the student by
-// name, teaches the priority skill by dialogue (small questions that lead
-// the student to the rule) or with a worked example, asks three oral
-// questions (each graded and adapting difficulty through the student
-// model), handles "اشرح"/"أعد" interruptions, and hangs up with a summary.
+// A phone-call lesson with the subject teacher — a conversation, not a
+// lecture: the teacher says one short thing, then waits for the student.
+// "ألو؟ تسمعني؟" → "واش راك؟" → today's topic, "مستعد؟" → the dialogue that
+// leads the student to the rule → three graded oral questions (after a
+// wrong answer: the correction, then "واضح؟" and a wait) → a summary.
+// The student can cut in at any time ("دوري"), say «عاود» to repeat, or
+// type. If the microphone is blocked or nothing is heard twice, the teacher
+// stops talking and waits — it never talks on by itself.
 // Browser speech APIs only — free, no call service, nothing recorded.
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, RotateCcw, Send } from "lucide-react";
@@ -21,16 +23,38 @@ const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|ag
 const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح)/;
 const SAY = {
   fusha: {
-    notHeard: "لم أسمعك جيداً. أعد جوابك من فضلك.",
+    hello: (name: string) => `ألو؟ السلام عليكم يا ${name}! معك أستاذ الرياضيات. هل تسمعني جيداً؟`,
+    howAreYou: "كيف حالك اليوم؟",
+    topic: (skill: string, mistake: string | null) =>
+      `الحمد لله. اليوم سنعمل على «${skill}».${mistake ? ` لاحظت أنك تخطئ أحياناً في هذا: ${mistake}.` : ""} هل أنت مستعد؟`,
+    go: "هيا بنا!",
+    helloAgain: "ألو؟ هل تسمعني؟",
+    clear: "هل هذا واضح؟",
+    next: "حسناً، السؤال التالي.",
     askAgain: "والآن، أعيد السؤال.",
     checkUnderstood: "والآن لنتأكد أنك فهمت.",
   },
   darja: {
-    notHeard: "ما سمعتكش مليح. عاود جوابك من فضلك.",
+    hello: (name: string) => `ألو؟ السلام عليكم يا ${name}! معاك أستاذ الرياضيات. راك تسمعني مليح؟`,
+    howAreYou: "واش راك، لاباس؟",
+    topic: (skill: string, mistake: string | null) =>
+      `الحمد لله. اليوم نخدمو على «${skill}».${mistake ? ` لاحظت بلي ساعات تغلط في هادي: ${mistake}.` : ""} راك واجد؟`,
+    go: "يالاه!",
+    helloAgain: "ألو؟ راك تسمعني؟",
+    clear: "واضحة؟",
+    next: "مليح، السؤال الجاي.",
     askAgain: "ودوك، نعاودلك السؤال.",
     checkUnderstood: "ودوك نشوفو إذا فهمت.",
   },
 };
+
+/** Microphone errors after which listening again is pointless. */
+const MIC_BLOCKED = new Set(["not-allowed", "service-not-allowed", "audio-capture", "not-supported", "start-failed"]);
+
+/** What the teacher says aloud: the worked solution stays on screen only. */
+function spokenPart(text: string) {
+  return text.split(/\n(?:الحل|Solution|Solution) ?:/)[0].trim();
+}
 
 /** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
 const DIALOGUE_DONE = "🎯";
@@ -122,6 +146,9 @@ export function CallScreen({
   const [seconds, setSeconds] = useState(0);
   const [typed, setTyped] = useState("");
   const [result, setResult] = useState<{ correct: number; total: number } | null>(null);
+  /** Nothing heard twice, or the mic is blocked: the teacher waits for a tap or typing. */
+  const [waiting, setWaiting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const stopRef = useRef<() => void>(() => {});
   const ringRef = useRef<() => void>(() => {});
@@ -131,8 +158,14 @@ export function CallScreen({
   const askedRef = useRef(0);
   const mutedRef = useRef(false);
   const misses = useRef(0);
-  /** "dialogue" while the teacher leads the student to the rule, then "quiz". */
-  const mode = useRef<"dialogue" | "quiz">("dialogue");
+  /**
+   * Where the conversation is: the opening turns, the dialogue, the quiz,
+   * or right after a correction (waiting for "واضح؟" to be answered).
+   */
+  const stage = useRef<"hello" | "howAreYou" | "ready" | "dialogue" | "quiz" | "afterFeedback">("hello");
+  const opening = useRef<{ name: string; skillName: string; mistake: string | null }>({ name: "", skillName: "", mistake: null });
+  /** The last thing the teacher said, for «عاود». */
+  const lastSaid = useRef("");
   mutedRef.current = muted;
 
   const stopAll = () => {
@@ -156,12 +189,14 @@ export function CallScreen({
     return () => clearInterval(timer);
   }, [phase === "ringing" || phase === "ended" || phase === "connecting"]);
 
-  const say = (text: string, then?: () => void) => {
+  /** Says one turn. The caption shows `text`; only `spoken` (default: the same) is read aloud. */
+  const say = (text: string, then?: () => void, spoken: string = text) => {
     if (closedRef.current) return;
     stopAll();
     setCaption(text);
+    lastSaid.current = spoken;
     setPhase("speaking");
-    stopRef.current = speakArabic(text, {
+    stopRef.current = speakArabic(spoken, {
       onEnd: () => {
         if (closedRef.current) return;
         then?.();
@@ -173,42 +208,66 @@ export function CallScreen({
     if (closedRef.current) return;
     stopAll();
     setHeard("");
+    setWaiting(false);
     setPhase("listening");
-    if (mutedRef.current || !canListen()) return; // typed answer or unmute
+    if (mutedRef.current || !canListen()) {
+      if (!canListen()) setNotice(t.callNoMic);
+      return; // typed answer
+    }
     let got = false;
-    stopRef.current = listenOnce(RECOGNITION_LANG[lang], {
+    let error = "";
+    let cancelled = false;
+    const stopListening = listenOnce(RECOGNITION_LANG[lang], {
       onInterim: text => setHeard(text),
       onFinal: text => {
         got = true;
         void respond(text);
       },
-      onError: () => {},
+      onError: code => {
+        error = code;
+      },
       onEnd: () => {
-        if (got || closedRef.current) return;
-        misses.current += 1;
-        if (misses.current <= 2) say(SAY[style].notHeard, listen);
-        else {
-          // Still nothing: switch to typing until the student unmutes.
+        // Stopped on purpose (the student cut in, typed, or hung up): not a silence.
+        if (got || cancelled || closedRef.current || error === "aborted") return;
+        if (MIC_BLOCKED.has(error)) {
+          // Blocked microphone: say nothing more, switch to typing.
+          setNotice(t.callMicBlocked);
           mutedRef.current = true;
           setMuted(true);
+          setPhase("listening");
+          return;
+        }
+        misses.current += 1;
+        if (misses.current === 1) say(SAY[style].helloAgain, listen);
+        else {
+          // Still nothing: stop and wait for the student — never talk on alone.
+          setWaiting(true);
           setPhase("listening");
         }
       },
     });
+    stopRef.current = () => {
+      cancelled = true;
+      stopListening();
+    };
   };
 
   const startDialogue = async () => {
     if (closedRef.current) return;
+    stage.current = "dialogue";
     setPhase("thinking");
     const { reply } = await send.mutateAsync({ lessonKey, message: "علّمني بالحوار", style });
     if (!reply.includes(DIALOGUE_STEP)) {
       // No dialogue for this skill: straight to the questions.
-      mode.current = "quiz";
+      stage.current = "quiz";
       await askNext();
       return;
     }
+    // The topic was already announced: skip the dialogue's own introduction.
+    const parts = reply.split("\n\n");
+    const short = parts.length > 2 ? parts.slice(1).join("\n\n") : reply;
     lastQuestion.current = reply.slice(reply.lastIndexOf(DIALOGUE_STEP));
-    say(reply, listen);
+    say(short, listen);
   };
 
   const askNext = async () => {
@@ -217,6 +276,7 @@ export function CallScreen({
       await finish();
       return;
     }
+    stage.current = "quiz";
     setPhase("thinking");
     const { reply } = await send.mutateAsync({ lessonKey, message: "اختبرني", style });
     lastQuestion.current = reply;
@@ -228,39 +288,68 @@ export function CallScreen({
   const respond = async (text: string) => {
     if (!text.trim() || closedRef.current) return;
     misses.current = 0;
+    setWaiting(false);
     setHeard(text);
     if (REPEAT.test(text)) {
-      say(lastQuestion.current, listen);
+      say(lastSaid.current, listen);
+      return;
+    }
+    const words = SAY[style];
+    // The opening: short turns, whatever the student answers.
+    if (stage.current === "hello") {
+      stage.current = "howAreYou";
+      say(words.howAreYou, listen);
+      return;
+    }
+    if (stage.current === "howAreYou") {
+      stage.current = "ready";
+      say(words.topic(opening.current.skillName, opening.current.mistake), listen);
+      return;
+    }
+    if (stage.current === "ready") {
+      say(words.go, () => void startDialogue());
+      return;
+    }
+    if (stage.current === "afterFeedback") {
+      say(words.next, () => void askNext());
       return;
     }
     setPhase("thinking");
     const { reply } = await send.mutateAsync({ lessonKey, message: text, style });
     void utils.tafawoq.workspace.invalidate({ lessonKey });
-    if (mode.current === "dialogue") {
+    if (stage.current === "dialogue") {
       if (reply.includes(DIALOGUE_DONE)) {
-        mode.current = "quiz";
-        say(`${forCall(reply)}\n${SAY[style].checkUnderstood}`, () => void askNext());
+        stage.current = "quiz";
+        const done = `${forCall(reply)}\n${words.checkUnderstood}`;
+        say(done, () => void askNext());
       } else if (reply.includes(DIALOGUE_STEP)) {
         lastQuestion.current = reply.slice(reply.lastIndexOf(DIALOGUE_STEP));
         say(reply, listen);
       } else {
-        // The dialogue was left (should not happen in a call): go on with the questions.
-        mode.current = "quiz";
-        say(forCall(reply), () => void askNext());
+        // A question in the middle: the answer, then the same step again.
+        say(`${reply}\n${words.askAgain}`, () => say(lastQuestion.current, listen));
       }
       return;
     }
     if (GRADED.test(reply)) {
-      say(forCall(reply), () => void askNext());
+      const feedback = forCall(reply);
+      if (reply.startsWith("✔")) {
+        say(feedback, () => void askNext(), spokenPart(feedback));
+      } else {
+        // After a mistake: the correction (solution on screen), then wait.
+        stage.current = "afterFeedback";
+        say(`${feedback}\n${words.clear}`, listen, `${spokenPart(feedback)} ${words.clear}`);
+      }
     } else {
       // An explanation or example in the middle of a question: answer it,
       // then put the same question back.
-      say(`${reply}\n${SAY[style].askAgain}`, () => say(lastQuestion.current, listen));
+      say(`${reply}\n${words.askAgain}`, () => say(lastQuestion.current, listen));
     }
   };
 
   const finish = async () => {
     stopAll();
+    setWaiting(false);
     if (callStart.current === null) {
       setPhase("ended");
       return;
@@ -276,21 +365,31 @@ export function CallScreen({
   const accept = async () => {
     ringRef.current();
     setPhase("connecting");
+    setNotice(canListen() ? null : t.callNoMic);
+    misses.current = 0;
     try {
       const data = await intro.mutateAsync({ lessonKey, style });
       callStart.current = data.afterId;
-      mode.current = "dialogue";
-      say(data.text, () => void startDialogue());
+      opening.current = { name: data.name, skillName: data.skillName, mistake: data.mistake };
+      stage.current = "hello";
+      say(SAY[style].hello(data.name), listen);
     } catch {
       setCaption(t.errors.generic);
       setPhase("ended");
     }
   };
 
+  /** The student cuts in: the teacher stops and listens. */
+  const cutIn = () => {
+    if (mutedRef.current || !canListen()) return;
+    misses.current = 0;
+    listen();
+  };
+
   const hangUp = () => {
     stopAll();
     ringRef.current();
-    if (phase === "ringing" || askedRef.current === 0) {
+    if (phase === "ringing" || (askedRef.current === 0 && stage.current !== "dialogue")) {
       closedRef.current = true;
       onClose();
       return;
@@ -318,7 +417,9 @@ export function CallScreen({
       : phase === "speaking"
         ? t.callTeacherSpeaking
         : phase === "listening"
-          ? t.callListening
+          ? waiting || muted || !canListen()
+            ? t.callWaiting
+            : t.callListening
           : phase === "thinking"
             ? t.callThinking
             : phase === "ended"
@@ -365,13 +466,22 @@ export function CallScreen({
           </div>
         )}
 
-        {(muted || !canListen()) && phase === "listening" && (
+        {notice && phase !== "ended" && <div className="tfq-banner">{notice}</div>}
+
+        {waiting && phase === "listening" && !muted && (
+          <button type="button" className="tfq-btn tfq-call-talk" onClick={cutIn}>
+            <Mic size={18} /> {t.callTapToTalk}
+          </button>
+        )}
+
+        {(muted || !canListen() || waiting) && phase === "listening" && (
           <form
             className="tfq-chat-input"
             onSubmit={event => {
               event.preventDefault();
               const text = typed;
               setTyped("");
+              stopAll();
               void respond(text);
             }}
           >
@@ -412,6 +522,7 @@ export function CallScreen({
                   setResult(null);
                   setCaption("");
                   setHeard("");
+                  setWaiting(false);
                   void accept();
                 }}
               >
@@ -431,6 +542,12 @@ export function CallScreen({
                 {muted ? <MicOff size={24} /> : <Mic size={24} />}
                 <span>{muted ? t.callUnmute : t.callMute}</span>
               </button>
+              {phase === "speaking" && !muted && canListen() && (
+                <button type="button" className="tfq-call-btn accept" onClick={cutIn} aria-label={t.callCutIn}>
+                  <Mic size={24} />
+                  <span>{t.callCutIn}</span>
+                </button>
+              )}
               <button type="button" className="tfq-call-btn decline" onClick={hangUp} aria-label={t.callHangUp}>
                 <PhoneOff size={28} />
                 <span>{t.callHangUp}</span>
