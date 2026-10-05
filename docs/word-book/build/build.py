@@ -15,6 +15,8 @@ def shot(m):
             k,v=line.split(':',1);d[k.strip()]=v.strip()
     sid=d['id'];shots.append(dict(id=sid,title=d['title'],take=d['take'],legend=leg))
     real=next((f for f in glob.glob(f'{B}shots/{sid}.*') if f.lower().endswith(('.png','.jpg','.jpeg'))),None)
+    ill=f'{S}/ill/{sid}.png'
+    if not real and os.path.exists(ill): real=ill
     if real:
         im=Image.open(real);w=min(16.5,12*im.width/im.height);src=real
     else:
@@ -31,7 +33,7 @@ def shot(m):
 <div style="font-size:30px;color:#D3DEEE;line-height:1.55"><b style="color:#F0D58C">كيف تصوّرها:</b> {esc(d['take'])}</div>
 <div style="position:absolute;bottom:40px;left:60px;font-size:22px;color:#8FA3C4;direction:ltr">shots/{sid}.png · Nourix Academy</div>
 </div></div>'''))
-    out=f'![]({src}){{width={w:.2f}cm}}\n\n::: {{custom-style="ShotCaption"}}\nلقطة {sid}: {d["title"]}\n:::\n\n'
+    out=f'![]({src}){{width={w:.2f}cm}}\n\n::: {{custom-style="ShotCaption"}}\nالشكل {int(sid[1:])}: {d["title"]}\n:::\n\n'
     if leg: out+='::: {custom-style="Legend"}\n'+'\n\n'.join(f'{NUM[i]}  {x}' for i,x in enumerate(leg))+'\n:::\n'
     return out
 out=[]
