@@ -13,7 +13,7 @@ import { trpc } from "@/lib/trpc";
 import { M } from "./components";
 import { useT } from "./i18n";
 import type { TeacherStyle } from "./teacherStyle";
-import { RECOGNITION_LANG, canListen, listenOnce, speakArabic } from "./speech";
+import { RECOGNITION_LANG, canListen, listenOnce, speakArabic, unlockAudio } from "./speech";
 
 type Phase = "ringing" | "connecting" | "speaking" | "listening" | "thinking" | "ended";
 
@@ -363,6 +363,7 @@ export function CallScreen({
   };
 
   const accept = async () => {
+    unlockAudio(); // from the "accept" tap: phones then let the voice play
     ringRef.current();
     setPhase("connecting");
     setNotice(canListen() ? null : t.callNoMic);

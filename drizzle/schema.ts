@@ -1299,6 +1299,13 @@ export const tafawoqExercises = mysqlTable(
   })
 );
 
+// Characters sent to the paid speech service per month (monthly cap).
+export const tafawoqTtsUsage = mysqlTable("tafawoqTtsUsage", {
+  month: varchar("month", { length: 7 }).primaryKey(),
+  characters: bigint("characters", { mode: "number" }).default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const tafawoqAttempts = mysqlTable(
   "tafawoqAttempts",
   {

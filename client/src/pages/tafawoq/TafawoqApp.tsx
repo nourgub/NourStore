@@ -50,6 +50,7 @@ import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
 import { darjaSuggestions, useTeacherStyle } from "./teacherStyle";
+import { unlockAudio } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
 
@@ -221,7 +222,7 @@ function HomeCallCard({
         </div>
       </div>
       {lesson ? (
-        <button type="button" className="tfq-btn tfq-call-open" onClick={() => setCalling(true)}>
+        <button type="button" className="tfq-btn tfq-call-open" onClick={() => { unlockAudio(); setCalling(true); }}>
           <Phone size={18} /> {t.homeCallGo}
         </button>
       ) : (
@@ -748,10 +749,10 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
         ))}
       </div>
       <div className="tfq-call-row">
-        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => setCall(true)}>
+        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => { unlockAudio(); setCall(true); }}>
           <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>
         </button>
-        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => setLive(true)}>
+        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => { unlockAudio(); setLive(true); }}>
           <Mic size={18} /> {t.liveButton}
         </button>
       </div>

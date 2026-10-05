@@ -13,7 +13,7 @@ import {
 import type { VideoScene, VideoScript } from "@shared/tafawoq";
 import { useT } from "./i18n";
 import { M } from "./components";
-import { speakArabic } from "./speech";
+import { canSpeak as canSpeakNow, speakArabic, unlockAudio } from "./speech";
 
 /**
  * Renders a generated personal video script as a narrated, animated video:
@@ -32,7 +32,7 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
   const container = useRef<HTMLDivElement>(null);
   const token = useRef(0);
   const scene = script.scenes[index];
-  const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
+  const canSpeak = canSpeakNow();
 
   useEffect(() => {
     setIndex(0);
@@ -74,9 +74,6 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
     };
   }, [playing, index, muted, scene, script.scenes.length, canSpeak]);
 
-  useEffect(() => () => {
-    if (canSpeak) window.speechSynthesis.cancel();
-  }, [canSpeak]);
 
   if (!scene) return null;
   const go = (next: number) => {
@@ -99,7 +96,10 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
             type="button"
             className="tfq-btn"
             style={{ position: "absolute", bottom: 18 }}
-            onClick={() => setPlaying(true)}
+            onClick={() => {
+              unlockAudio();
+              setPlaying(true);
+            }}
           >
             <Play size={18} /> {t.playVideo}
           </button>
@@ -110,11 +110,11 @@ export function VideoPlayer({ script }: { script: VideoScript }) {
           <SkipBack size={18} />
         </button>
         {finished ? (
-          <button type="button" aria-label={t.video.replay} onClick={() => { go(0); setPlaying(true); }}>
+          <button type="button" aria-label={t.video.replay} onClick={() => { unlockAudio(); go(0); setPlaying(true); }}>
             <RotateCcw size={18} />
           </button>
         ) : (
-          <button type="button" aria-label={playing ? t.video.pause : t.video.play} onClick={() => setPlaying(!playing)}>
+          <button type="button" aria-label={playing ? t.video.pause : t.video.play} onClick={() => { unlockAudio(); setPlaying(!playing); }}>
             {playing ? <Pause size={18} /> : <Play size={18} />}
           </button>
         )}
