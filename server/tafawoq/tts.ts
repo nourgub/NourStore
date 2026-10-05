@@ -40,7 +40,9 @@ import path from "path";
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { sql } from "drizzle-orm";
 import { HAS_WORD, bareWord, spokenSegments } from "../../shared/spokenArabic";
+import { ENV } from "../_core/env";
 import { getDb } from "../db/shared";
+import { storageGetSignedUrl, storagePut } from "../storage";
 import { tafawoqTtsUsage } from "../../drizzle/schema";
 
 export const MAX_TTS_CHARS = 600;
@@ -375,6 +377,9 @@ export function engines(gender: VoiceGender): Engine[] {
 // ---------------------------------------------------------------------------
 // The cache: whole sentences (MP3), assembled sentences (MP3), pieces (PCM).
 // Keyed by the exact voice, so a new voice never replays another's audio.
+// On this server's disk, and — with STORAGE_PROVIDER=s3 — in the object
+// storage too: a hosted deployment's disk is wiped on every deploy, and a
+// recording lost is allowance spent twice.
 // ---------------------------------------------------------------------------
 
 type Kind = "sentence" | "assembled" | "piece";
@@ -385,14 +390,39 @@ export function cachePath(engine: Pick<Engine, "provider" | "voice">, kind: Kind
   return path.join(CACHE_DIR, hash.slice(0, 2), `${hash}.${kind === "piece" ? "pcm" : "mp3"}`);
 }
 
-async function store(file: string, audio: Buffer) {
+const durable = () => ENV.storageProvider === "s3";
+const durableKey = (file: string) => `tts-cache/${path.basename(file)}`;
+
+async function storeLocally(file: string, audio: Buffer) {
   await mkdir(path.dirname(file), { recursive: true });
   const partial = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.part`;
   await writeFile(partial, audio);
   await rename(partial, file);
 }
 
-const readCached = (file: string) => readFile(file).catch(() => null);
+async function store(file: string, audio: Buffer) {
+  await storeLocally(file, audio);
+  if (!durable()) return;
+  const type = file.endsWith(".mp3") ? "audio/mpeg" : "application/octet-stream";
+  await storagePut(durableKey(file), audio, type).catch(error =>
+    console.warn("[tafawoq] voice not saved to storage:", error instanceof Error ? error.message : error)
+  );
+}
+
+async function readCached(file: string): Promise<Buffer | null> {
+  const local = await readFile(file).catch(() => null);
+  if (local || !durable()) return local;
+  try {
+    const response = await fetch(await storageGetSignedUrl(durableKey(file)));
+    if (!response.ok) return null;
+    const audio = Buffer.from(await response.arrayBuffer());
+    if (!audio.length) return null;
+    await storeLocally(file, audio);
+    return audio;
+  } catch {
+    return null;
+  }
+}
 
 /** A paid request: a slot this minute and characters this month, or false. */
 async function mayRequest(engine: Engine, characters: number, allowance: Allowance, waitMs: number, share: number) {

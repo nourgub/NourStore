@@ -10,7 +10,7 @@ import type { LessonExample, PersonalLesson, VideoScene, VideoScript } from "@sh
 import { TIER_LABELS_AR } from "@shared/tafawoq";
 import type { BankQuestion, Lesson } from "./curriculum";
 import type { StudentContext } from "./context";
-import { createRng, randomSeed } from "./generators/core";
+import { createRng, randomSeed, spokenSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { normalizeAnswer } from "./grading";
 import { targetDifficulty } from "./studentModel";
@@ -168,7 +168,8 @@ export function templateLesson(lesson: Lesson, context: StudentContext): Persona
       explanation,
       examples: [
         skill.example,
-        ...(generatedExamples(lesson, skill.key, context.tier) ?? bankExamples),
+        // Read aloud in the video: one of the spoken variants (./generators/core.ts).
+        ...(generatedExamples(lesson, skill.key, context.tier, spokenSeed()) ?? bankExamples),
       ],
       commonMistake: mistake ? `انتبه: ${mistake.label}.` : undefined,
     };
@@ -315,7 +316,7 @@ export function mentionedSkill(lesson: Lesson, message: string) {
   return mentioned;
 }
 
-function formatExample(example: LessonExample): string {
+export function formatExample(example: LessonExample): string {
   return `${example.problem}\n${example.steps.map((step, index) => `${index + 1}) ${step}`).join("\n")}\n✔ ${example.answer}`;
 }
 
@@ -329,7 +330,7 @@ export function templateTutorReply(
   lesson: Lesson,
   context: StudentContext,
   message: string,
-  seed: number = randomSeed()
+  seed: number = spokenSeed()
 ): string {
   const intent = detectIntent(message);
   const skill =
@@ -377,7 +378,7 @@ export function templateTutorReply(
 // math rewritten for the ear (client/src/pages/tafawoq/speech.ts).
 // ---------------------------------------------------------------------------
 
-export function callIntroText(lesson: Lesson, context: StudentContext, seed: number = randomSeed()): string {
+export function callIntroText(lesson: Lesson, context: StudentContext, seed: number = spokenSeed()): string {
   const focus =
     context.focusSkills[0] ?? [...context.skills].sort((a, b) => a.mastery - b.mastery)[0];
   const skill = lesson.skills.find(entry => entry.key === focus?.key) ?? lesson.skills[0];

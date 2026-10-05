@@ -28,7 +28,7 @@ import {
   type Lesson,
 } from "./curriculum";
 import { buildStudentContext, type StudentContext } from "./context";
-import { createRng, randomSeed } from "./generators/core";
+import { createRng, randomSeed, spokenSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
 import { inStyle, type TeacherStyle } from "./darja";
@@ -809,7 +809,8 @@ export async function startTutor(userId: number, lessonKey: string, style?: Teac
 
 const ORAL_WINDOW_MS = 30 * 60 * 1000;
 
-function pickOralItem(lesson: Lesson, context: StudentContext): StoredItem {
+/** One spoken question, among the spoken variants (./generators/core.ts), not one the student already answered when possible. */
+function pickOralItem(lesson: Lesson, context: StudentContext, seen: Set<string>): StoredItem {
   const focus =
     context.focusSkills[0] ?? [...context.skills].sort((a, b) => a.mastery - b.mastery)[0];
   const target = targetDifficulty(focus?.mastery ?? 0.3);
@@ -820,14 +821,15 @@ function pickOralItem(lesson: Lesson, context: StudentContext): StoredItem {
     const score = (generator: (typeof generators)[number]) =>
       Math.abs(generator.difficulty - target) * 2 + (generator.generate(createRng(1)).type === "short" ? 0 : 1);
     const best = Math.min(...generators.map(score));
-    return instantiate(rng.pick(generators.filter(generator => score(generator) === best)), rng.int(1, 2 ** 30));
+    const generator = rng.pick(generators.filter(entry => score(entry) === best));
+    return instantiate(generator, spokenSeed(seed => seen.has(instantiate(generator, seed).id)));
   }
   const bank = lesson.bank.filter(question => question.skill === focus?.key);
   const pool = bank.length ? bank : lesson.bank;
   return [...pool].sort((a, b) => Math.abs(a.difficulty - target) - Math.abs(b.difficulty - target))[0];
 }
 
-function oralQuestionText(item: StoredItem): string {
+export function oralQuestionText(item: StoredItem): string {
   const options =
     item.type === "mcq" && item.options
       ? "\n" + item.options.map((option, index) => `${OPTION_LETTERS[index]}: ${option}`).join("\n") + "\nقل حرف الجواب (أ، ب، ج أو د)."
@@ -847,7 +849,7 @@ async function oralTurn(
   const pending = open && Date.now() - open.createdAt.getTime() < ORAL_WINDOW_MS ? open : undefined;
 
   if (intent === "quiz") {
-    const item = pickOralItem(lesson, context);
+    const item = pickOralItem(lesson, context, new Set(await store.getAttemptedQuestionIds(student.id, lesson.key)));
     await store.createAssessment({
       studentId: student.id,
       lessonKey: lesson.key,

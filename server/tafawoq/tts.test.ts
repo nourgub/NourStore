@@ -96,4 +96,47 @@ describe("teacher voice", () => {
     expect(asked).toEqual(["5"]);
     vi.unstubAllEnvs();
   });
+
+  it("keeps recordings in the object storage too, so a redeploy loses none", async () => {
+    const saved = new Map<string, Buffer>();
+    vi.doMock("../storage", () => ({
+      storagePut: async (key: string, data: Buffer) => {
+        saved.set(key, Buffer.from(data));
+        return { key, url: `memory://${key}` };
+      },
+      storageGetSignedUrl: async (key: string) => `memory://${key}`,
+    }));
+    vi.stubGlobal("fetch", async (url: string) => {
+      const audio = saved.get(String(url).replace("memory://", ""));
+      return audio ? new Response(new Uint8Array(audio)) : new Response(null, { status: 404 });
+    });
+    vi.stubEnv("STORAGE_PROVIDER", "s3");
+    const made: string[] = [];
+    const engine = {
+      provider: "piper" as const,
+      voice: "test",
+      gender: "male" as const,
+      mp3: async (text: string) => {
+        made.push(text);
+        return Buffer.from([0xff, 0xfb, 1, 2, 3]);
+      },
+      pcm: async () => Buffer.alloc(0),
+      rate: async () => 24_000,
+    };
+    try {
+      for (const round of [1, 2]) {
+        // A fresh disk each round: the second is the server after a redeploy.
+        vi.resetModules();
+        vi.stubEnv("TAFAWOQ_TTS_CACHE_DIR", mkdtempSync(path.join(tmpdir(), `tts-${round}-`)));
+        const tts = await import("./tts");
+        expect((await tts.synthesizeSentence(engine, "معك أستاذ الرياضيات.", "month", 0))?.[0]).toBe(0xff);
+      }
+      expect(made).toEqual(["معك أستاذ الرياضيات."]);
+      expect([...saved.keys()][0]).toMatch(/^tts-cache\/[0-9a-f]{64}\.mp3$/);
+    } finally {
+      vi.doUnmock("../storage");
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
 });

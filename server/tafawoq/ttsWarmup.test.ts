@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { spokenSegments } from "../../shared/spokenArabic";
-import { warmupPieces, warmupSentences } from "./ttsWarmup";
+import { variantSentences, warmupPieces, warmupSentences } from "./ttsWarmup";
 
 describe("voice warm-up", () => {
   it("prepares every fixed sentence once, in Fusha and Darja, each a single request", () => {
@@ -17,5 +17,15 @@ describe("voice warm-up", () => {
     const pieces = warmupPieces();
     for (const word of ["إكس", "تربيع", "ناقص", "يساوي", "0", "12", "100"]) expect(pieces).toContain(word);
     for (const word of pieces) expect(spokenSegments(word)[0].math).toBe(true);
+  });
+
+  it("prepares the spoken variants of the generated exercises, never a student's own sentence", () => {
+    const one = variantSentences(1);
+    const two = variantSentences(2);
+    expect(one.length).toBeGreaterThan(500);
+    expect(two.length).toBeGreaterThan(one.length);
+    expect(two.slice(0, one.length)).toEqual(one); // variant 1 of everything comes first
+    expect(one.some(sentence => sentence.includes("ظظظ"))).toBe(false);
+    expect(one).toContain("قل جوابك أو اكتبه.");
   });
 });

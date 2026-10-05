@@ -77,3 +77,16 @@ for (const lesson of LESSONS) {
     }
   });
 }
+
+describe("spoken variants", () => {
+  it("gives each student the first variant they have not met, then any", async () => {
+    const { SPOKEN_VARIANTS, spokenSeed } = await import("./generators/core");
+    expect(spokenSeed(seed => seed < 4)).toBe(4);
+    expect(spokenSeed(() => false)).toBe(1);
+    for (let index = 0; index < 50; index += 1) {
+      const seed = spokenSeed(() => true);
+      expect(seed).toBeGreaterThanOrEqual(1);
+      expect(seed).toBeLessThanOrEqual(SPOKEN_VARIANTS);
+    }
+  });
+});

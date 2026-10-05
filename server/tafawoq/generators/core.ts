@@ -210,3 +210,25 @@ export function times(k: number, body: string): string {
   if (k === -1) return `−${body}`;
   return `${num(k)}×${body}`;
 }
+
+/**
+ * How many variants of each generated exercise the teacher says aloud. What
+ * is spoken (the call's example, the oral quiz, the tutor's worked examples)
+ * is drawn from this fixed set, so its voice is synthesised once and shared
+ * by every student (server/tafawoq/ttsWarmup.ts prepares it ahead, variant 1
+ * first). Written practice and exams keep unlimited variety (randomSeed).
+ */
+export const SPOKEN_VARIANTS = Math.max(1, Number(process.env.TAFAWOQ_SPOKEN_VARIANTS ?? 30));
+
+/**
+ * A seed among the spoken variants. With `used` (what this student already
+ * answered): the first variant they have not met — every student goes
+ * through the same, already-voiced variants in the same order; once all are
+ * met, any of them.
+ */
+export function spokenSeed(used?: (seed: number) => boolean): number {
+  if (used) {
+    for (let seed = 1; seed <= SPOKEN_VARIANTS; seed += 1) if (!used(seed)) return seed;
+  }
+  return 1 + Math.floor(Math.random() * SPOKEN_VARIANTS);
+}
