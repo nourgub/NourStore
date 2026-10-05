@@ -1002,7 +1002,7 @@ const runHasX = (run: string) => {
 };
 
 /** Longest prefix of t (from start) that reads as a formula. */
-function takeRun(t: string, start: number, allowEq: boolean): { text: string; end: number } {
+function takeRun(t: string, start: number, allowEq: boolean): { text: string; end: number; cut: boolean } {
   let i = start;
   let lastGood = start;
   while (i < t.length) {
@@ -1031,7 +1031,11 @@ function takeRun(t: string, start: number, allowEq: boolean): { text: string; en
     }
     break;
   }
+  const consumed = t.slice(start, lastGood).trim().replace(/\.$/, "");
+  // The formula was cut short when it ends on an operator or runs straight into an unknown word ("x+a", "2sin").
+  const attached = lastGood > start && /[a-z|!]/.test(t[lastGood] ?? "") && !/\s/.test(t[lastGood - 1]);
   let text = t.slice(start, lastGood).replace(/[\s+\-*/^=.(]+$/, "").trim();
+  const cut = attached || text !== consumed;
   text = text.replace(/\(\s*\)/g, " ").trim();
   // Drop unbalanced brackets at the edges.
   for (let guard = 0; guard < 4; guard += 1) {
@@ -1041,9 +1045,9 @@ function takeRun(t: string, start: number, allowEq: boolean): { text: string; en
     if (close > open && text.endsWith(")")) text = text.slice(0, -1).trim();
     else if (open > close && text.startsWith("(")) text = text.slice(1).trim();
     else if (close > open && text.startsWith(")")) text = text.slice(1).trim();
-    else return { text: "", end: lastGood };
+    else return { text: "", end: lastGood, cut: true };
   }
-  return { text, end: lastGood };
+  return { text, end: lastGood, cut };
 }
 function findRuns(t: string, allowEq: boolean): string[] {
   const runs: string[] = [];
@@ -1054,7 +1058,7 @@ function findRuns(t: string, allowEq: boolean): string[] {
     if (boundary && /[0-9a-z(√+\-.]/.test(ch)) {
       const run = takeRun(t, i, allowEq);
       if (run.end > i) {
-        if (run.text && runHasX(run.text.split("=").join(" "))) runs.push(run.text);
+        if (run.text && !run.cut && runHasX(run.text.split("=").join(" "))) runs.push(run.text);
         i = run.end;
         continue;
       }
@@ -1067,13 +1071,13 @@ function findRuns(t: string, allowEq: boolean): string[] {
 }
 const longest = (runs: string[]) => runs.reduce<string | null>((best, run) => (!best || run.length > best.length ? run : best), null);
 
-type Def = { name: string; expr: string; start: number; end: number };
+type Def = { name: string; expr: string; start: number; end: number; cut: boolean };
 function findDefs(t: string): Def[] {
   const defs: Def[] = [];
   const re = /(?<![a-z])([a-z])\s*\(\s*x\s*\)\s*=|(?<![a-z])(y)\s*=/g;
   for (let m = re.exec(t); m; m = re.exec(t)) {
     const run = takeRun(t, m.index + m[0].length, false);
-    defs.push({ name: m[1] ?? m[2], expr: run.text, start: m.index, end: run.end });
+    defs.push({ name: m[1] ?? m[2], expr: run.text, start: m.index, end: run.end, cut: run.cut || !run.text });
   }
   return defs;
 }
@@ -2162,6 +2166,8 @@ function primitiveOf(f: E): { F: E; steps: string[] } {
 // Task recognition
 // ---------------------------------------------------------------------------
 
+const IMAGE = new RegExp(`(?:صوره|صورة|image)\\s*(?:العدد\\s*|de\\s*|of\\s*)?(${NUM})`);
+const UNSUPPORTED = /(?<![a-z])(?:sin|cos|tan|cotan|cot|arcsin|arccos|arctan|sh|ch|th|abs|floor|max|min)(?![a-z])|\||π|(?<![a-z])pi(?![a-z])/;
 const REJECT = /بين\s*ان|اثبت|برهن|استنتج|ادرس|تغيرات|montrer|d[ée]montrer|prouver|justifier|[ée]tudier|variations?|prove|show\s+that|study|deduce|d[ée]duire/;
 const KEYWORDS: Array<[SolverKind | "equation-strong" | "equation-weak", RegExp]> = [
   ["tangent", /مماس|tangente?|طونجونت|تونجانت|تانجانت/],
@@ -2184,7 +2190,9 @@ function functionFrom(t: string, defs: Def[]): { f: E; name: string; rest: strin
 function solveText(raw: string): Solution | null {
   const t = normText(raw);
   if (REJECT.test(t)) return null;
+  if (UNSUPPORTED.test(t)) return null;
   const defs = findDefs(t);
+  if (defs.some(d => d.cut)) return null;
   const eqRuns = () => findRuns(t, true).filter(run => run.includes("="));
   const outsideEq = eqRuns().filter(run => !defs.some(d => d.expr && run.endsWith(d.expr) && t.includes(`=${d.expr}`) && run === d.expr));
   let kind: SolverKind | null = null;
@@ -2200,7 +2208,7 @@ function solveText(raw: string): Solution | null {
     kind = name;
     break;
   }
-  if (!kind && defs.length && new RegExp(`(?<![a-z])${defs[0].name}\\(\\s*${NUM}\\s*\\)`).test(t)) kind = "value";
+  if (!kind && defs.length && (new RegExp(`(?<![a-z])${defs[0].name}\\(\\s*${NUM}\\s*\\)`).test(t) || IMAGE.test(t))) kind = "value";
   if (!kind) return null;
 
   switch (kind) {
@@ -2209,9 +2217,9 @@ function solveText(raw: string): Solution | null {
       if (!source) return null;
       const name = source.name || "f";
       const { steps: ruleSteps, result } = derivativeOf(source.f);
-      const label = `${name}′(x)`;
+      const label = name === "y" ? "y′" : `${name}′(x)`;
       const steps = [
-        `${name}(x) = ${fmt(show(source.f))}`,
+        `${name === "y" ? "y" : `${name}(x)`} = ${fmt(show(source.f))}`,
         `الدالة ${name} قابلة للاشتقاق على مجال تعريفها، ونشتق باستعمال القواعد:`,
         ...ruleSteps,
         `إذن ${label} = ${fmt(result)}`,
@@ -2286,7 +2294,7 @@ function solveText(raw: string): Solution | null {
     }
     case "value": {
       const def = defs[0];
-      const m = new RegExp(`(?<![a-z])${def.name}\\(\\s*(${NUM})\\s*\\)`).exec(t);
+      const m = new RegExp(`(?<![a-z])${def.name}\\(\\s*(${NUM})\\s*\\)`).exec(t) ?? IMAGE.exec(t);
       if (!m || !def.expr) return null;
       return solveValue(parseRun(def.expr), def.name, qParse(m[1]));
     }
