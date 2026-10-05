@@ -16,6 +16,7 @@ import { OAUTH_STATE_COOKIE, COOKIE_NAME } from "@shared/const";
 import { ENV } from "./env";
 import { getSessionCookieOptions } from "./cookies";
 import { createSessionToken } from "./session";
+import { logEvent } from "../db/bacPlatform";
 import * as db from "../db";
 
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -151,6 +152,8 @@ export function registerGoogleAuthRoutes(app: Express) {
         lastSignedIn: signedInAt,
       });
 
+      const signedIn = await db.getUserByOpenId(openId);
+      await logEvent(signedIn?.id ?? null, "login", { method: "google" });
       const sessionToken = await createSessionToken(openId, {
         name: googleUser.name || "",
       });

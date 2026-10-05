@@ -49,6 +49,24 @@ async function latestOral(userId: number) {
   return rows[0];
 }
 
+/**
+ * BAC platform: a student only studies after locking a stream and once an
+ * admin has confirmed the payment of a subscription.
+ */
+let adminUser: User | null = null;
+async function enroll(user: User, stream: "sciences" | "lettres" | "langues" = "sciences") {
+  const db = await getDb();
+  if (!adminUser) {
+    const created = await fixtureUser("admin");
+    await db!.update(users).set({ role: "admin" }).where(eq(users.id, created.id));
+    adminUser = { ...created, role: "admin" };
+  }
+  const caller = appRouter.createCaller(ctxFor(user));
+  await caller.bac.chooseStream({ stream });
+  const request = await caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp" });
+  await appRouter.createCaller(ctxFor(adminUser)).bacAdmin.confirmSubscription({ id: request.id });
+}
+
 async function fixtureUser(label: string): Promise<User> {
   const db = await getDb();
   if (!db) throw new Error("Expected a real database connection in this suite");
@@ -84,6 +102,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
         code: "PRECONDITION_FAILED",
       });
       await caller.tafawoq.register({ displayName: "أحمد", age: 15, schoolLevel: "bac" });
+      await enroll(ahmed);
 
       const placement = await caller.tafawoq.startPlacement({ lessonKey: lesson.key });
       expect(placement.questions).toHaveLength(10);
@@ -150,6 +169,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       // Another student can't see or submit Ahmed's assessment.
       const intruder = appRouter.createCaller(ctxFor(other));
       await intruder.tafawoq.register({ displayName: "Other", age: 16, schoolLevel: "bac" });
+      await enroll(other);
       await expect(
         intruder.tafawoq.submitAssessment({ assessmentId: practice.assessmentId, answers: [] })
       ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -291,6 +311,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const otherCaller = appRouter.createCaller(ctxFor(examStranger));
       const examStrangerCaller = otherCaller;
       await otherCaller.tafawoq.register({ displayName: "سمير", age: 17, schoolLevel: "bac", stream: "sciences" });
+      await enroll(examStranger);
       await expect(otherCaller.tafawoq.submitExam({ examId: exam.examId, papers })).rejects.toMatchObject({
         code: "NOT_FOUND",
       });

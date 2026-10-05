@@ -17,6 +17,7 @@ import type {
   VideoScript,
 } from "@shared/tafawoq";
 import * as store from "../db/tafawoq";
+import type { TeacherMessage } from "@shared/bacPlatform";
 import { createParentInvite, getParentLinks } from "../db/parent";
 import {
   LESSONS,
@@ -51,6 +52,9 @@ import { OPTION_LETTERS, pickOption, spokenToAnswer } from "./spokenAnswer";
 import { answersMatch, gradeDeterministic } from "./grading";
 import { parseExpression } from "./mathExpr";
 import * as ai from "./ai";
+import { requireLessonAccess, requireSubjectAccess, requireSubscription } from "./platform/access";
+import { diagnoseAnswer } from "./platform/diagnosis";
+import { logEvent } from "../db/bacPlatform";
 import {
   applyObservations,
   MASTERED,
@@ -67,6 +71,7 @@ import {
   callIntroText,
   callSummaryText,
   detectIntent,
+  generatedExamples,
   mentionedSkill,
   templateExercises,
   templateLesson,
@@ -88,7 +93,7 @@ function lessonOrThrow(lessonKey: string, stream: BacStream | null): Lesson {
   return lessonForStream(lesson, stream);
 }
 
-async function studentOrThrow(userId: number) {
+export async function studentOrThrow(userId: number) {
   const student = await store.getTafawoqStudentByUser(userId);
   if (!student) {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Register your profile first" });
@@ -97,12 +102,12 @@ async function studentOrThrow(userId: number) {
 }
 
 /** Stored states, returned in the lesson's own skill order (or [] if never placed). */
-async function orderedSkillStates(studentId: number, lesson: Lesson) {
+export async function orderedSkillStates(studentId: number, lesson: Lesson) {
   const stored = await store.getSkillStates(studentId, lesson.key);
   return stored.length ? applyObservations(lesson, stored, [], { learning: false }) : [];
 }
 
-async function loadContext(
+export async function loadContext(
   student: Awaited<ReturnType<typeof studentOrThrow>>,
   lesson: Lesson
 ): Promise<StudentContext> {
@@ -114,7 +119,7 @@ async function loadContext(
   return buildStudentContext({ student, lesson, states, attempts });
 }
 
-function toPublicQuestion(item: StoredItem): PublicQuestion {
+export function toPublicQuestion(item: StoredItem): PublicQuestion {
   return {
     id: item.id,
     skill: item.skill,
@@ -169,12 +174,19 @@ export async function register(
   userId: number,
   input: { displayName: string; age: number; schoolLevel: SchoolLevel; stream?: BacStream | null; goals?: string }
 ) {
+  // A locked stream (BAC platform) is never changed from the profile form —
+  // only an admin, by approving a change request, can change it.
+  const existing = await store.getTafawoqStudentByUser(userId);
+  const locked = existing?.streamLockedAt ? existing : null;
+  if (locked && input.stream !== undefined && input.stream !== null && input.stream !== locked.stream) {
+    await logEvent(userId, "stream_change_blocked", { current: locked.stream, requested: input.stream });
+  }
   return store.upsertTafawoqStudent({
     userId,
     displayName: input.displayName.trim(),
     age: input.age,
-    schoolLevel: input.schoolLevel,
-    stream: input.schoolLevel === "bac" ? input.stream ?? null : null,
+    schoolLevel: locked ? "bac" : input.schoolLevel,
+    stream: locked ? locked.stream : input.schoolLevel === "bac" ? input.stream ?? null : null,
     goals: input.goals?.trim() || null,
   });
 }
@@ -184,7 +196,7 @@ export async function register(
 // ---------------------------------------------------------------------------
 
 export async function startPlacement(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: false });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const open = await store.getOpenAssessment(student.id, lesson.key, "placement");
   const items: StoredItem[] = open
@@ -203,7 +215,7 @@ export async function startPlacement(userId: number, lessonKey: string) {
 }
 
 export async function generatePractice(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const plan = buildExercisePlan(context, 5);
@@ -265,14 +277,14 @@ export async function generatePractice(userId: number, lessonKey: string) {
 // graded on its own (a practice assessment whose items share a statement).
 // ---------------------------------------------------------------------------
 
-function problemsFor(lesson: Lesson, stream: string | null) {
+export function problemsFor(lesson: Lesson, stream: string | null) {
   return (lesson.problems ?? []).filter(
     problem => !problem.streams || !stream || problem.streams.includes(stream as never)
   );
 }
 
 export async function generateProblem(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const problems = problemsFor(lesson, student.stream);
   if (!problems.length) {
@@ -299,7 +311,8 @@ export async function generateProblem(userId: number, lessonKey: string) {
 // ---------------------------------------------------------------------------
 
 export async function generateExam(userId: number) {
-  const student = await studentOrThrow(userId);
+  // Mock BAC papers are maths papers for now (the only subject with a full paper).
+  const student = await requireSubjectAccess(userId, "math");
   const blueprint = examBlueprint(student.stream);
   const rng = createRng(randomSeed());
   const chosen = blueprint.slots
@@ -353,6 +366,8 @@ export async function generateExam(userId: number) {
     paperJson: JSON.stringify(
       exercises.map(exercise => ({ assessmentId: exercise.assessmentId, lessonKey: exercise.lessonKey, points: exercise.points }))
     ),
+    kind: "mock",
+    subject: "math",
   });
   return { examId, minutes: blueprint.minutes, exercises };
 }
@@ -368,9 +383,10 @@ export async function submitExam(
   const student = await studentOrThrow(userId);
   const exam = await store.getExam(examId);
   // Same NOT_FOUND for "doesn't exist" and "belongs to someone else".
-  if (!exam || exam.studentId !== student.id) {
+  if (!exam || exam.studentId !== student.id || exam.kind !== "mock") {
     throw new TRPCError({ code: "NOT_FOUND", message: "Exam not found" });
   }
+  await requireSubjectAccess(userId, exam.subject ?? "math");
   const paper = JSON.parse(exam.paperJson) as ExamPaper;
   const byId = new Map(papers.map(entry => [entry.assessmentId, entry.answers]));
   if (papers.length !== paper.length || paper.some(entry => !byId.has(entry.assessmentId))) {
@@ -503,6 +519,7 @@ export async function submitAssessment(
   if (assessment.status !== "open") {
     throw new TRPCError({ code: "CONFLICT", message: "Assessment already graded" });
   }
+  await requireLessonAccess(userId, assessment.lessonKey, { requireSubscription: assessment.kind !== "placement" });
   const lesson = lessonOrThrow(assessment.lessonKey, student.stream);
   const items: StoredItem[] = JSON.parse(assessment.itemsJson);
   const byId = new Map(answers.map(answer => [answer.questionId, answer]));
@@ -555,9 +572,32 @@ export async function submitAssessment(
   const masteryAfter = overallMastery(nextStates);
   const correctCount = graded.filter(entry => entry.correct).length;
   const score = items.length ? Math.round((correctCount / items.length) * 100) : 0;
+  // Beyond right/wrong: what kind of mistake, where it happened, the rule,
+  // a similar worked example and the remedy (./platform/diagnosis.ts).
+  const diagnoses = graded.map(entry =>
+    entry.correct
+      ? null
+      : diagnoseAnswer(
+          entry.item,
+          entry.given,
+          entry.misconception,
+          entry.misconception ? lesson.misconceptions[entry.misconception] ?? entry.misconception : null
+        )
+  );
+  const ruleOf = (skillKey: string) => {
+    const skill = lesson.skills.find(entry => entry.key === skillKey);
+    if (!skill) return null;
+    return skill.dialogue?.rule ?? skill.explanation.split(/(?<=[.:])\s+/)[0] ?? skill.explanation;
+  };
+  const exampleOf = (skillKey: string) => {
+    const skill = lesson.skills.find(entry => entry.key === skillKey);
+    if (!skill) return null;
+    return generatedExamples(lesson, skillKey, "weak", randomSeed())?.[0] ?? skill.example;
+  };
 
-  const itemResults = graded.map(entry => ({
+  const itemResults = graded.map((entry, index) => ({
     questionId: entry.item.id,
+    lessonKey: lesson.key,
     skill: entry.item.skill,
     skillName: skillName(lesson, entry.item.skill),
     prompt: entry.item.prompt,
@@ -569,6 +609,12 @@ export async function submitAssessment(
     misconception: entry.misconception
       ? lesson.misconceptions[entry.misconception] ?? entry.misconception
       : null,
+    steps: entry.item.steps ?? null,
+    errorType: diagnoses[index]?.errorType ?? null,
+    errorStep: diagnoses[index]?.step ?? null,
+    rule: entry.correct ? null : ruleOf(entry.item.skill),
+    similarExample: entry.correct ? null : exampleOf(entry.item.skill),
+    remedy: entry.misconception ? lesson.remedies?.[entry.misconception] ?? null : null,
   }));
 
   const claimed = await store.markAssessmentGraded({
@@ -583,7 +629,7 @@ export async function submitAssessment(
   }
   await store.saveSkillStates(student.id, lesson.key, nextStates);
   await store.recordAttempts(
-    graded.map(entry => ({
+    graded.map((entry, index) => ({
       studentId: student.id,
       assessmentId,
       lessonKey: lesson.key,
@@ -592,6 +638,7 @@ export async function submitAssessment(
       difficulty: entry.item.difficulty,
       correct: entry.correct,
       misconception: entry.misconception,
+      errorType: diagnoses[index]?.errorType ?? null,
       responseMs: entry.responseMs,
     }))
   );
@@ -650,7 +697,7 @@ export async function submitAssessment(
 // ---------------------------------------------------------------------------
 
 export async function workspace(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const states = await store.getSkillStates(student.id, lesson.key);
   if (!states.length) {
@@ -690,6 +737,7 @@ export async function workspace(userId: number, lessonKey: string) {
       id: message.id,
       role: message.role,
       content: message.content,
+      structured: message.structuredJson ? (JSON.parse(message.structuredJson) as TeacherMessage) : null,
       createdAt: message.createdAt,
     })),
     history,
@@ -718,7 +766,7 @@ async function buildPersonalLesson(context: StudentContext, lesson: Lesson) {
 }
 
 export async function generateLesson(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const { content, source } = await buildPersonalLesson(context, lesson);
@@ -733,7 +781,7 @@ export async function generateLesson(userId: number, lessonKey: string) {
 }
 
 export async function generateVideo(userId: number, lessonKey: string) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   // The video narrates the student's current personal lesson; make one
@@ -789,7 +837,7 @@ async function tutorText(
 
 /** Opens the tutoring session with an analysis-based greeting, once. */
 export async function startTutor(userId: number, lessonKey: string, style?: TeacherStyle) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const existing = await store.listMessages(student.id, lesson.key);
   if (existing.length) return { started: false };
@@ -931,7 +979,7 @@ function dialogueTurn(
 // ---------------------------------------------------------------------------
 
 export async function callIntro(userId: number, lessonKey: string, style?: TeacherStyle) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const text = inStyle(callIntroText(lesson, context), style);
@@ -951,7 +999,7 @@ export async function callIntro(userId: number, lessonKey: string, style?: Teach
 }
 
 export async function callSummary(userId: number, lessonKey: string, afterId: number, style?: TeacherStyle) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const oral = (await store.listGradedAssessments(student.id, lesson.key)).filter(
     entry => entry.kind === "oral" && entry.id > afterId
@@ -980,7 +1028,7 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
 }
 
 export async function sendTutorMessage(userId: number, lessonKey: string, message: string, style?: TeacherStyle) {
-  const student = await studentOrThrow(userId);
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
   const history = (await store.listMessages(student.id, lesson.key))
@@ -1193,6 +1241,8 @@ export async function submitExercise(
   }
 ) {
   const student = await studentOrThrow(userId);
+  await requireSubscription(userId);
+  if (input.lessonKey) await requireLessonAccess(userId, input.lessonKey, { requireSubscription: true });
   const text = input.text?.trim() || null;
   const note = input.note?.trim() || null;
   if (!text && !input.image) {
@@ -1240,6 +1290,7 @@ export async function myExercises(userId: number) {
 /** "أريد شرح الأستاذ أيضاً": send an automatically solved exercise to a teacher. */
 export async function askTeacher(userId: number, exerciseId: number) {
   const student = await studentOrThrow(userId);
+  await requireSubscription(userId);
   const row = await store.getExercise(exerciseId);
   if (!row || row.studentId !== student.id) throw new TRPCError({ code: "NOT_FOUND", message: "Exercise not found" });
   await store.reopenExercise(row.id);

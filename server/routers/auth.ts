@@ -18,7 +18,15 @@ import {
   getEmailUserPasswordHash,
   markUserSignedIn,
   chooseOwnRole,
+  getUserByOpenId,
 } from "../db";
+import { logEvent } from "../db/bacPlatform";
+
+/** "a***@example.com": enough to spot repeated failures, without the full address. */
+function maskEmail(email: string) {
+  const [name, domain] = email.trim().toLowerCase().split("@");
+  return `${(name ?? "").slice(0, 1)}***@${domain ?? ""}`;
+}
 import { rateLimit } from "../_core/procedures";
 
 export const authRouter = router({
@@ -89,6 +97,8 @@ export const authRouter = router({
           code: "CONFLICT",
           message: "An account with this email already exists",
         });
+      const created = await getUserByOpenId(openId);
+      await logEvent(created?.id ?? null, "account_created", { method: "email" });
       const sessionToken = await createSessionToken(openId, {
         name: input.name,
       });
@@ -114,11 +124,13 @@ export const authRouter = router({
         });
       const record = await getEmailUserPasswordHash(openId);
       const valid = await verifyPassword(input.password, record?.passwordHash ?? null);
-      if (!valid)
+      if (!valid) {
+        await logEvent(null, "login_failed", { email: maskEmail(input.email), ip: ctx.req.ip || null });
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Invalid email or password",
         });
+      }
       if (record?.accountStatus === "pending")
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -131,6 +143,7 @@ export const authRouter = router({
           message: "Your account has been suspended.",
         });
       await markUserSignedIn(openId);
+      await logEvent((await getUserByOpenId(openId))?.id ?? null, "login", { method: "email" });
       const sessionToken = await createSessionToken(openId, {});
       ctx.res.cookie(COOKIE_NAME, sessionToken, {
         ...getSessionCookieOptions(ctx.req),

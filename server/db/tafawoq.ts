@@ -126,7 +126,14 @@ export async function createAssessment(input: {
   return result[0].id;
 }
 
-export async function createExam(input: { studentId: number; stream: string | null; paperJson: string }) {
+export async function createExam(input: {
+  studentId: number;
+  stream: string | null;
+  paperJson: string;
+  kind?: "mock" | "weekly" | "placement";
+  subject?: string | null;
+  weekKey?: string | null;
+}) {
   const db = await requireDb();
   const result = await db.insert(tafawoqExams).values(input).$returningId();
   return result[0].id;
@@ -153,13 +160,19 @@ export async function saveExamResult(examId: number, score: number, resultJson: 
   await db.update(tafawoqExams).set({ score, resultJson }).where(eq(tafawoqExams.id, examId));
 }
 
-/** Marked exams, newest first. */
-export async function listMarkedExams(studentId: number, limit = 20) {
+/** Marked papers of one kind (mock BAC by default), newest first. */
+export async function listMarkedExams(
+  studentId: number,
+  limit = 20,
+  kind: "mock" | "weekly" | "placement" = "mock"
+) {
   const db = await requireDb();
   return db
     .select()
     .from(tafawoqExams)
-    .where(and(eq(tafawoqExams.studentId, studentId), eq(tafawoqExams.status, "graded")))
+    .where(
+      and(eq(tafawoqExams.studentId, studentId), eq(tafawoqExams.status, "graded"), eq(tafawoqExams.kind, kind))
+    )
     .orderBy(desc(tafawoqExams.id))
     .limit(limit);
 }
@@ -256,6 +269,7 @@ export async function recordAttempts(
     difficulty: number;
     correct: boolean;
     misconception: string | null;
+    errorType?: string | null;
     responseMs: number | null;
   }>
 ) {
@@ -344,6 +358,7 @@ export async function addMessage(input: {
   role: "tutor" | "student";
   content: string;
   source: "ai" | "template" | null;
+  structuredJson?: string | null;
 }) {
   const db = await requireDb();
   await db.insert(tafawoqMessages).values(input);

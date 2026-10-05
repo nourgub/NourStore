@@ -2,19 +2,20 @@
 // out of 20 — exercise by exercise, with the official duration shown as a
 // soft countdown, then one hand-in that grades every exercise, gives the
 // mark, the mention and the points per exercise.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Clock, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { MasteryBar, QuestionRunner, ResultItems } from "./components";
 import { Content, useT } from "./i18n";
+import { bacError, useB } from "./bacI18n";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../../server/routers";
 
 type Outputs = inferRouterOutputs<AppRouter>["tafawoq"];
-type Exam = Outputs["generateExam"];
-type ExamResult = Outputs["submitExam"];
+type Exam = Outputs["generateExam"] & { startedAt?: Date | string; draft?: Record<string, Answer[]> | null };
+type ExamResult = inferRouterOutputs<AppRouter>["bac"]["submitMock"];
 type Answer = { questionId: string; answer: string; responseMs?: number };
 
 /** Index into the mentions list: <10, 10, 12, 14, 16, 18. */
@@ -72,33 +73,49 @@ export function ExamHistory({ exams }: { exams: History }) {
 
 export function ExamView() {
   const t = useT();
+  const b = useB();
   const utils = trpc.useUtils();
   const history = trpc.tafawoq.myExams.useQuery();
+  const openMock = trpc.bac.openMock.useQuery(undefined, { retry: false });
+  const state = trpc.bac.state.useQuery();
   const [exam, setExam] = useState<Exam | null>(null);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Answer[]>>({});
+  const [drafts, setDrafts] = useState<Record<number, Answer[]>>({});
   const [result, setResult] = useState<ExamResult | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const begin = (data: Exam) => {
+    setExam(data);
+    setIndex(0);
+    const restored = Object.fromEntries(Object.entries(data.draft ?? {}).map(([key, value]) => [Number(key), value]));
+    setDrafts(restored);
+    setAnswers({});
+    setResult(null);
+    setStartedAt(data.startedAt ? new Date(data.startedAt).getTime() : Date.now());
+  };
   const generate = trpc.tafawoq.generateExam.useMutation({
-    onSuccess: data => {
-      setExam(data);
-      setIndex(0);
-      setAnswers({});
-      setResult(null);
-      setStartedAt(Date.now());
-    },
-    onError: error => toast.error(error.message),
+    onSuccess: data => begin(data),
+    onError: error => toast.error(bacError(b, error)),
   });
-  const submit = trpc.tafawoq.submitExam.useMutation({
+  const saveDraft = trpc.bac.saveMockDraft.useMutation({ onSuccess: () => setSavedAt(Date.now()) });
+  const submit = trpc.bac.submitMock.useMutation({
     onSuccess: async data => {
       setResult(data);
       window.scrollTo({ top: 0 });
+      try {
+        localStorage.removeItem("tfq-mock-draft");
+      } catch {
+        // Storage may be unavailable (private mode): nothing to clean.
+      }
       await utils.tafawoq.overview.invalidate();
       await utils.tafawoq.myExams.invalidate();
+      await utils.bac.invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(bacError(b, error)),
   });
 
   useEffect(() => {
@@ -107,12 +124,29 @@ export function ExamView() {
     return () => clearInterval(timer);
   }, [exam, result]);
 
+  // Autosave: every change is kept on the device at once and on the server shortly after.
+  const recordDraft = (assessmentId: number, given: Answer[]) => {
+    if (!exam) return;
+    const next = { ...drafts, [assessmentId]: given };
+    setDrafts(next);
+    try {
+      localStorage.setItem("tfq-mock-draft", JSON.stringify({ examId: exam.examId, draft: next }));
+    } catch {
+      // Storage unavailable: the server copy still saves it.
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveDraft.mutate({ examId: exam.examId, draft: Object.fromEntries(Object.entries(next).map(([key, value]) => [String(key), value])) });
+    }, 1500);
+  };
+
   if (result) {
     const mention = t.examMentions[mentionIndex(result.score)];
+    const delta = result.comparison.previous !== null ? Math.round((result.score - result.comparison.previous) * 4) / 4 : null;
     return (
       <>
         <div className="tfq-card tfq-exam-mark">
-          <div className="tfq-kicker">{t.examTitle}</div>
+          <div className="tfq-kicker">{b.toolMock}</div>
           <div className="tfq-exam-score">
             <span>{t.examYourMark}</span>
             <strong dir="ltr">
@@ -135,6 +169,39 @@ export function ExamView() {
             </div>
           ))}
         </div>
+        <div className="tfq-grid">
+          <div className="tfq-card">
+            <h3>
+              <Clock size={16} /> {b.timeAnalysis}
+            </h3>
+            <p className="tfq-muted">{b.totalTime(result.totalMin, result.officialMin)}</p>
+            {result.time.map((entry, position) => (
+              <div className="tfq-skill-row" key={entry.assessmentId}>
+                <span>{t.examExercise(position + 1, result.exercises[position]?.points ?? 0)}</span>
+                <MasteryBar value={entry.suggestedMin ? Math.min(1, entry.spentMin / entry.suggestedMin) : 0} />
+                <span className="tfq-muted">
+                  {b.spent(entry.spentMin)} · {b.suggested(entry.suggestedMin)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="tfq-card">
+            <h3>{b.comparison}</h3>
+            {result.comparison.count === 0 ? (
+              <p className="tfq-muted">{b.firstMock}</p>
+            ) : (
+              <ul className="tfq-list">
+                {result.comparison.previous !== null && (
+                  <li>
+                    {b.previousMark(result.comparison.previous)} ({delta !== null && delta > 0 ? `+${delta}` : delta})
+                  </li>
+                )}
+                {result.comparison.best !== null && <li>{b.bestMark(result.comparison.best)}</li>}
+                {result.comparison.average !== null && <li>{b.averageMark(result.comparison.average)}</li>}
+              </ul>
+            )}
+          </div>
+        </div>
         {history.data && history.data.length > 1 && (
           <div className="tfq-card">
             <ExamHistory exams={history.data} />
@@ -155,7 +222,7 @@ export function ExamView() {
             <RefreshCw size={16} /> {generate.isPending ? t.examPreparing : t.examAgain}
           </button>
           <Link href="/tafawoq" className="tfq-btn ghost">
-            {t.examBack}
+            {b.dashboard}
           </Link>
         </div>
       </>
@@ -163,14 +230,34 @@ export function ExamView() {
   }
 
   if (!exam) {
+    const stream = state.data?.student?.stream;
+    const minutes = stream === "sciences" ? 210 : 150;
     return (
-      <div className="tfq-card tfq-empty">
-        <FileText size={30} />
-        <h2>{t.examTitle}</h2>
-        <p className="tfq-muted">{t.examIntroPending}</p>
-        <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate()}>
-          {generate.isPending ? t.examPreparing : t.examStart}
-        </button>
+      <div className="tfq-card tfq-narrow">
+        <Link href="/tafawoq" className="tfq-muted" style={{ fontSize: 13 }}>
+          ← {b.dashboard}
+        </Link>
+        <div style={{ textAlign: "center" }}>
+          <FileText size={30} />
+          <h2>{b.toolMock}</h2>
+        </div>
+        <h3>{b.mockInstructionsTitle}</h3>
+        <ol className="tfq-list">
+          {b.mockInstructions(openMock.data?.minutes ?? minutes).map(line => (
+            <li key={line}>{line}</li>
+          ))}
+        </ol>
+        <div className="tfq-row" style={{ marginTop: 12 }}>
+          {openMock.data && (
+            <button type="button" className="tfq-btn" onClick={() => begin(openMock.data as unknown as Exam)}>
+              {b.resumeMock}
+            </button>
+          )}
+          <button type="button" className={`tfq-btn ${openMock.data ? "ghost" : ""}`} disabled={generate.isPending} onClick={() => generate.mutate()}>
+            {generate.isPending ? t.examPreparing : t.examStart}
+          </button>
+        </div>
+        {openMock.error && <p className="tfq-error">{bacError(b, openMock.error)}</p>}
         {history.data && history.data.length > 0 && (
           <div style={{ marginTop: 22, textAlign: "start" }}>
             <ExamHistory exams={history.data} />
@@ -186,15 +273,18 @@ export function ExamView() {
   return (
     <>
       <div className="tfq-spread" style={{ marginBottom: 10 }}>
-        <div>
-          <div className="tfq-kicker">{t.examTitle}</div>
+        <div style={{ minWidth: 0 }}>
+          <div className="tfq-kicker">{b.toolMock}</div>
           <p className="tfq-muted" style={{ margin: 0 }}>
             {t.examIntro(exam.exercises.length, exam.minutes)}
           </p>
         </div>
-        <span className={`tfq-chip ${left <= 0 ? "" : "info"}`}>
-          <Clock size={14} /> <span dir="ltr">{t.examTimeLeft(clock(left))}</span>
-        </span>
+        <div className="tfq-chips">
+          <span className={`tfq-chip ${left <= 0 ? "" : "info"}`}>
+            <Clock size={14} /> <span dir="ltr">{t.examTimeLeft(clock(left))}</span>
+          </span>
+          {savedAt && <span className="tfq-chip good">{b.savedAt}</span>}
+        </div>
       </div>
       {left <= 0 && <div className="tfq-banner">{t.examTimeUp}</div>}
       <div className="tfq-tabs" role="tablist">
@@ -220,9 +310,12 @@ export function ExamView() {
         questions={exercise.questions}
         submitting={submit.isPending}
         submitLabel={isLast ? t.examHandIn : t.examNext}
+        initialAnswers={answers[exercise.assessmentId] ?? drafts[exercise.assessmentId]}
+        onChange={given => recordDraft(exercise.assessmentId, given)}
         onSubmit={given => {
           const next = { ...answers, [exercise.assessmentId]: given };
           setAnswers(next);
+          recordDraft(exercise.assessmentId, given);
           const missing = exam.exercises.findIndex(entry => !next[entry.assessmentId]);
           if (missing === -1) {
             submit.mutate({

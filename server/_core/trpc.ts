@@ -16,6 +16,10 @@ const requireUser = t.middleware(async opts => {
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
+  // A suspended account keeps no access, even with a session issued before.
+  if (ctx.user.accountStatus === "suspended") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "ACCOUNT_SUSPENDED" });
+  }
 
   return next({
     ctx: {
