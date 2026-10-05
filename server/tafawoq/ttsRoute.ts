@@ -41,8 +41,10 @@ export function registerTafawoqTtsRoutes(app: Express) {
       res.status(400).json({ error: `Text must be 1–${MAX_TTS_CHARS} characters.` });
       return;
     }
-    // A call is ~40 sentences; 600 an hour leaves room for several lessons.
-    if (!(await checkRateLimit(`tafawoq-tts:${userId}`, 600, 60 * 60 * 1000))) {
+    // One request per spoken sentence (~4 s): the teacher talking non-stop
+    // is ~900 an hour; 2000 leaves room for prefetching and replays (most
+    // are cached files) while still stopping a runaway client.
+    if (!(await checkRateLimit(`tafawoq-tts:${userId}`, 2000, 60 * 60 * 1000))) {
       res.status(429).json({ error: "Too many requests." });
       return;
     }
