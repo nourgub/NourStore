@@ -20,16 +20,16 @@ def shot(m):
     else:
         os.makedirs(S+'/ph',exist_ok=True);src=f'{S}/ph/{sid}.png';w=15.5
         items=''.join(f'<div style="display:flex;gap:14px;align-items:baseline;margin:4px 0"><span style="color:#D4A84B;font-size:30px">{NUM[i]}</span><span>{esc(x)}</span></div>' for i,x in enumerate(leg))
-        jobs.append(dict(out=src,w=1600,h=520,html=f'''<div style="width:1600px;height:520px;background:#15110A;padding:36px;position:relative">
+        jobs.append(dict(out=src,w=1600,h=520,html=f'''<div style="width:1600px;height:520px;background:#0F2747;padding:36px;position:relative">
 <div style="position:absolute;inset:36px;border:4px dashed #D4A84B;border-radius:28px"></div>
-<div style="position:relative;padding:44px 60px;color:#F4EEDF;height:100%">
+<div style="position:relative;padding:44px 60px;color:#FFFFFF;height:100%">
 <div style="display:flex;justify-content:space-between;align-items:center">
 <div style="font-size:30px;color:#D4A84B;font-weight:700">📷 مكان لقطة الشاشة</div>
 <div style="font-size:64px;font-weight:800;color:#D4A84B;direction:ltr;letter-spacing:2px">{sid}</div></div>
 <div style="font-size:50px;font-weight:800;margin-top:6px;line-height:1.3">{esc(d['title'])}</div>
 <div style="height:4px;width:180px;background:#D4A84B;margin:18px 0 22px"></div>
-<div style="font-size:30px;color:#CBBF9F;line-height:1.55"><b style="color:#F0D58C">كيف تصوّرها:</b> {esc(d['take'])}</div>
-<div style="position:absolute;bottom:40px;left:60px;font-size:22px;color:#8A7E62;direction:ltr">shots/{sid}.png · Nourix Academy</div>
+<div style="font-size:30px;color:#D3DEEE;line-height:1.55"><b style="color:#F0D58C">كيف تصوّرها:</b> {esc(d['take'])}</div>
+<div style="position:absolute;bottom:40px;left:60px;font-size:22px;color:#8FA3C4;direction:ltr">shots/{sid}.png · Nourix Academy</div>
 </div></div>'''))
     out=f'![]({src}){{width={w:.2f}cm}}\n\n::: {{custom-style="ShotCaption"}}\nلقطة {sid}: {d["title"]}\n:::\n\n'
     if leg: out+='::: {custom-style="Legend"}\n'+'\n\n'.join(f'{NUM[i]}  {x}' for i,x in enumerate(leg))+'\n:::\n'
