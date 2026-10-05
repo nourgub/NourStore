@@ -16,8 +16,8 @@
 
 export type TeacherStyle = "fusha" | "darja";
 
-/** The teacher's fixed sentences, Fusha → Darja. */
-const PHRASES: Array<[string, string]> = [
+/** The teacher's fixed sentences, Fusha → Darja (also prepared ahead as voice, ./ttsWarmup.ts). */
+export const PHRASES: Array<[string, string]> = [
   // Dialogue (./dialogue.ts)
   ["معاً بالحوار. لن أعطيك القاعدة جاهزة: أنت من سيصل إليها، خطوة صغيرة بعد خطوة.", "مع بعض بالحوار. ما نعطيكش القاعدة واجدة: نتا لي غادي توصلّها، خطوة صغيرة بخطوة."],
   ["هيا نكتشف", "يالاه نكتشفو"],

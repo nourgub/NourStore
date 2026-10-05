@@ -6,8 +6,10 @@ import type { Express, Request, Response } from "express";
 import { authenticateRequest } from "../_core/session";
 import { checkRateLimit } from "../rateLimit";
 import { MAX_TTS_CHARS, speak, ttsProviders } from "./tts";
+import { startTtsWarmup } from "./ttsWarmup";
 
 export function registerTafawoqTtsRoutes(app: Express) {
+  startTtsWarmup();
   app.get("/api/tafawoq/tts/status", (_req: Request, res: Response) => {
     const providers = ttsProviders();
     res.json({ available: providers.azure || providers.google || providers.piper });
