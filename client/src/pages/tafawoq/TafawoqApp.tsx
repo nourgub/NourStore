@@ -49,7 +49,7 @@ import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
-import { darjaSuggestions, useTeacherStyle } from "./teacherStyle";
+import { darjaSuggestions, useTeacherStyle, useTeacherVoice } from "./teacherStyle";
 import { unlockAudio } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import "./tafawoq.css";
@@ -220,6 +220,7 @@ function HomeCallCard({
             </button>
           ))}
         </div>
+        <VoiceSwitch />
       </div>
       {lesson ? (
         <button type="button" className="tfq-btn tfq-call-open" onClick={() => { unlockAudio(); setCalling(true); }}>
@@ -679,6 +680,29 @@ function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
   );
 }
 
+/** The student picks a male or a female teacher's voice (server/tafawoq/tts.ts). */
+function VoiceSwitch() {
+  const t = useT();
+  const [voice, setVoice] = useTeacherVoice();
+  return (
+    <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherVoice}>
+      <span className="tfq-muted">{t.teacherVoice}</span>
+      {(["male", "female"] as const).map(option => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={voice === option}
+          className={`tfq-btn small ${voice === option ? "" : "ghost"}`}
+          onClick={() => setVoice(option)}
+        >
+          {option === "male" ? t.voiceMale : t.voiceFemale}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
   const t = useT();
   const lang = useLang();
@@ -748,6 +772,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
           </button>
         ))}
       </div>
+      <VoiceSwitch />
       <div className="tfq-call-row">
         <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => { unlockAudio(); setCall(true); }}>
           <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>

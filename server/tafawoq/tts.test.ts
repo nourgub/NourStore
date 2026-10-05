@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pcmToMp3, speak, ttsProviders } from "./tts";
+import { azureSsml, pcmToMp3, speak, ttsProviders } from "./tts";
 
 describe("teacher voice", () => {
   it("encodes speech PCM to a small MP3", () => {
@@ -18,4 +18,20 @@ describe("teacher voice", () => {
     expect(await speak("ألو؟")).toBeNull();
     expect(await speak("   ")).toBeNull();
   });
+
+  it("asks Azure for the chosen voice in its own locale, text escaped", () => {
+    const ssml = azureSsml("ar-DZ-AminaNeural", "x < 3 & y > 2");
+    expect(ssml).toContain('xml:lang="ar-DZ"');
+    expect(ssml).toContain('<voice name="ar-DZ-AminaNeural">');
+    expect(ssml).toContain("x &lt; 3 &amp; y &gt; 2");
+    expect(azureSsml("ar-AE-FatimaNeural", "مرحبا")).toContain('xml:lang="ar-AE"');
+  });
+
+  it("a student who chose the female voice still hears a natural voice when only Kareem is installed", async () => {
+    const providers = ttsProviders();
+    if (!providers.piper || providers.piperFemale || providers.azure || providers.google) return;
+    const voice = await speak("مرحبا بيك", "female");
+    expect(voice?.provider).toBe("piper");
+    expect(voice?.gender).toBe("male");
+  }, 30_000);
 });

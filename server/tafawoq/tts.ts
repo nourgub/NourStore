@@ -1,14 +1,25 @@
 // Tafawoq AI Teacher — the teacher's natural voice.
 //
 // The browser's built-in voice sounds robotic on most phones and bothers
-// students, so the teacher's speech is synthesised on the server:
-//   1. Google Cloud Text-to-Speech (WaveNet, natural) — only when
-//      GOOGLE_TTS_API_KEY is set, and only up to TAFAWOQ_TTS_MONTHLY_CHARS
-//      characters a month (default 3.5 M, inside Google's 4 M free quota);
-//   2. Piper (MIT, open source, runs on this server, free and unlimited,
-//      nothing leaves the server) with the Arabic voice "Kareem" —
-//      installed by scripts/fetch-piper.mjs;
-//   3. otherwise the client falls back to the browser's best voice.
+// students, so the teacher's speech is synthesised on the server. The
+// student chooses a male or a female teacher; each service below is tried
+// in turn for that voice:
+//   1. Microsoft Azure Speech (neural) — only when AZURE_SPEECH_KEY and
+//      AZURE_SPEECH_REGION are set, and only up to TAFAWOQ_AZURE_MONTHLY_CHARS
+//      characters a month (default 450 k, inside the free F0 tier's 500 k).
+//      Its Algerian voices (ar-DZ: Ismael ♂, Amina ♀) are the closest to an
+//      Algerian teacher; TAFAWOQ_AZURE_VOICE_MALE / _FEMALE pick others
+//      (e.g. ar-AE-FatimaNeural);
+//   2. Google Cloud Text-to-Speech (WaveNet) — only when GOOGLE_TTS_API_KEY
+//      is set, up to TAFAWOQ_TTS_MONTHLY_CHARS a month (default 3.5 M,
+//      inside Google's 4 M free quota);
+//   3. Piper (MIT, open source, runs on this server, free and unlimited,
+//      nothing leaves the server): the Arabic voice "Kareem" (♂), installed
+//      by scripts/fetch-piper.mjs, and a female model when PIPER_MODEL_FEMALE
+//      points at one (Piper publishes no female Arabic voice yet);
+//   4. otherwise the client falls back to the browser's best voice.
+// A student who chose the female voice still hears a natural (male) voice
+// rather than the robotic one when no female voice is available.
 // Every sentence is synthesised once and cached on disk: the call's fixed
 // sentences and the lessons' dialogues are the same for every student.
 import { createHash } from "crypto";
@@ -26,16 +37,40 @@ export const MAX_TTS_CHARS = 600;
 const CACHE_DIR = path.resolve(process.env.TAFAWOQ_TTS_CACHE_DIR ?? path.join(process.cwd(), "uploads", "tts-cache"));
 const PIPER_DIR = path.resolve(process.env.TAFAWOQ_PIPER_DIR ?? path.join(process.cwd(), ".replit-data", "piper"));
 const PIPER_BIN = process.env.PIPER_BIN ?? path.join(PIPER_DIR, "piper", "piper");
-const PIPER_MODEL = process.env.PIPER_MODEL ?? path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx");
-const GOOGLE_VOICE = process.env.TAFAWOQ_TTS_VOICE ?? "ar-XA-Wavenet-B";
-const MONTHLY_CAP = Number(process.env.TAFAWOQ_TTS_MONTHLY_CHARS ?? 3_500_000);
 
-export type Voice = { audio: Buffer; contentType: "audio/mpeg"; provider: "google" | "piper" };
+export type VoiceGender = "male" | "female";
+type Provider = "azure" | "google" | "piper";
+
+const PIPER_MODELS: Record<VoiceGender, string | undefined> = {
+  male: process.env.PIPER_MODEL ?? path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx"),
+  female: process.env.PIPER_MODEL_FEMALE,
+};
+const GOOGLE_VOICES: Record<VoiceGender, string> = {
+  male: process.env.TAFAWOQ_TTS_VOICE ?? "ar-XA-Wavenet-B",
+  female: process.env.TAFAWOQ_TTS_VOICE_FEMALE ?? "ar-XA-Wavenet-A",
+};
+const AZURE_VOICES: Record<VoiceGender, string> = {
+  male: process.env.TAFAWOQ_AZURE_VOICE_MALE ?? "ar-DZ-IsmaelNeural",
+  female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
+};
+const MONTHLY_CAPS: Record<"azure" | "google", number> = {
+  azure: Number(process.env.TAFAWOQ_AZURE_MONTHLY_CHARS ?? 450_000),
+  google: Number(process.env.TAFAWOQ_TTS_MONTHLY_CHARS ?? 3_500_000),
+};
+
+export type Voice = { audio: Buffer; contentType: "audio/mpeg"; provider: Provider; gender: VoiceGender };
+
+const piperReady = (gender: VoiceGender) => {
+  const model = PIPER_MODELS[gender];
+  return Boolean(model) && existsSync(PIPER_BIN) && existsSync(model!);
+};
 
 export function ttsProviders() {
   return {
+    azure: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
-    piper: existsSync(PIPER_BIN) && existsSync(PIPER_MODEL),
+    piper: piperReady("male") || piperReady("female"),
+    piperFemale: piperReady("female"),
   };
 }
 
@@ -52,9 +87,9 @@ function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
 }
 
 /** Raw 16-bit mono PCM from the local engine (`--output_raw`). */
-function piperPcm(text: string): Promise<Buffer> {
+function piperPcm(model: string, text: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const child = spawn(PIPER_BIN, ["--model", PIPER_MODEL, "--length_scale", "1.05", "--output_raw"], {
+    const child = spawn(PIPER_BIN, ["--model", model, "--length_scale", "1.05", "--output_raw"], {
       env: { ...process.env, LD_LIBRARY_PATH: path.dirname(PIPER_BIN) },
       stdio: ["pipe", "pipe", "ignore"],
     });
@@ -66,13 +101,13 @@ function piperPcm(text: string): Promise<Buffer> {
   });
 }
 
-let piperRate: number | null = null;
-async function piperSampleRate(): Promise<number> {
-  if (piperRate === null) {
-    const config = JSON.parse(await readFile(`${PIPER_MODEL}.json`, "utf8")) as { audio?: { sample_rate?: number } };
-    piperRate = config.audio?.sample_rate ?? 22050;
+const piperRates = new Map<string, number>();
+async function piperSampleRate(model: string): Promise<number> {
+  if (!piperRates.has(model)) {
+    const config = JSON.parse(await readFile(`${model}.json`, "utf8")) as { audio?: { sample_rate?: number } };
+    piperRates.set(model, config.audio?.sample_rate ?? 22050);
   }
-  return piperRate;
+  return piperRates.get(model)!;
 }
 
 /** 16-bit little-endian mono PCM → MP3 at 48 kbit/s (≈ 7× smaller than WAV, fine for speech). */
@@ -89,31 +124,66 @@ export function pcmToMp3(pcm: Buffer, sampleRate: number): Buffer {
   return Buffer.concat(parts);
 }
 
-async function piperSpeak(text: string): Promise<Buffer> {
-  const rate = await piperSampleRate();
-  return oneAtATime(async () => pcmToMp3(await piperPcm(text), rate));
+async function piperSpeak(model: string, text: string): Promise<Buffer> {
+  const rate = await piperSampleRate(model);
+  return oneAtATime(async () => pcmToMp3(await piperPcm(model, text), rate));
 }
 
 // ---------------------------------------------------------------------------
-// Google Cloud Text-to-Speech, within a monthly character cap.
+// Paid services (Azure, Google), each within its monthly free allowance.
 // ---------------------------------------------------------------------------
 
-const month = () => new Date().toISOString().slice(0, 7);
+/** The quota row: "2026-10" for Google (kept from before Azure), "azure:2026-10". */
+const quotaKey = (provider: "azure" | "google") => {
+  const month = new Date().toISOString().slice(0, 7);
+  return provider === "google" ? month : `${provider}:${month}`;
+};
 
 /** Reserves `characters` of this month's quota; false when the cap would be passed. */
-async function reserveQuota(characters: number): Promise<boolean> {
+async function reserveQuota(provider: "azure" | "google", characters: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  const current = await db.select().from(tafawoqTtsUsage).where(sql`${tafawoqTtsUsage.month} = ${month()}`).limit(1);
-  if ((current[0]?.characters ?? 0) + characters > MONTHLY_CAP) return false;
+  const key = quotaKey(provider);
+  const current = await db.select().from(tafawoqTtsUsage).where(sql`${tafawoqTtsUsage.month} = ${key}`).limit(1);
+  if ((current[0]?.characters ?? 0) + characters > MONTHLY_CAPS[provider]) return false;
   await db
     .insert(tafawoqTtsUsage)
-    .values({ month: month(), characters })
+    .values({ month: key, characters })
     .onDuplicateKeyUpdate({ set: { characters: sql`${tafawoqTtsUsage.characters} + ${characters}` } });
   return true;
 }
 
-async function googleSpeak(text: string): Promise<Buffer> {
+const escapeXml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+/** SSML for the voice: its own locale (ar-DZ, ar-AE…), a calm teaching pace. */
+export function azureSsml(voice: string, text: string): string {
+  const locale = voice.split("-").slice(0, 2).join("-");
+  return (
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${locale}">` +
+    `<voice name="${escapeXml(voice)}"><prosody rate="-5%">${escapeXml(text)}</prosody></voice></speak>`
+  );
+}
+
+async function azureSpeak(voice: string, text: string): Promise<Buffer> {
+  const region = encodeURIComponent(process.env.AZURE_SPEECH_REGION!);
+  const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": process.env.AZURE_SPEECH_KEY!,
+      "Content-Type": "application/ssml+xml",
+      "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+      "User-Agent": "tafawoq",
+    },
+    body: azureSsml(voice, text),
+  });
+  if (!response.ok) throw new Error(`Azure TTS HTTP ${response.status}`);
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (!audio.length) throw new Error("Azure TTS returned no audio");
+  return audio;
+}
+
+async function googleSpeak(voice: string, text: string): Promise<Buffer> {
   const response = await fetch(
     `https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(process.env.GOOGLE_TTS_API_KEY!)}`,
     {
@@ -121,7 +191,7 @@ async function googleSpeak(text: string): Promise<Buffer> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: { text },
-        voice: { languageCode: "ar-XA", name: GOOGLE_VOICE },
+        voice: { languageCode: "ar-XA", name: voice },
         audioConfig: { audioEncoding: "MP3", speakingRate: 0.95 },
       }),
     }
@@ -134,13 +204,13 @@ async function googleSpeak(text: string): Promise<Buffer> {
 
 // ---------------------------------------------------------------------------
 
-function cachePath(provider: string, text: string) {
-  const hash = createHash("sha256").update(`${provider}|${provider === "google" ? GOOGLE_VOICE : "kareem"}|${text}`).digest("hex");
+/** Cached by the exact voice: a new voice never replays another's audio. */
+function cachePath(provider: Provider, voice: string, text: string) {
+  const hash = createHash("sha256").update(`${provider}|${voice}|${text}`).digest("hex");
   return path.join(CACHE_DIR, hash.slice(0, 2), `${hash}.mp3`);
 }
 
-async function cached(provider: "google" | "piper", text: string, make: () => Promise<Buffer>): Promise<Buffer> {
-  const file = cachePath(provider, text);
+async function cached(file: string, make: () => Promise<Buffer>): Promise<Buffer> {
   try {
     return await readFile(file);
   } catch {
@@ -154,26 +224,36 @@ async function cached(provider: "google" | "piper", text: string, make: () => Pr
   return audio;
 }
 
-/** The teacher saying `text`, or null when no natural voice is available. */
-export async function speak(text: string): Promise<Voice | null> {
+type Attempt = { provider: Provider; voice: string; gender: VoiceGender; make: (text: string) => Promise<Buffer> };
+
+/** The services able to say it, in order: the chosen gender first, then any natural voice. */
+function attempts(gender: VoiceGender): Attempt[] {
+  const providers = ttsProviders();
+  const list: Attempt[] = [];
+  const add = (wanted: VoiceGender) => {
+    if (providers.azure) list.push({ provider: "azure", voice: AZURE_VOICES[wanted], gender: wanted, make: text => azureSpeak(AZURE_VOICES[wanted], text) });
+    if (providers.google) list.push({ provider: "google", voice: GOOGLE_VOICES[wanted], gender: wanted, make: text => googleSpeak(GOOGLE_VOICES[wanted], text) });
+    const model = PIPER_MODELS[wanted];
+    if (model && piperReady(wanted)) list.push({ provider: "piper", voice: path.basename(model, ".onnx"), gender: wanted, make: text => piperSpeak(model, text) });
+  };
+  add(gender);
+  add(gender === "male" ? "female" : "male");
+  return list;
+}
+
+/** The teacher saying `text` in the chosen voice, or null when no natural voice is available. */
+export async function speak(text: string, gender: VoiceGender = "male"): Promise<Voice | null> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_TTS_CHARS);
   if (!clean) return null;
-  const providers = ttsProviders();
-  if (providers.google) {
-    // Already-cached sentences cost nothing; new ones count against the cap.
-    if (existsSync(cachePath("google", clean)) || (await reserveQuota(clean.length))) {
-      try {
-        return { audio: await cached("google", clean, () => googleSpeak(clean)), contentType: "audio/mpeg", provider: "google" };
-      } catch (error) {
-        console.warn("[tafawoq] Google TTS failed, using the local voice:", error instanceof Error ? error.message : error);
-      }
-    }
-  }
-  if (providers.piper) {
+  for (const attempt of attempts(gender)) {
+    const file = cachePath(attempt.provider, attempt.voice, clean);
+    // Already-cached sentences cost nothing; new ones count against the paid services' caps.
+    if (attempt.provider !== "piper" && !existsSync(file) && !(await reserveQuota(attempt.provider, clean.length))) continue;
     try {
-      return { audio: await cached("piper", clean, () => piperSpeak(clean)), contentType: "audio/mpeg", provider: "piper" };
+      const audio = await cached(file, () => attempt.make(clean));
+      return { audio, contentType: "audio/mpeg", provider: attempt.provider, gender: attempt.gender };
     } catch (error) {
-      console.warn("[tafawoq] Piper failed:", error instanceof Error ? error.message : error);
+      console.warn(`[tafawoq] ${attempt.provider} TTS failed, trying the next voice:`, error instanceof Error ? error.message : error);
     }
   }
   return null;

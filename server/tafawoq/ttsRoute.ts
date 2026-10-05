@@ -1,5 +1,5 @@
-// POST /api/tafawoq/tts { text } → the teacher's natural voice (audio/mpeg),
-// for signed-in users only (it costs server time, or Google quota), rate
+// POST /api/tafawoq/tts { text, voice: "male" | "female" } → the teacher's natural voice (audio/mpeg),
+// for signed-in users only (it costs server time, or paid quota), rate
 // limited. 503 when no natural voice is available: the client then uses
 // the browser's own voice.
 import type { Express, Request, Response } from "express";
@@ -10,7 +10,7 @@ import { MAX_TTS_CHARS, speak, ttsProviders } from "./tts";
 export function registerTafawoqTtsRoutes(app: Express) {
   app.get("/api/tafawoq/tts/status", (_req: Request, res: Response) => {
     const providers = ttsProviders();
-    res.json({ available: providers.google || providers.piper });
+    res.json({ available: providers.azure || providers.google || providers.piper });
   });
 
   app.post("/api/tafawoq/tts", async (req: Request, res: Response) => {
@@ -22,6 +22,7 @@ export function registerTafawoqTtsRoutes(app: Express) {
       return;
     }
     const text = typeof req.body?.text === "string" ? req.body.text : "";
+    const gender = req.body?.voice === "female" ? "female" : "male";
     if (!text.trim() || text.length > MAX_TTS_CHARS) {
       res.status(400).json({ error: `Text must be 1–${MAX_TTS_CHARS} characters.` });
       return;
@@ -32,14 +33,14 @@ export function registerTafawoqTtsRoutes(app: Express) {
       return;
     }
     try {
-      const voice = await speak(text);
+      const voice = await speak(text, gender);
       if (!voice) {
         res.status(503).json({ error: "No natural voice available." });
         return;
       }
       res.setHeader("Content-Type", voice.contentType);
       res.setHeader("Cache-Control", "private, max-age=86400");
-      res.setHeader("X-Tafawoq-Voice", voice.provider);
+      res.setHeader("X-Tafawoq-Voice", `${voice.provider}; ${voice.gender}`);
       res.send(voice.audio);
     } catch (error) {
       console.warn("[tafawoq] TTS failed:", error instanceof Error ? error.message : error);

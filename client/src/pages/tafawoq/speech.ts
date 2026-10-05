@@ -6,6 +6,7 @@
 // which text-to-speech reads badly or skips. toSpokenArabic() rewrites it
 // the way an Algerian teacher would say it aloud ("إكس تربيع", "ناقص 3",
 // "إف مشتقة إكس") before it is spoken. The screen still shows the symbols.
+import { readTeacherVoice } from "./teacherStyle";
 
 const SUPERSCRIPT_DIGITS: Record<string, string> = {
   "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
@@ -199,7 +200,7 @@ async function fetchVoice(text: string, signal: AbortSignal): Promise<Blob | nul
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, voice: readTeacherVoice() }),
       signal,
     });
     if (response.status === 503 || response.status === 404 || response.status === 401) {

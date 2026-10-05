@@ -32,3 +32,29 @@ export function useTeacherStyle(): [TeacherStyle, (style: TeacherStyle) => void]
 export function darjaSuggestions(focus?: string): string[] {
   return ["سقسيني", focus ? `فهمني ${focus} بالحوار` : "فهمني بالحوار", "عطيني مثال", "علاش نغلط؟"];
 }
+
+/** Whose voice the teacher speaks with — a male or a female teacher (server/tafawoq/tts.ts). */
+export type TeacherVoice = "male" | "female";
+
+const VOICE_KEY = "tfq-teacher-voice";
+
+export function readTeacherVoice(): TeacherVoice {
+  try {
+    return localStorage.getItem(VOICE_KEY) === "female" ? "female" : "male";
+  } catch {
+    return "male";
+  }
+}
+
+export function useTeacherVoice(): [TeacherVoice, (voice: TeacherVoice) => void] {
+  const [voice, setVoice] = useState<TeacherVoice>(readTeacherVoice);
+  const update = (next: TeacherVoice) => {
+    try {
+      localStorage.setItem(VOICE_KEY, next);
+    } catch {
+      // Private mode: keep it for this visit only.
+    }
+    setVoice(next);
+  };
+  return [voice, update];
+}
