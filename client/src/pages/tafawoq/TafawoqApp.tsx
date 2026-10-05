@@ -6,6 +6,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import {
   BarChart3,
   BookOpen,
+  Camera,
   ClipboardCheck,
   FileText,
   GraduationCap,
@@ -46,6 +47,7 @@ import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqSt
 import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
+import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
 import { darjaSuggestions, useTeacherStyle } from "./teacherStyle";
 import { VideoPlayer } from "./VideoPlayer";
@@ -102,6 +104,8 @@ export default function TafawoqApp() {
             <Landing />
           ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
             <ParentView />
+          ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
+            <TeacherInbox />
           ) : user && user.role !== "learner" && user.role !== "admin" ? (
             <div className="tfq-card tfq-empty">
               <h2>{t.staffOnly}</h2>
@@ -109,6 +113,8 @@ export default function TafawoqApp() {
             </div>
           ) : params?.lessonKey === "exam" ? (
             <ExamView />
+          ) : params?.lessonKey === "exercises" ? (
+            <ExercisesRoute />
           ) : params?.lessonKey ? (
             <LessonPage lessonKey={params.lessonKey} />
           ) : (
@@ -227,6 +233,20 @@ function HomeCallCard({
   );
 }
 
+/** "ارفع تمرينك" with the lessons of the student's level and stream. */
+function ExercisesRoute() {
+  const overview = trpc.tafawoq.overview.useQuery();
+  const catalog = trpc.tafawoq.catalog.useQuery();
+  const student = overview.data?.student;
+  const lessons = (catalog.data?.lessons ?? []).filter(
+    lesson =>
+      !student ||
+      (lesson.levels.includes(student.schoolLevel) &&
+        (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream)))
+  );
+  return <ExerciseHelp lessons={lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))} />;
+}
+
 function Home() {
   const t = useT();
   const overview = trpc.tafawoq.overview.useQuery();
@@ -270,6 +290,13 @@ function Home() {
           bac={student.schoolLevel === "bac"}
         />
       )}
+      <Link href="/tafawoq/exercises" className="tfq-card tfq-exam-card tfq-ex-home">
+        <Camera size={26} />
+        <div>
+          <h3 style={{ margin: 0 }}>{t.exTitle}</h3>
+          <p className="tfq-muted" style={{ margin: "4px 0 0" }}>{t.exCard}</p>
+        </div>
+      </Link>
       {student.schoolLevel === "bac" && lessons.length > 0 && <RoadmapCard />}
       {student.schoolLevel === "bac" && lessons.length > 0 && (
         <Link href="/tafawoq/exam" className="tfq-card tfq-exam-card">

@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { BAC_STREAMS, SCHOOL_LEVELS } from "@shared/tafawoq";
 import { publicProcedure, router } from "../_core/trpc";
-import { learnerProcedure, parentProcedure, rateLimit } from "../_core/procedures";
+import { learnerProcedure, parentProcedure, rateLimit, teacherProcedure } from "../_core/procedures";
 import * as tafawoq from "../tafawoq/service";
 
 const lessonKey = z.string().min(1).max(64);
@@ -93,6 +93,40 @@ export const tafawoqRouter = router({
   setTarget: learnerProcedure
     .input(z.object({ targetMark: z.number().min(10).max(20).multipleOf(0.5) }))
     .mutation(({ ctx, input }) => tafawoq.setTarget(ctx.user.id, input.targetMark)),
+
+  /** "ارفع تمرينك": typed and/or photographed exercise → solver now, or a teacher. */
+  submitExercise: learnerProcedure
+    .use(rateLimit("tafawoq-exercise", 20, HOUR))
+    .input(
+      z
+        .object({
+          text: z.string().max(4000).nullish(),
+          note: z.string().max(1000).nullish(),
+          lessonKey: z.string().max(64).nullish(),
+          image: z
+            .object({
+              mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+              // ~6 MB of bytes once decoded.
+              base64: z.string().max(8_400_000),
+            })
+            .nullish(),
+        })
+        .refine(input => Boolean(input.text?.trim()) || Boolean(input.image), "Type the exercise or add a photo")
+    )
+    .mutation(({ ctx, input }) => tafawoq.submitExercise(ctx.user.id, input)),
+
+  myExercises: learnerProcedure.query(({ ctx }) => tafawoq.myExercises(ctx.user.id)),
+
+  askTeacher: learnerProcedure
+    .input(z.object({ exerciseId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => tafawoq.askTeacher(ctx.user.id, input.exerciseId)),
+
+  /** Teachers: exercises waiting for a detailed solution. */
+  teacherInbox: teacherProcedure.query(() => tafawoq.teacherInbox()),
+
+  answerExercise: teacherProcedure
+    .input(z.object({ exerciseId: z.number().int().positive(), answer: z.string().trim().min(10).max(20000) }))
+    .mutation(({ ctx, input }) => tafawoq.answerExerciseAsTeacher(ctx.user.id, input.exerciseId, input.answer)),
 
   /** The student's marked mock exams, oldest first. */
   myExams: learnerProcedure.query(({ ctx }) => tafawoq.myExams(ctx.user.id)),

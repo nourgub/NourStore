@@ -289,6 +289,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       // Nobody else can hand in this paper.
       const examStranger = await fixtureUser("other-student");
       const otherCaller = appRouter.createCaller(ctxFor(examStranger));
+      const examStrangerCaller = otherCaller;
       await otherCaller.tafawoq.register({ displayName: "سمير", age: 17, schoolLevel: "bac", stream: "sciences" });
       await expect(otherCaller.tafawoq.submitExam({ examId: exam.examId, papers })).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -319,6 +320,48 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       expect((await caller.tafawoq.roadmap())!.target).toBe(16);
       const [childWithRoad] = await parentCaller.tafawoq.parentReport();
       expect(childWithRoad.roadmap?.target).toBe(16);
+
+      // "ارفع تمرينك": a typed derivative is solved at once, step by step.
+      const solved = await caller.tafawoq.submitExercise({ text: "احسب مشتقة f(x)=3x^3-2x+1" });
+      expect(solved.status).toBe("auto");
+      expect(solved.auto?.steps.length).toBeGreaterThan(0);
+      // An exercise the solver doesn't know, with a photo, goes to a teacher.
+      const tinyPng = Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        "base64"
+      ).toString("base64");
+      const asked = await caller.tafawoq.submitExercise({
+        text: "بيّن أن المثلث ABC قائم",
+        note: "لم أعرف من أين أبدأ",
+        image: { mimeType: "image/png", base64: tinyPng },
+      });
+      expect(asked.status).toBe("open");
+      expect(asked.imageUrl).toBe(`/api/protected-files/tafawoq-exercise/${asked.id}`);
+      // A renamed file is refused (the bytes must really be an image).
+      await expect(
+        caller.tafawoq.submitExercise({ image: { mimeType: "image/png", base64: Buffer.from("not an image").toString("base64") } })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      // Another student can't touch it; a learner can't open the inbox.
+      await expect(examStrangerCaller.tafawoq.askTeacher({ exerciseId: solved.id })).rejects.toMatchObject({ code: "NOT_FOUND" });
+      await expect(caller.tafawoq.teacherInbox()).rejects.toMatchObject({ code: "FORBIDDEN" });
+      // The student also wants the teacher's explanation of the solved one.
+      expect((await caller.tafawoq.askTeacher({ exerciseId: solved.id })).status).toBe("open");
+
+      const teacher = await fixtureUser("teacher");
+      const teacherCaller = appRouter.createCaller(ctxFor({ ...teacher, role: "teacher" }));
+      const inbox = await teacherCaller.tafawoq.teacherInbox();
+      expect(inbox.map(entry => entry.id)).toEqual(expect.arrayContaining([solved.id, asked.id]));
+      expect(inbox.find(entry => entry.id === asked.id)?.studentName).toBe("أحمد");
+      const answered = await teacherCaller.tafawoq.answerExercise({
+        exerciseId: asked.id,
+        answer: "نحسب الأطوال AB و AC و BC ثم نستعمل خاصية فيثاغورس العكسية.",
+      });
+      expect(answered.status).toBe("answered");
+      await expect(
+        teacherCaller.tafawoq.answerExercise({ exerciseId: asked.id, answer: "إجابة ثانية لا يجب أن تُقبل." })
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+      const mine = await caller.tafawoq.myExercises();
+      expect(mine.find(entry => entry.id === asked.id)?.answer).toContain("فيثاغورس");
     });
   }
 );

@@ -24,7 +24,7 @@ import path from "path";
 import { eq } from "drizzle-orm";
 import { UPLOAD_ROOT } from "./storageProviders/local";
 import { getDb } from "./db/shared";
-import { paymentReceipts, invoices, lessonAssets } from "../drizzle/schema";
+import { paymentReceipts, invoices, lessonAssets, tafawoqExercises, tafawoqStudents } from "../drizzle/schema";
 import { authenticateRequest } from "./_core/session";
 import { getLessonForLearner } from "./db/courses";
 import type { User } from "../drizzle/schema";
@@ -177,4 +177,46 @@ export function registerProtectedFileRoutes(app: Express) {
       await streamProtectedFile(res, asset.storageKey, asset.mimeType);
     }
   );
+
+  // A photographed exercise ("ارفع تمرينك"): the student who sent it, and
+  // the teachers who answer it, only.
+  app.get(
+    "/api/protected-files/tafawoq-exercise/:exerciseId",
+    async (req: Request, res: Response) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      const exerciseId = Number(req.params.exerciseId);
+      if (!Number.isInteger(exerciseId) || exerciseId <= 0) {
+        res.status(400).json({ error: "Invalid exercise id." });
+        return;
+      }
+      const db = await getDb();
+      if (!db) {
+        res.status(503).json({ error: "Database unavailable." });
+        return;
+      }
+      const rows = await db
+        .select({
+          storageKey: tafawoqExercises.imageKey,
+          mimeType: tafawoqExercises.imageMime,
+          ownerUserId: tafawoqStudents.userId,
+        })
+        .from(tafawoqExercises)
+        .innerJoin(tafawoqStudents, eq(tafawoqStudents.id, tafawoqExercises.studentId))
+        .where(eq(tafawoqExercises.id, exerciseId))
+        .limit(1);
+      const exercise = rows[0];
+      if (!exercise?.storageKey) {
+        res.status(404).json({ error: "Exercise photo not found." });
+        return;
+      }
+      const allowed = exercise.ownerUserId === user.id || user.role === "teacher" || user.role === "admin";
+      if (!allowed) {
+        res.status(403).json({ error: "Not authorized to view this photo." });
+        return;
+      }
+      await streamProtectedFile(res, exercise.storageKey, exercise.mimeType);
+    }
+  );
+
 }

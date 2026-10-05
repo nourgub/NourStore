@@ -292,3 +292,16 @@
 @keyframes tfq-home-ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(-12deg); } 85% { transform: rotate(12deg); } }
 @media (prefers-reduced-motion: reduce) { .tfq-home-call-icon { animation: none; } }
 .tfq-call-talk { align-self: center; margin: 6px auto; }
+
+/* "ارفع تمرينك" */
+.tfq-ex-home { border-color: rgba(120, 170, 255, 0.5); background: linear-gradient(135deg, rgba(120, 170, 255, 0.14), rgba(120, 170, 255, 0.03)); }
+.tfq-ex-home svg { color: #8fb4ff; }
+.tfq-ex-card { margin-top: 12px; }
+.tfq-ex-text { white-space: pre-line; margin: 10px 0; line-height: 1.9; }
+.tfq-ex-photo { display: block; max-width: 100%; max-height: 360px; border-radius: 10px; margin: 10px 0; object-fit: contain; }
+.tfq-ex-preview img { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; margin-bottom: 8px; }
+.tfq-ex-solution { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: rgba(79, 191, 127, 0.08); border: 1px solid rgba(79, 191, 127, 0.35); }
+.tfq-ex-solution.teacher { background: rgba(240, 180, 80, 0.08); border-color: rgba(240, 180, 80, 0.4); }
+.tfq-ex-solution ol { margin: 8px 0; padding-inline-start: 22px; line-height: 1.9; }
+.tfq-ex-answer { white-space: pre-line; line-height: 1.9; }
+.tfq-form textarea.tfq-input { resize: vertical; font-family: inherit; }

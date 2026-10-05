@@ -4,6 +4,7 @@ import {
   tafawoqAssessments,
   tafawoqAttempts,
   tafawoqExams,
+  tafawoqExercises,
   tafawoqLessons,
   tafawoqMessages,
   tafawoqSkillStates,
@@ -392,4 +393,77 @@ export async function lastAssessmentId(studentId: number) {
     .orderBy(desc(tafawoqAssessments.id))
     .limit(1);
   return rows[0]?.id ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// "ارفع تمرينك": exercises submitted by students, answered by the free solver
+// or by a teacher.
+// ---------------------------------------------------------------------------
+
+export async function createExercise(input: {
+  studentId: number;
+  lessonKey: string | null;
+  text: string | null;
+  note: string | null;
+  imageKey: string | null;
+  imageMime: string | null;
+  status: "auto" | "open";
+  autoJson: string | null;
+}) {
+  const db = await requireDb();
+  const result = await db.insert(tafawoqExercises).values(input).$returningId();
+  return result[0].id;
+}
+
+export async function getExercise(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(tafawoqExercises).where(eq(tafawoqExercises.id, id)).limit(1);
+  return rows[0];
+}
+
+export async function listStudentExercises(studentId: number, limit = 30) {
+  const db = await requireDb();
+  return db
+    .select()
+    .from(tafawoqExercises)
+    .where(eq(tafawoqExercises.studentId, studentId))
+    .orderBy(desc(tafawoqExercises.id))
+    .limit(limit);
+}
+
+/** Exercises waiting for a teacher, oldest first, with who asked. */
+export async function listOpenExercises(limit = 50) {
+  const db = await requireDb();
+  return db
+    .select({
+      exercise: tafawoqExercises,
+      studentName: tafawoqStudents.displayName,
+      schoolLevel: tafawoqStudents.schoolLevel,
+      stream: tafawoqStudents.stream,
+    })
+    .from(tafawoqExercises)
+    .innerJoin(tafawoqStudents, eq(tafawoqStudents.id, tafawoqExercises.studentId))
+    .where(eq(tafawoqExercises.status, "open"))
+    .orderBy(asc(tafawoqExercises.id))
+    .limit(limit);
+}
+
+/** The student wants a teacher to look at an automatically solved exercise too. */
+export async function reopenExercise(id: number) {
+  const db = await requireDb();
+  const [result] = await db
+    .update(tafawoqExercises)
+    .set({ status: "open" })
+    .where(and(eq(tafawoqExercises.id, id), eq(tafawoqExercises.status, "auto")));
+  return result.affectedRows === 1;
+}
+
+/** Records a teacher's answer once; false if it was already answered. */
+export async function answerExercise(id: number, teacherUserId: number, answer: string) {
+  const db = await requireDb();
+  const [result] = await db
+    .update(tafawoqExercises)
+    .set({ status: "answered", answer, answeredBy: teacherUserId, answeredAt: new Date() })
+    .where(and(eq(tafawoqExercises.id, id), eq(tafawoqExercises.status, "open")));
+  return result.affectedRows === 1;
 }

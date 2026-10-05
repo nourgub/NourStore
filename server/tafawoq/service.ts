@@ -32,6 +32,9 @@ import { createRng, randomSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
 import { inStyle, type TeacherStyle } from "./darja";
+import { solveExercise, type Solution } from "./solver";
+import { storagePut } from "../storage";
+import { randomUUID } from "crypto";
 import {
   bestNextLesson,
   examBlueprint,
@@ -1139,4 +1142,125 @@ export async function parentReport(parentUserId: number) {
       };
     })
   );
+}
+
+// ---------------------------------------------------------------------------
+// "ارفع تمرينك": a student submits an exercise — typed and/or a photo. A
+// typed BAC exercise the free solver recognises is answered at once, step by
+// step; anything else (a photo, an unrecognised exercise, or the student
+// asking for a teacher anyway) waits in the teachers' inbox for a detailed
+// solution written by a person.
+// ---------------------------------------------------------------------------
+
+const EXERCISE_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+export const MAX_EXERCISE_IMAGE_BYTES = 6 * 1024 * 1024;
+
+/** The bytes really are the declared image type (not a renamed file). */
+function looksLikeImage(bytes: Buffer, mimeType: string) {
+  if (mimeType === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mimeType === "image/png") return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (mimeType === "image/webp") return bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
+}
+
+type ExerciseRow = NonNullable<Awaited<ReturnType<typeof store.getExercise>>>;
+
+function publicExercise(row: ExerciseRow) {
+  return {
+    id: row.id,
+    lessonKey: row.lessonKey,
+    lessonTitle: row.lessonKey ? getLesson(row.lessonKey)?.title ?? null : null,
+    text: row.text,
+    note: row.note,
+    imageUrl: row.imageKey ? `/api/protected-files/tafawoq-exercise/${row.id}` : null,
+    status: row.status,
+    auto: row.autoJson ? (JSON.parse(row.autoJson) as Solution) : null,
+    answer: row.answer,
+    createdAt: row.createdAt,
+    answeredAt: row.answeredAt,
+  };
+}
+
+export async function submitExercise(
+  userId: number,
+  input: {
+    text?: string | null;
+    note?: string | null;
+    lessonKey?: string | null;
+    image?: { mimeType: string; base64: string } | null;
+  }
+) {
+  const student = await studentOrThrow(userId);
+  const text = input.text?.trim() || null;
+  const note = input.note?.trim() || null;
+  if (!text && !input.image) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Type the exercise or add a photo" });
+  }
+  const lessonKey = input.lessonKey && getLesson(input.lessonKey) ? input.lessonKey : null;
+
+  let imageKey: string | null = null;
+  let imageMime: string | null = null;
+  if (input.image) {
+    const extension = EXERCISE_IMAGE_TYPES[input.image.mimeType];
+    const bytes = Buffer.from(input.image.base64, "base64");
+    if (!extension || !bytes.length || bytes.length > MAX_EXERCISE_IMAGE_BYTES || !looksLikeImage(bytes, input.image.mimeType)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "The photo must be a JPEG, PNG or WebP image under 6 MB" });
+    }
+    const stored = await storagePut(
+      `tafawoq-exercises/${student.id}/${Date.now()}-${randomUUID()}.${extension}`,
+      bytes,
+      input.image.mimeType
+    );
+    imageKey = stored.key;
+    imageMime = input.image.mimeType;
+  }
+
+  const solution = text ? solveExercise(text) : null;
+  // A photo always reaches a teacher (it can't be read automatically for free).
+  const id = await store.createExercise({
+    studentId: student.id,
+    lessonKey,
+    text,
+    note,
+    imageKey,
+    imageMime,
+    status: solution && !imageKey ? "auto" : "open",
+    autoJson: solution ? JSON.stringify(solution) : null,
+  });
+  return publicExercise((await store.getExercise(id))!);
+}
+
+export async function myExercises(userId: number) {
+  const student = await studentOrThrow(userId);
+  return (await store.listStudentExercises(student.id)).map(publicExercise);
+}
+
+/** "أريد شرح الأستاذ أيضاً": send an automatically solved exercise to a teacher. */
+export async function askTeacher(userId: number, exerciseId: number) {
+  const student = await studentOrThrow(userId);
+  const row = await store.getExercise(exerciseId);
+  if (!row || row.studentId !== student.id) throw new TRPCError({ code: "NOT_FOUND", message: "Exercise not found" });
+  await store.reopenExercise(row.id);
+  return publicExercise((await store.getExercise(row.id))!);
+}
+
+/** The teachers' inbox: exercises waiting for a detailed solution, oldest first. */
+export async function teacherInbox() {
+  const rows = await store.listOpenExercises();
+  return rows.map(({ exercise, studentName, schoolLevel, stream }) => ({
+    ...publicExercise(exercise),
+    // First name only: the teacher needs a name to address, not an identity.
+    studentName: studentName.split(/\s+/)[0],
+    schoolLevel,
+    stream,
+  }));
+}
+
+export async function answerExerciseAsTeacher(teacherUserId: number, exerciseId: number, answer: string) {
+  const row = await store.getExercise(exerciseId);
+  if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Exercise not found" });
+  if (!(await store.answerExercise(row.id, teacherUserId, answer.trim()))) {
+    throw new TRPCError({ code: "CONFLICT", message: "This exercise was already answered" });
+  }
+  return publicExercise((await store.getExercise(row.id))!);
 }

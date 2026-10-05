@@ -1273,6 +1273,32 @@ export const tafawoqExams = mysqlTable(
   })
 );
 
+// "ارفع تمرينك": an exercise a student submits (typed and/or a photo). The
+// free solver answers recognised typed exercises at once ("auto"); others
+// wait ("open") for a teacher's detailed solution ("answered").
+export const tafawoqExercises = mysqlTable(
+  "tafawoqExercises",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }),
+    text: mediumtext("text"),
+    note: text("note"),
+    imageKey: varchar("imageKey", { length: 255 }),
+    imageMime: varchar("imageMime", { length: 32 }),
+    status: mysqlEnum("status", ["auto", "open", "answered"]).notNull(),
+    autoJson: mediumtext("autoJson"),
+    answer: mediumtext("answer"),
+    answeredBy: int("answeredBy").references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    answeredAt: timestamp("answeredAt"),
+  },
+  table => ({
+    studentIdx: index("tafawoqExercises_student_idx").on(table.studentId, table.createdAt),
+    statusIdx: index("tafawoqExercises_status_idx").on(table.status, table.createdAt),
+  })
+);
+
 export const tafawoqAttempts = mysqlTable(
   "tafawoqAttempts",
   {
