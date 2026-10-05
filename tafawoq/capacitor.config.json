@@ -1,0 +1,15 @@
+{
+  "appId": "com.nourixacademy.app",
+  "appName": "Nourix Academy",
+  "webDir": "dist/public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "backgroundColor": "#050505",
+  "ios": {
+    "contentInset": "always"
+  },
+  "android": {
+    "backgroundColor": "#050505"
+  }
+}

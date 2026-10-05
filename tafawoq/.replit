@@ -1,0 +1,18 @@
+run = "npm install && bash scripts/replit-start.sh"
+modules = ["nodejs-22"]
+
+[nix]
+channel = "stable-24_05"
+packages = ["mariadb", "nodejs_22", "libaio"]
+
+[env]
+NODE_ENV = "development"
+AUTH_PROVIDER = "email"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[deployment]
+run = ["sh", "-c", "npm install && NODE_ENV=production bash scripts/replit-start.sh"]
+deploymentTarget = "cloudrun"

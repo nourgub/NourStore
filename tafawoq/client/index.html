@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050505" />
+    <title>تفوّق — أستاذ الرياضيات الذكي</title>
+    <meta
+      name="description"
+      content="تفوّق — أستاذ رياضيات ذكي ومجاني لتلاميذ البكالوريا في الجزائر: يتصل بك ويشرح لك بالصوت، بالفصحى أو بالدارجة، ويحضّرك بمواضيع وبكالوريا تجريبية."
+    />
+
+    <!-- Open Graph / Twitter Card — real, complete tags so a shared link
+         (WhatsApp, Facebook, Twitter/X) shows an actual title, description,
+         and preview image instead of a bare URL. Individual pages (course
+         detail, lesson) can override title/description/image at runtime
+         via useDocumentMeta (see client/src/lib/documentMeta.ts) — these
+         are the correct, real fallback for every other page and for the
+         first paint before that JS runs. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tafawoq" />
+    <meta property="og:title" content="تفوّق — أستاذ الرياضيات الذكي" />
+    <meta
+      property="og:description"
+      content="منصة تعليم إلكتروني للسوق الجزائرية — الرياضيات والإعلام الآلي، بالعربية والفرنسية والإنجليزية."
+    />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:locale" content="ar_DZ" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="تفوّق — أستاذ الرياضيات الذكي" />
+    <meta
+      name="twitter:description"
+      content="منصة تعليم إلكتروني للسوق الجزائرية — الرياضيات والإعلام الآلي."
+    />
+    <meta name="twitter:image" content="/icon-512.png" />
+
+    <!-- Fonts loaded via <link>, not CSS @import — @import is render-
+         blocking and delays font discovery until after the CSS file that
+         contains it is fully downloaded and parsed. preconnect lets the
+         browser open the connection to Google Fonts in parallel with
+         everything else, which matters most exactly on the slow/high-
+         latency mobile connections this app needs to work well on. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- A plain <link rel="stylesheet"> to a cross-origin host is still
+         render-blocking on its own — measured with Lighthouse against a
+         production build: first paint waited on this one request even
+         though the font files themselves use display=swap. The media="print"
+         swapped to "all" on load is the standard no-JS-framework way to fetch
+         it without blocking the initial render; noscript keeps the fonts
+         working with JS disabled, just blocking in that one case. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
+
+    <!-- PWA: works on Android via manifest.webmanifest (Chrome shows a real "Add to Home Screen" / install prompt) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+
+    <!-- PWA: iOS Safari ignores manifest.json for home-screen install — it needs these specific tags instead -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="تفوّق" />
+  </head>
+  <body>
+    <!-- Runs before any React code, synchronously, so a returning visitor
+         who previously chose French/English never sees (or has anything
+         rendered against) the wrong document direction — this is the ONE
+         place that sets it, rather than every page's own language
+         switcher, so it can never be missed. See
+         client/src/lib/language.ts, which every switcher calls into to
+         keep this in sync after the initial load too. -->
+    <script>
+      (function () {
+        var lang = localStorage.getItem("nourix-language");
+        if (lang === "fr" || lang === "en") {
+          document.documentElement.lang = lang;
+          document.documentElement.dir = "ltr";
+        }
+      })();
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
