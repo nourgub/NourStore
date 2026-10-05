@@ -187,3 +187,21 @@ export function spokenSegments(sentence: string): SpokenSegment[] {
   });
   return segments;
 }
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The sentence without the student's name ("السلام عليكم يا سارة!" →
+ * "السلام عليكم!"): what every student shares, so a prepared voice can say
+ * it when it has no recording of this student's name.
+ */
+export function withoutName(sentence: string, name: string): string {
+  const spoken = toSpokenArabic(name).trim();
+  if (!spoken) return sentence;
+  return sentence
+    .replace(new RegExp(`\\s*(?:يا\\s+)?${escapeRegExp(spoken)}`, "g"), "")
+    .replace(/\s+(?=[.،,:!؟?])/g, "")
+    .replace(/([،,])(?=[.!؟?:،,])/g, "")
+    .replace(/^[،,\s]+/, "")
+    .trim();
+}

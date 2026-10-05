@@ -7,11 +7,12 @@
 // allowance goes further every month. The warm-up only spends what the
 // month's pro-rata line leaves spare (minus a margin kept for students) and
 // at most half of each minute's requests. TAFAWOQ_TTS_WARMUP=0 turns it off.
-import { STRONG_MATH, spokenChunks } from "../../shared/spokenArabic";
+import { HAS_WORD, STRONG_MATH, spokenChunks, spokenSegments, withoutName } from "../../shared/spokenArabic";
 import { TIERS } from "../../shared/tafawoq";
 import type { StudentContext } from "./context";
 import { LESSONS } from "./curriculum";
 import { PHRASES, toDarja } from "./darja";
+import { DIALOGUE_DONE } from "./dialogue";
 import { SPOKEN_VARIANTS } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { oralQuestionText } from "./service";
@@ -23,9 +24,47 @@ export function warmupPieces(): string[] {
   return [...Array.from(STRONG_MATH), ...Array.from({ length: 101 }, (_, number) => String(number))];
 }
 
+/** Stands for the student's name: sentences with it are said without it by a prepared voice. */
+const SOMEONE = "ظظظ";
+
+/** Texts → the sentences the client sends, in Fusha and Darja, names left out, each once. */
+function sentencesOf(texts: string[]): string[] {
+  const sentences = texts
+    .flatMap(text => [text, toDarja(text)])
+    .flatMap(text => spokenChunks(text))
+    .map(sentence => withoutName(sentence, SOMEONE))
+    .filter(sentence => HAS_WORD.test(sentence));
+  return Array.from(new Set(sentences));
+}
+
+/** The teacher's sentences that name the student (said without the name by a prepared voice). */
+const NAMED = [
+  `السلام عليكم يا ${SOMEONE}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+  `✔ صحيح، أحسنت يا ${SOMEONE}!`,
+  `${DIALOGUE_DONE} رائع يا ${SOMEONE}، لقد وصلت إلى القاعدة بنفسك:`,
+  `انتهت حصتنا يا ${SOMEONE}.`,
+  `بالتوفيق يا ${SOMEONE}! أنا هنا متى احتجتني.`,
+  `أحسنت يا ${SOMEONE}! جرّب قسم «التمارين» لتثبيت ما تعلمته.`,
+  `مرحباً ${SOMEONE}.`,
+  `أحسنت يا ${SOMEONE}.`,
+];
+
+/**
+ * The prose between the maths of these sentences ("إذن الجواب:", "احسب"…):
+ * with the maths vocabulary, what a sentence no one recorded whole is
+ * assembled from (./tts.ts).
+ */
+export function prosePieces(sentences: string[]): string[] {
+  const pieces = sentences.flatMap(sentence => {
+    const segments = spokenSegments(sentence);
+    return segments.some(segment => segment.math) ? segments.filter(segment => !segment.math && HAS_WORD.test(segment.text)).map(segment => segment.text) : [];
+  });
+  return Array.from(new Set(pieces));
+}
+
 /** Every fixed sentence the teacher says, as the client sends it (one spoken sentence each), most heard first. */
 export function warmupSentences(): string[] {
-  const texts: string[] = [];
+  const texts: string[] = [...NAMED];
   for (const [fusha, darja] of PHRASES) if (/[.!؟:]$/.test(fusha)) texts.push(fusha, darja);
   for (const lesson of LESSONS) {
     for (const skill of lesson.skills) {
@@ -34,12 +73,8 @@ export function warmupSentences(): string[] {
     }
   }
   for (const lesson of LESSONS) for (const skill of lesson.skills) texts.push(skill.explanation);
-  const sentences = texts.flatMap(text => [text, toDarja(text)]).flatMap(text => spokenChunks(text));
-  return Array.from(new Set(sentences));
+  return sentencesOf(texts);
 }
-
-/** Stands for the student's name: sentences with it are each student's own. */
-const SOMEONE = "ظظظ";
 
 /**
  * The generated exercises the teacher says aloud, in every spoken variant
@@ -66,8 +101,7 @@ export function variantSentences(variants = SPOKEN_VARIANTS): string[] {
       }
     }
   }
-  const sentences = texts.flatMap(text => [text, toDarja(text)]).flatMap(text => spokenChunks(text));
-  return Array.from(new Set(sentences.filter(sentence => !sentence.includes(SOMEONE))));
+  return sentencesOf(texts);
 }
 
 /** The first paid voice of each gender: the one students hear. */
@@ -86,7 +120,7 @@ export async function warmUp(): Promise<{ made: number; stopped: boolean }> {
   let made = 0;
   try {
     for (const engine of paidEngines()) {
-      for (const text of warmupPieces()) {
+      for (const text of [...warmupPieces(), ...prosePieces(variantSentences())]) {
         if (!(await piece(engine, text, "spare", 60_000, 0.5))) return { made, stopped: true };
         made += 1;
       }

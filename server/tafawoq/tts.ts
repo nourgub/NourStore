@@ -39,7 +39,7 @@ import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { sql } from "drizzle-orm";
-import { HAS_WORD, bareWord, spokenSegments } from "../../shared/spokenArabic";
+import { HAS_WORD, bareWord, spokenSegments, withoutName } from "../../shared/spokenArabic";
 import { ENV } from "../_core/env";
 import { getDb } from "../db/shared";
 import { storageGetSignedUrl, storagePut } from "../storage";
@@ -47,12 +47,12 @@ import { tafawoqTtsUsage } from "../../drizzle/schema";
 
 export const MAX_TTS_CHARS = 600;
 
-const CACHE_DIR = path.resolve(process.env.TAFAWOQ_TTS_CACHE_DIR ?? path.join(process.cwd(), "uploads", "tts-cache"));
+export const CACHE_DIR = path.resolve(process.env.TAFAWOQ_TTS_CACHE_DIR ?? path.join(process.cwd(), "uploads", "tts-cache"));
 const PIPER_DIR = path.resolve(process.env.TAFAWOQ_PIPER_DIR ?? path.join(process.cwd(), ".replit-data", "piper"));
 const PIPER_BIN = process.env.PIPER_BIN ?? path.join(PIPER_DIR, "piper", "piper");
 
 export type VoiceGender = "male" | "female";
-type Provider = "azure" | "google" | "piper";
+type Provider = "pack" | "azure" | "google" | "piper";
 type Paid = "azure" | "google";
 
 const PIPER_MODELS: Record<VoiceGender, string | undefined> = {
@@ -67,6 +67,17 @@ const AZURE_VOICES: Record<VoiceGender, string> = {
   male: process.env.TAFAWOQ_AZURE_VOICE_MALE ?? "ar-DZ-IsmaelNeural",
   female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
 };
+/**
+ * A prepared voice ("voice pack"): every sentence the teacher says, recorded
+ * ahead with an open model (voice-dataset/pack/) and imported into the
+ * cache. Free and unlimited, but nothing is synthesised live: what it lacks
+ * falls to the next voice. The value names the pack (e.g. dz-teacher-f).
+ */
+const VOICE_PACKS: Record<VoiceGender, string | undefined> = {
+  male: process.env.TAFAWOQ_VOICE_PACK_MALE || undefined,
+  female: process.env.TAFAWOQ_VOICE_PACK_FEMALE || undefined,
+};
+export const PACK_RATE = Number(process.env.TAFAWOQ_VOICE_PACK_RATE ?? 24_000);
 const MONTHLY_CAPS: Record<Paid, number> = {
   azure: Number(process.env.TAFAWOQ_AZURE_MONTHLY_CHARS ?? 450_000),
   google: Number(process.env.TAFAWOQ_TTS_MONTHLY_CHARS ?? 3_500_000),
@@ -84,6 +95,7 @@ const piperReady = (gender: VoiceGender) => {
 
 export function ttsProviders() {
   return {
+    pack: Boolean(VOICE_PACKS.male || VOICE_PACKS.female),
     azure: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
     piper: piperReady("male") || piperReady("female"),
@@ -332,6 +344,13 @@ export type Engine = {
 function enginesFor(gender: VoiceGender): Engine[] {
   const providers = ttsProviders();
   const list: Engine[] = [];
+  const pack = VOICE_PACKS[gender];
+  if (pack) {
+    const notLive = async (): Promise<Buffer> => {
+      throw new Error("a voice pack only plays what was prepared");
+    };
+    list.push({ provider: "pack", voice: pack, gender, mp3: notLive, pcm: notLive, rate: async () => PACK_RATE });
+  }
   if (providers.azure) {
     const voice = AZURE_VOICES[gender];
     list.push({
@@ -400,7 +419,8 @@ async function storeLocally(file: string, audio: Buffer) {
   await rename(partial, file);
 }
 
-async function store(file: string, audio: Buffer) {
+/** Saves a recording on disk (and in the object storage when configured). */
+export async function store(file: string, audio: Buffer) {
   await storeLocally(file, audio);
   if (!durable()) return;
   const type = file.endsWith(".mp3") ? "audio/mpeg" : "application/octet-stream";
@@ -427,6 +447,7 @@ async function readCached(file: string): Promise<Buffer | null> {
 /** A paid request: a slot this minute and characters this month, or false. */
 async function mayRequest(engine: Engine, characters: number, allowance: Allowance, waitMs: number, share: number) {
   if (engine.provider === "piper") return true;
+  if (engine.provider === "pack") return false;
   return (await requestSlot(engine.provider, waitMs, share)) && (await reserveQuota(engine.provider, characters, allowance));
 }
 
@@ -481,27 +502,35 @@ export async function assemble(engine: Engine, text: string, waitMs: number): Pr
   return parts.length ? pcmToMp3(Buffer.concat(parts), rate) : null;
 }
 
-/** The teacher saying `text` in the chosen voice, or null when no natural voice is available. */
-export async function speak(text: string, gender: VoiceGender = "male"): Promise<Voice | null> {
+/**
+ * The teacher saying `text` in the chosen voice, or null when no natural
+ * voice is available. `name` is the student's: a voice that cannot say this
+ * student's name (a voice pack) says the sentence without it.
+ */
+export async function speak(text: string, gender: VoiceGender = "male", name?: string): Promise<Voice | null> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_TTS_CHARS);
   if (!clean) return null;
-  const hasMaths = spokenSegments(clean).some(segment => segment.math);
+  const nameless = name ? withoutName(clean, name) : clean;
+  const sentences = nameless !== clean && HAS_WORD.test(nameless) ? [clean, nameless] : [clean];
   for (const engine of engines(gender)) {
     const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender });
     try {
-      // Whole: always for prose (shared by every student, cached for good);
-      // with maths, while this month's usage is under its pro-rata line.
-      const whole = await synthesizeSentence(engine, clean, hasMaths ? "paced" : "month", 3_000);
-      if (whole) return found(whole);
-      if (!hasMaths) continue;
-      // Beyond the line: the same voice, assembled from cached pieces.
-      const file = cachePath(engine, "assembled", clean);
-      const cached = await readCached(file);
-      if (cached) return found(cached);
-      const assembled = await assemble(engine, clean, 3_000);
-      if (assembled) {
-        await store(file, assembled);
-        return found(assembled);
+      for (const sentence of sentences) {
+        const hasMaths = spokenSegments(sentence).some(segment => segment.math);
+        // Whole: always for prose (shared by every student, cached for good);
+        // with maths, while this month's usage is under its pro-rata line.
+        const whole = await synthesizeSentence(engine, sentence, hasMaths ? "paced" : "month", 3_000);
+        if (whole) return found(whole);
+        if (!hasMaths) continue;
+        // Beyond the line: the same voice, assembled from cached pieces.
+        const file = cachePath(engine, "assembled", sentence);
+        const cached = await readCached(file);
+        if (cached) return found(cached);
+        const assembled = await assemble(engine, sentence, 3_000);
+        if (assembled) {
+          await store(file, assembled);
+          return found(assembled);
+        }
       }
     } catch (error) {
       console.warn(`[tafawoq] ${engine.provider} TTS failed, trying the next voice:`, error instanceof Error ? error.message : error);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spokenChunks, spokenSegments } from "./spokenArabic";
+import { spokenChunks, spokenSegments, withoutName } from "./spokenArabic";
 
 describe("spoken sentences", () => {
   it("cuts the teacher's text into short sentences every student shares", () => {
@@ -29,5 +29,13 @@ describe("spoken sentences", () => {
 
   it("ends a maths run at punctuation, so the pause falls where it is written", () => {
     expect(spokenSegments("إكس يساوي 2، واي يساوي 3").map(segment => segment.text)).toEqual(["إكس يساوي 2،", "واي يساوي 3"]);
+  });
+
+  it("says a sentence without the student's name, the way every student shares it", () => {
+    expect(withoutName("السلام عليكم يا سارة!", "سارة")).toBe("السلام عليكم!");
+    expect(withoutName("صحيح، أحسنت يا سارة!", "سارة")).toBe("صحيح، أحسنت!");
+    expect(withoutName("رائع يا سارة، لقد وصلت إلى القاعدة بنفسك:", "سارة")).toBe("رائع، لقد وصلت إلى القاعدة بنفسك:");
+    expect(withoutName("مرحباً سارة.", "سارة")).toBe("مرحباً.");
+    expect(withoutName("أتمنى أن تكون بخير.", "سارة")).toBe("أتمنى أن تكون بخير.");
   });
 });
