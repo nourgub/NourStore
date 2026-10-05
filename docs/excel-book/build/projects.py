@@ -330,15 +330,17 @@ def paie():
 
 
 # ---------------------------------------------------------------- Exercices par chapitre
-def exercices():
+def exercices(cor=False):
+    S = lambda f: f if cor else None
     wb = Workbook(); ws = wb.active; ws.title = 'Ch5 Formules'
     title(ws, 'Chapitre 5 · Formules et références', 'Calculez le total de chaque ligne, puis la TVA avec la référence absolue $F$3.', 6)
     ws['E3'] = 'Taux TVA :'; cell(ws, 3, 6, 0.19, PCT, inp=True)
     header(ws, 5, ['Produit', 'Prix', 'Quantité', 'Total HT', 'TVA', 'Total TTC'])
     for i, (n, pr, q) in enumerate([('Cahier', 120, 10), ('Stylo', 30, 25), ('Classeur', 250, 4), ('Agenda', 400, 3), ('Trousse', 350, 6)]):
         r = 6 + i; cell(ws, r, 1, n); cell(ws, r, 2, pr, NUM, inp=True); cell(ws, r, 3, q, '0', inp=True)
-        for c in (4, 5, 6): cell(ws, r, c, None, NUM, fill='F2F2F2')
-    ws['A12'] = 'Solution : D6 =B6*C6 · E6 =D6*$F$3 · F6 =D6+E6, puis recopiez vers le bas.'; ws['A12'].font = F(italic=True, size=9, color='7F7F7F')
+        for c, f in ((4, f'=B{r}*C{r}'), (5, f'=D{r}*$F$3'), (6, f'=D{r}+E{r}')): cell(ws, r, c, S(f), NUM, fill='F2F2F2')
+    if cor: ws['A12'] = 'Solution : D6 =B6*C6 · E6 =D6*$F$3 · F6 =D6+E6, puis recopiez vers le bas.'
+    ws['A12'].font = F(italic=True, size=9, color='7F7F7F')
     widths(ws, [14, 10, 10, 12, 12, 12])
     w2 = wb.create_sheet('Ch6-7 Fonctions')
     title(w2, 'Chapitres 6 et 7 · Fonctions', 'Utilisez SOMME, MOYENNE, MAX, MIN, NB.SI, SI et SOMME.SI sur ces données.', 5)
@@ -346,24 +348,27 @@ def exercices():
     data = [('Ali', 'Commercial', 120000, 135000), ('Fatima', 'Commercial', 98000, 87000), ('Hamza', 'Marketing', 76000, 99000), ('Salma', 'Commercial', 143000, 151000), ('Youssef', 'Marketing', 54000, 61000), ('Asma', 'Commercial', 110000, 104000)]
     for i, row in enumerate(data):
         for j, v in enumerate(row): cell(w2, 5 + i, 1 + j, v, NUM if j >= 2 else None, inp=True)
-        cell(w2, 5 + i, 5, None, fill='F2F2F2')
+        cell(w2, 5 + i, 5, S(f'=IF(D{5+i}>=100000,"Oui","Non")'), fill='F2F2F2', align='center')
     for k, q in enumerate(['Total T1 (SOMME)', 'Moyenne T2 (MOYENNE)', 'Meilleure vente T2 (MAX)', 'Employés du service Commercial (NB.SI)', 'Ventes T1 du Marketing (SOMME.SI)', 'Objectif : « Oui » si T2 ≥ 100 000 (SI)']):
-        w2.cell(12 + k, 1, q).font = F(size=10); cell(w2, 12 + k, 4, None, NUM, fill='F2F2F2')
+        w2.cell(12 + k, 1, q).font = F(size=10); cell(w2, 12 + k, 4, S(['=SUM(C5:C10)', '=AVERAGE(D5:D10)', '=MAX(D5:D10)', '=COUNTIF(B5:B10,"Commercial")', '=SUMIF(B5:B10,"Marketing",C5:C10)', '=COUNTIF(E5:E10,"Oui")'][k]), NUM if k < 3 or k == 4 else '0', fill='F2F2F2')
     widths(w2, [40, 14, 13, 13, 18])
     w3 = wb.create_sheet('Ch8 Recherche')
     title(w3, 'Chapitre 8 · Recherche', 'Tapez un code en B13 et retrouvez le nom et le prix avec RECHERCHEV ou INDEX/EQUIV.', 4)
     header(w3, 4, ['Code', 'Produit', 'Prix', 'Stock'])
     for i, row in enumerate([('P001', 'Cahier', 120, 80), ('P002', 'Stylo', 30, 300), ('P003', 'Classeur', 250, 45), ('P004', 'Ramette A4', 750, 20), ('P005', 'Agenda', 400, 15), ('P006', 'Calculatrice', 1200, 9)]):
         for j, v in enumerate(row): cell(w3, 5 + i, 1 + j, v, NUM if j == 2 else None, inp=True)
-    w3['A13'] = 'Code cherché :'; cell(w3, 13, 2, 'P004', inp=True); w3['A14'] = 'Produit :'; cell(w3, 14, 2, None, fill='F2F2F2'); w3['A15'] = 'Prix :'; cell(w3, 15, 2, None, NUM, fill='F2F2F2')
-    w3['A17'] = 'Solution : =RECHERCHEV(B13;A5:D10;2;FAUX) puis colonne 3 pour le prix.'; w3['A17'].font = F(italic=True, size=9, color='7F7F7F')
+    w3['A13'] = 'Code cherché :'; cell(w3, 13, 2, 'P004', inp=True); w3['A14'] = 'Produit :'; cell(w3, 14, 2, S('=VLOOKUP(B13,A5:D10,2,FALSE)'), fill='F2F2F2'); w3['A15'] = 'Prix :'; cell(w3, 15, 2, S('=VLOOKUP(B13,A5:D10,3,FALSE)'), NUM, fill='F2F2F2')
+    if cor: w3['A16'] = 'Variante :'; cell(w3, 16, 2, '=INDEX(B5:B10,MATCH(B13,A5:A10,0))', fill='F2F2F2')
+    if cor: w3['A17'] = 'Solution : =RECHERCHEV(B13;A5:D10;2;FAUX) puis colonne 3 pour le prix.'
+    w3['A17'].font = F(italic=True, size=9, color='7F7F7F')
     widths(w3, [16, 16, 10, 10])
     w4 = wb.create_sheet('Ch9 Texte et dates')
     title(w4, 'Chapitre 9 · Texte et dates', 'Nettoyez les noms (SUPPRESPACE, NOMPROPRE), séparez-les, et calculez l’âge avec DATEDIF.', 6)
     header(w4, 4, ['Nom complet (brut)', 'Nom nettoyé', 'Prénom', 'Date de naissance', 'Âge', 'Code'])
     for i, (n, d_) in enumerate([('  sami   EXEMPLE ', dt.date(1998, 3, 14)), ('lina exemple', dt.date(2001, 11, 2)), ('OMAR  exemple', dt.date(1995, 7, 23)), (' nour Exemple', dt.date(2003, 1, 30))]):
         cell(w4, 5 + i, 1, n, inp=True); cell(w4, 5 + i, 4, d_, 'dd/mm/yyyy', inp=True)
-        for c in (2, 3, 5, 6): cell(w4, 5 + i, c, None, fill='F2F2F2')
+        r = 5 + i
+        for c, f in ((2, f'=PROPER(TRIM(A{r}))'), (3, f'=IFERROR(LEFT(B{r},FIND(" ",B{r})-1),B{r})'), (5, f'=DATEDIF(D{r},TODAY(),"y")'), (6, f'=UPPER(LEFT(C{r},3))')): cell(w4, r, c, S(f), fill='F2F2F2')
     widths(w4, [22, 18, 12, 16, 8, 10])
     w5 = wb.create_sheet('Ch10-12 Données')
     title(w5, 'Chapitres 10 à 12 · Tableau, filtres, graphique, TCD', 'Transformez ces données en tableau (Ctrl+T), filtrez, puis créez un graphique et un tableau croisé dynamique.', 5)
@@ -373,10 +378,13 @@ def exercices():
         cell(w5, r, 2, random.choice(['Alger', 'Oran', 'Casablanca', 'Tunis', 'Rabat']), inp=True); cell(w5, r, 3, random.choice(['Thé', 'Café', 'Jus', 'Eau']), inp=True)
         q = random.randint(5, 60); cell(w5, r, 4, q, '0', inp=True); cell(w5, r, 5, q * random.choice([150, 220, 90, 60]), NUM, inp=True)
     widths(w5, [12, 12, 10, 10, 12])
-    wb.calculation.fullCalcOnLoad = True; wb.save(f'{OUT}/Exercices-par-chapitre.xlsx')
+    if cor:
+        for w in wb.worksheets: w.cell(2, 1).value = (w.cell(2, 1).value or '') + '  ·  CORRIGÉ : les cellules grises contiennent les solutions.'
+    wb.calculation.fullCalcOnLoad = True; wb.save(f'{OUT}/Exercices-CORRIGE.xlsx' if cor else f'{OUT}/Exercices-par-chapitre.xlsx')
 
 
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
-    for f in (budget, facture, stock, notes, ventes, paie, exercices): f()
+    for f in (budget, facture, stock, notes, ventes, paie): f()
+    st = random.getstate(); exercices(); random.setstate(st); exercices(cor=True)
     print('ok')

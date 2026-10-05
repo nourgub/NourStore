@@ -59,7 +59,7 @@ files['word/document.xml']=d.encode()
 # footer
 files['word/footer1.xml']=('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
  '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:bidi/><w:jc w:val="center"/></w:pPr>'
- '<w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">Excel من الصفر إلى الاحتراف  ·  Nourix Academy  ·  </w:t></w:r>'
+ '<w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">Excel العملي  ·  Nourix Academy  ·  </w:t></w:r>'
  '<w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>'
  '<w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:color w:val="5E7A66"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>').encode()
 r=files['word/_rels/document.xml.rels'].decode()
@@ -128,7 +128,7 @@ addstyle('ShotCaption','<w:keepNext/><w:spacing w:before="40" w:after="60"/><w:j
 addstyle('Legend','<w:pBdr><w:right w:val="single" w:sz="18" w:space="6" w:color="D4A84B"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="EDF6EF"/><w:spacing w:before="0" w:after="0" w:line="252" w:lineRule="auto"/><w:ind w:left="300" w:right="300"/>','<w:sz w:val="20"/><w:szCs w:val="22"/><w:color w:val="1B2A1F"/>')
 files['word/styles.xml']=s.encode()
 core=('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
- '<dc:title>Excel من الصفر إلى الاحتراف</dc:title><dc:subject>تعلّم Microsoft Excel بالصور مع مشاريع حقيقية</dc:subject><dc:creator>Nourix Academy</dc:creator><dc:language>ar</dc:language>'
+ '<dc:title>Excel العملي</dc:title><dc:subject>من المبتدئ إلى المستوى المتوسط، بالصور و6 مشاريع حقيقية</dc:subject><dc:creator>Nourix Academy</dc:creator><dc:language>ar</dc:language>'
  '<cp:keywords>Microsoft Excel، Excel، دوال، جداول محورية، Nourix Academy</cp:keywords><dcterms:created xsi:type="dcterms:W3CDTF">2026-10-01T00:00:00Z</dcterms:created></cp:coreProperties>')
 files['docProps/core.xml']=core.encode()
 zout=zipfile.ZipFile(dst,'w',zipfile.ZIP_DEFLATED)

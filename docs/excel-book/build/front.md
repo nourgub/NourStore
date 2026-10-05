@@ -1,9 +1,9 @@
 ::: {custom-style="Copyright"}
-**Excel من الصفر إلى الاحتراف: تعلّم Microsoft Excel بالصور مع مشاريع حقيقية**
+**Excel العملي: من المبتدئ إلى المستوى المتوسط، بالصور و6 مشاريع حقيقية**
 
-*Maîtriser Microsoft Excel, pas à pas*
+*Excel pratique : du débutant au niveau intermédiaire*
 
-**المؤلف والناشر:** Nourix Academy · **الطبعة الأولى:** أكتوبر 2026
+**المؤلف والناشر:** Nourix Academy · **الطبعة الثانية المنقّحة:** أكتوبر 2026
 
 © 2026 Nourix Academy. جميع الحقوق محفوظة. لا يجوز نسخ هذا الكتاب أو أي جزء منه أو نشره أو بيعه بأي وسيلة دون إذن كتابي من Nourix Academy، باستثناء اقتباسات قصيرة مع ذكر المصدر.
 

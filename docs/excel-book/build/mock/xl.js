@@ -139,7 +139,7 @@ function win(o) {
     <div class="tb-right"><span class="avatar">NA</span><span class="wc">—</span><span class="wc">▢</span><span class="wc">✕</span></div></div>
   <div class="tabs"${M(o.mTabs, (o.mp && o.mp.mTabs) || 'b')}>${tabsHtml}<div class="tabs-right"><span class="pill">💬 Commentaires</span><span class="pill share">⇪ Partager ▾</span></div></div>
   <div class="ribbon"${M(o.mRibbon, (o.mp && o.mp.mRibbon) || 'b')}>${ribbon}<div class="collapse">⌃</div></div>
-  <div class="fbar"><div class="namebox"${M(o.mName, (o.mp && o.mp.mName) || 'b')}>${o.name || o.active || 'A1'} ▾</div><span class="fsep">⋮</span><span class="fbtn">✕</span><span class="fbtn">✓</span><span class="fbtn"${M(o.mFx, (o.mp && o.mp.mFx) || 'b')}><i>fx</i></span><div class="formula"${M(o.mFormula, (o.mp && o.mp.mFormula) || 'b')}>${o.formula ?? ''}</div></div>
+  <div class="fbar"><div class="namebox"${M(o.mName, (o.mp && o.mp.mName) || 'b')}>${o.name || o.active || 'A1'} ▾</div><span class="fsep">⋮</span><span class="fbtn">✕</span><span class="fbtn">✓</span><span class="fbtn"${M(o.mFx, (o.mp && o.mp.mFx) || 'b')}><i>fx</i></span><div class="formula"><span${M(o.mFormula, (o.mp && o.mp.mFormula) || 'b')}>${o.formula ?? ''}</span></div></div>
   <div class="work"><div class="canvas xcanvas">${o.grid || ''}</div>${o.right ? `<div class="side right">${o.right}</div>` : ''}</div>
   <div class="sheetbar"${M(o.mSheets, (o.mp && o.mp.mSheets) || 't')}><span style="color:#8a8886">◀ ▶</span>${sheets}<span class="st plus">⊕</span></div>
   <div class="status"${M(o.mStatus, (o.mp && o.mp.mStatus) || 't')}><div>${o.mode || 'Prêt'} &nbsp;&nbsp; ♿ Accessibilité : vérification terminée</div>
