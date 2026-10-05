@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
-import type { TeacherAction, TeacherMessage } from "@shared/bacPlatform";
+import { teacherMessageSpeech, type TeacherAction, type TeacherMessage } from "@shared/bacPlatform";
 import type { PublicQuestion } from "@shared/tafawoq";
 import { trpc } from "@/lib/trpc";
 import { M, QuestionRunner, ResultItems, type SubmitResult } from "./components";
@@ -35,12 +35,6 @@ export function useVoiceMode(): [VoiceMode, (mode: VoiceMode) => void] {
   return [mode, update];
 }
 
-/** What the teacher says aloud: the explanation, the law, the question (never the labels). */
-function spokenText(message: TeacherMessage) {
-  return [message.title, message.explanation, ...message.formula, message.example ? `${message.example.problem}. ${message.example.answer}` : "", message.question]
-    .filter(Boolean)
-    .join(". ");
-}
 
 export function StructuredMessage({ message, autoRead }: { message: TeacherMessage; autoRead: boolean }) {
   const b = useB();
@@ -50,7 +44,7 @@ export function StructuredMessage({ message, autoRead }: { message: TeacherMessa
   const read = useCallback(() => {
     stopRef.current();
     setSpeaking(true);
-    stopRef.current = speakArabic(spokenText(message), { onEnd: () => setSpeaking(false) });
+    stopRef.current = speakArabic(teacherMessageSpeech(message), { onEnd: () => setSpeaking(false) });
   }, [message]);
   useEffect(() => {
     if (autoRead && canSpeak()) read();

@@ -408,3 +408,15 @@
   .tfq-total { flex-direction: column; align-items: flex-start; }
   .tfq-exam-score strong { font-size: 30px; }
 }
+
+/* A flashcard with its "listen" button under it. */
+.tfq-flashcard-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  min-width: 0;
+}
+.tfq-flashcard-wrap > .tfq-btn {
+  align-self: flex-start;
+}

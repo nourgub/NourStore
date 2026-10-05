@@ -17,6 +17,8 @@ import { SPOKEN_VARIANTS } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
 import { oralQuestionText } from "./service";
 import { callIntroText, formatExample, generatedExamples } from "./templates";
+import { teacherMessageSpeech, type TeacherAction } from "../../shared/bacPlatform";
+import { teacherMessage } from "./platform/teacher";
 import { engines, piece, synthesizeSentence, type Engine, type VoiceGender } from "./tts";
 
 /** The maths vocabulary assembled sentences are made of: words and the common numbers. */
@@ -104,6 +106,37 @@ export function variantSentences(variants = SPOKEN_VARIANTS): string[] {
   return sentencesOf(texts);
 }
 
+/**
+ * The BAC platform teacher's structured messages ("اشرح بطريقة أبسط",
+ * "أعطني مثالًا", "لم أفهم هذه الخطوة", "تمرين مشابه") as read aloud, for
+ * every skill, both styles and every spoken variant of their example.
+ */
+export function teacherMessageSentences(variants = SPOKEN_VARIANTS): string[] {
+  const actions: TeacherAction[] = ["simpler", "example", "stepHelp", "similar"];
+  const texts: string[] = [];
+  for (let seed = 1; seed <= variants; seed += 1) {
+    for (const lesson of LESSONS) {
+      for (const skill of lesson.skills) {
+        for (const tier of TIERS) {
+          const summary = { key: skill.key, name: skill.name, mastery: 0.2 };
+          const context = { name: SOMEONE, tier, skills: [summary], focusSkills: [summary], strengths: [], recurringErrors: [] } as unknown as StudentContext;
+          for (const action of actions) {
+            // "similar" ends on the exercise itself (spoken from pieces); its other parts are fixed.
+            if (action === "similar" && (seed > 1 || tier !== "weak")) continue;
+            if (action !== "example" && tier !== "weak") continue;
+            for (const style of [undefined, "darja"] as const) {
+              const message = teacherMessage({ action, lesson, context, skill, style, seed, exercisePrompt: action === "similar" ? " " : undefined });
+              texts.push(teacherMessageSpeech(message));
+            }
+          }
+        }
+      }
+    }
+  }
+  const sentences = texts.flatMap(text => spokenChunks(text)).filter(sentence => HAS_WORD.test(sentence));
+  return Array.from(new Set(sentences));
+}
+
 /** The first paid voice of each gender: the one students hear. */
 function paidEngines(): Engine[] {
   return (["male", "female"] as VoiceGender[])
@@ -126,7 +159,7 @@ export async function warmUp(): Promise<{ made: number; stopped: boolean }> {
       }
     }
     // The fixed sentences first (every student hears them), then the spoken variants.
-    for (const text of [...warmupSentences(), ...variantSentences()]) {
+    for (const text of [...warmupSentences(), ...teacherMessageSentences(1), ...variantSentences(), ...teacherMessageSentences()]) {
       for (const engine of paidEngines()) {
         if (!(await synthesizeSentence(engine, text, "spare", 60_000, 0.5))) return { made, stopped: true };
         made += 1;

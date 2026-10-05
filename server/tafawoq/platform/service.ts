@@ -32,7 +32,7 @@ import { getPlatformSetting, setPlatformSetting } from "../../db/platformSetting
 import { logAdminAction } from "../../db/adminAudit";
 import { createParentInvite, getParentLinks } from "../../db/parent";
 import { getLesson, lessonForStream, type BankQuestion, type Lesson } from "../curriculum";
-import { createRng, randomSeed } from "../generators/core";
+import { createRng, randomSeed, spokenSeed } from "../generators/core";
 import { instantiate } from "../generators/instantiate";
 import { examMention, nextBacDate, paperLessons } from "../bac";
 import { overallMastery, skillName, targetDifficulty, MASTERED, STRENGTH } from "../studentModel";
@@ -1134,7 +1134,8 @@ export async function teacherAction(
     context,
     skill,
     style: input.style,
-    seed: randomSeed(),
+    // A spoken variant: what the teacher reads aloud is recorded once for every student.
+    seed: spokenSeed(),
     exercisePrompt: exercise?.questions[0]?.prompt,
   });
   const requestLabel: Record<TeacherAction, string> = {

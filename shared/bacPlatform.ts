@@ -142,3 +142,23 @@ export type TeacherMessage = {
   example?: { problem: string; steps: string[]; answer: string };
   question: string;
 };
+
+/**
+ * What the teacher says aloud for a structured message: the title, the
+ * explanation, the law, the example and its answer, the question — never
+ * the section labels. One line per part, so each is its own spoken
+ * sentence (shared/spokenArabic.ts) and its recording is shared by every
+ * student who hears the same part.
+ */
+export function teacherMessageSpeech(message: TeacherMessage): string {
+  return [
+    message.title,
+    message.explanation,
+    ...message.formula,
+    message.example?.problem ?? "",
+    message.example?.answer ?? "",
+    message.question,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}

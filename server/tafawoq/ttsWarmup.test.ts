@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { spokenSegments } from "../../shared/spokenArabic";
-import { prosePieces, variantSentences, warmupPieces, warmupSentences } from "./ttsWarmup";
+import { teacherMessageSpeech } from "../../shared/bacPlatform";
+import { prosePieces, teacherMessageSentences, variantSentences, warmupPieces, warmupSentences } from "./ttsWarmup";
 
 describe("voice warm-up", () => {
   it("prepares every fixed sentence once, in Fusha and Darja, each a single request", () => {
@@ -31,5 +32,21 @@ describe("voice warm-up", () => {
 
   it("prepares the prose between the maths, so any maths sentence can be assembled", () => {
     expect(prosePieces(["إذن الجواب: 6 إكس ناقص 5.", "أتمنى أن تكون بخير."])).toEqual(["إذن الجواب:"]);
+  });
+
+  it("reads the BAC teacher's structured messages part by part, never the section labels", () => {
+    const text = teacherMessageSpeech({
+      title: "مثال محلول — الاشتقاق",
+      explanation: "نطبّق القاعدة على مثال.",
+      formula: ["(xⁿ)′ = n·xⁿ⁻¹"],
+      example: { problem: "f(x) = x³", steps: ["…"], answer: "f′(x) = 3x²" },
+      question: "ما أول خطوة؟",
+    });
+    expect(text.split("\n")).toHaveLength(6);
+    expect(text).not.toMatch(/العنوان|الشرح|سؤال للطالب/);
+    const sentences = teacherMessageSentences(1);
+    expect(sentences).toContain("هل فهمت هذه الخطوة؟");
+    expect(sentences).toContain("هل فهمت هادي الخطوة؟"); // Darja
+    for (const sentence of sentences) expect(sentence.length).toBeLessThanOrEqual(180);
   });
 });

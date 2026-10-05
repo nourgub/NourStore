@@ -5,6 +5,7 @@
 import type { Express, Request, Response } from "express";
 import { authenticateRequest } from "../_core/session";
 import { getTafawoqStudentByUser } from "../db/tafawoq";
+import { hasActiveSubscription } from "./platform/access";
 import { checkRateLimit } from "../rateLimit";
 import { MAX_TTS_CHARS, speak, ttsProviders } from "./tts";
 import { startTtsWarmup } from "./ttsWarmup";
@@ -30,9 +31,21 @@ export function registerTafawoqTtsRoutes(app: Express) {
   app.post("/api/tafawoq/tts", async (req: Request, res: Response) => {
     let userId: number;
     try {
-      userId = (await authenticateRequest(req)).id;
+      const user = await authenticateRequest(req);
+      // Same rules as the rest of the platform: no voice for a suspended
+      // account, nor without an active subscription (admins pass). A 403
+      // lets the client fall back to the device's own voice.
+      if (user.accountStatus === "suspended") {
+        res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+        return;
+      }
+      userId = user.id;
     } catch {
       res.status(401).json({ error: "Sign in required." });
+      return;
+    }
+    if (!(await hasActiveSubscription(userId).catch(() => false))) {
+      res.status(403).json({ error: "SUBSCRIPTION_REQUIRED" });
       return;
     }
     const text = typeof req.body?.text === "string" ? req.body.text : "";

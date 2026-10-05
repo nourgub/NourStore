@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { M } from "./components";
 import { Content, useLang } from "./i18n";
 import { bacError, formatDate, useB } from "./bacI18n";
+import { ListenButton } from "./ListenButton";
 import type { BacOutputs } from "./Onboarding";
 
 type Pack = BacOutputs["revisionPack"];
@@ -198,9 +199,12 @@ function Flashcard({ front, back }: { front: string; back: string }) {
   const b = useB();
   const [flipped, setFlipped] = useState(false);
   return (
-    <button type="button" className={`tfq-flashcard ${flipped ? "flipped" : ""}`} onClick={() => setFlipped(!flipped)} aria-label={b.flip}>
-      {flipped ? <span className="tfq-math-box"><M>{back}</M></span> : <strong>{front}</strong>}
-    </button>
+    <div className="tfq-flashcard-wrap">
+      <button type="button" className={`tfq-flashcard ${flipped ? "flipped" : ""}`} onClick={() => setFlipped(!flipped)} aria-label={b.flip}>
+        {flipped ? <span className="tfq-math-box"><M>{back}</M></span> : <strong>{front}</strong>}
+      </button>
+      <ListenButton text={flipped ? back : front} />
+    </div>
   );
 }
 
@@ -210,6 +214,7 @@ function QuickQuestion({ entry }: { entry: Pack["subjects"][number]["lessons"][n
   return (
     <div className="tfq-example">
       <p className="tfq-math-box"><M>{entry.prompt}</M></p>
+      <ListenButton text={[entry.prompt, ...(entry.options ?? [])].join("\n")} />
       {entry.options && (
         <ul className="tfq-list">
           {entry.options.map(option => (

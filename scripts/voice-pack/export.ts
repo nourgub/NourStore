@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { numbersInWords } from "../../shared/arabicNumbers";
 import { cachePath, CACHE_DIR } from "../../server/tafawoq/tts";
-import { prosePieces, variantSentences, warmupPieces, warmupSentences } from "../../server/tafawoq/ttsWarmup";
+import { prosePieces, teacherMessageSentences, variantSentences, warmupPieces, warmupSentences } from "../../server/tafawoq/ttsWarmup";
 import { SPOKEN_VARIANTS } from "../../server/tafawoq/generators/core";
 
 function arg(name: string, fallback?: string): string {
@@ -38,7 +38,7 @@ const add = (kind: "piece" | "sentence", text: string) => {
   lines.push(JSON.stringify({ file, kind, text, say: numbersInWords(text) }));
 };
 const fixed = warmupSentences();
-const spoken = variantSentences(variants);
+const spoken = [...teacherMessageSentences(1), ...variantSentences(variants), ...teacherMessageSentences(variants)];
 for (const text of [...warmupPieces(), ...prosePieces([...fixed, ...spoken])]) add("piece", text);
 for (const text of fixed) add("sentence", text);
 for (const text of spoken) add("sentence", text);
