@@ -4,6 +4,10 @@ import { CheckCircle2, ChevronLeft, Sparkles, XCircle } from "lucide-react";
 import type { AppRouter } from "../../../../server/routers";
 import type { PublicQuestion } from "@shared/tafawoq";
 import { Content, useT } from "./i18n";
+import { bacError, useB } from "./bacI18n";
+import type { ErrorType } from "@shared/bacPlatform";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 type Outputs = inferRouterOutputs<AppRouter>["tafawoq"];
 export type SubmitResult = Outputs["submitAssessment"];
@@ -145,15 +149,31 @@ export function QuestionRunner({
   submitting,
   onSubmit,
   submitLabel,
+  initialAnswers,
+  onChange,
 }: {
   questions: PublicQuestion[];
   submitting: boolean;
   onSubmit: (answers: Answer[]) => void;
   submitLabel: string;
+  /** Answers saved earlier (a resumed paper). */
+  initialAnswers?: Array<{ questionId: string; answer: string; responseMs?: number }>;
+  /** Called whenever an answer is recorded (autosave). */
+  onChange?: (answers: Answer[]) => void;
 }) {
   const t = useT();
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [answers, setAnswers] = useState<Record<string, Answer>>(() =>
+    Object.fromEntries(
+      (initialAnswers ?? []).map(entry => [entry.questionId, { questionId: entry.questionId, answer: entry.answer, responseMs: entry.responseMs ?? 0 }])
+    )
+  );
+  const changed = useRef(false);
+  useEffect(() => {
+    if (!changed.current) return;
+    onChange?.(Object.values(answers));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers]);
   const [draft, setDraft] = useState("");
   const shownAt = useRef(Date.now());
   const question = questions[index];
@@ -166,6 +186,7 @@ export function QuestionRunner({
 
   if (!question) return null;
   const record = (value: string) => {
+    changed.current = true;
     const previous = answers[question.id]?.responseMs ?? 0;
     setAnswers(current => ({
       ...current,
@@ -314,6 +335,7 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
               {t.detectedError}: <Content as="span"><M>{item.misconception}</M></Content>
             </div>
           )}
+          {!item.correct && <Diagnosis item={item} />}
         </div>
       ))}
     </div>
@@ -390,5 +412,86 @@ export function M({ children }: { children: string }) {
         </span>
       ))}
     </>
+  );
+}
+
+/**
+ * Beyond "wrong": the kind of mistake, where it happened, the correct rule,
+ * a similar worked example, the remedy, and an extra exercise on the same
+ * skill (graded on the server like any other).
+ */
+function Diagnosis({ item }: { item: SubmitResult["items"][number] }) {
+  const b = useB();
+  const t = useT();
+  const utils = trpc.useUtils();
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const remedial = trpc.bac.targetedPractice.useMutation({ onError: error => toast.error(bacError(b, error)) });
+  const submit = trpc.tafawoq.submitAssessment.useMutation({
+    onSuccess: async data => {
+      setResult(data);
+      await utils.bac.invalidate();
+    },
+    onError: error => toast.error(bacError(b, error)),
+  });
+  if (!item.errorType && !item.rule) return null;
+  return (
+    <div className="tfq-diagnosis">
+      {item.errorType && (
+        <div>
+          <strong>{b.errorKind}:</strong> {b.errorTypes[item.errorType as ErrorType]}
+        </div>
+      )}
+      {item.errorStep !== null && item.errorStep !== undefined && (
+        <div>
+          <strong>{b.whereError}:</strong> {b.atStep(item.errorStep)}
+        </div>
+      )}
+      {item.rule && (
+        <Content>
+          <strong>{b.correctRule}:</strong> <span className="tfq-math-box"><M>{item.rule}</M></span>
+        </Content>
+      )}
+      {item.remedy && (
+        <Content>
+          <strong>{b.remedy}:</strong> <M>{item.remedy}</M>
+        </Content>
+      )}
+      {item.similarExample && (
+        <Content className="tfq-example">
+          <strong>{b.similarExample}</strong>
+          <p className="tfq-math-box"><M>{item.similarExample.problem}</M></p>
+          <ol>
+            {item.similarExample.steps.map((step, index) => (
+              <li key={index} className="tfq-math-box"><M>{step}</M></li>
+            ))}
+          </ol>
+          <p>✔ <M>{item.similarExample.answer}</M></p>
+        </Content>
+      )}
+      {item.lessonKey && !remedial.data && (
+        <button
+          type="button"
+          className="tfq-btn ghost small"
+          disabled={remedial.isPending}
+          onClick={() => remedial.mutate({ lessonKey: item.lessonKey, skillKey: item.skill })}
+        >
+          {remedial.isPending ? "…" : b.remedialExercise}
+        </button>
+      )}
+      {remedial.data && !result && (
+        <QuestionRunner
+          questions={remedial.data.questions}
+          submitting={submit.isPending}
+          submitLabel={t.checkAnswers}
+          onSubmit={answers => submit.mutate({ assessmentId: remedial.data!.assessmentId, answers })}
+        />
+      )}
+      {result && (
+        <div>
+          <p className="tfq-muted">{b.score(result.correct, result.total)}</p>
+          <ResultItems items={result.items} />
+        </div>
+      )}
+    </div>
   );
 }

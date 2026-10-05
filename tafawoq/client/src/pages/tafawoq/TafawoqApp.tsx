@@ -18,6 +18,7 @@ import {
   PlayCircle,
   RefreshCw,
   Send,
+  Shield,
   Sparkles,
   Target,
   Trophy,
@@ -50,8 +51,19 @@ import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
 import { darjaSuggestions, useTeacherStyle } from "./teacherStyle";
-import { unlockAudio } from "./speech";
+import { speakArabic, unlockAudio } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
+import { bacError, useB } from "./bacI18n";
+import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker } from "./Onboarding";
+import { StudentDashboard } from "./Dashboard";
+import { DailyPlanView } from "./DailyPlan";
+import { StreamRequestPage, SubscriptionPage } from "./Subscription";
+import { WeeklyTestPage } from "./WeeklyTest";
+import { TopicBankPage } from "./TopicBank";
+import { AchievementsPage, RevisionPage } from "./Revision";
+import { AdminPanel } from "./AdminPanel";
+import { ChildBacInfo, MyNotifications } from "./ParentBac";
+import { StructuredMessage, TeacherQuickActions, useVoiceMode } from "./TeacherPanel";
 import "./tafawoq.css";
 
 function errorMessage(t: TafawoqStrings, error: { message: string }) {
@@ -91,6 +103,11 @@ export default function TafawoqApp() {
                 <option value="en">English</option>
               </select>
             </label>
+            {user?.role === "admin" && (
+              <Link href="/tafawoq/admin" className="tfq-btn ghost small">
+                <Shield size={14} /> <span className="tfq-btn-label">Admin</span>
+              </Link>
+            )}
             {isAuthenticated && (
               <button type="button" className="tfq-btn ghost small" onClick={() => logout()}>
                 <LogOut size={14} /> <span className="tfq-btn-label">{t.logout}</span>
@@ -102,24 +119,21 @@ export default function TafawoqApp() {
           {loading ? (
             <p className="tfq-muted">{t.loading}</p>
           ) : !isAuthenticated ? (
-            <Landing />
+            // Quick revision opens from the copy saved on the device, even offline.
+            params?.lessonKey === "revision" && hasOfflineRevision() ? <RevisionPage /> : <Landing />
           ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
             <ParentView />
           ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
             <TeacherInbox />
+          ) : user?.role === "admin" && params?.lessonKey === "admin" ? (
+            <AdminPanel />
           ) : user && user.role !== "learner" && user.role !== "admin" ? (
             <div className="tfq-card tfq-empty">
               <h2>{t.staffOnly}</h2>
               <p className="tfq-muted">{t.staffOnlyDesc}</p>
             </div>
-          ) : params?.lessonKey === "exam" ? (
-            <ExamView />
-          ) : params?.lessonKey === "exercises" ? (
-            <ExercisesRoute />
-          ) : params?.lessonKey ? (
-            <LessonPage lessonKey={params.lessonKey} />
           ) : (
-            <Home />
+            <LearnerRoutes route={params?.lessonKey ?? null} />
           )}
         </main>
       </div>
@@ -229,136 +243,91 @@ function HomeCallCard({
   );
 }
 
-/** "ارفع تمرينك" with the lessons of the student's level and stream. */
-function ExercisesRoute() {
-  const overview = trpc.tafawoq.overview.useQuery();
-  const catalog = trpc.tafawoq.catalog.useQuery();
-  const student = overview.data?.student;
-  const lessons = (catalog.data?.lessons ?? []).filter(
-    lesson =>
-      !student ||
-      (lesson.levels.includes(student.schoolLevel) &&
-        (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream)))
-  );
-  return <ExerciseHelp lessons={lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))} />;
+function hasOfflineRevision() {
+  try {
+    return Boolean(localStorage.getItem("tfq-revision-pack"));
+  } catch {
+    return false;
+  }
 }
 
-function Home() {
+function LearnerRoutes({ route }: { route: string | null }) {
+  const t = useT();
+  const b = useB();
+  const state = trpc.bac.state.useQuery();
+  if (state.isLoading) return <p className="tfq-muted" aria-busy="true">{t.loading}</p>;
+  if (state.error) return <div className="tfq-card">{bacError(b, state.error)}</div>;
+  const data = state.data!;
+  // Onboarding first: profile → stream (locked) → second subject → placement.
+  // The server refuses every other page's data until then anyway.
+  if (data.step === "profile") return <RegisterForm student={null} onDone={() => undefined} />;
+  if (data.step === "stream") return <StreamPicker />;
+  if (route === "profile") return <ProfileRoute />;
+  if (data.step === "second" || route === "second-subject") return <SecondSubjectPicker state={data} />;
+  if (route === "stream-request") return <StreamRequestPage />;
+  if (route === "subscription") return <SubscriptionPage />;
+  if (data.step === "placement" || route === "placement") return <PlacementRoute />;
+  switch (route) {
+    case null:
+      return <DashboardHome lessons={data.lessons} />;
+    case "plan":
+      return <DailyPlanView />;
+    case "weekly":
+      return <WeeklyTestPage />;
+    case "bank":
+      return <TopicBankPage />;
+    case "revision":
+      return <RevisionPage />;
+    case "achievements":
+      return <AchievementsPage />;
+    case "exam":
+      return <ExamView />;
+    case "exercises":
+      return <ExerciseHelp lessons={data.lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))} />;
+    default:
+      return <LessonPage lessonKey={route} />;
+  }
+}
+
+function PlacementRoute() {
+  const done = trpc.bac.placementResult.useQuery();
+  const [fresh, setFresh] = useState<Parameters<typeof PlacementResult>[0]["result"] | null>(null);
+  if (fresh) return <PlacementResult result={fresh} />;
+  if (done.isLoading) return <p className="tfq-muted">…</p>;
+  if (done.data) return <PlacementResult result={done.data} />;
+  return <PlacementTest onDone={setFresh} />;
+}
+
+function ProfileRoute() {
+  const overview = trpc.tafawoq.overview.useQuery();
+  const [, navigate] = useLocation();
+  if (overview.isLoading) return <p className="tfq-muted">…</p>;
+  return <RegisterForm student={overview.data?.student ?? null} onDone={() => navigate("/tafawoq")} />;
+}
+
+/** The dashboard, with the teacher's phone call and the road to the BAC mark below it. */
+function DashboardHome({ lessons }: { lessons: Array<{ key: string; title: string; subject: string }> }) {
   const t = useT();
   const overview = trpc.tafawoq.overview.useQuery();
-  const catalog = trpc.tafawoq.catalog.useQuery();
-  const exams = trpc.tafawoq.myExams.useQuery(undefined, {
-    enabled: overview.data?.student?.schoolLevel === "bac",
-  });
-  const [editing, setEditing] = useState(false);
-  if (overview.isLoading || catalog.isLoading) return <p className="tfq-muted">{t.loading}</p>;
-  if (overview.error) return <div className="tfq-card">{errorMessage(t, overview.error)}</div>;
-  const student = overview.data?.student;
-  if (!student || editing) {
-    return <RegisterForm student={student ?? null} onDone={() => setEditing(false)} />;
-  }
-  const lessons = (catalog.data?.lessons ?? []).filter(
-    lesson =>
-      lesson.levels.includes(student.schoolLevel) &&
-      (student.schoolLevel !== "bac" || !student.stream || !lesson.streams || lesson.streams.includes(student.stream))
-  );
-  const progress = new Map((overview.data?.lessons ?? []).map(entry => [entry.key, entry]));
-  const subjects = catalog.data?.subjects ?? [];
+  const dashboard = trpc.bac.dashboard.useQuery();
+  const active = dashboard.data?.subscription.active ?? false;
+  const mathLessons = lessons.filter(lesson => lesson.subject === "math");
   return (
     <>
-      <div className="tfq-spread">
-        <div>
-          <div className="tfq-kicker">{t.hello(student.displayName)}</div>
-          <h1 style={{ marginBottom: 4 }}>{t.whatToday}</h1>
-          <p className="tfq-muted">
-            {t.years(student.age)} · {t.levels[student.schoolLevel]}
-            {student.schoolLevel === "bac" && student.stream ? ` · ${t.streams[student.stream]}` : ""}
-          </p>
-        </div>
-        <button type="button" className="tfq-btn ghost small" onClick={() => setEditing(true)}>
-          {t.editProfile}
-        </button>
-      </div>
-      {lessons.length > 0 && (
-        <HomeCallCard
-          lessons={lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))}
-          placedKeys={(overview.data?.lessons ?? []).map(entry => entry.key)}
-          bac={student.schoolLevel === "bac"}
-        />
-      )}
-      <Link href="/tafawoq/exercises" className="tfq-card tfq-exam-card tfq-ex-home">
-        <Camera size={26} />
-        <div>
-          <h3 style={{ margin: 0 }}>{t.exTitle}</h3>
-          <p className="tfq-muted" style={{ margin: "4px 0 0" }}>{t.exCard}</p>
-        </div>
-      </Link>
-      {student.schoolLevel === "bac" && lessons.length > 0 && <RoadmapCard />}
-      {student.schoolLevel === "bac" && lessons.length > 0 && (
-        <Link href="/tafawoq/exam" className="tfq-card tfq-exam-card">
-          <FileText size={26} />
-          <div>
-            <h3 style={{ margin: 0 }}>{t.examTitle}</h3>
-            <p className="tfq-muted" style={{ margin: "4px 0 0" }}>{t.examCard}</p>
-            {exams.data && exams.data.length > 0 && (
-              <strong style={{ display: "block", marginTop: 6 }}>
-                {t.examLastMark(exams.data[exams.data.length - 1].score)}
-              </strong>
-            )}
-          </div>
-        </Link>
-      )}
-      {subjects.map(subject => {
-        const subjectLessons = lessons.filter(lesson => lesson.subject === subject.key);
-        if (!subjectLessons.length) return null;
-        return (
-          <section key={subject.key} style={{ marginTop: 26 }}>
-            <Content>
-              <h2>{subject.name}</h2>
-            </Content>
-            <div className="tfq-grid">
-              {subjectLessons.map(lesson => {
-                const status = progress.get(lesson.key);
-                return (
-                  <Link key={lesson.key} href={`/tafawoq/${lesson.key}`} className="tfq-card tfq-lesson-card">
-                    <div className="tfq-spread">
-                      <Content>
-                        <h3>{lesson.title}</h3>
-                      </Content>
-                      {status?.complete ? (
-                        <span className="tfq-chip good">{t.complete}</span>
-                      ) : status?.tier ? (
-                        <span className="tfq-chip">{t.tiers[status.tier]}</span>
-                      ) : (
-                        <span className="tfq-chip info">{t.isNew}</span>
-                      )}
-                    </div>
-                    <p className="tfq-muted" style={{ fontSize: 14 }}>
-                      {t.skillsCount(lesson.skills.length)}:{" "}
-                      <Content as="span">{lesson.skills.slice(0, 3).map(skill => skill.name).join("، ")}…</Content>
-                    </p>
-                    {status?.mastery !== null && status?.mastery !== undefined ? (
-                      <>
-                        <MasteryBar value={status.mastery} />
-                        <div className="tfq-muted" style={{ fontSize: 13, marginTop: 6 }}>
-                          {t.mastery} {percent(status.mastery)}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="tfq-muted" style={{ fontSize: 13 }}>{t.startWithPlacement}</div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-      {!lessons.length && (
-        <div className="tfq-card tfq-empty" style={{ marginTop: 20 }}>
-          {t.noLessons}
+      <StudentDashboard />
+      {active && mathLessons.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <HomeCallCard
+            lessons={mathLessons.map(lesson => ({ key: lesson.key, title: lesson.title }))}
+            placedKeys={(overview.data?.lessons ?? []).map(entry => entry.key)}
+            bac
+          />
+          <RoadmapCard />
         </div>
       )}
+      <p className="tfq-muted" style={{ marginTop: 18, fontSize: 13 }}>
+        <Link href="/tafawoq/profile">{t.editProfile}</Link>
+      </p>
     </>
   );
 }
@@ -375,19 +344,21 @@ function RegisterForm({
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState(student?.displayName ?? user?.name ?? "");
   const [age, setAge] = useState(String(student?.age ?? ""));
-  const [schoolLevel, setSchoolLevel] = useState<SchoolLevel>(student?.schoolLevel ?? "bac");
-  const [stream, setStream] = useState<BacStream | "">(student?.stream ?? "");
+  // BAC platform: every student is at BAC level; the stream is chosen (and
+  // locked by the server) on its own page, never from this form.
+  const schoolLevel: SchoolLevel = "bac";
   const [goals, setGoals] = useState(student?.goals ?? "");
   const register = trpc.tafawoq.register.useMutation({
     onSuccess: async () => {
       await utils.tafawoq.overview.invalidate();
+      await utils.bac.invalidate();
       onDone();
     },
     onError: error => toast.error(errorMessage(t, error)),
   });
   const ageNumber = Number(age);
   const valid =
-    displayName.trim().length >= 2 && ageNumber >= 6 && ageNumber <= 25 && (schoolLevel !== "bac" || stream !== "");
+    displayName.trim().length >= 2 && ageNumber >= 6 && ageNumber <= 25;
   return (
     <div className="tfq-card" style={{ maxWidth: 620, margin: "0 auto" }}>
       <div className="tfq-kicker">{t.step1}</div>
@@ -402,7 +373,6 @@ function RegisterForm({
               displayName,
               age: ageNumber,
               schoolLevel,
-              stream: schoolLevel === "bac" && stream ? stream : null,
               goals: goals || undefined,
             });
         }}
@@ -415,31 +385,6 @@ function RegisterForm({
           {t.age}
           <input className="tfq-input" type="number" min={6} max={25} value={age} onChange={event => setAge(event.target.value)} required />
         </label>
-        <label className="tfq-field">
-          {t.schoolLevel}
-          <select className="tfq-select" value={schoolLevel} onChange={event => setSchoolLevel(event.target.value as SchoolLevel)}>
-            {SCHOOL_LEVELS.map(level => (
-              <option key={level} value={level}>
-                {t.levels[level]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {schoolLevel === "bac" && (
-          <label className="tfq-field">
-            {t.stream}
-            <select className="tfq-select" value={stream} onChange={event => setStream(event.target.value as BacStream)} required>
-              <option value="" disabled>
-                {t.chooseStream}
-              </option>
-              {BAC_STREAMS.map(entry => (
-                <option key={entry} value={entry}>
-                  {t.streams[entry]}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <label className="tfq-field">
           {t.goals}
           <textarea className="tfq-textarea" dir="auto" value={goals} maxLength={500} placeholder={t.goalsPlaceholder} onChange={event => setGoals(event.target.value)} />
@@ -465,6 +410,7 @@ function RegisterForm({
 
 function LessonPage({ lessonKey }: { lessonKey: string }) {
   const t = useT();
+  const b = useB();
   const overview = trpc.tafawoq.overview.useQuery();
   const workspace = trpc.tafawoq.workspace.useQuery({ lessonKey }, { retry: false });
   const [, navigate] = useLocation();
@@ -476,12 +422,31 @@ function LessonPage({ lessonKey }: { lessonKey: string }) {
 
   if (workspace.isLoading) return <p className="tfq-muted">{t.loading}</p>;
   if (workspace.error) {
+    const code = workspace.error.message;
     return (
       <div className="tfq-card tfq-empty">
-        <p>{workspace.error.data?.code === "NOT_FOUND" ? t.lessonNotFound : errorMessage(t, workspace.error)}</p>
-        <Link href="/tafawoq" className="tfq-btn ghost">
-          {t.back}
-        </Link>
+        <p>
+          {workspace.error.data?.code === "NOT_FOUND"
+            ? t.lessonNotFound
+            : workspace.error.data?.code === "FORBIDDEN"
+              ? bacError(b, workspace.error)
+              : errorMessage(t, workspace.error)}
+        </p>
+        <div className="tfq-row" style={{ justifyContent: "center" }}>
+          {code === "STREAM_LOCKED" && (
+            <Link href="/tafawoq/stream-request" className="tfq-btn">
+              {b.requestStreamChange}
+            </Link>
+          )}
+          {code === "SUBSCRIPTION_REQUIRED" && (
+            <Link href="/tafawoq/subscription" className="tfq-btn">
+              {b.manageSubscription}
+            </Link>
+          )}
+          <Link href="/tafawoq" className="tfq-btn ghost">
+            {t.back}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -627,7 +592,10 @@ type TabKey = (typeof TABS)[number]["key"];
 
 function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
   const t = useT();
-  const [tab, setTab] = useState<TabKey>("teacher");
+  const [tab, setTab] = useState<TabKey>(() => {
+    const asked = new URLSearchParams(window.location.search).get("tab");
+    return TABS.some(entry => entry.key === asked) ? (asked as TabKey) : "teacher";
+  });
   const analysis = data.analysis;
   return (
     <>
@@ -685,6 +653,19 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  // Written and spoken: in "talk" mode each new teacher message is also read aloud.
+  const [voiceMode, setVoiceMode] = useVoiceMode();
+  const seenUpTo = useRef<number | null>(null);
+  if (seenUpTo.current === null) seenUpTo.current = data.messages.at(-1)?.id ?? 0;
+  const spokenUpTo = useRef(seenUpTo.current);
+  useEffect(() => {
+    const fresh = data.messages.filter(message => message.role === "tutor" && message.id > spokenUpTo.current && !message.structured);
+    const last = data.messages.at(-1);
+    if (last) spokenUpTo.current = Math.max(spokenUpTo.current, last.id);
+    if (voiceMode !== "talk" || !fresh.length) return;
+    const stop = speakArabic(fresh.map(message => message.content).join("\n"));
+    return () => stop();
+  }, [data.messages, voiceMode]);
   const startTutor = trpc.tafawoq.startTutor.useMutation({
     onSettled: () => utils.tafawoq.workspace.invalidate({ lessonKey }),
   });
@@ -752,11 +733,17 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
         </button>
       </div>
       <div className="tfq-chat" aria-live="polite">
-        {data.messages.map(message => (
-          <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">
-            <M>{message.content}</M>
-          </div>
-        ))}
+        {data.messages.map(message =>
+          message.structured ? (
+            <div key={message.id} className="tfq-bubble tutor structured">
+              <StructuredMessage message={message.structured} autoRead={voiceMode === "talk" && message.id > (seenUpTo.current ?? 0)} />
+            </div>
+          ) : (
+            <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">
+              <M>{message.content}</M>
+            </div>
+          )
+        )}
         {pending && (
           <div className="tfq-bubble student" dir="auto">
             {pending}
@@ -765,6 +752,15 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
         {(send.isPending || startTutor.isPending) && <div className="tfq-bubble tutor tfq-muted">{t.typing}</div>}
         <div ref={bottom} />
       </div>
+      <TeacherQuickActions
+        lessonKey={lessonKey}
+        style={style}
+        voiceMode={voiceMode}
+        setVoiceMode={setVoiceMode}
+        busy={send.isPending}
+        onQuiz={() => submit(style === "darja" ? "سقسيني" : "اختبرني")}
+        onUnderstood={understood => submit(understood ? "فهمت، شكراً" : "لم أفهم")}
+      />
       <div className="tfq-row" style={{ marginTop: 12 }}>
         {suggestions.map(suggestion => (
           <button key={suggestion} type="button" className="tfq-btn ghost small" dir="auto" onClick={() => submit(suggestion)}>
@@ -1124,14 +1120,14 @@ function ShareWithParent() {
 function ParentView() {
   const t = useT();
   const utils = trpc.useUtils();
-  const report = trpc.tafawoq.parentReport.useQuery();
+  const report = trpc.bac.parentOverview.useQuery();
   const [code, setCode] = useState("");
   const accept = trpc.parent.acceptInvite.useMutation({
     onSuccess: async linked => {
       if (linked) {
         toast.success(t.parentLinked);
         setCode("");
-        await utils.tafawoq.parentReport.invalidate();
+        await utils.bac.parentOverview.invalidate();
       } else {
         toast.error(t.parentInvalid);
       }
@@ -1167,8 +1163,14 @@ function ParentView() {
       ) : !children.length ? (
         <div className="tfq-card tfq-empty">{t.parentNoChildren}</div>
       ) : (
-        children.map(child => <ChildReport key={child.linkId} child={child} />)
+        children.map(child => (
+          <div key={child.linkId}>
+            <ChildReport child={child} />
+            <ChildBacInfo bac={child.bac} />
+          </div>
+        ))
       )}
+      <MyNotifications />
     </>
   );
 }

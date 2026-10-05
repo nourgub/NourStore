@@ -9,7 +9,7 @@ import {
   SUBSCRIPTION_PLANS,
   TEACHER_ACTIONS,
 } from "@shared/bacPlatform";
-import { router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import { adminProcedure, learnerProcedure, parentProcedure, rateLimit } from "../_core/procedures";
 import * as platform from "../tafawoq/platform/service";
 import * as bacDb from "../db/bacPlatform";
@@ -200,6 +200,13 @@ export const bacRouter = router({
     .mutation(({ ctx }) => platform.createParentCode(ctx.user.id)),
 
   parentOverview: parentProcedure.query(({ ctx }) => platform.parentOverview(ctx.user.id)),
+
+  /** Any signed-in user's own notifications (students, parents). */
+  myNotifications: protectedProcedure.query(({ ctx }) => bacDb.listUserNotifications(ctx.user.id, 30)),
+  readNotifications: protectedProcedure.mutation(async ({ ctx }) => {
+    await bacDb.markNotificationsRead(ctx.user.id);
+    return { ok: true };
+  }),
 });
 
 const bankTopicInput = z.object({

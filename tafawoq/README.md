@@ -97,3 +97,34 @@ MySQL, part of `npm run test:db`).
 الدخول، حسابات الأولياء، قاعدة البيانات). صفحات Nourix (الدورات، الدفع، لوحات
 الأساتذة) حُذفت من الواجهة؛ بقيت بعض جداولها في الترحيلات وبعض مساراتها في
 الخادم دون أن تُستعمل.
+
+## منصة البكالوريا (BAC platform)
+
+Streams: **العلوم التجريبية**, **الآداب والفلسفة**, **اللغات الأجنبية**. Server code in
+`server/tafawoq/platform/` (rules: `catalog.ts`, `plan.ts`, `papers.ts`, `diagnosis.ts`,
+`teacher.ts`; orchestration: `service.ts`; guard: `access.ts`), routers in
+`server/routers/bac.ts` (`bac.*` students/parents, `bacAdmin.*` admins), migration
+`drizzle/0032_add_tafawoq_bac_platform.sql`, screens in `client/src/pages/tafawoq/`.
+
+- **Stream lock**: chosen once (`bac.chooseStream`), locked in the database; profile edits can't
+  change it; another stream's lessons are refused by the server (`STREAM_LOCKED`) and logged.
+  Changes only via a request an admin approves; every change is kept in `tafawoqStreamChanges`.
+- **Second subject**: one at a time, from the stream's options, only if it has content; one own
+  change per subscription cycle (admin can turn changes off in Settings).
+- **Subscription 3000 DA/month** (3/6/12-month offers, coupons, referral free days). No payment
+  is simulated: a request stays `pending_payment` until an admin confirms it. Everything except
+  the placement test needs an active subscription (checked server-side).
+- **Content honesty**: a subject is offered only if the curriculum has lessons for it; otherwise
+  it is shown as "قريباً". Today only mathematics has BAC content, so it's available to sciences
+  (core) and to lettres/langues (as second subject). Generated bank topics carry no year; real
+  dated topics can be published by an admin.
+- Placement test across subjects (5 levels), daily plan + streak, mistake diagnosis stored per
+  answer (`tafawoqAttempts.errorType`), weekly test /20, mock BAC with autosave and time
+  analysis, topic bank, offline quick revision, teacher quick requests in the fixed format
+  (title / explanation / law / example / question, read aloud on request), points & badges (no
+  public ranking), parent follow-up (chats only with the student's consent), admin panel and an
+  event log (`tafawoqEvents`, never passwords).
+- Tests: `server/tafawoq/platform/platform.test.ts` and the real-DB
+  `server/tafawoq/platform/bacPlatform.realDb.e2e.test.ts` (in `npm run test:db`).
+
+Payment instructions shown to students are set by an admin (Admin → Settings).

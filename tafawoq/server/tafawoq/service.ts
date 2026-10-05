@@ -597,6 +597,7 @@ export async function submitAssessment(
 
   const itemResults = graded.map((entry, index) => ({
     questionId: entry.item.id,
+    lessonKey: lesson.key,
     skill: entry.item.skill,
     skillName: skillName(lesson, entry.item.skill),
     prompt: entry.item.prompt,

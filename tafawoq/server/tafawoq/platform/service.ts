@@ -30,7 +30,7 @@ import * as bac from "../../db/bacPlatform";
 import * as store from "../../db/tafawoq";
 import { getPlatformSetting, setPlatformSetting } from "../../db/platformSettings";
 import { logAdminAction } from "../../db/adminAudit";
-import { createParentInvite } from "../../db/parent";
+import { createParentInvite, getParentLinks } from "../../db/parent";
 import { getLesson, lessonForStream, type BankQuestion, type Lesson } from "../curriculum";
 import { createRng, randomSeed } from "../generators/core";
 import { instantiate } from "../generators/instantiate";
@@ -1342,9 +1342,10 @@ export async function createParentCode(userId: number) {
  */
 export async function parentOverview(parentUserId: number) {
   const reports = await tafawoq.parentReport(parentUserId);
+  const links = await getParentLinks(parentUserId);
   return Promise.all(
     reports.map(async report => {
-      const link = (await (await import("../../db/parent")).getParentLinks(parentUserId)).find(entry => entry.id === report.linkId);
+      const link = links.find(entry => entry.id === report.linkId && entry.status === "active");
       const childId = link?.childId;
       if (!childId) return { ...report, bac: null };
       const student = await store.getTafawoqStudentByUser(childId);

@@ -305,3 +305,106 @@
 .tfq-ex-solution ol { margin: 8px 0; padding-inline-start: 22px; line-height: 1.9; }
 .tfq-ex-answer { white-space: pre-line; line-height: 1.9; }
 .tfq-form textarea.tfq-input { resize: vertical; font-family: inherit; }
+
+/* ---------------------------------------------------------------------------
+   BAC platform (stream, dashboard, plan, tests, bank, revision, admin).
+   Mobile first: nothing may overflow the viewport; only a long formula
+   scrolls, inside its own box.
+   --------------------------------------------------------------------------- */
+.tfq-main, .tfq-card, .tfq-dash, .tfq-narrow { min-width: 0; }
+.tfq h1, .tfq h2, .tfq h3, .tfq-btn, .tfq-chip { overflow-wrap: anywhere; }
+.tfq-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.tfq-grid-wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.tfq-narrow { max-width: 760px; margin: 0 auto; }
+.tfq-narrow > .tfq-card, .tfq-narrow > .tfq-grid, .tfq-narrow > article { margin-top: 14px; }
+.tfq-btn { max-width: 100%; text-align: center; min-height: 40px; }
+.tfq-btn.small { min-height: 34px; }
+.tfq-block { width: 100%; margin-top: 14px; }
+.tfq-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tfq-chips .tfq-chip { max-width: 100%; }
+.tfq-banner.warn { border-style: solid; border-color: rgba(212, 167, 44, .5); background: color-mix(in srgb, var(--primary) 10%, var(--card)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.tfq-error { color: #e07b7b; font-size: 13px; font-weight: 500; }
+.tfq-stream-card { display: flex; flex-direction: column; }
+.tfq-stream-card.selected, .tfq-choice.selected { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.tfq-stream-card > .tfq-btn, .tfq-stream-card > .tfq-confirm { margin-top: auto; }
+.tfq-confirm { margin-top: 14px; padding: 12px; border-radius: 12px; background: var(--secondary); }
+.tfq-choice { display: grid; gap: 8px; align-content: start; text-align: start; font: inherit; color: inherit; cursor: pointer; }
+.tfq-choice h3 { margin: 0; }
+/* Dashboard */
+.tfq-dash-head h1 { margin: 4px 0 8px; }
+.tfq-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: 10px; margin: 14px 0; }
+.tfq-dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+.tfq-dash-grid > .tfq-card { margin: 0; }
+.tfq-dash-grid .tfq-big-number, .tfq-card .tfq-big-number { font-size: clamp(28px, 7vw, 40px); margin: 6px 0 10px; }
+.tfq-task-mini { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 6px; font-size: 14px; }
+.tfq-task-mini li.done { color: var(--muted-foreground); text-decoration: line-through; }
+.tfq-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.tfq-tool { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); text-decoration: none; font-weight: 600; font-size: 14px; }
+.tfq-tool:hover { border-color: var(--primary); }
+.tfq-tool svg { color: var(--primary); flex: none; }
+.tfq-subject-block { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tfq-lesson-card.locked { opacity: .55; cursor: not-allowed; }
+.tfq-lesson-card.locked:hover { transform: none; border-color: var(--border); }
+.tfq-notifs { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.tfq-notifs li { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--secondary); font-size: 14px; }
+.tfq-notifs li.unread { border-inline-start: 3px solid var(--primary); }
+.tfq-check { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; cursor: pointer; }
+.tfq-check input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--primary); flex: none; }
+.tfq-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; margin: 14px 0 0; }
+.tfq-facts div { padding: 10px 12px; border-radius: 12px; background: var(--secondary); }
+.tfq-facts dt { font-size: 12px; color: var(--muted-foreground); }
+.tfq-facts dd { margin: 2px 0 0; font-weight: 700; }
+.tfq-inline-input { display: flex; gap: 8px; }
+.tfq-inline-input .tfq-input { flex: 1; min-width: 0; }
+.tfq-inline-input .tfq-select { width: auto; }
+.tfq-total { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--accent); color: var(--accent-foreground); font-size: 16px; }
+.tfq-total strong { font-size: 20px; }
+/* Tables scroll inside their own box on a small screen, never the page. */
+.tfq-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px; border: 1px solid var(--border); margin-top: 10px; }
+.tfq-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
+.tfq-table th, .tfq-table td { padding: 10px; border-bottom: 1px solid var(--border); text-align: start; vertical-align: top; }
+.tfq-table th { font-size: 12px; color: var(--muted-foreground); font-weight: 700; }
+.tfq-table .tfq-select { min-width: 140px; }
+.tfq-small-code { font-size: 11px; word-break: break-all; color: var(--muted-foreground); }
+.tfq-tabs-scroll { scrollbar-width: thin; }
+/* Plan */
+.tfq-task.done { border-color: rgba(66, 170, 110, .45); }
+.tfq-task .tfq-kicker { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Long formulas: horizontal scroll inside this box only. */
+.tfq-math-box { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tfq-math-box .tfq-math { white-space: pre; }
+.tfq-problem, .tfq-question, .tfq-option, .tfq-example { overflow-x: auto; max-width: 100%; }
+/* Mistake diagnosis */
+.tfq-diagnosis { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 7%, var(--card)); border: 1px dashed color-mix(in srgb, var(--primary) 40%, var(--border)); display: grid; gap: 6px; font-size: 14px; }
+/* Bank & revision */
+.tfq-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 10px; align-items: end; }
+.tfq-answer { min-height: 180px; }
+.tfq-details summary { cursor: pointer; list-style: none; }
+.tfq-details summary::-webkit-details-marker { display: none; }
+.tfq-details summary::after { content: "▾"; margin-inline-start: 8px; color: var(--muted-foreground); }
+.tfq-details[open] summary { margin-bottom: 10px; }
+.tfq-flashcard { min-height: 110px; padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--secondary); color: var(--foreground); font: inherit; cursor: pointer; display: grid; place-items: center; text-align: center; transition: transform .2s ease, border-color .2s ease; }
+.tfq-flashcard.flipped { border-color: var(--primary); background: var(--accent); }
+.tfq-badge { display: grid; gap: 6px; justify-items: center; text-align: center; opacity: .5; }
+.tfq-badge.earned { opacity: 1; border-color: var(--primary); }
+.tfq-badge span { font-size: 30px; }
+/* Teacher messages in the fixed format */
+.tfq-bubble.structured { max-width: 100%; width: 100%; white-space: normal; }
+.tfq-tmsg { display: grid; gap: 10px; }
+.tfq-tmsg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tfq-tmsg-title { font-size: 17px; margin: 0; color: var(--primary); }
+.tfq-tmsg-section { display: grid; gap: 4px; }
+.tfq-tmsg-section p { margin: 0; }
+.tfq-tmsg-label { font-size: 12px; font-weight: 700; color: var(--muted-foreground); }
+.tfq-tmsg-steps { margin: 0; padding-inline-start: 20px; display: grid; gap: 6px; }
+.tfq-tmsg-steps li { padding: 6px 10px; border-radius: 8px; background: var(--card); animation: tfq-line-in .35s ease both; }
+.tfq-tmsg-section.question { padding: 10px 12px; border-radius: 12px; background: var(--accent); color: var(--accent-foreground); }
+.tfq-quick { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+@media (max-width: 420px) {
+  .tfq-card { padding: 16px; border-radius: 16px; }
+  .tfq h1 { font-size: 24px; }
+  .tfq-bubble { max-width: 100%; }
+  .tfq-chat-input { gap: 6px; }
+  .tfq-total { flex-direction: column; align-items: flex-start; }
+  .tfq-exam-score strong { font-size: 30px; }
+}
