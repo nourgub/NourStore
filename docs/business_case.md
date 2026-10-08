@@ -1,11 +1,26 @@
 # Business case
 
-Customer operations teams receive repetitive refund, cancellation, payment and order questions across channels. The platform standardizes intake, gathers relevant policy context, creates a traceable proposed action and keeps a human in control of sensitive cases.
+## Business problem
 
-**Automated:** validation, intent triage, field extraction, policy lookup, eligibility checks, simulated CRM ticket creation and low-risk refund request creation.
+Customer-operations teams receive repetitive questions about refunds, subscriptions, payments and orders. Manual triage consumes attention, produces inconsistent routing and makes it difficult to reconstruct why an action was taken.
 
-**Human controlled:** cancellations, over-limit refunds, low-confidence cases, policy conflicts, missing customer/order data and every LLM failure.
+## How a company could use the system
 
-AI adds value through language understanding and retrieval; deterministic rules are necessary because a probabilistic suggestion must not authorize a financial or account-changing action. Mock adapters are deliberately isolated so a future CRM/helpdesk/email integration can replace them behind the same interface.
+A company could place this workflow behind an existing support intake channel. The platform would validate the request, identify its likely intent, extract fields such as order ID and amount, retrieve the relevant internal policy, and apply deterministic rules. Low-risk, well-supported cases can demonstrate a simulated automatic action; uncertain, sensitive, incomplete or failed cases are placed in a human-review workflow.
 
-No cost savings, accuracy in production, or business outcome is asserted by this repository.
+## Expected operational value
+
+The design targets:
+
+- automation of repetitive customer-operations triage;
+- less manual classification and policy lookup;
+- faster handling of straightforward requests;
+- consistent rule-based decisions;
+- explicit human oversight for sensitive decisions; and
+- auditability of classification, retrieval, rule evaluation, review and action events.
+
+These are intended capabilities, not measured production outcomes. This repository does not invent ROI, savings, automation rates or customer-impact claims.
+
+## Boundaries
+
+The LLM is an assistant for structured extraction, not the final authority for a sensitive business decision. SQLite, local retrieval and mock adapters keep the portfolio implementation understandable and safe. Real CRM, email and payment integrations would require separate security, authorization, reliability and compliance review.

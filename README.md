@@ -1,21 +1,27 @@
 # Enterprise AI Automation Platform
 
-## Business overview
+## Business problem
 
-This prototype helps a customer-operations team handle repetitive requests such as refunds, subscription cancellations, payment problems and order issues. It classifies the incoming message, extracts structured information, finds the relevant **demo company policy**, applies deterministic controls, executes only safe simulated actions, and sends sensitive or uncertain cases to a human reviewer.
+Customer-operations teams receive repetitive refund, subscription, payment and order requests across channels. This portfolio prototype validates the request, classifies it, extracts structured fields, retrieves synthetic policy context, applies deterministic business rules and routes uncertain or sensitive cases to a human.
 
-The platform is not a chatbot and does not connect to payment, CRM, email or customer systems. Its value proposition is traceable workflow automation: faster triage, consistent policy lookup, reduced repetitive work and human oversight. No ROI or production outcome is claimed.
+## Status of the implementation
+
+- **Implemented:** FastAPI API, Pydantic validation, SQLite repository, structured audit events, deterministic workflow state transitions, local TF-IDF retrieval with source references, strict structured extraction, prompt-injection blocking, human approval/rejection, safe error handling, mock enterprise adapters and offline tests.
+- **Simulated:** LLM provider in offline mode, enterprise actions (CRM/payment/email), company policy corpus and dashboard data.
+- **Future work:** authentication/authorization, durable queueing, production secrets management, monitoring backend, real approved integrations, model calibration and a legally reviewed policy corpus.
+
+No payment, CRM, email or customer system is contacted by this repository.
 
 ## Quick start
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
-uvicorn app.main:app --reload
 pytest -q
+uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000` for the operations dashboard and `/docs` for OpenAPI.
+Open `http://127.0.0.1:8000` for the dashboard and `/docs` for OpenAPI.
 
 ## Architecture
 
@@ -23,48 +29,53 @@ Open `http://127.0.0.1:8000` for the operations dashboard and `/docs` for OpenAP
 flowchart TD
   A[POST /requests] --> B[Pydantic validation]
   B --> C[TF-IDF intent classifier]
-  C --> D[Structured extractor: mock or LLM]
-  D --> E[Directory-backed RAG]
-  E --> F[Deterministic rules]
-  F -->|safe| G[Mock enterprise adapter]
-  F -->|risky/uncertain| H[Human review queue]
-  G --> I[(SQLite + append-only audit)]
+  C --> D[Structured extractor: mock or OpenAI-compatible]
+  D --> E[Local chunking and TF-IDF retrieval]
+  E --> F[Deterministic business rules]
+  F -->|safe and supported| G[Mock enterprise adapter]
+  F -->|uncertain, sensitive or unsafe| H[Human review]
+  G --> I[(SQLite + structured audit)]
   H --> I
   I --> J[FastAPI + dashboard]
 ```
 
-The modular code lives under `app/api`, `app/ai`, `app/workflows`, `app/database`, `app/schemas` and `app/services`-compatible boundaries. `app/orchestrator.py` remains the readable workflow coordinator.
+The modular monolith is intentionally small: `app/api`, `app/ai`, `app/workflows`, `app/database` and `app/schemas.py`. `app/orchestrator.py` coordinates the readable workflow without introducing microservices or infrastructure that the portfolio does not need.
 
-## AI/ML
+## AI/ML evaluation
 
-The application keeps a small offline fallback so tests remain deterministic. The real experiment is separate and uses the official public Banking77 train/test CSV files. It uses TF-IDF word 1–2 grams and Logistic Regression with a fixed random seed. It does not train on test labels.
+The reproducible experiment uses the official Banking77 `train.csv` and `test.csv` files, with TF-IDF word 1–2 grams and Logistic Regression (`random_state=42`, `max_iter=1000`). The vectorizer is fit on training data only. It writes measured outputs to `results/`:
 
 ```bash
 python scripts/run_experiment.py
 ```
 
-This creates measured `results/metrics.json`, `results/confusion_matrix.png`, `results/error_analysis.csv` and `results/model_comparison.csv`. The experiment may use the internet; `pytest -q` never downloads Banking77.
+The latest execution in this workspace measured **10,003 training examples, 3,080 test examples, 77 classes, 0.857792 accuracy, 0.856805 macro F1 and 0.856805 weighted F1**, with 438 misclassified test examples. These are experiment results, not production performance claims. The run also creates `metrics.json`, `confusion_matrix.png`, `error_analysis.csv` and `model_comparison.csv`. The experiment may use the internet; unit tests do not download Banking77.
 
-## LLM integration
+## RAG and LLM
 
-`app/ai/extractor.py` defines an `LLMProvider` interface with an offline mock and an optional OpenAI-compatible provider. Configure `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_TIMEOUT` through `.env` or the process environment. Responses are parsed as JSON and validated with strict Pydantic fields. Invalid JSON, missing fields, unexpected fields, timeout and provider errors stop automation and route the workflow to human review.
+Markdown documents in `data/documents/` are chunked and indexed using a lightweight local TF-IDF vector store. Retrieval returns top-k excerpts with source paths. If no relevant source is found, deterministic rules return `REQUIRES_HUMAN_REVIEW` rather than authorizing an unsupported action.
 
-## RAG
+`app/ai/extractor.py` defines `LLMProvider`, an offline `MockLLMProvider` and an optional OpenAI-compatible provider. Configure `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_TIMEOUT` using `.env` or the process environment. Provider output is strict JSON validated by Pydantic; invalid JSON, unexpected fields and timeouts fail safely without executing an action. Customer text is untrusted data and cannot change system rules, thresholds or review requirements.
 
-Demo company documents are stored in `data/documents/` and explicitly labelled as synthetic demo documents. The pipeline loads Markdown files, chunks them, builds a TF-IDF vector index, returns top-k relevant chunks and exposes source references. No source means no automatic policy-driven action.
+## Workflow and API
 
-## Workflow, review and API
+The states are `RECEIVED`, `CLASSIFIED`, `PROCESSING`, `AUTO_APPROVED`, `REQUIRES_HUMAN_REVIEW`, `APPROVED_BY_HUMAN`, `REJECTED`, `COMPLETED` and `FAILED`. Transitions are centralized and invalid transitions are rejected. A refund can be auto-approved only when confidence, policy evidence, order information, amount limit and risk rules all pass. Cancellations and failures require human review.
 
-Configured auto-approval requires known intent, confidence above the configurable engineering threshold, required order information for refunds, relevant policy evidence, a policy-compatible action and no sensitive condition. Cancellation is always human-controlled. Actions use replaceable `EnterpriseAdapter` interfaces with safe mock implementations.
+Available endpoints: `POST /requests`, `GET /requests`, `GET /requests/{id}`, `GET /workflows/{id}`, `POST /workflows/{id}/approve`, `POST /workflows/{id}/reject`, `GET /audit/{workflow_id}` and `GET /health`.
 
-Available endpoints include `POST /requests`, `GET /requests`, `GET /requests/{id}`, `GET /workflows/{id}`, `POST /workflows/{id}/approve`, `POST /workflows/{id}/reject`, `GET /audit/{workflow_id}` and `GET /health`.
+Audit entries contain workflow ID, event type, component, status, optional duration and bounded metadata. Secrets and complete customer messages are not written into audit metadata.
 
 ## Testing and reproducibility
 
-Tests cover API validation, successful automation, human review, rejection, over-limit refunds and audit events. Test dependencies are mocked/offline. Python and dependency versions are pinned in `pyproject.toml`; model parameters, dataset source and random seed are recorded by the experiment output.
+```bash
+pip install -e .
+pytest -q
+python scripts/run_experiment.py
+uvicorn app.main:app --reload
+```
 
-## Security and limitations
+The test suite covers ML component behavior, RAG, structured output validation, provider failure, API validation, workflow transitions, human review, database field validation, audit events and prompt-injection scenarios. Configuration defaults are documented in `.env.example`; Python and dependency versions are declared in `pyproject.toml`.
 
-Secrets are environment-based and `.env` is ignored. Database files and raw data are ignored, logs do not include API keys, and simulated adapters never perform real financial actions. Authentication, authorization, encryption, queue durability, production observability and legal/compliance approval are intentionally out of scope. The `0.70` confidence threshold is a configurable business/engineering decision, not a scientifically optimal value.
+## Limitations
 
-See [`docs/current_architecture.md`](docs/current_architecture.md), [`docs/architecture.md`](docs/architecture.md) and [`docs/business_case.md`](docs/business_case.md).
+Authentication, authorization, encryption, high-availability storage, queue durability, production observability, multilingual model evaluation and legal/compliance approval are out of scope. The confidence threshold is a configurable engineering decision, not a scientifically optimal calibration. Mock adapters must remain disconnected from real financial systems.
