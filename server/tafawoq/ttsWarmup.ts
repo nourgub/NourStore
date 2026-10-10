@@ -10,7 +10,7 @@
 import { HAS_WORD, STRONG_MATH, spokenChunks, spokenSegments, withoutName } from "../../shared/spokenArabic";
 import { TIERS } from "../../shared/tafawoq";
 import type { StudentContext } from "./context";
-import { LESSONS } from "./curriculum";
+import { LESSONS, SUBJECTS } from "./curriculum";
 import { PHRASES, toDarja } from "./darja";
 import { DIALOGUE_DONE } from "./dialogue";
 import { SPOKEN_VARIANTS } from "./generators/core";
@@ -41,7 +41,7 @@ function sentencesOf(texts: string[]): string[] {
 
 /** The teacher's sentences that name the student (said without the name by a prepared voice). */
 const NAMED = [
-  `السلام عليكم يا ${SOMEONE}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+  ...Object.values(SUBJECTS).map(subject => `السلام عليكم يا ${SOMEONE}! معك أستاذ ${subject.name}. أتمنى أن تكون بخير.`),
   `✔ صحيح، أحسنت يا ${SOMEONE}!`,
   `${DIALOGUE_DONE} رائع يا ${SOMEONE}، لقد وصلت إلى القاعدة بنفسك:`,
   `انتهت حصتنا يا ${SOMEONE}.`,

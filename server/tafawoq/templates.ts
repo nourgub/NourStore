@@ -9,6 +9,7 @@ import { translateFrenchTerms } from "./darja";
 import type { LessonExample, PersonalLesson, VideoScene, VideoScript } from "@shared/tafawoq";
 import { TIER_LABELS_AR } from "@shared/tafawoq";
 import type { BankQuestion, Lesson } from "./curriculum";
+import { SUBJECTS } from "./curriculum";
 import type { StudentContext } from "./context";
 import { createRng, randomSeed, spokenSeed } from "./generators/core";
 import { instantiate } from "./generators/instantiate";
@@ -388,7 +389,7 @@ export function callIntroText(lesson: Lesson, context: StudentContext, seed: num
   if (skill.dialogue) {
     // The call teaches this skill by dialogue: no rule handed over up front.
     return [
-      `السلام عليكم يا ${context.name}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+      `السلام عليكم يا ${context.name}! معك أستاذ ${SUBJECTS[lesson.subject]?.name ?? "الرياضيات"}. أتمنى أن تكون بخير.`,
       `اليوم سنعمل معاً على «${skill.name}» في درس ${lesson.title}.`,
       error ? `لاحظت أنك تقع أحياناً في هذا الخطأ: ${error.label}. سنصححه معاً.` : "",
       "لن أعطيك القاعدة جاهزة: سأطرح عليك أسئلة صغيرة، وأنت من سيكتشفها. ثم أختبرك بثلاثة أسئلة قصيرة.",
@@ -398,7 +399,7 @@ export function callIntroText(lesson: Lesson, context: StudentContext, seed: num
       .join("\n");
   }
   return [
-    `السلام عليكم يا ${context.name}! معك أستاذ الرياضيات. أتمنى أن تكون بخير.`,
+    `السلام عليكم يا ${context.name}! معك أستاذ ${SUBJECTS[lesson.subject]?.name ?? "الرياضيات"}. أتمنى أن تكون بخير.`,
     `اليوم سنعمل معاً على «${skill.name}» في درس ${lesson.title}.`,
     error ? `لاحظت أنك تقع أحياناً في هذا الخطأ: ${error.label}. سنصححه معاً.` : "",
     `لنبدأ بفكرة سريعة: ${firstIdea}`,

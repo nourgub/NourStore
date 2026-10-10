@@ -69,7 +69,7 @@ export type GeneratedItem = {
    * mathematically equivalent form; "exact" requires one of the listed
    * forms (e.g. "simplify this fraction", where 6/9 must not pass as 2/3).
    */
-  grading?: "expression" | "exact";
+  grading?: "expression" | "exact" | "numeric";
   /** MCQ only: exactly three wrong options, each tagged with its misconception key. */
   distractors?: Array<{ option: string; misconception: string }>;
   /** Worked solution, step by step. */

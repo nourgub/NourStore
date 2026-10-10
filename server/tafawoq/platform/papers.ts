@@ -35,14 +35,45 @@ export function placementItemsForLesson(lesson: Lesson, seed: number, count: num
 }
 
 /**
+ * Lessons of several subjects spread evenly along the paper: each subject's
+ * lessons take positions in proportion to their count, so every subject
+ * reaches the easy, the medium and the hard part of the paper.
+ */
+function interleaveBySubject(lessons: Lesson[]): Lesson[] {
+  const groups = new Map<string, Lesson[]>();
+  for (const lesson of lessons) groups.set(lesson.subject, [...(groups.get(lesson.subject) ?? []), lesson]);
+  return Array.from(groups.values())
+    .flatMap(group => group.map((lesson, index) => ({ lesson, at: (index + 0.5) / group.length })))
+    .sort((a, b) => a.at - b.at)
+    .map(entry => entry.lesson);
+}
+
+/**
  * Placement paper over several lessons (one subject or more): a few items
  * per lesson, ordered easy → medium → hard across the whole paper.
  */
 export function placementPaper(lessons: Lesson[], seed: number, maxQuestions = 20) {
   if (!lessons.length) return [];
-  const perLesson = Math.max(1, Math.min(3, Math.floor(maxQuestions / lessons.length)));
   const rng = createRng(seed);
-  return lessons.map(lesson => ({
+  // More lessons than questions: an even spread of them.
+  const chosen =
+    lessons.length > maxQuestions
+      ? Array.from({ length: maxQuestions }, (_, index) => lessons[Math.floor((index * lessons.length) / maxQuestions)])
+      : lessons;
+  const perLesson = Math.max(1, Math.min(3, Math.floor(maxQuestions / chosen.length)));
+  if (perLesson === 1) {
+    // One item per lesson: the difficulty rises along the paper (easy, then
+    // medium, then hard), so the test still separates the levels; subjects
+    // take turns, so each one is measured at every difficulty.
+    return interleaveBySubject(chosen).map((lesson, index, ordered) => {
+      const target = (1 + Math.floor((3 * index) / ordered.length)) as 1 | 2 | 3;
+      const pool = itemPool(lesson, rng.int(1, 2 ** 30));
+      const closest = Math.min(...pool.map(item => Math.abs(item.difficulty - target)));
+      const candidates = pool.filter(item => Math.abs(item.difficulty - target) === closest);
+      return { lesson, items: candidates.length ? [rng.pick(candidates)] : [] };
+    });
+  }
+  return chosen.map(lesson => ({
     lesson,
     items: placementItemsForLesson(lesson, rng.int(1, 2 ** 30), perLesson),
   }));

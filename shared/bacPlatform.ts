@@ -52,6 +52,7 @@ export const SECOND_SUBJECT_OPTIONS: Record<PlatformStream, BacSubject[]> = {
 export const CURRICULUM_SUBJECT_TO_BAC: Record<string, BacSubject> = {
   math: "math",
   physics: "physics",
+  philosophy: "philosophy",
 };
 
 // ---------------------------------------------------------------------------

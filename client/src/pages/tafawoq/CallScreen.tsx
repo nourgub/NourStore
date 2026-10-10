@@ -23,7 +23,7 @@ const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|ag
 const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح)/;
 const SAY = {
   fusha: {
-    hello: (name: string) => `ألو؟ السلام عليكم يا ${name}! معك أستاذ الرياضيات. هل تسمعني جيداً؟`,
+    hello: (name: string, teacher: string) => `ألو؟ السلام عليكم يا ${name}! معك ${teacher}. هل تسمعني جيداً؟`,
     howAreYou: "كيف حالك اليوم؟",
     topic: (skill: string, mistake: string | null) =>
       `الحمد لله. اليوم سنعمل على «${skill}».${mistake ? ` لاحظت أنك تخطئ أحياناً في هذا: ${mistake}.` : ""} هل أنت مستعد؟`,
@@ -35,7 +35,7 @@ const SAY = {
     checkUnderstood: "والآن لنتأكد أنك فهمت.",
   },
   darja: {
-    hello: (name: string) => `ألو؟ السلام عليكم يا ${name}! معاك أستاذ الرياضيات. راك تسمعني مليح؟`,
+    hello: (name: string, teacher: string) => `ألو؟ السلام عليكم يا ${name}! معاك ${teacher}. راك تسمعني مليح؟`,
     howAreYou: "واش راك، لاباس؟",
     topic: (skill: string, mistake: string | null) =>
       `الحمد لله. اليوم نخدمو على «${skill}».${mistake ? ` لاحظت بلي ساعات تغلط في هادي: ${mistake}.` : ""} راك واجد؟`,
@@ -373,7 +373,7 @@ export function CallScreen({
       callStart.current = data.afterId;
       opening.current = { name: data.name, skillName: data.skillName, mistake: data.mistake };
       stage.current = "hello";
-      say(SAY[style].hello(data.name), listen);
+      say(SAY[style].hello(data.name, teacherName), listen);
     } catch {
       setCaption(t.errors.generic);
       setPhase("ended");

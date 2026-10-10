@@ -18,6 +18,8 @@ import { instantiate } from "./generators/instantiate";
 import type { ProblemGenerator } from "./problems";
 import { derivativeGenerators } from "./lessons/derivativesGenerators";
 import { derivativeProblems } from "./lessons/derivativesProblems";
+import { PHYSICS_LESSONS } from "./lessons/physics";
+import { PHILOSOPHY_LESSONS } from "./lessons/philosophy";
 import { BAC_LESSONS } from "./lessons";
 
 export type Skill = {
@@ -75,7 +77,7 @@ export type BankQuestion = {
   /** Wrong option → misconception key (see Lesson.misconceptions). */
   distractors?: Record<string, string>;
   /** "exact": only the listed forms pass (no equivalence), e.g. "simplify". */
-  grading?: "expression" | "exact";
+  grading?: "expression" | "exact" | "numeric";
   explanation: string;
   /** Worked solution (generated items). */
   steps?: string[];
@@ -115,11 +117,12 @@ export const CURRICULA: Record<CurriculumKey, { country: string; language: "ar" 
   dz: { country: "DZ", language: "ar", name: "المنهاج الجزائري" },
 };
 
-export type SubjectKey = "math" | "physics";
+export type SubjectKey = "math" | "physics" | "philosophy";
 
 export const SUBJECTS: Record<SubjectKey, { name: string }> = {
   math: { name: "الرياضيات" },
   physics: { name: "العلوم الفيزيائية" },
+  philosophy: { name: "الفلسفة" },
 };
 
 const derivatives: Lesson = {
@@ -1876,6 +1879,8 @@ export const LESSONS: Lesson[] = [
   linearEquations,
   fractions,
   ohmLaw,
+  ...PHYSICS_LESSONS,
+  ...PHILOSOPHY_LESSONS,
 ];
 
 /**

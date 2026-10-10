@@ -28,8 +28,8 @@ describe("stream content and availability", () => {
     const sciences = subscriptionContent("sciences", null, NO_SWITCHES);
     expect(sciences.core.map(entry => entry.key)).toEqual(STREAM_CORE_SUBJECTS.sciences);
     expect(sciences.core.find(entry => entry.key === "math")?.available).toBe(true);
-    // No BAC physics or natural-sciences lessons yet: "coming soon", never "everything".
-    expect(sciences.core.find(entry => entry.key === "physics")?.available).toBe(false);
+    expect(sciences.core.find(entry => entry.key === "physics")?.available).toBe(true);
+    // No BAC natural-sciences lessons yet: "coming soon", never "everything".
     expect(sciences.core.find(entry => entry.key === "natural_sciences")?.available).toBe(false);
     expect(sciences.everythingAvailable).toBe(false);
   });
@@ -42,8 +42,10 @@ describe("stream content and availability", () => {
       expect(lessons).toContain("math-sequences");
       expect(lessons).not.toContain("math-complex");
     }
-    // Without the second subject, a literary student has no maths at all.
-    expect(accessibleLessons("lettres", null, NO_SWITCHES)).toHaveLength(0);
+    // Without the second subject, a literary student has no maths at all (philosophy is core).
+    const lettres = accessibleLessons("lettres", null, NO_SWITCHES);
+    expect(lettres.filter(lesson => lesson.subject === "math")).toHaveLength(0);
+    expect(lettres.some(lesson => lesson.subject === "philosophy")).toBe(true);
   });
 
   it("hides what an admin switched off", () => {
@@ -96,7 +98,8 @@ describe("server-side access decision", () => {
   it("checks subject papers the same way", () => {
     expect(checkSubjectAccess(locked("sciences"), "math", NO_SWITCHES, open)).toMatchObject({ ok: true });
     expect(checkSubjectAccess(locked("sciences"), "philosophy", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectNotAllowed });
-    expect(checkSubjectAccess(locked("sciences"), "physics", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectUnavailable });
+    expect(checkSubjectAccess(locked("sciences"), "physics", NO_SWITCHES, open)).toMatchObject({ ok: true });
+    expect(checkSubjectAccess(locked("sciences"), "natural_sciences", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectUnavailable });
     expect(checkSubjectAccess(locked("lettres"), "math", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectNotAllowed });
   });
 });
@@ -240,10 +243,14 @@ describe("papers", () => {
     expect(items.length).toBeLessThanOrEqual(20);
     for (const part of paper) {
       expect(part.items.length).toBeGreaterThan(0);
-      expect(part.items[0].difficulty).toBe(1);
       expect(new Set(part.items.map(item => item.id)).size).toBe(part.items.length);
     }
-    expect(items.some(item => item.difficulty >= 2)).toBe(true);
+    // The paper as a whole goes easy → medium → hard, even with one item per lesson.
+    const difficulties = items.map(item => item.difficulty);
+    expect(difficulties[0]).toBe(1);
+    expect([...difficulties].sort()).toEqual(difficulties);
+    expect(difficulties).toContain(2);
+    expect(difficulties).toContain(3);
   });
 
   it("draws fresh items on one skill and for a weekly test", () => {
