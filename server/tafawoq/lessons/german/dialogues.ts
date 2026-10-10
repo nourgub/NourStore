@@ -92,8 +92,8 @@ export const GERMAN_DIALOGUES: Record<string, Record<string, Dialogue>> = {
     prepositions: {
       opening: "بعض حروف الجر تفرض حالة واحدة دائماً، وبعضها يتغير حسب السؤال wo? (أين) أو wohin? (إلى أين).",
       steps: [
-        { ask: "mit, nach, bei, von, zu, aus, seit تأتي دائماً مع Akkusativ أم Dativ؟", answer: "dativ", hint: "تذكّر: «mit dem Bus»." },
-        { ask: "و für, durch, gegen, ohne, um؟", answer: "akkusativ", hint: "تذكّر: «für den Vater»." },
+        { ask: "mit, nach, bei, von, zu, aus, seit تأتي دائماً مع Akkusativ أم Dativ؟", answer: "Dativ", hint: "تذكّر: «mit dem Bus»." },
+        { ask: "و für, durch, gegen, ohne, um؟", answer: "Akkusativ", hint: "تذكّر: «für den Vater»." },
         { ask: "«Ich gehe in ___ Schule» (wohin? حركة). die Schule تصبح؟", answer: "die", hint: "سؤال الاتجاه يأخذ حالة النصب، والمؤنث لا يتغير فيها." },
         { ask: "«Ich bin in ___ Schule» (wo? مكان ثابت). die Schule تصبح؟", answer: "der", hint: "سؤال المكان الثابت يأخذ حالة الجر، تذكّر المؤنث في Dativ." },
       ],
@@ -106,7 +106,7 @@ export const GERMAN_DIALOGUES: Record<string, Record<string, Dialogue>> = {
       steps: [
         { ask: "ما الفعل المساعد في المجهول الحاضر: «Das Auto ___ repariert»؟", answer: "wird", hint: "هو فعل werden مصرَّفاً مع es." },
         { ask: "وفي الماضي: «Das Auto ___ gestern repariert»؟", answer: "wurde", hint: "Präteritum فعل werden مع er/sie/es." },
-        { ask: "وما شكل الفعل الأساسي في آخر الجملة: المصدر أم Partizip II؟", answer: "partizip", accept: ["partizip ii", "partizip 2"], hint: "هو نفس الشكل الذي نستعمله في Perfekt." },
+        { ask: "وما شكل الفعل الأساسي في آخر الجملة: المصدر أم Partizip II؟", answer: "Partizip", accept: ["Partizip II", "Partizip 2"], hint: "هو نفس الشكل الذي نستعمله في Perfekt." },
         { ask: "الفاعل الأصلي يُذكر بعد حرف جر + Dativ: «Das Auto wird ___ dem Mechaniker repariert»؟", answer: "von", hint: "حرف جر يعني «من طرف»." },
       ],
       rule: "Passiv = werden مصرَّف + Partizip II في الآخر. حاضر: wird gebaut، ماضٍ: wurde gebaut، والفاعل الأصلي بعد von + Dativ.",
@@ -136,10 +136,10 @@ export const GERMAN_DIALOGUES: Record<string, Record<string, Dialogue>> = {
     comprehension: {
       opening: "في البكالوريا تقرأ نصاً ثم تجيب عن أسئلة. السر: حدّد كلمة الاستفهام (W-Frage) ثم ابحث عن الجملة التي تجيب عنها.",
       steps: [
-        { ask: "أي كلمة استفهام تسأل عن الزمان: Wo أم Wann؟", answer: "wann", hint: "ليست الكلمة التي تسأل عن المكان." },
-        { ask: "وأي كلمة تسأل عن السبب؟", answer: "warum", accept: ["wieso", "weshalb"], hint: "جوابها يبدأ غالباً برابط السبب الذي يرمي الفعل إلى الآخر." },
-        { ask: "النص: «Karim wohnt in Tlemcen.» السؤال: «Wo wohnt Karim?» ما الجواب؟", answer: "tlemcen", accept: ["تلمسان"], hint: "ابحث عن الاسم الذي يأتي بعد حرف الجر in." },
-        { ask: "«Warum bleibt Lina zu Hause?» والنص: «Lina bleibt zu Hause, weil sie krank ist.» بأي كلمة نبدأ الجواب؟", answer: "weil", hint: "نفس رابط السبب الموجود في النص." },
+        { ask: "أي كلمة استفهام تسأل عن الزمان: Wo أم Wann؟", answer: "Wann", hint: "ليست الكلمة التي تسأل عن المكان." },
+        { ask: "وأي كلمة تسأل عن السبب؟", answer: "Warum", accept: ["Wieso", "Weshalb"], hint: "جوابها يبدأ غالباً برابط السبب الذي يرمي الفعل إلى الآخر." },
+        { ask: "النص: «Karim wohnt in Tlemcen.» السؤال: «Wo wohnt Karim?» ما الجواب؟", answer: "Tlemcen", accept: ["تلمسان"], hint: "ابحث عن الاسم الذي يأتي بعد حرف الجر in." },
+        { ask: "«Warum bleibt Lina zu Hause?» والنص: «Lina bleibt zu Hause, weil sie krank ist.» بأي كلمة نبدأ الجواب؟", answer: "Weil", hint: "نفس رابط السبب الموجود في النص." },
       ],
       rule: "اقرأ السؤال أولاً وحدد كلمة الاستفهام (Wer = من، Was = ماذا، Wo = أين، Wann = متى، Warum = لماذا، Wie = كيف)، ابحث في النص عن الجملة المطابقة، وأجب بجملة كاملة (Warum → Weil …).",
     },
@@ -156,10 +156,10 @@ export const GERMAN_DIALOGUES: Record<string, Record<string, Dialogue>> = {
     writing: {
       opening: "التعبير الكتابي في البكالوريا غالباً رسالة (Brief) أو موضوع قصير (Aufsatz). لكل منهما قواعد ثابتة.",
       steps: [
-        { ask: "رسالة إلى صديقة اسمها Sara: «Lieber Sara» أم «Liebe Sara»؟", answer: "liebe sara", hint: "للمؤنث نحذف الحرف الأخير r." },
+        { ask: "رسالة إلى صديقة اسمها Sara: «Lieber Sara» أم «Liebe Sara»؟", answer: "Liebe Sara", hint: "للمؤنث نحذف الحرف الأخير r." },
         { ask: "في رسالة رسمية إلى السيد Müller: «Sehr ___ Herr Müller»؟", answer: "geehrter", hint: "صفة تعني «المحترم» تنتهي بـ -er مع المذكر." },
-        { ask: "ختام الرسالة الرسمية: «Mit freundlichen …»؟", answer: "grüßen", accept: ["gruessen", "grussen"], hint: "كلمة تعني «تحيات»." },
-        { ask: "الموضوع: المقدمة Einleitung، العرض Hauptteil، وما اسم الخاتمة؟", answer: "schluss", accept: ["schluß"], hint: "كلمة تعني «النهاية»." },
+        { ask: "ختام الرسالة الرسمية: «Mit freundlichen …»؟", answer: "Grüßen", accept: ["Gruessen", "Grussen"], hint: "كلمة تعني «تحيات»." },
+        { ask: "الموضوع: المقدمة Einleitung، العرض Hauptteil، وما اسم الخاتمة؟", answer: "Schluss", accept: ["Schluß"], hint: "كلمة تعني «النهاية»." },
       ],
       rule: "الرسالة: المكان والتاريخ، التحية (Lieber / Liebe … للصديق، Sehr geehrter / Sehr geehrte … للرسمي)، الموضوع، الختام (Viele Grüße / Mit freundlichen Grüßen) والتوقيع. الموضوع: Einleitung، Hauptteil بروابط (erstens, außerdem, deshalb, trotzdem)، Schluss برأيك.",
     },

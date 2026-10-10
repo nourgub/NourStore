@@ -154,11 +154,12 @@ export function foreignLanguageOfLesson(lessonKey: string | null | undefined): F
 
 const LATIN = "A-Za-zÄÖÜäöüß";
 /** A run of the taught language: Latin words with the spaces and punctuation between them. */
-const FOREIGN_RUN = new RegExp(`[${LATIN}](?:[${LATIN}0-9'’\\-.,!?;:()… ]*[${LATIN}0-9.!?])?`, "g");
+const FOREIGN_RUN = new RegExp(`[${LATIN}](?:[${LATIN}0-9'’\\-.,!?;:()…%«» ]*[${LATIN}0-9.!?%»])?`, "g");
 
 function foreignChunks(run: string, max: number): string[] {
   const pieces: string[] = [];
-  for (const sentence of run.split(/(?<=[.!?])\s+/)) {
+  // Quotes are for the eye: «Ich sehe den Hund» is just said.
+  for (const sentence of run.replace(/[«»]/g, "").split(/(?<=[.!?])\s+/)) {
     for (const word of sentence.trim().split(/\s+/)) {
       const last = pieces[pieces.length - 1];
       if (last !== undefined && last.length + word.length + 1 <= max && !/[.!?]$/.test(last)) pieces[pieces.length - 1] = `${last} ${word}`;
@@ -179,8 +180,11 @@ export function spokenParts(text: string, foreign: ForeignLang | null = null, ma
   const parts: SpokenPart[] = [];
   // Grammar notation read as words, not maths: "werden + Partizip II", "gehen → ging".
   const words = text
+    // A dialogue held in the taught language: its markers in that language too.
+    .replace(/❓\s*\((\d+)\/\d+\)\s*(?=«?[A-Za-zÄÖÜäöüß])/g, "Frage $1: ")
+    .replace(/💡\s*(?=«?[A-Za-zÄÖÜäöüß])/g, "Tipp: ")
     .replace(/_{2,}/g, " … ")
-    .replace(/\s*[→⟶]\s*/g, "، ")
+    .replace(/\s*[→⟶]\s*/g, ", ")
     .replace(/\s=\s/g, " يعني ")
     .replace(/\s\+\s/g, " مع ")
     // A hyphen on a word part ("-en", "ge-") is no minus sign.
@@ -199,7 +203,7 @@ export function spokenParts(text: string, foreign: ForeignLang | null = null, ma
   return parts.reduce<SpokenPart[]>((merged, part) => {
     const last = merged[merged.length - 1];
     if (last?.lang === foreign && part.lang === foreign && last.text.length + part.text.length + 2 <= max) {
-      last.text = `${last.text}, ${part.text}`;
+      last.text = `${last.text}${/[.!?:]$/.test(last.text) ? " " : ", "}${part.text}`;
     } else merged.push({ ...part });
     return merged;
   }, []);

@@ -50,7 +50,7 @@ import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
-import { darjaSuggestions, useTeacherStyle, useTeacherVoice } from "./teacherStyle";
+import { darjaSuggestions, germanSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
 import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
@@ -196,12 +196,13 @@ function HomeCallCard({
 }) {
   const t = useT();
   const lang = useLang();
-  const [style, setStyle] = useTeacherStyle();
+  const [chosenStyle, setStyle] = useTeacherStyle();
   const [calling, setCalling] = useState(false);
   const road = trpc.tafawoq.roadmap.useQuery(undefined, { enabled: bac });
   const today = road.data?.today?.lessonKey;
   const lessonKey = today && placedKeys.includes(today) ? today : placedKeys.find(key => lessons.some(lesson => lesson.key === key));
   const lesson = lessons.find(entry => entry.key === lessonKey);
+  const style = styleIn(chosenStyle, lesson?.key);
   return (
     <section className="tfq-card tfq-home-call">
       {calling && lesson && (
@@ -221,7 +222,7 @@ function HomeCallCard({
         <Content className="tfq-muted">{lesson ? t.homeCallText(lesson.title) : t.homeCallFirst}</Content>
         <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
           <span className="tfq-muted">{t.teacherStyle}</span>
-          {(["fusha", "darja"] as const).map(option => (
+          {stylesFor(lesson?.key).map(option => (
             <button
               key={option}
               type="button"
@@ -230,7 +231,7 @@ function HomeCallCard({
               className={`tfq-btn small ${style === option ? "" : "ghost"}`}
               onClick={() => setStyle(option)}
             >
-              {option === "fusha" ? t.styleFusha : t.styleDarja}
+              {styleLabel(t, option)}
             </button>
           ))}
         </div>
@@ -247,6 +248,11 @@ function HomeCallCard({
       )}
     </section>
   );
+}
+
+/** The style's name on its switch ("Deutsch" is the same in every interface language). */
+function styleLabel(t: ReturnType<typeof useT>, style: TeacherStyle) {
+  return style === "deutsch" ? "Deutsch" : style === "darja" ? t.styleDarja : t.styleFusha;
 }
 
 function hasOfflineRevision() {
@@ -679,7 +685,9 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   const [live, setLive] = useState(false);
   const [call, setCall] = useState(false);
   const teacherName = `أستاذ ${data.analysis.subjectName}`;
-  const [style, setStyle] = useTeacherStyle();
+  const [chosenStyle, setStyle] = useTeacherStyle();
+  // "Deutsch" only in the German lessons; elsewhere the teacher speaks Arabic.
+  const style = styleIn(chosenStyle, lessonKey);
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -721,9 +729,11 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
 
   const suggestions = useMemo(
     () =>
-      style === "darja"
-        ? darjaSuggestions(data.analysis.focusSkills[0]?.name)
-        : t.suggestions(data.analysis.focusSkills[0]?.name),
+      style === "deutsch"
+        ? germanSuggestions()
+        : style === "darja"
+          ? darjaSuggestions(data.analysis.focusSkills[0]?.name)
+          : t.suggestions(data.analysis.focusSkills[0]?.name),
     [t, data.analysis.focusSkills, style]
   );
 
@@ -742,7 +752,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
       )}
       <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
         <span className="tfq-muted">{t.teacherStyle}</span>
-        {(["fusha", "darja"] as const).map(option => (
+        {stylesFor(lessonKey).map(option => (
           <button
             key={option}
             type="button"
@@ -751,7 +761,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
             className={`tfq-btn small ${style === option ? "" : "ghost"}`}
             onClick={() => setStyle(option)}
           >
-            {option === "fusha" ? t.styleFusha : t.styleDarja}
+            {styleLabel(t, option)}
           </button>
         ))}
       </div>
@@ -790,8 +800,10 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
         voiceMode={voiceMode}
         setVoiceMode={setVoiceMode}
         busy={send.isPending}
-        onQuiz={() => submit(style === "darja" ? "سقسيني" : "اختبرني")}
-        onUnderstood={understood => submit(understood ? "فهمت، شكراً" : "لم أفهم")}
+        onQuiz={() => submit(style === "deutsch" ? "Frag mich" : style === "darja" ? "سقسيني" : "اختبرني")}
+        onUnderstood={understood =>
+          submit(style === "deutsch" ? (understood ? "Verstanden, danke" : "Ich habe es nicht verstanden") : understood ? "فهمت، شكراً" : "لم أفهم")
+        }
       />
       <div className="tfq-row" style={{ marginTop: 12 }}>
         {suggestions.map(suggestion => (

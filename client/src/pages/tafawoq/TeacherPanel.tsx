@@ -7,6 +7,7 @@ import { Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { teacherMessageSpeech, type TeacherAction, type TeacherMessage } from "@shared/bacPlatform";
 import type { PublicQuestion } from "@shared/tafawoq";
+import type { TeacherStyle } from "./teacherStyle";
 import { trpc } from "@/lib/trpc";
 import { M, QuestionRunner, ResultItems, type SubmitResult } from "./components";
 import { Content, useT } from "./i18n";
@@ -156,7 +157,7 @@ export function TeacherQuickActions({
   busy,
 }: {
   lessonKey: string;
-  style: "fusha" | "darja";
+  style: TeacherStyle;
   voiceMode: VoiceMode;
   setVoiceMode: (mode: VoiceMode) => void;
   onQuiz: () => void;

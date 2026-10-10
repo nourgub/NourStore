@@ -34,6 +34,16 @@ export type Skill = {
   dialogue?: Dialogue;
   /** BAC streams whose programme includes this skill; omitted = every stream of the lesson. */
   streams?: BacStream[];
+  /** A language lesson's skill in that language (German: the teacher speaking German). */
+  de?: SkillEdition;
+};
+
+/** A skill as taught in the taught language itself. */
+export type SkillEdition = {
+  name: string;
+  explanation: string;
+  example: { problem: string; steps: string[]; answer: string };
+  dialogue: Dialogue;
 };
 
 /**
@@ -77,6 +87,8 @@ export type BankQuestion = {
   accept?: string[];
   /** Wrong option → misconception key (see Lesson.misconceptions). */
   distractors?: Record<string, string>;
+  /** The prompt in German (German lessons, teacher speaking German). */
+  promptDe?: string;
   /** "exact": only the listed forms pass (no equivalence), e.g. "simplify". */
   grading?: "expression" | "exact" | "numeric";
   explanation: string;
@@ -92,6 +104,8 @@ export type Lesson = {
   curriculum: CurriculumKey;
   subject: SubjectKey;
   title: string;
+  /** The title in German (German lessons). */
+  titleDe?: string;
   levels: SchoolLevel[];
   /** BAC streams whose programme includes this lesson; omitted = every stream. */
   streams?: BacStream[];

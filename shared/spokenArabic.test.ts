@@ -65,6 +65,13 @@ describe("spokenParts (language lessons)", () => {
     ]);
   });
 
+  it("says a German dialogue's markers in German, the Arabic one's in Arabic", () => {
+    expect(spokenParts("Kein Problem.\n💡 Nur r wird zu n.\n\n❓ (1/4) «Ich sehe ___ Hund». Was wird aus der?", "de")).toEqual([
+      { text: "Kein Problem. Tipp: Nur r wird zu n. Frage 1: Ich sehe … Hund. Was wird aus der?", lang: "de" },
+    ]);
+    expect(spokenParts("❓ (2/4) ما Partizip II للفعل kaufen؟", "de")[0]).toEqual({ text: "السؤال 2:", lang: "ar" });
+  });
+
   it("is plain Arabic (maths included) outside language lessons", () => {
     expect(spokenParts("x − 3 = 5")).toEqual([{ text: "إكس ناقص 3 يساوي 5", lang: "ar" }]);
     expect(foreignLanguageOfLesson("de-tenses")).toBe("de");

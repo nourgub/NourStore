@@ -18,9 +18,9 @@ import { RECOGNITION_LANG, canListen, listenOnce, speakArabic, unlockAudio, useS
 type Phase = "ringing" | "connecting" | "speaking" | "listening" | "thinking" | "ended";
 
 const QUESTIONS_PER_CALL = 3;
-const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again/i;
-// Graded-answer openings, in Fusha and in Darja (server/tafawoq/darja.ts).
-const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح)/;
+const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again|wiederhol|noch ?einmal|nochmal/i;
+// Graded-answer openings, in Fusha, in Darja (server/tafawoq/darja.ts) and in German (server/tafawoq/deutsch.ts).
+const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح|Nicht ganz\.|Kein Problem\. Die richtige Antwort)/;
 const SAY = {
   fusha: {
     hello: (name: string, teacher: string) => `ألو؟ السلام عليكم يا ${name}! معك ${teacher}. هل تسمعني جيداً؟`,
@@ -46,6 +46,25 @@ const SAY = {
     askAgain: "ودوك، نعاودلك السؤال.",
     checkUnderstood: "ودوك نشوفو إذا فهمت.",
   },
+  // German lessons, the teacher speaking German.
+  deutsch: {
+    hello: (name: string, _teacher: string) => `Hallo ${name}! Hier ist dein Deutschlehrer. Hörst du mich gut?`,
+    howAreYou: "Wie geht es dir heute?",
+    topic: (skill: string, mistake: string | null) =>
+      `Schön. Heute arbeiten wir an «${skill}».${mistake ? ` Ein Fehler kommt bei dir manchmal vor: ${mistake}.` : ""} Bist du bereit?`,
+    go: "Los geht's!",
+    helloAgain: "Hallo? Hörst du mich?",
+    clear: "Ist das klar?",
+    next: "Gut, die nächste Frage.",
+    askAgain: "Und jetzt stelle ich die Frage noch einmal.",
+    checkUnderstood: "Jetzt prüfen wir, ob du es verstanden hast.",
+  },
+};
+
+/** What the student's call requests are, in the teacher's language. */
+const REQUEST = {
+  dialogue: (style: TeacherStyle) => (style === "deutsch" ? "Im Dialog" : "علّمني بالحوار"),
+  quiz: (style: TeacherStyle) => (style === "deutsch" ? "Frag mich" : "اختبرني"),
 };
 
 /** Microphone errors after which listening again is pointless. */
@@ -53,7 +72,7 @@ const MIC_BLOCKED = new Set(["not-allowed", "service-not-allowed", "audio-captur
 
 /** What the teacher says aloud: the worked solution stays on screen only. */
 function spokenPart(text: string) {
-  return text.split(/\n(?:الحل|Solution|Solution) ?:/)[0].trim();
+  return text.split(/\n(?:الحل|Solution|Erklärung \(auf Arabisch\)) ?:/)[0].trim();
 }
 
 /** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
@@ -62,7 +81,7 @@ const DIALOGUE_STEP = "❓ (";
 
 /** The tutor's "say «اختبرني»…" tails make no sense mid-call. */
 function forCall(text: string) {
-  return text.replace(/\n?(قل|قول) «اختبرني»[^\n]*/g, "").trim();
+  return text.replace(/\n?(?:(?:قل|قول) «اختبرني»|Sag «Frag mich»)[^\n]*/g, "").trim();
 }
 
 /** Two-tone ring, synthesised (no audio file). Returns a stop function. */
@@ -218,7 +237,8 @@ export function CallScreen({
     let got = false;
     let error = "";
     let cancelled = false;
-    const stopListening = listenOnce(RECOGNITION_LANG[lang], {
+    // Taught in German: the student answers in German.
+    const stopListening = listenOnce(style === "deutsch" ? "de-DE" : RECOGNITION_LANG[lang], {
       onInterim: text => setHeard(text),
       onFinal: text => {
         got = true;
@@ -257,7 +277,7 @@ export function CallScreen({
     if (closedRef.current) return;
     stage.current = "dialogue";
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: "علّمني بالحوار", style });
+    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.dialogue(style), style });
     if (!reply.includes(DIALOGUE_STEP)) {
       // No dialogue for this skill: straight to the questions.
       stage.current = "quiz";
@@ -279,7 +299,7 @@ export function CallScreen({
     }
     stage.current = "quiz";
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: "اختبرني", style });
+    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.quiz(style), style });
     lastQuestion.current = reply;
     askedRef.current += 1;
     setAsked(askedRef.current);

@@ -89,6 +89,12 @@ export function pickOption(raw: string, options: string[]): string | null {
     const index = LETTERS.indexOf(letter[1] === "ا" ? "أ" : letter[1]);
     if (index >= 0 && options[index] !== undefined) return options[index];
   }
+  // German quiz (teacher speaking German): "B", "Antwort C", "Buchstabe a".
+  const latin = text.match(/^(?:(?:die\s+)?(?:antwort|buchstabe)\s+)?([a-d])[.!]?$/i);
+  if (latin) {
+    const index = latin[1].toLowerCase().charCodeAt(0) - 97;
+    if (options[index] !== undefined) return options[index];
+  }
   if (/^[أابجد]$/.test(text)) {
     const index = LETTERS.indexOf(text === "ا" ? "أ" : text);
     if (options[index] !== undefined) return options[index];

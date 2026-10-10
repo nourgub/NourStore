@@ -239,7 +239,9 @@ export type TutorTurn = { role: "tutor" | "student"; content: string };
 export async function tutorReply(
   context: StudentContext,
   history: TutorTurn[],
-  message: string | null
+  message: string | null,
+  /** "de": a German lesson taught in German (the teacher speaking German). */
+  language?: "de"
 ): Promise<string> {
   const messages: Anthropic.Beta.BetaMessageParam[] = [];
   // The profile is the first user turn so the (stable) system prompt stays
@@ -252,6 +254,10 @@ export async function tutorReply(
       message === null
         ? "ابدأ الحصة الآن: رحّب به باسمه، قل له بصدق ما لاحظته من تحليل مستواه (ما يتقنه وما يصعب عليه)، واشرح كيف سنتقدم معاً، ثم اطرح عليه سؤالاً أولاً بسيطاً."
         : "تابع الحوار."
+    }${
+      language === "de"
+        ? "\n\nهذه حصة لغة ألمانية والتلميذ اختار أن يكلمه الأستاذ بالألمانية: اكتب ردودك بالألمانية البسيطة (مستوى A2 إلى B1) وبجمل قصيرة، وأضف ترجمة عربية قصيرة بين قوسين للكلمة الصعبة فقط، واشرح بالعربية فقط إذا قال التلميذ إنه لم يفهم."
+        : ""
     }`,
   });
   for (const turn of history) {

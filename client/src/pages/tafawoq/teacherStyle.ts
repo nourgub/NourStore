@@ -1,15 +1,18 @@
-// How the teacher speaks — Fusha or Algerian Darja (server/tafawoq/darja.ts).
+// How the teacher speaks — Fusha or Algerian Darja (server/tafawoq/darja.ts),
+// or German in the German lessons (server/tafawoq/deutsch.ts).
 // A per-device preference, so it lives in localStorage; the page works the
 // same (Fusha) when storage is unavailable.
 import { useState } from "react";
+import { foreignLanguageOfLesson } from "@shared/spokenArabic";
 
-export type TeacherStyle = "fusha" | "darja";
+export type TeacherStyle = "fusha" | "darja" | "deutsch";
 
 const KEY = "tfq-teacher-style";
 
 function read(): TeacherStyle {
   try {
-    return localStorage.getItem(KEY) === "darja" ? "darja" : "fusha";
+    const stored = localStorage.getItem(KEY);
+    return stored === "darja" || stored === "deutsch" ? stored : "fusha";
   } catch {
     return "fusha";
   }
@@ -26,6 +29,21 @@ export function useTeacherStyle(): [TeacherStyle, (style: TeacherStyle) => void]
     setStyle(next);
   };
   return [style, update];
+}
+
+/** The styles a lesson offers: German only in the German lessons. */
+export function stylesFor(lessonKey: string | null | undefined): TeacherStyle[] {
+  return foreignLanguageOfLesson(lessonKey) === "de" ? ["fusha", "darja", "deutsch"] : ["fusha", "darja"];
+}
+
+/** The chosen style where it applies: "deutsch" outside a German lesson is Fusha. */
+export function styleIn(style: TeacherStyle, lessonKey: string | null | undefined): TeacherStyle {
+  return stylesFor(lessonKey).includes(style) ? style : "fusha";
+}
+
+/** Chat suggestions in German (the teacher speaking German). */
+export function germanSuggestions(focus?: string): string[] {
+  return ["Frag mich", focus ? `Bring mir ${focus} im Dialog bei` : "Im Dialog", "Ein Beispiel bitte", "Warum mache ich Fehler?"];
 }
 
 /** Chat suggestions in Darja (what an Algerian student would type). */

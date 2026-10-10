@@ -16,6 +16,8 @@ import {
   type SkillState,
 } from "./studentModel";
 import { buildStudentContext } from "./context";
+import { GERMAN_MISCONCEPTIONS, germanOpening, germanOralQuestion, germanTutorReply, speaksGerman } from "./deutsch";
+import { pickOption } from "./spokenAnswer";
 import { examMention, partPoints } from "./service";
 import { bestNextLesson, nextBacDate, paperLessons, predictMark, sessionsPerWeek } from "./bac";
 import {
@@ -417,5 +419,50 @@ describe("skills per BAC stream", () => {
     const questions = selectPlacementQuestions(sciences, 10, 7);
     expect(questions.length).toBeGreaterThan(0);
     expect(questions.some(question => question.skill === "second_order")).toBe(false);
+  });
+});
+
+describe("the German teacher speaking German", () => {
+  const lesson = getLesson("de-cases")!;
+  const context = buildStudentContext({
+    student: { displayName: "Amel", age: 17, schoolLevel: "bac" as const, goals: null },
+    lesson,
+    states: [
+      { skill: "akkusativ", pKnown: 0.95, attempts: 4, correct: 4 },
+      { skill: "dativ", pKnown: 0.2, attempts: 4, correct: 1 },
+      { skill: "prepositions", pKnown: 0.3, attempts: 2, correct: 1 },
+    ],
+    attempts: [
+      { correct: false, difficulty: 1, responseMs: 30_000, misconception: "case_confusion" },
+      { correct: false, difficulty: 2, responseMs: 30_000, misconception: "case_confusion" },
+    ],
+  });
+
+  it("only in German lessons, and only when chosen", () => {
+    expect(speaksGerman("deutsch", lesson)).toBe(true);
+    expect(speaksGerman("fusha", lesson)).toBe(false);
+    expect(speaksGerman("deutsch", getLesson("math-limits")!)).toBe(false);
+  });
+
+  it("greets and answers in German from the student's analysis", () => {
+    const opening = germanOpening(lesson, context);
+    expect(opening).toContain("Hallo Amel!");
+    expect(opening).toContain("Der Akkusativ");
+    expect(opening).toContain(GERMAN_MISCONCEPTIONS.case_confusion);
+    expect(germanTutorReply(lesson, context, "Ein Beispiel bitte")).toContain("Ein gelöstes Beispiel zu «Der Dativ»");
+    expect(germanTutorReply(lesson, context, "Warum mache ich Fehler?")).toContain("2-mal");
+    expect(germanTutorReply(lesson, context, "Erklär mir die Präpositionen")).toContain("«Präpositionen und ihr Kasus»");
+    // No Arabic sentence of the Arabic teacher slips in.
+    expect(germanTutorReply(lesson, context, "Ich habe das nicht verstanden")).not.toMatch(/[؀-ۿ]{3,}/);
+  });
+
+  it("asks quiz questions in German, answered with A–D", () => {
+    const item = lesson.bank.find(question => question.id === "de-cas-1")!;
+    const text = germanOralQuestion(item);
+    expect(text).toContain("Frage: Ergänze: «Ich habe ___ Bruder.» (der Bruder)");
+    expect(text).toContain("A: ");
+    expect(pickOption("B", item.options!)).toBe(item.options![1]);
+    expect(pickOption("Antwort c", item.options!)).toBe(item.options![2]);
+    expect(pickOption("ب", item.options!)).toBe(item.options![1]);
   });
 });

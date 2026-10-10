@@ -102,3 +102,67 @@ describe("dialogue content", () => {
     }
   }
 });
+
+describe("German editions (the teacher speaking German)", () => {
+  for (const lesson of LESSONS.filter(entry => entry.subject === "german")) {
+    it(`${lesson.key}: every skill and item has its German edition`, () => {
+      expect(lesson.titleDe).toBeTruthy();
+      for (const question of lesson.bank) expect(question.promptDe, question.id).toBeTruthy();
+      for (const skill of lesson.skills) expect(skill.de, skill.key).toBeDefined();
+    });
+    for (const skill of lesson.skills) {
+      it(`${lesson.key} / ${skill.key} has a sound German dialogue`, () => {
+        const dialogue = skill.de!.dialogue;
+        expect(dialogue.opening.trim()).not.toBe("");
+        expect(dialogue.rule.trim()).not.toBe("");
+        expect(dialogue.steps.length).toBeGreaterThanOrEqual(3);
+        expect(dialogue.steps.length).toBeLessThanOrEqual(5);
+        dialogue.steps.forEach((step, index) => {
+          const where = `step ${index + 1}: ${step.ask}`;
+          for (const form of [step.answer, ...(step.accept ?? [])]) {
+            expect(dialogueAnswerMatches(step, form), `${where} — "${form}" is not accepted`).toBe(true);
+          }
+          expect(dialogueAnswerMatches(step, step.hint), `${where} — the hint contains the answer`).toBe(false);
+          for (const unsure of ["Ich weiß es nicht", "keine Ahnung", "لا أعرف"]) {
+            expect(dialogueAnswerMatches(step, unsure), `${where} — "${unsure}"`).toBe(false);
+          }
+        });
+      });
+    }
+  }
+});
+
+describe("the teacher speaking German", () => {
+  it("holds a whole dialogue in German, hint then answer", () => {
+    const lesson = getLesson("de-tenses")!;
+    const skill = lesson.skills.find(entry => entry.key === "partizip")!;
+    let last = startDialogue(skill, "de");
+    expect(last).toContain("Wir entdecken «Das Partizip II bilden»");
+    let state = dialogueState(lesson, last)!;
+    expect(state.lang).toBe("de");
+    // A wrong answer gets a German hint, "ich weiß es nicht" the answer.
+    last = dialogueReply(state, "kaufte", detectIntent("kaufte"), "Amel", 0)!;
+    expect(last).toContain("Noch nicht, aber du bist nah dran.");
+    state = dialogueState(lesson, last)!;
+    expect(state.hinted).toBe(true);
+    last = dialogueReply(state, "Ich weiß es nicht", detectIntent("Ich weiß es nicht"), "Amel", 0)!;
+    expect(last).toContain("Die Antwort: gekauft.");
+    for (const answer of ["gesehen", "telefoniert", "aufgemacht"]) {
+      state = dialogueState(lesson, last)!;
+      last = dialogueReply(state, answer, detectIntent(answer), "Amel", 2)!;
+    }
+    expect(last).toContain("Super, Amel! Du hast die Regel selbst gefunden:");
+    expect(last).toContain(skill.de!.dialogue.rule);
+  });
+
+  it("understands requests in German", () => {
+    expect(detectIntent("Frag mich")).toBe("quiz");
+    expect(detectIntent("Ich weiß es nicht")).toBe("giveUp");
+    expect(detectIntent("Bring mir das Passiv bei")).toBe("dialogue");
+    expect(detectIntent("Im Dialog bitte")).toBe("dialogue");
+    expect(detectIntent("Ein Beispiel bitte")).toBe("example");
+    expect(detectIntent("Ich habe das nicht verstanden")).toBe("simpler");
+    expect(detectIntent("Etwas Schwereres? Eine Herausforderung")).toBe("challenge");
+    expect(detectIntent("Danke!")).toBe("thanks");
+  });
+});

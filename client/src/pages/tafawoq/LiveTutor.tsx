@@ -16,6 +16,7 @@ type Phase = "idle" | "listening" | "thinking" | "speaking";
 const OPENING = {
   fusha: "أنا معك الآن. اسألني عن أي نقطة في الدرس، أو قل «أعطني مثالاً»، أو قل «اختبرني» لأطرح عليك سؤالاً.",
   darja: "راني معاك دوك. سقسيني على أي نقطة في الدرس، ولا قول «عطيني مثال»، ولا قول «سقسيني» نعطيك سؤال.",
+  deutsch: "Ich bin jetzt bei dir. Frag mich alles zur Lektion, sag «Ein Beispiel», oder sag «Frag mich», dann stelle ich dir eine Frage.",
 };
 
 export function LiveTutor({
@@ -83,7 +84,8 @@ export function LiveTutor({
     setHeard("");
     setPhase("listening");
     let gotSpeech = false;
-    stopRef.current = listenOnce(RECOGNITION_LANG[lang], {
+    // Taught in German: the student speaks German.
+    stopRef.current = listenOnce(style === "deutsch" ? "de-DE" : RECOGNITION_LANG[lang], {
       onInterim: text => setHeard(text),
       onFinal: text => {
         gotSpeech = true;

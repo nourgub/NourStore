@@ -285,14 +285,14 @@ export function templateOpening(context: StudentContext): string {
 export type TutorIntent = "quiz" | "giveUp" | "dialogue" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
-  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me/],
-  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up/],
-  ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me/],
-  ["thanks", /شكر|merci|thank|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
-  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong/],
-  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier/],
-  ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder/],
-  ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example/],
+  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me|frag mich|teste mich|prüf mich|prüfe mich|noch eine frage|neue frage/],
+  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up|ich wei(?:ß|ss) (?:es )?nicht|keine ahnung|gib mir die (?:lösung|antwort)/],
+  ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me|im dialog|bring mir .*bei|schritt für schritt/],
+  ["thanks", /شكر|merci|thank|danke|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
+  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong|warum|wieso|fehler/],
+  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer/],
+  ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder|schwerer|herausforderung/],
+  ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example|beispiel/],
 ];
 
 export function detectIntent(message: string): TutorIntent {
@@ -300,15 +300,20 @@ export function detectIntent(message: string): TutorIntent {
   return INTENT_WORDS.find(([, pattern]) => pattern.test(text))?.[0] ?? "explain";
 }
 
+// Words in skill names that say nothing about which skill is meant.
+const GENERIC_WORDS = new Set(["der", "die", "das", "und", "oder", "mit", "von", "im", "in", "auf", "bilden"]);
+
 export function mentionedSkill(lesson: Lesson, message: string) {
   const text = translateFrenchTerms(message).toLowerCase();
   let mentioned: Lesson["skills"][number] | undefined;
   let best = 0;
   for (const candidate of lesson.skills) {
-    const score = candidate.name
+    // By its name, or its German name (German lessons, teacher speaking German).
+    const score = [candidate.name, candidate.de?.name ?? ""]
+      .join(" ")
       .toLowerCase()
-      .split(/[\s،]+/)
-      .filter(word => word.length > 1 && text.includes(word)).length;
+      .split(/[\s،:,]+/)
+      .filter(word => word.length > 1 && !GENERIC_WORDS.has(word) && text.includes(word)).length;
     if (score > best) {
       best = score;
       mentioned = candidate;

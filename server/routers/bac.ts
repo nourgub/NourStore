@@ -29,7 +29,7 @@ const paperAnswers = z
     })
   )
   .max(80);
-const style = z.enum(["fusha", "darja"]).optional();
+const style = z.enum(["fusha", "darja", "deutsch"]).optional();
 
 export const bacRouter = router({
   /** Onboarding step and what the student's subscription contains. */
