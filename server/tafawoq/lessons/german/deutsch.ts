@@ -399,3 +399,41 @@ export const GERMAN_PROMPTS: Record<string, string> = {
   "de-txt-12": "Welcher Konnektor passt, um eine neue Idee hinzuzufügen?",
   "de-txt-13": "Was ist die richtige Reihenfolge in einem Aufsatz?",
 };
+
+/** The misconceptions of the German lessons, in German. */
+export const GERMAN_MISCONCEPTIONS: Record<string, string> = {
+  wrong_auxiliary: "das falsche Hilfsverb (haben statt sein oder umgekehrt)",
+  participle_form: "eine falsche Form des Partizips II",
+  irregular_as_regular: "ein unregelmäßiges Verb wie ein regelmäßiges konjugiert",
+  tense_confusion: "die Zeiten verwechselt",
+  conjugation_error: "die Verbform passt nicht zum Subjekt",
+  verb_position: "das Verb an der falschen Position",
+  connector_meaning: "die Bedeutung des Konnektors verwechselt",
+  relative_pronoun: "das falsche Relativpronomen (Genus oder Kasus)",
+  case_confusion: "Akkusativ und Dativ verwechselt",
+  nominative_default: "den Artikel im Nominativ gelassen",
+  gender_error: "das falsche Genus oder die falsche Zahl",
+  preposition_case: "die Präposition mit dem falschen Kasus",
+  passive_aux: "sein oder haben statt werden im Passiv",
+  modal_meaning: "die Bedeutung der Modalverben verwechselt",
+  modal_structure: "das Hauptverb nach dem Modalverb konjugiert",
+  konjunktiv_form: "eine falsche Form des Konjunktivs II",
+  comprehension_error: "eine Information im Text falsch verstanden",
+  vocab_confusion: "ähnliche Wörter verwechselt",
+  letter_convention: "eine falsche Anrede oder ein falscher Gruß im Brief",
+  structure_error: "ein Fehler im Aufbau oder beim Konnektor",
+};
+
+/** How to fix them, in German. */
+export const GERMAN_REMEDIES: Record<string, string> = {
+  wrong_auxiliary: "Frag dich: Bewegt sich die Person von einem Ort zum anderen oder ändert sich ihr Zustand? Ja: sein (ist gegangen, ist aufgestanden). Nein: haben.",
+  participle_form: "Regelmäßig ge…t, unregelmäßig ge…en, -ieren und be-/ver-/er- ohne ge, trennbare Verben: das Präfix vor ge.",
+  verb_position: "Hauptsatz: das Verb auf Position 2 (nach deshalb oder trotzdem kommt das Subjekt danach). Nebensatz mit weil, dass, wenn, obwohl: das Verb am Ende.",
+  connector_meaning: "weil und denn: Grund. deshalb: Folge. obwohl und trotzdem: Gegensatz.",
+  case_confusion: "Direktes Objekt (was? wen?): Akkusativ, den und einen. Indirektes Objekt (wem?) und helfen, danken, gefallen: Dativ, dem, der, einem.",
+  preposition_case: "mit, nach, bei, von, zu, aus, seit: Dativ. für, durch, gegen, ohne, um: Akkusativ. in, an, auf: wo? Dativ, wohin? Akkusativ.",
+  passive_aux: "Passiv = werden: wird gebaut (Präsens), wurde gebaut (Präteritum).",
+  modal_structure: "Das Modalverb ist konjugiert, das Hauptverb bleibt im Infinitiv am Ende: «Ich kann … sprechen».",
+  comprehension_error: "Geh zurück in den Text: Such das Schlüsselwort der Frage und lies den ganzen Satz, bevor du antwortest.",
+  letter_convention: "Freund: Lieber (maskulin) oder Liebe (feminin) … Viele Grüße. Formell: Sehr geehrter Herr oder Sehr geehrte Frau … Mit freundlichen Grüßen.",
+};

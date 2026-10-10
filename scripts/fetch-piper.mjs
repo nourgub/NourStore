@@ -1,7 +1,8 @@
 // Downloads Piper (free, open-source, MIT — github.com/rhasspy/piper) and
 // its Arabic voice "Kareem" (ar_JO, medium) for the Tafawoq teacher's
-// natural voice, then the German voice "Thorsten" (de_DE, medium) that reads
-// the German lessons' own words. Idempotent: does nothing when all are there.
+// natural voice, then the voices that read the language lessons' own words:
+// "Thorsten" (German), "davefx" (Spanish), "Paola" (Italian) — all CC0,
+// recorded by consenting speakers. Idempotent: does nothing when all are there.
 // Prints the directory on success; exits non-zero (and the app falls back
 // to the browser's voice) on failure.
 //
@@ -14,7 +15,8 @@ import { Readable } from "stream";
 
 const PIPER_URL = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz";
 const VOICE_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ar/ar_JO/kareem/medium/ar_JO-kareem-medium";
-const GERMAN_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/medium/de_DE-thorsten-medium";
+const LANGUAGE_VOICES = ["de/de_DE/thorsten/medium/de_DE-thorsten-medium", "es/es_ES/davefx/medium/es_ES-davefx-medium", "it/it_IT/paola/medium/it_IT-paola-medium"];
+const VOICES_ROOT = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0";
 
 const target = path.resolve(process.argv[2] ?? path.join(process.cwd(), ".replit-data", "piper"));
 mkdirSync(target, { recursive: true });
@@ -38,12 +40,15 @@ try {
   }
   await download(`${VOICE_BASE}.onnx`, path.join(target, "ar_JO-kareem-medium.onnx"));
   await download(`${VOICE_BASE}.onnx.json`, path.join(target, "ar_JO-kareem-medium.onnx.json"));
-  // The German voice is a bonus: without it German words fall back to the device's voice.
-  try {
-    await download(`${GERMAN_BASE}.onnx.json`, path.join(target, "de_DE-thorsten-medium.onnx.json"));
-    await download(`${GERMAN_BASE}.onnx`, path.join(target, "de_DE-thorsten-medium.onnx"));
-  } catch (error) {
-    console.error("[fetch-piper] German voice not installed:", error instanceof Error ? error.message : error);
+  // The language voices are a bonus: without one, that language's words fall back to the device's voice.
+  for (const voice of LANGUAGE_VOICES) {
+    const name = path.basename(voice);
+    try {
+      await download(`${VOICES_ROOT}/${voice}.onnx.json`, path.join(target, `${name}.onnx.json`));
+      await download(`${VOICES_ROOT}/${voice}.onnx`, path.join(target, `${name}.onnx`));
+    } catch (error) {
+      console.error(`[fetch-piper] ${name} not installed:`, error instanceof Error ? error.message : error);
+    }
   }
   console.log(target);
 } catch (error) {

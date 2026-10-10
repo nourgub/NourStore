@@ -72,6 +72,17 @@ describe("spokenParts (language lessons)", () => {
     expect(spokenParts("❓ (2/4) ما Partizip II للفعل kaufen؟", "de")[0]).toEqual({ text: "السؤال 2:", lang: "ar" });
   });
 
+  it("reads Spanish and Italian with their own markers and letters", () => {
+    expect(spokenParts("Casi.\n💡 Piensa en haber.\n\n❓ (2/4) ¿Cuál es el participio de «hacer»?", "es")).toEqual([
+      { text: "Casi. Pista: Piensa en haber. Pregunta 2: ¿Cuál es el participio de hacer?", lang: "es" },
+    ]);
+    expect(spokenParts("❓ (3/4) «Sono andato» o «ho andato»? Perché?", "it")).toEqual([
+      { text: "Domanda 3: Sono andato o ho andato? Perché?", lang: "it" },
+    ]);
+    expect(foreignLanguageOfLesson("es-tenses")).toBe("es");
+    expect(foreignLanguageOfSubject("italian")).toBe("it");
+  });
+
   it("is plain Arabic (maths included) outside language lessons", () => {
     expect(spokenParts("x − 3 = 5")).toEqual([{ text: "إكس ناقص 3 يساوي 5", lang: "ar" }]);
     expect(foreignLanguageOfLesson("de-tenses")).toBe("de");

@@ -44,6 +44,7 @@ import { ENV } from "../_core/env";
 import { getDb } from "../db/shared";
 import { storageGetSignedUrl, storagePut } from "../storage";
 import { tafawoqTtsUsage } from "../../drizzle/schema";
+import { FOREIGN_LANGS, type ForeignLang } from "@shared/taughtLanguages";
 
 export const MAX_TTS_CHARS = 600;
 
@@ -57,10 +58,13 @@ type Paid = "azure" | "google";
 
 /**
  * The teacher speaks Arabic; in a language lesson the taught language's
- * words go to a voice of that language (German: Piper's "Thorsten",
- * free and open, recorded by a consenting speaker; Azure/Google when set).
+ * words go to a voice of that language — free and open Piper voices, each
+ * recorded by a consenting speaker and released CC0: "Thorsten" (German),
+ * "davefx" (Spanish), "Paola" (Italian, a woman's voice; Piper has no good
+ * male Italian voice, so she also answers for the male teacher). Azure /
+ * Google voices of the language when those keys are set.
  */
-export type SpeechLang = "ar" | "de";
+export type SpeechLang = "ar" | ForeignLang;
 
 const PIPER_MODELS: Record<SpeechLang, Record<VoiceGender, string | undefined>> = {
   ar: {
@@ -71,6 +75,14 @@ const PIPER_MODELS: Record<SpeechLang, Record<VoiceGender, string | undefined>> 
     male: process.env.PIPER_MODEL_DE ?? path.join(PIPER_DIR, "de_DE-thorsten-medium.onnx"),
     female: process.env.PIPER_MODEL_DE_FEMALE,
   },
+  es: {
+    male: process.env.PIPER_MODEL_ES ?? path.join(PIPER_DIR, "es_ES-davefx-medium.onnx"),
+    female: process.env.PIPER_MODEL_ES_FEMALE,
+  },
+  it: {
+    male: process.env.PIPER_MODEL_IT,
+    female: process.env.PIPER_MODEL_IT_FEMALE ?? path.join(PIPER_DIR, "it_IT-paola-medium.onnx"),
+  },
 };
 const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
@@ -78,6 +90,8 @@ const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
     female: process.env.TAFAWOQ_TTS_VOICE_FEMALE ?? "ar-XA-Wavenet-A",
   },
   de: { male: "de-DE-Wavenet-B", female: "de-DE-Wavenet-A" },
+  es: { male: "es-ES-Wavenet-B", female: "es-ES-Wavenet-C" },
+  it: { male: "it-IT-Wavenet-C", female: "it-IT-Wavenet-A" },
 };
 const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
@@ -85,6 +99,8 @@ const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
     female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
   },
   de: { male: "de-DE-ConradNeural", female: "de-DE-KatjaNeural" },
+  es: { male: "es-ES-AlvaroNeural", female: "es-ES-ElviraNeural" },
+  it: { male: "it-IT-DiegoNeural", female: "it-IT-ElsaNeural" },
 };
 /**
  * A prepared voice ("voice pack"): every sentence the teacher says, recorded
@@ -119,7 +135,7 @@ export function ttsProviders() {
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
     piper: piperReady("male") || piperReady("female"),
     piperFemale: piperReady("female"),
-    piperGerman: piperReady("male", "de") || piperReady("female", "de"),
+    piperForeign: FOREIGN_LANGS.filter(lang => piperReady("male", lang) || piperReady("female", lang)),
   };
 }
 

@@ -50,7 +50,8 @@ import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
-import { darjaSuggestions, germanSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
+import { FOREIGN_REQUESTS, darjaSuggestions, foreignSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
+import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
 import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
@@ -231,7 +232,7 @@ function HomeCallCard({
               className={`tfq-btn small ${style === option ? "" : "ghost"}`}
               onClick={() => setStyle(option)}
             >
-              {styleLabel(t, option)}
+              {styleLabel(t, option, lesson?.key)}
             </button>
           ))}
         </div>
@@ -250,9 +251,11 @@ function HomeCallCard({
   );
 }
 
-/** The style's name on its switch ("Deutsch" is the same in every interface language). */
-function styleLabel(t: ReturnType<typeof useT>, style: TeacherStyle) {
-  return style === "deutsch" ? "Deutsch" : style === "darja" ? t.styleDarja : t.styleFusha;
+/** The style's name on its switch (a taught language by its own name: "Deutsch", "Español", "Italiano"). */
+function styleLabel(t: ReturnType<typeof useT>, style: TeacherStyle, lessonKey: string | null | undefined) {
+  const taught = foreignLanguageOfLesson(lessonKey);
+  if (style === "foreign" && taught) return TAUGHT_LANGUAGES[taught].label;
+  return style === "darja" ? t.styleDarja : t.styleFusha;
 }
 
 function hasOfflineRevision() {
@@ -688,6 +691,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
   const [chosenStyle, setStyle] = useTeacherStyle();
   // "Deutsch" only in the German lessons; elsewhere the teacher speaks Arabic.
   const style = styleIn(chosenStyle, lessonKey);
+  const taught = style === "foreign" ? foreignLanguageOfLesson(lessonKey) : null;
   const utils = trpc.useUtils();
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -729,12 +733,12 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
 
   const suggestions = useMemo(
     () =>
-      style === "deutsch"
-        ? germanSuggestions()
+      taught
+        ? foreignSuggestions(taught)
         : style === "darja"
           ? darjaSuggestions(data.analysis.focusSkills[0]?.name)
           : t.suggestions(data.analysis.focusSkills[0]?.name),
-    [t, data.analysis.focusSkills, style]
+    [t, data.analysis.focusSkills, style, taught]
   );
 
   const submit = (message: string) => {
@@ -761,7 +765,7 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
             className={`tfq-btn small ${style === option ? "" : "ghost"}`}
             onClick={() => setStyle(option)}
           >
-            {styleLabel(t, option)}
+            {styleLabel(t, option, lessonKey)}
           </button>
         ))}
       </div>
@@ -800,9 +804,17 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
         voiceMode={voiceMode}
         setVoiceMode={setVoiceMode}
         busy={send.isPending}
-        onQuiz={() => submit(style === "deutsch" ? "Frag mich" : style === "darja" ? "سقسيني" : "اختبرني")}
+        onQuiz={() => submit(taught ? FOREIGN_REQUESTS[taught].quiz : style === "darja" ? "سقسيني" : "اختبرني")}
         onUnderstood={understood =>
-          submit(style === "deutsch" ? (understood ? "Verstanden, danke" : "Ich habe es nicht verstanden") : understood ? "فهمت، شكراً" : "لم أفهم")
+          submit(
+            taught
+              ? understood
+                ? FOREIGN_REQUESTS[taught].understood
+                : FOREIGN_REQUESTS[taught].notUnderstood
+              : understood
+                ? "فهمت، شكراً"
+                : "لم أفهم"
+          )
         }
       />
       <div className="tfq-row" style={{ marginTop: 12 }}>

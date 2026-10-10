@@ -22,7 +22,7 @@ const answersInput = z
   .max(50);
 
 /** How the teacher speaks: Fusha (default) or Algerian Darja. */
-const style = z.enum(["fusha", "darja", "deutsch"]).optional();
+const style = z.enum(["fusha", "darja", "foreign"]).optional();
 
 export const tafawoqRouter = router({
   catalog: publicProcedure.query(() => tafawoq.catalog()),

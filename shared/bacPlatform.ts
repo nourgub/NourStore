@@ -77,6 +77,8 @@ export const CURRICULUM_SUBJECT_TO_BAC: Record<string, BacSubject> = {
   physics: "physics",
   philosophy: "philosophy",
   german: "german",
+  spanish: "spanish",
+  italian: "italian",
 };
 
 // ---------------------------------------------------------------------------

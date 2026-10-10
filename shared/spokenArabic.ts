@@ -12,6 +12,8 @@
 // are maths (numbers, "إكس", "تربيع"…): the part that changes from one
 // exercise to the next.
 
+import { TAUGHT_LANGUAGES, type ForeignLang } from "./taughtLanguages";
+
 const SUPERSCRIPT_DIGITS: Record<string, string> = {
   "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
   "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "ⁿ": "n", "⁺": "+",
@@ -139,22 +141,14 @@ export function spokenChunks(text: string, max = 180): string[] {
 // ---------------------------------------------------------------------------
 
 /** A taught language read by its own voice (the rest stays Arabic). */
-export type ForeignLang = "de";
 export type SpokenPart = { text: string; lang: "ar" | ForeignLang };
+export { foreignLanguageOfLesson, foreignLanguageOfSubject, type ForeignLang } from "./taughtLanguages";
 
-/** The language a subject teaches, if it is one. */
-export function foreignLanguageOfSubject(subject: string | null | undefined): ForeignLang | null {
-  return subject === "german" ? "de" : null;
-}
-
-/** The language a lesson teaches (German lessons are "de-…"). */
-export function foreignLanguageOfLesson(lessonKey: string | null | undefined): ForeignLang | null {
-  return lessonKey?.startsWith("de-") ? "de" : null;
-}
-
-const LATIN = "A-Za-zÄÖÜäöüß";
+// German, Spanish and Italian letters.
+const LATIN = "A-Za-zÄÖÜäöüßÁÉÍÓÚÑáéíóúñÀÈÌÒÙàèìòùç";
 /** A run of the taught language: Latin words with the spaces and punctuation between them. */
-const FOREIGN_RUN = new RegExp(`[${LATIN}](?:[${LATIN}0-9'’\\-.,!?;:()…%«» ]*[${LATIN}0-9.!?%»])?`, "g");
+const FOREIGN_RUN = new RegExp(`[¿¡${LATIN}](?:[${LATIN}0-9'’\\-.,!?¿¡;:()…%«» ]*[${LATIN}0-9.!?%»])?`, "g");
+const STARTS_FOREIGN = new RegExp(`^\\s*[«¿¡]?[${LATIN}]`);
 
 function foreignChunks(run: string, max: number): string[] {
   const pieces: string[] = [];
@@ -179,10 +173,13 @@ export function spokenParts(text: string, foreign: ForeignLang | null = null, ma
   if (!foreign) return arabic(text);
   const parts: SpokenPart[] = [];
   // Grammar notation read as words, not maths: "werden + Partizip II", "gehen → ging".
+  const { question, hint } = TAUGHT_LANGUAGES[foreign];
   const words = text
     // A dialogue held in the taught language: its markers in that language too.
-    .replace(/❓\s*\((\d+)\/\d+\)\s*(?=«?[A-Za-zÄÖÜäöüß])/g, "Frage $1: ")
-    .replace(/💡\s*(?=«?[A-Za-zÄÖÜäöüß])/g, "Tipp: ")
+    .replace(/❓\s*\((\d+)\/\d+\)\s*/g, (marker, step: string, at: number, all: string) =>
+      STARTS_FOREIGN.test(all.slice(at + marker.length)) ? `${question} ${step}: ` : marker
+    )
+    .replace(/💡\s*/g, (marker, at: number, all: string) => (STARTS_FOREIGN.test(all.slice(at + marker.length)) ? `${hint}: ` : marker))
     .replace(/_{2,}/g, " … ")
     .replace(/\s*[→⟶]\s*/g, ", ")
     .replace(/\s=\s/g, " يعني ")

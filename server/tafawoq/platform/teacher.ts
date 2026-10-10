@@ -12,7 +12,8 @@ import type { TeacherAction, TeacherMessage } from "@shared/bacPlatform";
 import type { Lesson, Skill } from "../curriculum";
 import type { StudentContext } from "../context";
 import { inStyle, type TeacherStyle } from "../darja";
-import { speaksGerman } from "../deutsch";
+import type { ForeignLang } from "@shared/taughtLanguages";
+import { taughtLanguage, teacherWords } from "../foreign";
 import { generatedExamples } from "../templates";
 
 function sentences(text: string): string[] {
@@ -51,7 +52,8 @@ export function teacherMessage(input: {
   exercisePrompt?: string;
 }): TeacherMessage {
   const { action, lesson, context, skill, seed } = input;
-  if (speaksGerman(input.style, lesson) && skill.de) return germanTeacherMessage(input);
+  const taught = taughtLanguage(input.style, lesson);
+  if (taught && skill.taught) return foreignTeacherMessage(taught, input);
   const say = (text: string) => inStyle(text, input.style);
   const understood = say("هل فهمت هذه الخطوة؟");
   switch (action) {
@@ -117,62 +119,60 @@ export function teacherMessage(input: {
   }
 }
 
-/** The same requests answered in German (German lessons, teacher speaking German). */
-function germanTeacherMessage(input: Parameters<typeof teacherMessage>[0]): TeacherMessage {
+/** The same requests answered in the taught language (language lessons, teacher speaking it). */
+function foreignTeacherMessage(lang: ForeignLang, input: Parameters<typeof teacherMessage>[0]): TeacherMessage {
   const { action, lesson, context, skill } = input;
-  const de = skill.de!;
-  const rule = (entry: Skill) => entry.de?.dialogue.rule ?? ruleOf(entry);
-  const understood = "Hast du diesen Schritt verstanden?";
+  const w = teacherWords(lang).msg;
+  const taught = skill.taught!;
+  const rule = (entry: Skill) => entry.taught?.dialogue.rule ?? ruleOf(entry);
   switch (action) {
     case "simpler":
       return {
-        title: `${de.name}: einfacher`,
-        explanation: `Nur eine Idee: ${sentences(de.explanation)[0] ?? de.explanation}`,
+        title: w.simplerTitle(taught.name),
+        explanation: w.oneIdea(sentences(taught.explanation)[0] ?? taught.explanation),
         formula: [rule(skill)],
-        example: de.example,
-        question: `${de.dialogue.steps[0].ask}\n${understood}`,
+        example: taught.example,
+        question: `${taught.dialogue.steps[0].ask}\n${w.understood}`,
       };
     case "example":
       return {
-        title: `Gelöstes Beispiel: ${de.name}`,
-        explanation: "Wir wenden die Regel auf ein Beispiel an, Schritt für Schritt. Achte darauf, wie wir die Regel in jedem Schritt benutzen.",
+        title: w.exampleTitle(taught.name),
+        explanation: w.exampleExplanation,
         formula: [rule(skill)],
-        example: de.example,
-        question: "Was war unser erster Schritt in diesem Beispiel, und warum?",
+        example: taught.example,
+        question: w.exampleQuestion,
       };
     case "stepHelp":
       return {
-        title: `Schritt für Schritt: ${de.name}`,
-        explanation: "Kein Problem. Wir gehen die Lösung Schritt für Schritt durch und machen erst weiter, wenn alles klar ist.",
-        formula: de.example.steps.map((step, index) => `${index + 1}) ${step}`),
-        example: { problem: de.example.problem, steps: [], answer: de.example.answer },
-        question: "Welchen Schritt hast du nicht verstanden? Schreib seine Nummer, und ich erkläre ihn dir.",
+        title: w.stepTitle(taught.name),
+        explanation: w.stepExplanation,
+        formula: taught.example.steps.map((step, index) => `${index + 1}) ${step}`),
+        example: { problem: taught.example.problem, steps: [], answer: taught.example.answer },
+        question: w.stepQuestion,
       };
     case "similar":
       return {
-        title: `Ähnliche Übung: ${de.name}`,
-        explanation: "Versuch es zuerst selbst. Ich gebe dir die Lösung nicht sofort: Schick mir deine Antwort, und ich korrigiere sie.",
+        title: w.similarTitle(taught.name),
+        explanation: w.similarExplanation,
         formula: [rule(skill)],
         // The exercise itself is shown below the message.
-        question: "Löse die Übung unten und schick mir deine Antwort.",
+        question: w.similarQuestion,
       };
     case "summary": {
+      const pick = (entries: StudentContext["skills"]) =>
+        entries
+          .map(entry => lesson.skills.find(candidate => candidate.key === entry.key))
+          .filter((entry): entry is Skill => !!entry);
       const focus = context.focusSkills.slice(0, 3);
-      const skills = (focus.length ? focus : context.skills.slice(0, 3))
-        .map(entry => lesson.skills.find(candidate => candidate.key === entry.key))
-        .filter((entry): entry is Skill => !!entry);
+      const skills = pick(focus.length ? focus : context.skills.slice(0, 3));
+      const strong = pick(context.strengths);
       const weakest = skills[0] ?? skill;
-      const names = (list: Skill[]) => list.map(entry => entry.de?.name ?? entry.name).join(", ");
-      const strong = context.strengths
-        .map(entry => lesson.skills.find(candidate => candidate.key === entry.key))
-        .filter((entry): entry is Skill => !!entry);
+      const names = (list: Skill[]) => list.map(entry => entry.taught?.name ?? entry.name).join(", ");
       return {
-        title: `Zusammenfassung: ${lesson.titleDe ?? lesson.title}`,
-        explanation: strong.length
-          ? `Das kannst du schon: ${names(strong)}. Jetzt konzentrieren wir uns auf: ${names(skills)}.`
-          : `Jetzt konzentrieren wir uns auf: ${names(skills)}.`,
+        title: w.summaryTitle(lesson.titleTaught ?? lesson.title),
+        explanation: strong.length ? `${w.canAlready(names(strong))} ${w.focusNow(names(skills))}` : w.focusNow(names(skills)),
         formula: skills.map(rule),
-        question: `Eine kurze Frage zur Kontrolle: ${weakest.de?.dialogue.steps[0].ask ?? weakest.dialogue?.steps[0]?.ask ?? weakest.name}`,
+        question: w.check(weakest.taught?.dialogue.steps[0].ask ?? weakest.dialogue?.steps[0]?.ask ?? weakest.name),
       };
     }
   }

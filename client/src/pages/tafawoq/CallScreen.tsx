@@ -12,15 +12,17 @@ import { Mic, MicOff, Phone, PhoneOff, RotateCcw, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { M } from "./components";
 import { useT } from "./i18n";
-import type { TeacherStyle } from "./teacherStyle";
+import { FOREIGN_REQUESTS, type TeacherStyle } from "./teacherStyle";
+import { TAUGHT_LANGUAGES, foreignLanguageOfLesson, type ForeignLang } from "@shared/taughtLanguages";
 import { RECOGNITION_LANG, canListen, listenOnce, speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 
 type Phase = "ringing" | "connecting" | "speaking" | "listening" | "thinking" | "ended";
 
 const QUESTIONS_PER_CALL = 3;
-const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again|wiederhol|noch ?einmal|nochmal/i;
-// Graded-answer openings, in Fusha, in Darja (server/tafawoq/darja.ts) and in German (server/tafawoq/deutsch.ts).
-const GRADED = /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح|Nicht ganz\.|Kein Problem\. Die richtige Antwort)/;
+const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again|wiederhol|noch ?einmal|nochmal|repite|otra vez|ripeti|di nuovo/i;
+// Graded-answer openings, in Fusha, in Darja (server/tafawoq/darja.ts) and in the taught languages (server/tafawoq/foreign.ts).
+const GRADED =
+  /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح|Nicht ganz\.|Kein Problem\. Die richtige Antwort|Casi\.|No pasa nada\. La respuesta correcta|Non proprio\.|Nessun problema\. La risposta giusta)/;
 const SAY = {
   fusha: {
     hello: (name: string, teacher: string) => `ألو؟ السلام عليكم يا ${name}! معك ${teacher}. هل تسمعني جيداً؟`,
@@ -46,12 +48,16 @@ const SAY = {
     askAgain: "ودوك، نعاودلك السؤال.",
     checkUnderstood: "ودوك نشوفو إذا فهمت.",
   },
-  // German lessons, the teacher speaking German.
-  deutsch: {
-    hello: (name: string, _teacher: string) => `Hallo ${name}! Hier ist dein Deutschlehrer. Hörst du mich gut?`,
+};
+
+type CallWords = (typeof SAY)["fusha"];
+
+/** The same call phrases in each taught language (the teacher speaking it). */
+const FOREIGN_SAY: Record<ForeignLang, CallWords> = {
+  de: {
+    hello: name => `Hallo ${name}! Hier ist dein Deutschlehrer. Hörst du mich gut?`,
     howAreYou: "Wie geht es dir heute?",
-    topic: (skill: string, mistake: string | null) =>
-      `Schön. Heute arbeiten wir an «${skill}».${mistake ? ` Ein Fehler kommt bei dir manchmal vor: ${mistake}.` : ""} Bist du bereit?`,
+    topic: (skill, mistake) => `Schön. Heute arbeiten wir an «${skill}».${mistake ? ` Ein Fehler kommt bei dir manchmal vor: ${mistake}.` : ""} Bist du bereit?`,
     go: "Los geht's!",
     helloAgain: "Hallo? Hörst du mich?",
     clear: "Ist das klar?",
@@ -59,12 +65,34 @@ const SAY = {
     askAgain: "Und jetzt stelle ich die Frage noch einmal.",
     checkUnderstood: "Jetzt prüfen wir, ob du es verstanden hast.",
   },
+  es: {
+    hello: name => `¡Hola, ${name}! Soy tu profesor de español. ¿Me oyes bien?`,
+    howAreYou: "¿Qué tal estás hoy?",
+    topic: (skill, mistake) => `Muy bien. Hoy trabajamos «${skill}».${mistake ? ` A veces cometes este error: ${mistake}.` : ""} ¿Estás listo?`,
+    go: "¡Vamos!",
+    helloAgain: "¿Hola? ¿Me oyes?",
+    clear: "¿Está claro?",
+    next: "Bien, la siguiente pregunta.",
+    askAgain: "Y ahora te repito la pregunta.",
+    checkUnderstood: "Ahora comprobamos si lo has entendido.",
+  },
+  it: {
+    hello: name => `Ciao ${name}! Sono il tuo professore d'italiano. Mi senti bene?`,
+    howAreYou: "Come stai oggi?",
+    topic: (skill, mistake) => `Bene. Oggi lavoriamo su «${skill}».${mistake ? ` A volte fai questo errore: ${mistake}.` : ""} Sei pronto?`,
+    go: "Andiamo!",
+    helloAgain: "Pronto? Mi senti?",
+    clear: "È chiaro?",
+    next: "Bene, la prossima domanda.",
+    askAgain: "E adesso ti ripeto la domanda.",
+    checkUnderstood: "Adesso controlliamo se hai capito.",
+  },
 };
 
 /** What the student's call requests are, in the teacher's language. */
 const REQUEST = {
-  dialogue: (style: TeacherStyle) => (style === "deutsch" ? "Im Dialog" : "علّمني بالحوار"),
-  quiz: (style: TeacherStyle) => (style === "deutsch" ? "Frag mich" : "اختبرني"),
+  dialogue: (taught: ForeignLang | null) => (taught ? FOREIGN_REQUESTS[taught].dialogue : "علّمني بالحوار"),
+  quiz: (taught: ForeignLang | null) => (taught ? FOREIGN_REQUESTS[taught].quiz : "اختبرني"),
 };
 
 /** Microphone errors after which listening again is pointless. */
@@ -72,7 +100,7 @@ const MIC_BLOCKED = new Set(["not-allowed", "service-not-allowed", "audio-captur
 
 /** What the teacher says aloud: the worked solution stays on screen only. */
 function spokenPart(text: string) {
-  return text.split(/\n(?:الحل|Solution|Erklärung \(auf Arabisch\)) ?:/)[0].trim();
+  return text.split(/\n(?:الحل|Solution|Erklärung \(auf Arabisch\)|Explicación \(en árabe\)|Spiegazione \(in arabo\)) ?:/)[0].trim();
 }
 
 /** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
@@ -81,7 +109,7 @@ const DIALOGUE_STEP = "❓ (";
 
 /** The tutor's "say «اختبرني»…" tails make no sense mid-call. */
 function forCall(text: string) {
-  return text.replace(/\n?(?:(?:قل|قول) «اختبرني»|Sag «Frag mich»)[^\n]*/g, "").trim();
+  return text.replace(/\n?(?:(?:قل|قول) «اختبرني»|Sag «Frag mich»|Di «Pregúntame»|Di' «Fammi una domanda»)[^\n]*/g, "").trim();
 }
 
 /** Two-tone ring, synthesised (no audio file). Returns a stop function. */
@@ -157,6 +185,9 @@ export function CallScreen({
   const send = trpc.tafawoq.sendMessage.useMutation();
   const summary = trpc.tafawoq.callSummary.useMutation();
   useSpeechLesson(lessonKey);
+  // A language lesson taught in its own language: the call is held in it.
+  const taught = style === "foreign" ? foreignLanguageOfLesson(lessonKey) : null;
+  const words = taught ? FOREIGN_SAY[taught] : SAY[style === "darja" ? "darja" : "fusha"];
 
   const [phase, setPhase] = useState<Phase>("ringing");
   const [caption, setCaption] = useState("");
@@ -237,8 +268,8 @@ export function CallScreen({
     let got = false;
     let error = "";
     let cancelled = false;
-    // Taught in German: the student answers in German.
-    const stopListening = listenOnce(style === "deutsch" ? "de-DE" : RECOGNITION_LANG[lang], {
+    // Taught in its own language: the student answers in it.
+    const stopListening = listenOnce(taught ? TAUGHT_LANGUAGES[taught].bcp47 : RECOGNITION_LANG[lang], {
       onInterim: text => setHeard(text),
       onFinal: text => {
         got = true;
@@ -259,7 +290,7 @@ export function CallScreen({
           return;
         }
         misses.current += 1;
-        if (misses.current === 1) say(SAY[style].helloAgain, listen);
+        if (misses.current === 1) say(words.helloAgain, listen);
         else {
           // Still nothing: stop and wait for the student — never talk on alone.
           setWaiting(true);
@@ -277,7 +308,7 @@ export function CallScreen({
     if (closedRef.current) return;
     stage.current = "dialogue";
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.dialogue(style), style });
+    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.dialogue(taught), style });
     if (!reply.includes(DIALOGUE_STEP)) {
       // No dialogue for this skill: straight to the questions.
       stage.current = "quiz";
@@ -299,7 +330,7 @@ export function CallScreen({
     }
     stage.current = "quiz";
     setPhase("thinking");
-    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.quiz(style), style });
+    const { reply } = await send.mutateAsync({ lessonKey, message: REQUEST.quiz(taught), style });
     lastQuestion.current = reply;
     askedRef.current += 1;
     setAsked(askedRef.current);
@@ -315,7 +346,6 @@ export function CallScreen({
       say(lastSaid.current, listen);
       return;
     }
-    const words = SAY[style];
     // The opening: short turns, whatever the student answers.
     if (stage.current === "hello") {
       stage.current = "howAreYou";
@@ -394,7 +424,7 @@ export function CallScreen({
       callStart.current = data.afterId;
       opening.current = { name: data.name, skillName: data.skillName, mistake: data.mistake };
       stage.current = "hello";
-      say(SAY[style].hello(data.name, teacherName), listen);
+      say(words.hello(data.name, teacherName), listen);
     } catch {
       setCaption(t.errors.generic);
       setPhase("ended");

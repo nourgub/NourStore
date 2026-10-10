@@ -21,6 +21,8 @@ import { derivativeProblems } from "./lessons/derivativesProblems";
 import { PHYSICS_LESSONS } from "./lessons/physics";
 import { PHILOSOPHY_LESSONS } from "./lessons/philosophy";
 import { GERMAN_LESSONS } from "./lessons/german";
+import { SPANISH_LESSONS } from "./lessons/spanish";
+import { ITALIAN_LESSONS } from "./lessons/italian";
 import { BAC_LESSONS } from "./lessons";
 
 export type Skill = {
@@ -34,8 +36,8 @@ export type Skill = {
   dialogue?: Dialogue;
   /** BAC streams whose programme includes this skill; omitted = every stream of the lesson. */
   streams?: BacStream[];
-  /** A language lesson's skill in that language (German: the teacher speaking German). */
-  de?: SkillEdition;
+  /** A language lesson's skill in the taught language itself (the teacher speaking that language). */
+  taught?: SkillEdition;
 };
 
 /** A skill as taught in the taught language itself. */
@@ -87,8 +89,8 @@ export type BankQuestion = {
   accept?: string[];
   /** Wrong option → misconception key (see Lesson.misconceptions). */
   distractors?: Record<string, string>;
-  /** The prompt in German (German lessons, teacher speaking German). */
-  promptDe?: string;
+  /** The prompt in the taught language (language lessons, teacher speaking it). */
+  promptTaught?: string;
   /** "exact": only the listed forms pass (no equivalence), e.g. "simplify". */
   grading?: "expression" | "exact" | "numeric";
   explanation: string;
@@ -104,8 +106,10 @@ export type Lesson = {
   curriculum: CurriculumKey;
   subject: SubjectKey;
   title: string;
-  /** The title in German (German lessons). */
-  titleDe?: string;
+  /** Language lessons: the title, misconceptions and remedies in the taught language. */
+  titleTaught?: string;
+  misconceptionsTaught?: Record<string, string>;
+  remediesTaught?: Record<string, string>;
   levels: SchoolLevel[];
   /** BAC streams whose programme includes this lesson; omitted = every stream. */
   streams?: BacStream[];
@@ -132,13 +136,15 @@ export const CURRICULA: Record<CurriculumKey, { country: string; language: "ar" 
   dz: { country: "DZ", language: "ar", name: "المنهاج الجزائري" },
 };
 
-export type SubjectKey = "math" | "physics" | "philosophy" | "german";
+export type SubjectKey = "math" | "physics" | "philosophy" | "german" | "spanish" | "italian";
 
 export const SUBJECTS: Record<SubjectKey, { name: string }> = {
   math: { name: "الرياضيات" },
   physics: { name: "العلوم الفيزيائية" },
   philosophy: { name: "الفلسفة" },
   german: { name: "اللغة الألمانية" },
+  spanish: { name: "اللغة الإسبانية" },
+  italian: { name: "اللغة الإيطالية" },
 };
 
 const derivatives: Lesson = {
@@ -1898,6 +1904,8 @@ export const LESSONS: Lesson[] = [
   ...PHYSICS_LESSONS,
   ...PHILOSOPHY_LESSONS,
   ...GERMAN_LESSONS,
+  ...SPANISH_LESSONS,
+  ...ITALIAN_LESSONS,
 ];
 
 /**

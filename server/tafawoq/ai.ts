@@ -22,6 +22,7 @@ import {
 import type { BankQuestion } from "./curriculum";
 import { ENV } from "../_core/env";
 import type { StudentContext } from "./context";
+import type { ForeignLang } from "@shared/taughtLanguages";
 
 let client: Anthropic | null = null;
 
@@ -236,12 +237,14 @@ export async function gradeShortAnswer(input: {
 
 export type TutorTurn = { role: "tutor" | "student"; content: string };
 
+const LANGUAGE_NAMES: Record<ForeignLang, string> = { de: "اللغة الألمانية", es: "اللغة الإسبانية", it: "اللغة الإيطالية" };
+
 export async function tutorReply(
   context: StudentContext,
   history: TutorTurn[],
   message: string | null,
-  /** "de": a German lesson taught in German (the teacher speaking German). */
-  language?: "de"
+  /** A language lesson taught in its own language (the teacher speaking it). */
+  language?: ForeignLang
 ): Promise<string> {
   const messages: Anthropic.Beta.BetaMessageParam[] = [];
   // The profile is the first user turn so the (stable) system prompt stays
@@ -255,8 +258,8 @@ export async function tutorReply(
         ? "ابدأ الحصة الآن: رحّب به باسمه، قل له بصدق ما لاحظته من تحليل مستواه (ما يتقنه وما يصعب عليه)، واشرح كيف سنتقدم معاً، ثم اطرح عليه سؤالاً أولاً بسيطاً."
         : "تابع الحوار."
     }${
-      language === "de"
-        ? "\n\nهذه حصة لغة ألمانية والتلميذ اختار أن يكلمه الأستاذ بالألمانية: اكتب ردودك بالألمانية البسيطة (مستوى A2 إلى B1) وبجمل قصيرة، وأضف ترجمة عربية قصيرة بين قوسين للكلمة الصعبة فقط، واشرح بالعربية فقط إذا قال التلميذ إنه لم يفهم."
+      language
+        ? `\n\nهذه حصة ${LANGUAGE_NAMES[language]} والتلميذ اختار أن يكلمه الأستاذ بها: اكتب ردودك بهذه اللغة البسيطة (مستوى A2 إلى B1) وبجمل قصيرة، وأضف ترجمة عربية قصيرة بين قوسين للكلمة الصعبة فقط، واشرح بالعربية فقط إذا قال التلميذ إنه لم يفهم.`
         : ""
     }`,
   });

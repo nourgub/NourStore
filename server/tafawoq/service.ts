@@ -34,16 +34,17 @@ import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
 import { inStyle, type TeacherStyle } from "./darja";
 import {
-  GERMAN_MISCONCEPTIONS,
-  germanCallIntro,
-  germanCallSummary,
-  germanOpening,
-  germanOralFeedback,
-  germanOralQuestion,
-  germanSkillName,
-  germanTutorReply,
-  speaksGerman,
-} from "./deutsch";
+  foreignCallIntro,
+  foreignCallSummary,
+  foreignOpening,
+  foreignOralFeedback,
+  foreignOralQuestion,
+  foreignTutorReply,
+  taughtLanguage,
+  taughtMisconception,
+  taughtSkillName,
+} from "./foreign";
+import type { ForeignLang } from "@shared/taughtLanguages";
 import { solveExercise, type Solution } from "./solver";
 import { storagePut } from "../storage";
 import { randomUUID } from "crypto";
@@ -832,17 +833,20 @@ async function tutorText(
   lesson: Lesson,
   history: ai.TutorTurn[],
   message: string | null,
-  german = false
+  taught: ForeignLang | null = null
 ): Promise<{ text: string; source: ContentSource }> {
   if (ai.isAiConfigured()) {
     try {
-      return { text: await ai.tutorReply(context, history, message, german ? "de" : undefined), source: "ai" };
+      return { text: await ai.tutorReply(context, history, message, taught ?? undefined), source: "ai" };
     } catch (error) {
       logAiFailure("tutor reply", error);
     }
   }
-  if (german) {
-    return { text: message === null ? germanOpening(lesson, context) : germanTutorReply(lesson, context, message), source: "template" };
+  if (taught) {
+    return {
+      text: message === null ? foreignOpening(taught, lesson, context) : foreignTutorReply(taught, lesson, context, message),
+      source: "template",
+    };
   }
   return {
     text: message === null ? templateOpening(context) : templateTutorReply(lesson, context, message),
@@ -857,7 +861,7 @@ export async function startTutor(userId: number, lessonKey: string, style?: Teac
   const existing = await store.listMessages(student.id, lesson.key);
   if (existing.length) return { started: false };
   const context = await loadContext(student, lesson);
-  const opening = await tutorText(context, lesson, [], null, speaksGerman(style, lesson));
+  const opening = await tutorText(context, lesson, [], null, taughtLanguage(style, lesson));
   const text = opening.source === "ai" ? opening.text : inStyle(opening.text, style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: opening.source });
   return { started: true };
@@ -906,7 +910,7 @@ async function oralTurn(
   lesson: Lesson,
   context: StudentContext,
   message: string,
-  german = false
+  taught: ForeignLang | null = null
 ): Promise<string | null> {
   const intent = detectIntent(message);
   const open = await store.getOpenAssessment(student.id, lesson.key, "oral");
@@ -921,7 +925,7 @@ async function oralTurn(
       itemsJson: JSON.stringify([item]),
       source: item.id.startsWith("g-") ? "template" : "bank",
     });
-    return german ? germanOralQuestion(item) : oralQuestionText(item);
+    return taught ? foreignOralQuestion(taught, item) : oralQuestionText(item);
   }
   // Any other request ("مثال", "لماذا"…) is answered normally; the pending
   // question stays open for a while.
@@ -953,8 +957,8 @@ async function oralTurn(
       ? ` (${skillName(lesson, item.skill)}: ${Math.round(change.before * 100)}% ← ${Math.round(change.after * 100)}%)`
       : "";
   const misconceptionKey = Object.entries(lesson.misconceptions).find(([, label]) => label === graded.misconception)?.[0];
-  if (german) {
-    return germanOralFeedback({
+  if (taught) {
+    return foreignOralFeedback(taught, lesson, {
       name: student.displayName,
       correct: graded.correct,
       gaveUp: intent === "giveUp",
@@ -989,13 +993,13 @@ function dialogueTurn(
   name: string,
   lastTutor: string | undefined,
   message: string,
-  german = false
+  taught: ForeignLang | null = null
 ): string | null {
   const intent = detectIntent(message);
   if (intent === "dialogue") {
     const mentioned = mentionedSkill(lesson, message);
     const skill = mentioned?.dialogue ? mentioned : dialogueSkills(lesson, context)[0];
-    return skill ? startDialogue(skill, german ? "de" : "ar") : null;
+    return skill ? startDialogue(skill, taught ?? "ar") : null;
   }
   const state = dialogueState(lesson, lastTutor);
   return state ? dialogueReply(state, message, intent, name, randomSeed()) : null;
@@ -1010,8 +1014,8 @@ export async function callIntro(userId: number, lessonKey: string, style?: Teach
   const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
   const context = await loadContext(student, lesson);
-  const german = speaksGerman(style, lesson);
-  const text = german ? germanCallIntro(lesson, context) : inStyle(callIntroText(lesson, context), style);
+  const taught = taughtLanguage(style, lesson);
+  const text = taught ? foreignCallIntro(taught, lesson, context) : inStyle(callIntroText(lesson, context), style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
   // Questions asked during the call are the assessments created after this
   // id (ids, not timestamps: those only have one-second precision).
@@ -1022,10 +1026,10 @@ export async function callIntro(userId: number, lessonKey: string, style?: Teach
     text,
     afterId: await store.lastAssessmentId(student.id),
     name: student.displayName,
-    skillName: german ? germanSkillName(lesson, focus?.key, focus?.name ?? null) ?? lesson.titleDe ?? lesson.title : focus?.name ?? lesson.title,
+    skillName: taught ? taughtSkillName(lesson, focus?.key, focus?.name ?? null) ?? lesson.titleTaught ?? lesson.title : focus?.name ?? lesson.title,
     mistake: context.recurringErrors[0]
-      ? german
-        ? GERMAN_MISCONCEPTIONS[context.recurringErrors[0].key] ?? context.recurringErrors[0].label
+      ? taught
+        ? taughtMisconception(lesson, context.recurringErrors[0])
         : context.recurringErrors[0].label
       : null,
   };
@@ -1040,18 +1044,18 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
   const context = await loadContext(student, lesson);
   const focus = context.focusSkills[0] ?? null;
   const correct = oral.filter(entry => (entry.score ?? 0) === 100).length;
-  const german = speaksGerman(style, lesson);
+  const taught = taughtLanguage(style, lesson);
   const next = context.focusSkills[1];
   const summaryInput = {
     name: student.displayName,
     correct,
     total: oral.length,
-    skillName: german ? germanSkillName(lesson, focus?.key, focus?.name ?? null) : focus?.name ?? null,
+    skillName: taught ? taughtSkillName(lesson, focus?.key, focus?.name ?? null) : focus?.name ?? null,
     before: oral[0]?.masteryBefore ?? null,
     after: oral.at(-1)?.masteryAfter ?? null,
-    nextSkillName: german ? germanSkillName(lesson, next?.key, next?.name ?? null) : next?.name ?? null,
+    nextSkillName: taught ? taughtSkillName(lesson, next?.key, next?.name ?? null) : next?.name ?? null,
   };
-  const text = german ? germanCallSummary(summaryInput) : inStyle(callSummaryText(summaryInput), style);
+  const text = taught ? foreignCallSummary(taught, summaryInput) : inStyle(callSummaryText(summaryInput), style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: "template" });
   return {
     text,
@@ -1077,20 +1081,20 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     source: null,
   });
   const lastTutor = [...history].reverse().find(entry => entry.role === "tutor")?.content;
-  const german = speaksGerman(style, lesson);
-  const dialogueText = dialogueTurn(lesson, context, student.displayName, lastTutor, message, german);
+  const taught = taughtLanguage(style, lesson);
+  const dialogueText = dialogueTurn(lesson, context, student.displayName, lastTutor, message, taught);
   const dialogue = dialogueText === null ? null : inStyle(dialogueText, style);
   if (dialogue !== null) {
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: dialogue, source: "template" });
     return { reply: dialogue, source: "template" as ContentSource };
   }
-  const oralText = await oralTurn(userId, student, lesson, context, message, german);
+  const oralText = await oralTurn(userId, student, lesson, context, message, taught);
   const oral = oralText === null ? null : inStyle(oralText, style);
   if (oral !== null) {
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
     return { reply: oral, source: "template" as ContentSource };
   }
-  const answered = await tutorText(context, lesson, history, message, german);
+  const answered = await tutorText(context, lesson, history, message, taught);
   // A question in the middle of a dialogue is answered, then the dialogue
   // picks up where it was (unless the student moved on to a quiz).
   const paused = detectIntent(message) !== "quiz" ? dialogueState(lesson, lastTutor) : null;

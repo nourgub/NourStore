@@ -1,4 +1,4 @@
-// POST /api/tafawoq/tts { text, voice: "male" | "female", lang?: "ar" | "de" } → the teacher's natural voice (audio/mpeg),
+// POST /api/tafawoq/tts { text, voice: "male" | "female", lang?: "ar" | "de" | "es" | "it" } → the teacher's natural voice (audio/mpeg),
 // for signed-in users only (it costs server time, or paid quota), rate
 // limited. 503 when no natural voice is available: the client then uses
 // the browser's own voice.
@@ -9,6 +9,7 @@ import { hasActiveSubscription } from "./platform/access";
 import { checkRateLimit } from "../rateLimit";
 import { MAX_TTS_CHARS, speak, ttsProviders } from "./tts";
 import { startTtsWarmup } from "./ttsWarmup";
+import { isForeignLang } from "@shared/taughtLanguages";
 
 /** The student's name, so a prepared voice can leave it out (./tts.ts); cached a few minutes. */
 const names = new Map<number, { name: string | undefined; at: number }>();
@@ -50,8 +51,8 @@ export function registerTafawoqTtsRoutes(app: Express) {
     }
     const text = typeof req.body?.text === "string" ? req.body.text : "";
     const gender = req.body?.voice === "female" ? "female" : "male";
-    // A language lesson's own words (German) go to a voice of that language.
-    const lang = req.body?.lang === "de" ? "de" : "ar";
+    // A language lesson's own words go to a voice of that language.
+    const lang = isForeignLang(req.body?.lang) ? req.body.lang : "ar";
     if (!text.trim() || text.length > MAX_TTS_CHARS) {
       res.status(400).json({ error: `Text must be 1–${MAX_TTS_CHARS} characters.` });
       return;

@@ -1,18 +1,19 @@
 // How the teacher speaks — Fusha or Algerian Darja (server/tafawoq/darja.ts),
-// or German in the German lessons (server/tafawoq/deutsch.ts).
+// or, in a language lesson, that language itself (server/tafawoq/foreign.ts).
 // A per-device preference, so it lives in localStorage; the page works the
 // same (Fusha) when storage is unavailable.
 import { useState } from "react";
-import { foreignLanguageOfLesson } from "@shared/spokenArabic";
+import { foreignLanguageOfLesson, type ForeignLang } from "@shared/taughtLanguages";
 
-export type TeacherStyle = "fusha" | "darja" | "deutsch";
+export type TeacherStyle = "fusha" | "darja" | "foreign";
 
 const KEY = "tfq-teacher-style";
 
 function read(): TeacherStyle {
   try {
     const stored = localStorage.getItem(KEY);
-    return stored === "darja" || stored === "deutsch" ? stored : "fusha";
+    if (stored === "deutsch") return "foreign"; // the German-only name it had first
+    return stored === "darja" || stored === "foreign" ? stored : "fusha";
   } catch {
     return "fusha";
   }
@@ -31,19 +32,54 @@ export function useTeacherStyle(): [TeacherStyle, (style: TeacherStyle) => void]
   return [style, update];
 }
 
-/** The styles a lesson offers: German only in the German lessons. */
+/** The styles a lesson offers: its own language only in a language lesson. */
 export function stylesFor(lessonKey: string | null | undefined): TeacherStyle[] {
-  return foreignLanguageOfLesson(lessonKey) === "de" ? ["fusha", "darja", "deutsch"] : ["fusha", "darja"];
+  return foreignLanguageOfLesson(lessonKey) ? ["fusha", "darja", "foreign"] : ["fusha", "darja"];
 }
 
-/** The chosen style where it applies: "deutsch" outside a German lesson is Fusha. */
+/** The chosen style where it applies: "foreign" outside a language lesson is Fusha. */
 export function styleIn(style: TeacherStyle, lessonKey: string | null | undefined): TeacherStyle {
   return stylesFor(lessonKey).includes(style) ? style : "fusha";
 }
 
-/** Chat suggestions in German (the teacher speaking German). */
-export function germanSuggestions(focus?: string): string[] {
-  return ["Frag mich", focus ? `Bring mir ${focus} im Dialog bei` : "Im Dialog", "Ein Beispiel bitte", "Warum mache ich Fehler?"];
+/** What the student says to a teacher speaking the taught language (understood by server/tafawoq/templates.ts). */
+export const FOREIGN_REQUESTS: Record<
+  ForeignLang,
+  { quiz: string; dialogue: string; example: string; why: string; understood: string; notUnderstood: string; greeting: string }
+> = {
+  de: {
+    quiz: "Frag mich",
+    dialogue: "Im Dialog",
+    example: "Ein Beispiel bitte",
+    why: "Warum mache ich Fehler?",
+    understood: "Verstanden, danke",
+    notUnderstood: "Ich habe es nicht verstanden",
+    greeting: "Ich bin jetzt bei dir. Frag mich alles zur Lektion, sag «Ein Beispiel», oder sag «Frag mich», dann stelle ich dir eine Frage.",
+  },
+  es: {
+    quiz: "Pregúntame",
+    dialogue: "En diálogo",
+    example: "Un ejemplo, por favor",
+    why: "¿Por qué me equivoco?",
+    understood: "Entendido, gracias",
+    notUnderstood: "No lo he entendido",
+    greeting: "Estoy contigo. Pregúntame lo que quieras de la lección, di «Un ejemplo», o di «Pregúntame» y te hago una pregunta.",
+  },
+  it: {
+    quiz: "Fammi una domanda",
+    dialogue: "In dialogo",
+    example: "Un esempio, per favore",
+    why: "Perché sbaglio?",
+    understood: "Ho capito, grazie",
+    notUnderstood: "Non ho capito",
+    greeting: "Sono qui con te. Chiedimi quello che vuoi sulla lezione, di' «Un esempio», oppure «Fammi una domanda» e ti faccio una domanda.",
+  },
+};
+
+/** Chat suggestions in the taught language. */
+export function foreignSuggestions(lang: ForeignLang): string[] {
+  const requests = FOREIGN_REQUESTS[lang];
+  return [requests.quiz, requests.dialogue, requests.example, requests.why];
 }
 
 /** Chat suggestions in Darja (what an Algerian student would type). */

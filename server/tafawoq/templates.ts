@@ -285,14 +285,14 @@ export function templateOpening(context: StudentContext): string {
 export type TutorIntent = "quiz" | "giveUp" | "dialogue" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
-  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me|frag mich|teste mich|prüf mich|prüfe mich|noch eine frage|neue frage/],
-  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up|ich wei(?:ß|ss) (?:es )?nicht|keine ahnung|gib mir die (?:lösung|antwort)/],
-  ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me|im dialog|bring mir .*bei|schritt für schritt/],
-  ["thanks", /شكر|merci|thank|danke|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
-  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong|warum|wieso|fehler/],
-  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer/],
-  ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder|schwerer|herausforderung/],
-  ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example|beispiel/],
+  ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me|frag mich|teste mich|prüf mich|prüfe mich|noch eine frage|neue frage|pregúntame|preguntame|otra pregunta|hazme una pregunta|fammi una domanda|interrogami|un.altra domanda/],
+  ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up|ich wei(?:ß|ss) (?:es )?nicht|keine ahnung|gib mir die (?:lösung|antwort)|no (?:lo )?sé|no lo se|ni idea|non lo so|non so\b/],
+  ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me|im dialog|bring mir .*bei|schritt für schritt|en diálogo|en dialogo|paso a paso|enséñame|in dialogo|passo dopo passo|insegnami/],
+  ["thanks", /شكر|merci|thank|danke|gracias|grazie|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
+  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong|warum|wieso|fehler|por qué|porqué|perché|errore|error/],
+  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer|no entiendo|no (?:lo )?he entendido|no entendí|más fácil|mas facil|non ho capito|non capisco|più facile/],
+  ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder|schwerer|herausforderung|más difícil|reto|più difficile|sfida/],
+  ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example|beispiel|ejemplo|esempio/],
 ];
 
 export function detectIntent(message: string): TutorIntent {
@@ -309,7 +309,7 @@ export function mentionedSkill(lesson: Lesson, message: string) {
   let best = 0;
   for (const candidate of lesson.skills) {
     // By its name, or its German name (German lessons, teacher speaking German).
-    const score = [candidate.name, candidate.de?.name ?? ""]
+    const score = [candidate.name, candidate.taught?.name ?? ""]
       .join(" ")
       .toLowerCase()
       .split(/[\s،:,]+/)

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LESSONS, getLesson } from "./curriculum";
 import { DIALOGUE_DONE, dialogueAnswerMatches, dialogueReply, dialogueState, startDialogue } from "./dialogue";
 import { detectIntent } from "./templates";
+import { foreignLanguageOfSubject } from "@shared/taughtLanguages";
 
 /** Plays a whole dialogue, answering each step with `answer(step)`. */
 function play(lessonKey: string, skillKey: string, answer: (index: number) => string[]) {
@@ -103,16 +104,17 @@ describe("dialogue content", () => {
   }
 });
 
-describe("German editions (the teacher speaking German)", () => {
-  for (const lesson of LESSONS.filter(entry => entry.subject === "german")) {
-    it(`${lesson.key}: every skill and item has its German edition`, () => {
-      expect(lesson.titleDe).toBeTruthy();
-      for (const question of lesson.bank) expect(question.promptDe, question.id).toBeTruthy();
-      for (const skill of lesson.skills) expect(skill.de, skill.key).toBeDefined();
+describe("taught-language editions (the teacher speaking the language)", () => {
+  for (const lesson of LESSONS.filter(entry => foreignLanguageOfSubject(entry.subject))) {
+    it(`${lesson.key}: every skill, item and misconception has its edition`, () => {
+      expect(lesson.titleTaught).toBeTruthy();
+      for (const question of lesson.bank) expect(question.promptTaught, question.id).toBeTruthy();
+      for (const skill of lesson.skills) expect(skill.taught, skill.key).toBeDefined();
+      for (const key of Object.keys(lesson.misconceptions)) expect(lesson.misconceptionsTaught?.[key], key).toBeTruthy();
     });
     for (const skill of lesson.skills) {
-      it(`${lesson.key} / ${skill.key} has a sound German dialogue`, () => {
-        const dialogue = skill.de!.dialogue;
+      it(`${lesson.key} / ${skill.key} has a sound dialogue in the taught language`, () => {
+        const dialogue = skill.taught!.dialogue;
         expect(dialogue.opening.trim()).not.toBe("");
         expect(dialogue.rule.trim()).not.toBe("");
         expect(dialogue.steps.length).toBeGreaterThanOrEqual(3);
@@ -123,7 +125,7 @@ describe("German editions (the teacher speaking German)", () => {
             expect(dialogueAnswerMatches(step, form), `${where} — "${form}" is not accepted`).toBe(true);
           }
           expect(dialogueAnswerMatches(step, step.hint), `${where} — the hint contains the answer`).toBe(false);
-          for (const unsure of ["Ich weiß es nicht", "keine Ahnung", "لا أعرف"]) {
+          for (const unsure of ["Ich weiß es nicht", "keine Ahnung", "No lo sé", "Non lo so", "لا أعرف"]) {
             expect(dialogueAnswerMatches(step, unsure), `${where} — "${unsure}"`).toBe(false);
           }
         });
@@ -152,7 +154,7 @@ describe("the teacher speaking German", () => {
       last = dialogueReply(state, answer, detectIntent(answer), "Amel", 2)!;
     }
     expect(last).toContain("Super, Amel! Du hast die Regel selbst gefunden:");
-    expect(last).toContain(skill.de!.dialogue.rule);
+    expect(last).toContain(skill.taught!.dialogue.rule);
   });
 
   it("understands requests in German", () => {
@@ -164,5 +166,24 @@ describe("the teacher speaking German", () => {
     expect(detectIntent("Ich habe das nicht verstanden")).toBe("simpler");
     expect(detectIntent("Etwas Schwereres? Eine Herausforderung")).toBe("challenge");
     expect(detectIntent("Danke!")).toBe("thanks");
+  });
+
+  it("understands requests in Spanish and Italian", () => {
+    for (const [message, intent] of [
+      ["Pregúntame", "quiz"],
+      ["No lo sé", "giveUp"],
+      ["Enséñame paso a paso", "dialogue"],
+      ["Un ejemplo, por favor", "example"],
+      ["No lo he entendido", "simpler"],
+      ["¿Por qué me equivoco?", "mistake"],
+      ["Fammi una domanda", "quiz"],
+      ["Non lo so", "giveUp"],
+      ["In dialogo", "dialogue"],
+      ["Un esempio, per favore", "example"],
+      ["Non ho capito", "simpler"],
+      ["Grazie!", "thanks"],
+    ] as const) {
+      expect(detectIntent(message), message).toBe(intent);
+    }
   });
 });

@@ -18,12 +18,13 @@ import { answersMatch } from "./grading";
 import { expressionsEquivalent, parseExpression } from "./mathExpr";
 import { spokenToAnswer } from "./spokenAnswer";
 import { toDarja } from "./darja";
+import { foreignLanguageOfSubject, type ForeignLang } from "@shared/taughtLanguages";
 
 /** Starts every message that closes a dialogue (the phone call looks for it). */
 export const DIALOGUE_DONE = "🎯";
 
-/** The language the dialogue is held in: Arabic, or German (German lessons, teacher speaking German). */
-export type DialogueLang = "ar" | "de";
+/** The language the dialogue is held in: Arabic, or a language lesson's own language (teacher speaking it). */
+export type DialogueLang = "ar" | ForeignLang;
 
 /** What the teacher says around the dialogue's own questions, in each language. */
 const PHRASES: Record<
@@ -62,11 +63,33 @@ const PHRASES: Record<
     answer: answer => `Die Antwort: ${answer}.`,
     notQuite: answer => `Nicht ganz. Die Antwort: ${answer}.`,
   },
+  es: {
+    praise: ["✔ ¡Exacto!", "✔ ¡Sí, muy bien!", "✔ ¡Correcto!", "✔ ¡Genial!"],
+    start: skillName => `Vamos a descubrir «${skillName}» juntos en diálogo. No te doy la regla hecha: tú la encuentras, paso a paso.`,
+    done: name => `${DIALOGUE_DONE} ¡Genial, ${name}! Has encontrado la regla tú solo:`,
+    next: "Di «Pregúntame» y compruebo si la has entendido, o «En diálogo» para descubrir otra idea.",
+    resume: "Volvamos a nuestra pregunta:",
+    thinkWithMe: "No pasa nada, piensa conmigo.",
+    notYet: "Todavía no, pero estás cerca.",
+    answer: answer => `La respuesta: ${answer}.`,
+    notQuite: answer => `Casi. La respuesta: ${answer}.`,
+  },
+  it: {
+    praise: ["✔ Esatto!", "✔ Sì, bravissimo!", "✔ Giusto!", "✔ Ottimo!"],
+    start: skillName => `Scopriamo insieme «${skillName}» in dialogo. Non ti do la regola già pronta: la trovi tu, passo dopo passo.`,
+    done: name => `${DIALOGUE_DONE} Ottimo, ${name}! Hai trovato la regola da solo:`,
+    next: "Di' «Fammi una domanda» e controllo se l'hai capita, oppure «In dialogo» per scoprire un'altra idea.",
+    resume: "Torniamo alla nostra domanda:",
+    thinkWithMe: "Nessun problema, pensa con me.",
+    notYet: "Non ancora, ma ci sei vicino.",
+    answer: answer => `La risposta: ${answer}.`,
+    notQuite: answer => `Non proprio. La risposta: ${answer}.`,
+  },
 };
 
-/** The skill's dialogue in that language (German only where the skill has its German edition). */
+/** The skill's dialogue in that language (a taught language only where the skill has its edition in it). */
 export function dialogueIn(skill: Skill, lang: DialogueLang): Dialogue | undefined {
-  return lang === "de" ? skill.de?.dialogue : skill.dialogue;
+  return lang === "ar" ? skill.dialogue : skill.taught?.dialogue;
 }
 
 const NON_WORD = new RegExp("[^\\p{L}\\p{N}]+", "gu");
@@ -127,7 +150,8 @@ export type DialogueState = { skill: Skill; dialogue: Dialogue; index: number; h
 /** Where the dialogue stands, read from the teacher's last message. */
 export function dialogueState(lesson: Lesson, lastTutorMessage: string | null | undefined): DialogueState | null {
   if (!lastTutorMessage || !lastTutorMessage.includes("❓ (")) return null;
-  for (const lang of ["ar", "de"] as const) {
+  const taught = foreignLanguageOfSubject(lesson.subject);
+  for (const lang of taught ? (["ar", taught] as const) : (["ar"] as const)) {
     for (const skill of lesson.skills) {
       const dialogue = dialogueIn(skill, lang);
       if (!dialogue) continue;
@@ -168,11 +192,11 @@ export function resumeLine(state: DialogueState): string {
   return `${PHRASES[state.lang].resume}\n${stepLine(state.dialogue, state.index)}`;
 }
 
-/** Opens the skill's dialogue, in German when asked and the skill has its German edition. */
+/** Opens the skill's dialogue, in the taught language when asked and the skill has its edition in it. */
 export function startDialogue(skill: Skill, lang: DialogueLang = "ar"): string {
-  const german = lang === "de" && skill.de ? skill.de : null;
-  const dialogue = german ? german.dialogue : skill.dialogue!;
-  return [PHRASES[german ? "de" : "ar"].start(german ? german.name : skill.name), dialogue.opening, stepLine(dialogue, 0)].join("\n\n");
+  const taught = lang !== "ar" && skill.taught ? skill.taught : null;
+  const dialogue = taught ? taught.dialogue : skill.dialogue!;
+  return [PHRASES[taught ? lang : "ar"].start(taught ? taught.name : skill.name), dialogue.opening, stepLine(dialogue, 0)].join("\n\n");
 }
 
 function advance(state: DialogueState, name: string, lead: string): string {

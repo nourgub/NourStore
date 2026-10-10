@@ -14,8 +14,8 @@
 // student says — lives in detectIntent (./templates.ts), spokenToAnswer
 // (./spokenAnswer.ts) and FRENCH_TERMS below.
 
-/** "deutsch": the teacher speaks German (German lessons only; ./deutsch.ts). */
-export type TeacherStyle = "fusha" | "darja" | "deutsch";
+/** "foreign": a language lesson taught in its own language (German, Spanish, Italian; ./foreign.ts). */
+export type TeacherStyle = "fusha" | "darja" | "foreign";
 
 /** The teacher's fixed sentences, Fusha → Darja (also prepared ahead as voice, ./ttsWarmup.ts). */
 export const PHRASES: Array<[string, string]> = [

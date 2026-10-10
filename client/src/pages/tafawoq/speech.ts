@@ -4,6 +4,7 @@
 // (shared/spokenArabic.ts).
 import { useEffect } from "react";
 import { foreignLanguageOfLesson, spokenParts, type ForeignLang, type SpokenPart } from "@shared/spokenArabic";
+import { TAUGHT_LANGUAGES } from "@shared/taughtLanguages";
 import { readTeacherVoice } from "./teacherStyle";
 
 export { toSpokenArabic } from "@shared/spokenArabic";
@@ -43,7 +44,12 @@ function deviceVoice(lang: SpokenPart["lang"]): SpeechSynthesisVoice | undefined
   return voices.sort((a, b) => score(b) - score(a))[0];
 }
 
-const DEFAULT_LANG: Record<SpokenPart["lang"], string> = { ar: "ar-SA", de: "de-DE" };
+const DEFAULT_LANG: Record<SpokenPart["lang"], string> = {
+  ar: "ar-SA",
+  de: TAUGHT_LANGUAGES.de.bcp47,
+  es: TAUGHT_LANGUAGES.es.bcp47,
+  it: TAUGHT_LANGUAGES.it.bcp47,
+};
 
 /** One piece in the device's voice; resolves when it is said (or cannot be). */
 function browserSay(part: SpokenPart): Promise<void> {
