@@ -264,7 +264,8 @@ export function templateOpening(context: StudentContext): string {
   const firstFocus = context.focusSkills[0]?.name;
   const parts = [`مرحباً ${context.name}!`];
   if (strong) parts.push(`أرى أنك فهمت ${strong} بشكل جيد.`);
-  if (weak) parts.push(`لكن لديك صعوبة في ${weak}.`);
+  // "لكن" only after something the student already masters.
+  if (weak) parts.push(strong ? `لكن لديك صعوبة في ${weak}.` : `لديك صعوبة في ${weak}.`);
   if (context.recurringErrors.length)
     parts.push(`ولاحظت خطأً يتكرر عندك: ${context.recurringErrors[0].label}.`);
   if (firstFocus) {
