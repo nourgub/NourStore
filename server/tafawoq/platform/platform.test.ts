@@ -60,7 +60,10 @@ describe("stream content and availability", () => {
     expect(isThirdLanguage("english")).toBe(false);
     const spanish = subscriptionContent("langues", null, NO_SWITCHES, "spanish");
     expect(spanish.core.map(entry => entry.key)).toEqual(["french", "english", "spanish", "arabic"]);
-    expect(spanish.core.find(entry => entry.key === "spanish")?.available).toBe(false);
+    expect(spanish.core.find(entry => entry.key === "spanish")?.available).toBe(true);
+    expect(subscriptionContent("langues", null, NO_SWITCHES, "italian").core.find(entry => entry.key === "italian")?.available).toBe(true);
+    // Each third language's lessons for its own students only.
+    expect(accessibleLessons("langues", null, NO_SWITCHES, "spanish").some(lesson => lesson.subject === "italian")).toBe(false);
     // German has its lessons, for German students only.
     const german = subscriptionContent("langues", null, NO_SWITCHES, "german");
     expect(german.core.find(entry => entry.key === "german")?.available).toBe(true);

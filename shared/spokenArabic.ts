@@ -148,7 +148,7 @@ export { foreignLanguageOfLesson, foreignLanguageOfSubject, type ForeignLang } f
 const LATIN = "A-Za-zÄÖÜäöüßÁÉÍÓÚÑáéíóúñÀÈÌÒÙàèìòùç";
 /** A run of the taught language: Latin words with the spaces and punctuation between them. */
 const FOREIGN_RUN = new RegExp(`[¿¡${LATIN}](?:[${LATIN}0-9'’\\-.,!?¿¡;:()…%«» ]*[${LATIN}0-9.!?%»])?`, "g");
-const STARTS_FOREIGN = new RegExp(`^\\s*[«¿¡]?[${LATIN}]`);
+const STARTS_FOREIGN = new RegExp(`^\\s*[«¿¡"]*[${LATIN}]`);
 
 function foreignChunks(run: string, max: number): string[] {
   const pieces: string[] = [];

@@ -79,6 +79,7 @@ describe("spokenParts (language lessons)", () => {
     expect(spokenParts("❓ (3/4) «Sono andato» o «ho andato»? Perché?", "it")).toEqual([
       { text: "Domanda 3: Sono andato o ho andato? Perché?", lang: "it" },
     ]);
+    expect(spokenParts("❓ (1/4) «¿Compras los libros?»", "es")[0].text).toBe("Pregunta 1: ¿Compras los libros?");
     expect(foreignLanguageOfLesson("es-tenses")).toBe("es");
     expect(foreignLanguageOfSubject("italian")).toBe("it");
   });
