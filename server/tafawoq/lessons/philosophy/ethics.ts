@@ -2,7 +2,7 @@
 // freedom and determinism with responsibility, and justice between
 // equality and inequality.
 import type { Lesson } from "../../curriculum";
-import { mcq } from "./build";
+import { mcq } from "../mcq";
 
 export const ethicsLesson: Lesson = {
   key: "philo-ethics",

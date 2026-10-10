@@ -1,7 +1,7 @@
 // BAC philosophy: "اللغة والفكر" — the dualist and monist positions on
 // language and thought, and the linguistic sign (de Saussure).
 import type { Lesson } from "../../curriculum";
-import { mcq } from "./build";
+import { mcq } from "../mcq";
 
 export const languageLesson: Lesson = {
   key: "philo-language",

@@ -2,7 +2,7 @@
 // question calls for (جدلية، مقارنة، استقصاء بالوضع، استقصاء بالرفع) and the
 // stages of each, as the Algerian BAC marks them.
 import type { Lesson } from "../../curriculum";
-import { mcq } from "./build";
+import { mcq } from "../mcq";
 
 export const methodLesson: Lesson = {
   key: "philo-method",

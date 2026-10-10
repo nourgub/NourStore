@@ -56,6 +56,10 @@ describe("curriculum integrity", () => {
             expect(option, question.id).not.toBe(question.answer);
             expect(lesson.misconceptions[misconception], `${question.id}:${misconception}`).toBeTruthy();
           }
+          // Choosing an option grades exactly that option (no two read as the same answer).
+          for (const option of question.options ?? []) {
+            expect(gradeDeterministic(question, option).status, `${question.id}: ${option}`).toBe(option === question.answer ? "correct" : "incorrect");
+          }
         }
         // The key must grade as correct against itself.
         expect(gradeDeterministic(question, question.answer).status, question.id).toBe("correct");

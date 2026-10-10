@@ -10,6 +10,7 @@ import { M } from "./components";
 import { Content, useLang } from "./i18n";
 import { bacError, formatDate, useB } from "./bacI18n";
 import { ListenButton } from "./ListenButton";
+import { useSpeechLesson } from "./speech";
 import type { BacOutputs } from "./Onboarding";
 
 type Pack = BacOutputs["revisionPack"];
@@ -41,6 +42,8 @@ export function RevisionPage() {
   const fromCache = !pack.data && Boolean(cached);
   const [subjectIndex, setSubjectIndex] = useState(0);
   const [lessonKey, setLessonKey] = useState<string | null>(null);
+  const lessons = data?.subjects[subjectIndex]?.lessons;
+  useSpeechLesson((lessons?.find(entry => entry.key === lessonKey) ?? lessons?.[0])?.key);
 
   if (!data) {
     if (pack.isLoading) return <p className="tfq-muted" aria-busy="true">…</p>;

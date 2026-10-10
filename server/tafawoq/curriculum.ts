@@ -20,6 +20,7 @@ import { derivativeGenerators } from "./lessons/derivativesGenerators";
 import { derivativeProblems } from "./lessons/derivativesProblems";
 import { PHYSICS_LESSONS } from "./lessons/physics";
 import { PHILOSOPHY_LESSONS } from "./lessons/philosophy";
+import { GERMAN_LESSONS } from "./lessons/german";
 import { BAC_LESSONS } from "./lessons";
 
 export type Skill = {
@@ -117,12 +118,13 @@ export const CURRICULA: Record<CurriculumKey, { country: string; language: "ar" 
   dz: { country: "DZ", language: "ar", name: "المنهاج الجزائري" },
 };
 
-export type SubjectKey = "math" | "physics" | "philosophy";
+export type SubjectKey = "math" | "physics" | "philosophy" | "german";
 
 export const SUBJECTS: Record<SubjectKey, { name: string }> = {
   math: { name: "الرياضيات" },
   physics: { name: "العلوم الفيزيائية" },
   philosophy: { name: "الفلسفة" },
+  german: { name: "اللغة الألمانية" },
 };
 
 const derivatives: Lesson = {
@@ -1881,6 +1883,7 @@ export const LESSONS: Lesson[] = [
   ohmLaw,
   ...PHYSICS_LESSONS,
   ...PHILOSOPHY_LESSONS,
+  ...GERMAN_LESSONS,
 ];
 
 /**

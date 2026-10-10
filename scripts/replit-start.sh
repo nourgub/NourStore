@@ -189,10 +189,10 @@ if [ -n "${REPLIT_DB_URL_OVERRIDE:-}" ]; then
 fi
 
 # --- The teacher's natural voice (Piper, free) ------------------------------
-# Downloaded once (~90 MB) in the background so the app starts right away;
+# Downloaded once (~90 MB, + ~60 MB for the German voice) in the background so the app starts right away;
 # the server picks it up as soon as it's there (server/tafawoq/tts.ts).
 # Until then — or if this fails — the browser's own voice is used.
-if [ ! -x "$DATA_DIR/piper/piper/piper" ] || [ ! -f "$DATA_DIR/piper/ar_JO-kareem-medium.onnx" ]; then
+if [ ! -x "$DATA_DIR/piper/piper/piper" ] || [ ! -f "$DATA_DIR/piper/ar_JO-kareem-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/de_DE-thorsten-medium.onnx" ]; then
   echo "[replit-start] Fetching the teacher's natural voice (Piper) in the background..."
   (node scripts/fetch-piper.mjs "$DATA_DIR/piper" >> "$DATA_DIR/piper-fetch.log" 2>&1 &)
 fi

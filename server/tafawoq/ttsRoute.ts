@@ -1,4 +1,4 @@
-// POST /api/tafawoq/tts { text, voice: "male" | "female" } → the teacher's natural voice (audio/mpeg),
+// POST /api/tafawoq/tts { text, voice: "male" | "female", lang?: "ar" | "de" } → the teacher's natural voice (audio/mpeg),
 // for signed-in users only (it costs server time, or paid quota), rate
 // limited. 503 when no natural voice is available: the client then uses
 // the browser's own voice.
@@ -50,6 +50,8 @@ export function registerTafawoqTtsRoutes(app: Express) {
     }
     const text = typeof req.body?.text === "string" ? req.body.text : "";
     const gender = req.body?.voice === "female" ? "female" : "male";
+    // A language lesson's own words (German) go to a voice of that language.
+    const lang = req.body?.lang === "de" ? "de" : "ar";
     if (!text.trim() || text.length > MAX_TTS_CHARS) {
       res.status(400).json({ error: `Text must be 1–${MAX_TTS_CHARS} characters.` });
       return;
@@ -62,7 +64,7 @@ export function registerTafawoqTtsRoutes(app: Express) {
       return;
     }
     try {
-      const voice = await speak(text, gender, await studentName(userId));
+      const voice = await speak(text, gender, await studentName(userId), lang);
       if (!voice) {
         res.status(503).json({ error: "No natural voice available." });
         return;

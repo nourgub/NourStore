@@ -2,10 +2,29 @@
 // and the teacher's voice (synthesised on the server, the browser's own
 // voice as a fallback). Maths is rewritten for the ear first
 // (shared/spokenArabic.ts).
-import { spokenChunks } from "@shared/spokenArabic";
+import { useEffect } from "react";
+import { foreignLanguageOfLesson, spokenParts, type ForeignLang, type SpokenPart } from "@shared/spokenArabic";
 import { readTeacherVoice } from "./teacherStyle";
 
 export { toSpokenArabic } from "@shared/spokenArabic";
+
+/**
+ * The language taught where the student is (a German lesson → "de"): its
+ * words are then read by a voice of that language, the rest in Arabic.
+ * Set by the lesson and call screens (useSpeechLesson).
+ */
+let lessonLanguage: ForeignLang | null = null;
+export function setSpeechLesson(lessonKey: string | null) {
+  lessonLanguage = foreignLanguageOfLesson(lessonKey);
+}
+
+/** While this screen shows `lessonKey`, the teacher reads its language in that language's voice. */
+export function useSpeechLesson(lessonKey: string | null | undefined) {
+  useEffect(() => {
+    setSpeechLesson(lessonKey ?? null);
+    return () => setSpeechLesson(null);
+  }, [lessonKey]);
+}
 
 export function canSpeak(): boolean {
   return typeof window !== "undefined" && ("speechSynthesis" in window || typeof Audio !== "undefined");
@@ -16,18 +35,35 @@ export function canSpeak(): boolean {
  * unavailable: network/neural voices ("Google", "Natural", "Online"…) sound
  * far less robotic than the default local ones.
  */
-function arabicVoice(): SpeechSynthesisVoice | undefined {
-  const voices = window.speechSynthesis.getVoices().filter(voice => voice.lang.toLowerCase().startsWith("ar"));
+function deviceVoice(lang: SpokenPart["lang"]): SpeechSynthesisVoice | undefined {
+  const voices = window.speechSynthesis.getVoices().filter(voice => voice.lang.toLowerCase().startsWith(lang));
   const natural = /natural|neural|online|google|premium|enhanced|siri/i;
   const score = (voice: SpeechSynthesisVoice) =>
     (natural.test(voice.name) ? 4 : 0) + (voice.lang.toLowerCase().startsWith("ar-dz") ? 2 : 0) + (voice.localService ? 0 : 1);
   return voices.sort((a, b) => score(b) - score(a))[0];
 }
 
+const DEFAULT_LANG: Record<SpokenPart["lang"], string> = { ar: "ar-SA", de: "de-DE" };
+
+/** One piece in the device's voice; resolves when it is said (or cannot be). */
+function browserSay(part: SpokenPart): Promise<void> {
+  return new Promise(resolve => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return resolve();
+    const voice = deviceVoice(part.lang);
+    const utterance = new SpeechSynthesisUtterance(part.text);
+    if (voice) utterance.voice = voice;
+    utterance.lang = voice?.lang ?? DEFAULT_LANG[part.lang];
+    utterance.rate = 0.95;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 type SpeakHandlers = { onStart?: () => void; onEnd?: () => void };
 
 /** The browser's own voice (fallback). */
-function browserSpeak(chunks: string[], handlers: SpeakHandlers, started: boolean) {
+function browserSpeak(chunks: SpokenPart[], handlers: SpeakHandlers, started: boolean) {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !chunks.length) {
     handlers.onEnd?.();
     return () => {};
@@ -35,11 +71,11 @@ function browserSpeak(chunks: string[], handlers: SpeakHandlers, started: boolea
   const synth = window.speechSynthesis;
   synth.cancel();
   let stopped = false;
-  const voice = arabicVoice();
   chunks.forEach((chunk, index) => {
-    const utterance = new SpeechSynthesisUtterance(chunk);
+    const voice = deviceVoice(chunk.lang);
+    const utterance = new SpeechSynthesisUtterance(chunk.text);
     if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang ?? "ar-SA";
+    utterance.lang = voice?.lang ?? DEFAULT_LANG[chunk.lang];
     utterance.rate = 0.95;
     if (index === 0 && !started) utterance.onstart = () => !stopped && handlers.onStart?.();
     if (index === chunks.length - 1) {
@@ -86,18 +122,19 @@ export function unlockAudio() {
   }
 }
 
-async function fetchVoice(text: string, signal: AbortSignal): Promise<Blob | null> {
+async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Promise<Blob | null> {
   if (serverVoice === false) return null;
   try {
     const response = await fetch("/api/tafawoq/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ text, voice: readTeacherVoice() }),
+      body: JSON.stringify({ text, voice: readTeacherVoice(), lang }),
       signal,
     });
     if (response.status === 503 || response.status === 404 || response.status === 401) {
-      serverVoice = false;
+      // No voice for a taught language says nothing about the Arabic one.
+      if (lang === "ar") serverVoice = false;
       return null;
     }
     if (!response.ok) return null;
@@ -131,8 +168,8 @@ function play(blob: Blob): Promise<boolean> {
  * the current one plays. Falls back to the browser's best voice when the
  * server has none. Returns a stop function.
  */
-export function speakArabic(text: string, handlers: SpeakHandlers = {}) {
-  const chunks = spokenChunks(text);
+export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign: ForeignLang | null = lessonLanguage) {
+  const chunks = spokenParts(text, foreign);
   if (!chunks.length) {
     handlers.onEnd?.();
     return () => {};
@@ -158,6 +195,13 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}) {
       fetchAt(index + 2);
       const ok = blob ? await (index === 0 ? (handlers.onStart?.(), play(blob)) : play(blob)) : false;
       if (stopped) return;
+      if (!ok && chunks[index].lang !== "ar" && serverVoice) {
+        // No server voice for this language: the device says this piece, the teacher the rest.
+        if (index === 0) handlers.onStart?.();
+        await browserSay(chunks[index]);
+        if (stopped) return;
+        continue;
+      }
       if (!ok) {
         // No natural voice (or it can't play here): say the rest with the browser's.
         stopFallback = browserSpeak(chunks.slice(index), handlers, index > 0);
@@ -171,6 +215,7 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}) {
     stopped = true;
     controller.abort();
     player?.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     stopFallback();
   };
 }

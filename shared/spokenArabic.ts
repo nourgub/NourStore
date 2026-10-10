@@ -134,6 +134,77 @@ export function spokenChunks(text: string, max = 180): string[] {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Language lessons: the language itself is read by a voice of that language.
+// ---------------------------------------------------------------------------
+
+/** A taught language read by its own voice (the rest stays Arabic). */
+export type ForeignLang = "de";
+export type SpokenPart = { text: string; lang: "ar" | ForeignLang };
+
+/** The language a subject teaches, if it is one. */
+export function foreignLanguageOfSubject(subject: string | null | undefined): ForeignLang | null {
+  return subject === "german" ? "de" : null;
+}
+
+/** The language a lesson teaches (German lessons are "de-…"). */
+export function foreignLanguageOfLesson(lessonKey: string | null | undefined): ForeignLang | null {
+  return lessonKey?.startsWith("de-") ? "de" : null;
+}
+
+const LATIN = "A-Za-zÄÖÜäöüß";
+/** A run of the taught language: Latin words with the spaces and punctuation between them. */
+const FOREIGN_RUN = new RegExp(`[${LATIN}](?:[${LATIN}0-9'’\\-.,!?;:()… ]*[${LATIN}0-9.!?])?`, "g");
+
+function foreignChunks(run: string, max: number): string[] {
+  const pieces: string[] = [];
+  for (const sentence of run.split(/(?<=[.!?])\s+/)) {
+    for (const word of sentence.trim().split(/\s+/)) {
+      const last = pieces[pieces.length - 1];
+      if (last !== undefined && last.length + word.length + 1 <= max && !/[.!?]$/.test(last)) pieces[pieces.length - 1] = `${last} ${word}`;
+      else pieces.push(word);
+    }
+  }
+  return pieces.filter(piece => HAS_WORD.test(piece));
+}
+
+/**
+ * Spoken text as parts, each with its voice's language: plain Arabic
+ * chunks, or — in a language lesson — the taught language's runs cut out
+ * of the Arabic ("الفعل المساعد | haben | أو | sein").
+ */
+export function spokenParts(text: string, foreign: ForeignLang | null = null, max = 180): SpokenPart[] {
+  const arabic = (piece: string): SpokenPart[] => spokenChunks(piece, max).map(chunk => ({ text: chunk, lang: "ar" }));
+  if (!foreign) return arabic(text);
+  const parts: SpokenPart[] = [];
+  // Grammar notation read as words, not maths: "werden + Partizip II", "gehen → ging".
+  const words = text
+    .replace(/_{2,}/g, " … ")
+    .replace(/\s*[→⟶]\s*/g, "، ")
+    .replace(/\s=\s/g, " يعني ")
+    .replace(/\s\+\s/g, " مع ")
+    // A hyphen on a word part ("-en", "ge-") is no minus sign.
+    .replace(/(^|[\s«(])-(?=[A-Za-zÄÖÜäöüß])/g, "$1")
+    .replace(/(?<=[A-Za-zÄÖÜäöüß])-(?=[\s»),.،:]|$)/g, "");
+  for (const line of words.split(/\n+/)) {
+    let at = 0;
+    for (const match of Array.from(line.matchAll(FOREIGN_RUN))) {
+      parts.push(...arabic(line.slice(at, match.index)));
+      parts.push(...foreignChunks(match[0], max).map(chunk => ({ text: chunk, lang: foreign })));
+      at = match.index! + match[0].length;
+    }
+    parts.push(...arabic(line.slice(at)));
+  }
+  // Foreign words separated only by a pause ("gemacht، kaufen") are one request.
+  return parts.reduce<SpokenPart[]>((merged, part) => {
+    const last = merged[merged.length - 1];
+    if (last?.lang === foreign && part.lang === foreign && last.text.length + part.text.length + 2 <= max) {
+      last.text = `${last.text}, ${part.text}`;
+    } else merged.push({ ...part });
+    return merged;
+  }, []);
+}
+
 // Words toSpokenArabic says for maths. "Strong" ones are maths on their own;
 // "weak" ones ("على", "إلى", "من"…) only between two maths words.
 export const STRONG_MATH = new Set([

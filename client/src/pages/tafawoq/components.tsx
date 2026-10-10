@@ -342,7 +342,9 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
   );
 }
 
-const ARABIC_RUN = /([\u0600-\u06FF\u0750-\u077F](?:[\u0600-\u06FF\u0750-\u077F،؛؟«»ـ.:!]|\s+(?=[\u0600-\u06FF\u0750-\u077F«]))*)/;
+// An opening « belongs to the Arabic only before an Arabic word; before a
+// formula or a German word it opens that run («machen: gemacht»).
+const ARABIC_RUN = /([\u0600-\u06FF\u0750-\u077F](?:[\u0600-\u06FF\u0750-\u077F،؛؟»ـ.:!]|«(?=[\u0600-\u06FF\u0750-\u077F])|\s+(?=[\u0600-\u06FF\u0750-\u077F«]))*)/;
 
 const count = (text: string, char: string) => text.split(char).length - 1;
 
@@ -357,7 +359,8 @@ function Formula({ part }: { part: string }) {
   core = core.slice(lead.length);
   let tail = "";
   // Sentence punctuation after a formula belongs to the sentence.
-  const punctuation = core.match(/[.,،؛:!?؟]+$/);
+  // Closing quotes too: «sein» keeps its guillemets in the sentence's direction.
+  const punctuation = core.match(/[.,،؛:!?؟»"]+$/);
   if (punctuation) {
     tail = punctuation[0];
     core = core.slice(0, -tail.length);
@@ -371,15 +374,18 @@ function Formula({ part }: { part: string }) {
     core = core.slice(0, -1);
   }
   return (
-    <span>
+    <>
       {part.match(/^\s*/)![0]}
-      {lead}
-      <span className="tfq-math" dir="ltr">
-        {core.trim()}
+      {/* A short run, with its quotes, never breaks across lines (its words would swap sides). */}
+      <span className={core.trim().length <= 20 ? "tfq-math-short" : undefined}>
+        {lead}
+        <span className="tfq-math" dir="ltr">
+          {core.trim()}
+        </span>
+        {tail}
       </span>
-      {tail}
       {part.match(/\s*$/)![0]}
-    </span>
+    </>
   );
 }
 

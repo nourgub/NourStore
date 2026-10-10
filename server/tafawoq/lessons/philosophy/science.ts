@@ -3,7 +3,7 @@
 // geometries, the experimental method and the place of hypothesis, and the
 // obstacles to experimenting on life and on human facts.
 import type { Lesson } from "../../curriculum";
-import { mcq } from "./build";
+import { mcq } from "../mcq";
 
 export const scienceLesson: Lesson = {
   key: "philo-science",

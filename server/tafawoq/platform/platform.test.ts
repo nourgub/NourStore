@@ -61,6 +61,13 @@ describe("stream content and availability", () => {
     const spanish = subscriptionContent("langues", null, NO_SWITCHES, "spanish");
     expect(spanish.core.map(entry => entry.key)).toEqual(["french", "english", "spanish", "arabic"]);
     expect(spanish.core.find(entry => entry.key === "spanish")?.available).toBe(false);
+    // German has its lessons, for German students only.
+    const german = subscriptionContent("langues", null, NO_SWITCHES, "german");
+    expect(german.core.find(entry => entry.key === "german")?.available).toBe(true);
+    expect(accessibleLessons("langues", null, NO_SWITCHES, "german").map(lesson => lesson.key)).toContain("de-tenses");
+    expect(accessibleLessons("langues", null, NO_SWITCHES, "spanish").some(lesson => lesson.subject === "german")).toBe(false);
+    expect(streamLessons("sciences").some(lesson => lesson.subject === "german")).toBe(false);
+    expect(checkLessonAccess({ ...locked("langues"), thirdLanguage: "spanish" }, "de-tenses", NO_SWITCHES, open)).toMatchObject({ ok: false });
   });
 
   it("hides what an admin switched off", () => {

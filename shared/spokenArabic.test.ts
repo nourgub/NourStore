@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { spokenChunks, spokenSegments, withoutName } from "./spokenArabic";
+import { foreignLanguageOfLesson, foreignLanguageOfSubject, spokenChunks, spokenParts, spokenSegments, withoutName } from "./spokenArabic";
 
 describe("spoken sentences", () => {
   it("cuts the teacher's text into short sentences every student shares", () => {
@@ -37,5 +37,38 @@ describe("spoken sentences", () => {
     expect(withoutName("رائع يا سارة، لقد وصلت إلى القاعدة بنفسك:", "سارة")).toBe("رائع، لقد وصلت إلى القاعدة بنفسك:");
     expect(withoutName("مرحباً سارة.", "سارة")).toBe("مرحباً.");
     expect(withoutName("أتمنى أن تكون بخير.", "سارة")).toBe("أتمنى أن تكون بخير.");
+  });
+});
+
+describe("spokenParts (language lessons)", () => {
+  it("cuts the taught language out of the Arabic, notation read as words", () => {
+    expect(spokenParts("Perfekt = haben أو sein + Partizip II في الآخر.", "de")).toEqual([
+      { text: "Perfekt", lang: "de" },
+      { text: "يعني", lang: "ar" },
+      { text: "haben", lang: "de" },
+      { text: "أو", lang: "ar" },
+      { text: "sein", lang: "de" },
+      { text: "مع", lang: "ar" },
+      { text: "Partizip II", lang: "de" },
+      { text: "في الآخر.", lang: "ar" },
+    ]);
+  });
+
+  it("keeps a German sentence whole, a blank as a pause, word-part hyphens silent", () => {
+    expect(spokenParts("أكمل: «Ich ___ gestern Fußball gespielt.»", "de")).toEqual([
+      { text: "أكمل:", lang: "ar" },
+      { text: "Ich … gestern Fußball gespielt.", lang: "de" },
+    ]);
+    expect(spokenParts("تنتهي بـ -en", "de")).toEqual([
+      { text: "تنتهي بـ", lang: "ar" },
+      { text: "en", lang: "de" },
+    ]);
+  });
+
+  it("is plain Arabic (maths included) outside language lessons", () => {
+    expect(spokenParts("x − 3 = 5")).toEqual([{ text: "إكس ناقص 3 يساوي 5", lang: "ar" }]);
+    expect(foreignLanguageOfLesson("de-tenses")).toBe("de");
+    expect(foreignLanguageOfLesson("math-limits")).toBeNull();
+    expect(foreignLanguageOfSubject("german")).toBe("de");
   });
 });

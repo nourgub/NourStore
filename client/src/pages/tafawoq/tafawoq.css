@@ -168,6 +168,7 @@
 .tfq-lang option { background: var(--card); color: var(--foreground); }
 .tfq[dir="ltr"] .tfq-caption, .tfq[dir="ltr"] .tfq-avatar { direction: rtl; }
 .tfq-math { unicode-bidi: isolate; direction: ltr; white-space: pre-wrap; }
+.tfq-math-short { display: inline-block; }
 @media (max-width: 560px) {
   .tfq-header { padding: 10px 12px; }
   .tfq-brand { font-size: 14px; }

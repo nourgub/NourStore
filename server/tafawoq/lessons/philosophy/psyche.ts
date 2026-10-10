@@ -2,7 +2,7 @@
 // the Algerian programme with their authors, their arguments and their
 // limits, as the essay questions ask for them.
 import type { Lesson } from "../../curriculum";
-import { mcq } from "./build";
+import { mcq } from "../mcq";
 
 export const psycheLesson: Lesson = {
   key: "philo-psyche",

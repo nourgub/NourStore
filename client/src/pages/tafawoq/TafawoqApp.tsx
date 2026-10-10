@@ -51,7 +51,7 @@ import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
 import { darjaSuggestions, useTeacherStyle, useTeacherVoice } from "./teacherStyle";
-import { speakArabic, unlockAudio } from "./speech";
+import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
 import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker, ThirdLanguagePicker } from "./Onboarding";
@@ -422,6 +422,7 @@ function LessonPage({ lessonKey }: { lessonKey: string }) {
   const workspace = trpc.tafawoq.workspace.useQuery({ lessonKey }, { retry: false });
   const [, navigate] = useLocation();
   const [placementResult, setPlacementResult] = useState<SubmitResult | null>(null);
+  useSpeechLesson(lessonKey);
 
   useEffect(() => {
     if (overview.data && !overview.data.student) navigate("/tafawoq");

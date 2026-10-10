@@ -1,6 +1,6 @@
-// Helper for the philosophy lessons: a multiple-choice item in one line,
+// Helper for the word-based lessons (philosophy, languages): a multiple-choice item in one line,
 // its three wrong options each tagged with the mistake it reveals.
-import type { BankQuestion } from "../../curriculum";
+import type { BankQuestion } from "../curriculum";
 
 export function mcq(
   id: string,

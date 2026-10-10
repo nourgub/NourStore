@@ -55,17 +55,36 @@ export type VoiceGender = "male" | "female";
 type Provider = "pack" | "azure" | "google" | "piper";
 type Paid = "azure" | "google";
 
-const PIPER_MODELS: Record<VoiceGender, string | undefined> = {
-  male: process.env.PIPER_MODEL ?? path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx"),
-  female: process.env.PIPER_MODEL_FEMALE,
+/**
+ * The teacher speaks Arabic; in a language lesson the taught language's
+ * words go to a voice of that language (German: Piper's "Thorsten",
+ * free and open, recorded by a consenting speaker; Azure/Google when set).
+ */
+export type SpeechLang = "ar" | "de";
+
+const PIPER_MODELS: Record<SpeechLang, Record<VoiceGender, string | undefined>> = {
+  ar: {
+    male: process.env.PIPER_MODEL ?? path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx"),
+    female: process.env.PIPER_MODEL_FEMALE,
+  },
+  de: {
+    male: process.env.PIPER_MODEL_DE ?? path.join(PIPER_DIR, "de_DE-thorsten-medium.onnx"),
+    female: process.env.PIPER_MODEL_DE_FEMALE,
+  },
 };
-const GOOGLE_VOICES: Record<VoiceGender, string> = {
-  male: process.env.TAFAWOQ_TTS_VOICE ?? "ar-XA-Wavenet-B",
-  female: process.env.TAFAWOQ_TTS_VOICE_FEMALE ?? "ar-XA-Wavenet-A",
+const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
+  ar: {
+    male: process.env.TAFAWOQ_TTS_VOICE ?? "ar-XA-Wavenet-B",
+    female: process.env.TAFAWOQ_TTS_VOICE_FEMALE ?? "ar-XA-Wavenet-A",
+  },
+  de: { male: "de-DE-Wavenet-B", female: "de-DE-Wavenet-A" },
 };
-const AZURE_VOICES: Record<VoiceGender, string> = {
-  male: process.env.TAFAWOQ_AZURE_VOICE_MALE ?? "ar-DZ-IsmaelNeural",
-  female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
+const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
+  ar: {
+    male: process.env.TAFAWOQ_AZURE_VOICE_MALE ?? "ar-DZ-IsmaelNeural",
+    female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
+  },
+  de: { male: "de-DE-ConradNeural", female: "de-DE-KatjaNeural" },
 };
 /**
  * A prepared voice ("voice pack"): every sentence the teacher says, recorded
@@ -88,8 +107,8 @@ const PAID_RATE = 24_000;
 
 export type Voice = { audio: Buffer; contentType: "audio/mpeg"; provider: Provider; gender: VoiceGender };
 
-const piperReady = (gender: VoiceGender) => {
-  const model = PIPER_MODELS[gender];
+const piperReady = (gender: VoiceGender, lang: SpeechLang = "ar") => {
+  const model = PIPER_MODELS[lang][gender];
   return Boolean(model) && existsSync(PIPER_BIN) && existsSync(model!);
 };
 
@@ -100,6 +119,7 @@ export function ttsProviders() {
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
     piper: piperReady("male") || piperReady("female"),
     piperFemale: piperReady("female"),
+    piperGerman: piperReady("male", "de") || piperReady("female", "de"),
   };
 }
 
@@ -237,7 +257,7 @@ async function googleSpeak(voice: string, text: string, format: "mp3" | "pcm"): 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: { text },
-        voice: { languageCode: "ar-XA", name: voice },
+        voice: { languageCode: voice.split("-").slice(0, 2).join("-"), name: voice },
         audioConfig:
           format === "mp3"
             ? { audioEncoding: "MP3", speakingRate: 0.95 }
@@ -341,10 +361,11 @@ export type Engine = {
   rate: () => Promise<number>;
 };
 
-function enginesFor(gender: VoiceGender): Engine[] {
+function enginesFor(gender: VoiceGender, lang: SpeechLang): Engine[] {
   const providers = ttsProviders();
   const list: Engine[] = [];
-  const pack = VOICE_PACKS[gender];
+  // Voice packs hold the Arabic teacher's sentences only.
+  const pack = lang === "ar" ? VOICE_PACKS[gender] : undefined;
   if (pack) {
     const notLive = async (): Promise<Buffer> => {
       throw new Error("a voice pack only plays what was prepared");
@@ -352,7 +373,7 @@ function enginesFor(gender: VoiceGender): Engine[] {
     list.push({ provider: "pack", voice: pack, gender, mp3: notLive, pcm: notLive, rate: async () => PACK_RATE });
   }
   if (providers.azure) {
-    const voice = AZURE_VOICES[gender];
+    const voice = AZURE_VOICES[lang][gender];
     list.push({
       provider: "azure",
       voice,
@@ -363,7 +384,7 @@ function enginesFor(gender: VoiceGender): Engine[] {
     });
   }
   if (providers.google) {
-    const voice = GOOGLE_VOICES[gender];
+    const voice = GOOGLE_VOICES[lang][gender];
     list.push({
       provider: "google",
       voice,
@@ -373,8 +394,8 @@ function enginesFor(gender: VoiceGender): Engine[] {
       rate: async () => PAID_RATE,
     });
   }
-  const model = PIPER_MODELS[gender];
-  if (model && piperReady(gender)) {
+  const model = PIPER_MODELS[lang][gender];
+  if (model && piperReady(gender, lang)) {
     const rate = () => piperSampleRate(model);
     list.push({
       provider: "piper",
@@ -389,8 +410,8 @@ function enginesFor(gender: VoiceGender): Engine[] {
 }
 
 /** The voices able to speak, in order: the chosen gender first, then any natural voice. */
-export function engines(gender: VoiceGender): Engine[] {
-  return [...enginesFor(gender), ...enginesFor(gender === "male" ? "female" : "male")];
+export function engines(gender: VoiceGender, lang: SpeechLang = "ar"): Engine[] {
+  return [...enginesFor(gender, lang), ...enginesFor(gender === "male" ? "female" : "male", lang)];
 }
 
 // ---------------------------------------------------------------------------
@@ -507,16 +528,17 @@ export async function assemble(engine: Engine, text: string, waitMs: number): Pr
  * voice is available. `name` is the student's: a voice that cannot say this
  * student's name (a voice pack) says the sentence without it.
  */
-export async function speak(text: string, gender: VoiceGender = "male", name?: string): Promise<Voice | null> {
+export async function speak(text: string, gender: VoiceGender = "male", name?: string, lang: SpeechLang = "ar"): Promise<Voice | null> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_TTS_CHARS);
   if (!clean) return null;
   const nameless = name ? withoutName(clean, name) : clean;
   const sentences = nameless !== clean && HAS_WORD.test(nameless) ? [clean, nameless] : [clean];
-  for (const engine of engines(gender)) {
+  for (const engine of engines(gender, lang)) {
     const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender });
     try {
       for (const sentence of sentences) {
-        const hasMaths = spokenSegments(sentence).some(segment => segment.math);
+        // Maths pieces are an Arabic thing; a German sentence is always said whole.
+        const hasMaths = lang === "ar" && spokenSegments(sentence).some(segment => segment.math);
         // Whole: always for prose (shared by every student, cached for good);
         // with maths, while this month's usage is under its pro-rata line.
         const whole = await synthesizeSentence(engine, sentence, hasMaths ? "paced" : "month", 3_000);
