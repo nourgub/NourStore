@@ -20,6 +20,7 @@ import { callIntroText, formatExample, generatedExamples } from "./templates";
 import { teacherMessageSpeech, type TeacherAction } from "../../shared/bacPlatform";
 import { teacherMessage } from "./platform/teacher";
 import { engines, piece, synthesizeSentence, type Engine, type VoiceGender } from "./tts";
+import { foreignLanguageOfSubject } from "@shared/taughtLanguages";
 
 /** The maths vocabulary assembled sentences are made of: words and the common numbers. */
 export function warmupPieces(): string[] {
@@ -68,13 +69,17 @@ export function prosePieces(sentences: string[]): string[] {
 export function warmupSentences(): string[] {
   const texts: string[] = [...NAMED];
   for (const [fusha, darja] of PHRASES) if (/[.!؟:]$/.test(fusha)) texts.push(fusha, darja);
-  for (const lesson of LESSONS) {
+  // A language lesson is spoken in pieces, each in its own language's voice
+  // (shared/spokenArabic.ts spokenParts): a whole sentence in the Arabic
+  // voice would never be asked for.
+  const spokenWhole = LESSONS.filter(lesson => !foreignLanguageOfSubject(lesson.subject));
+  for (const lesson of spokenWhole) {
     for (const skill of lesson.skills) {
       const dialogue = skill.dialogue;
       if (dialogue) texts.push(dialogue.opening, ...dialogue.steps.flatMap(step => [step.ask, step.hint, step.then ?? ""]), dialogue.rule);
     }
   }
-  for (const lesson of LESSONS) for (const skill of lesson.skills) texts.push(skill.explanation);
+  for (const lesson of spokenWhole) for (const skill of lesson.skills) texts.push(skill.explanation);
   return sentencesOf(texts);
 }
 
