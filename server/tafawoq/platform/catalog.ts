@@ -12,6 +12,7 @@ import {
   CURRICULUM_SUBJECT_TO_BAC,
   SECOND_SUBJECT_OPTIONS,
   STREAM_CORE_SUBJECTS,
+  coreSubjects,
   isPlatformStream,
   type BacSubject,
   type PlatformStream,
@@ -55,9 +56,10 @@ function offer(stream: PlatformStream, subject: BacSubject, switches: ContentSwi
 export function subscriptionContent(
   stream: PlatformStream,
   secondSubject: BacSubject | null,
-  switches: ContentSwitches
+  switches: ContentSwitches,
+  thirdLanguage: string | null = null
 ) {
-  const core = STREAM_CORE_SUBJECTS[stream].map(subject => offer(stream, subject, switches));
+  const core = coreSubjects(stream, thirdLanguage).map(subject => offer(stream, subject, switches));
   const second = secondSubject ? offer(stream, secondSubject, switches) : null;
   const all = second ? [...core, second] : core;
   return {
@@ -74,8 +76,9 @@ export function secondSubjectChoices(stream: PlatformStream, switches: ContentSw
   return SECOND_SUBJECT_OPTIONS[stream].map(subject => offer(stream, subject, switches));
 }
 
-export function allowedSubjects(stream: PlatformStream, secondSubject: string | null): Set<BacSubject> {
-  const allowed = new Set<BacSubject>(STREAM_CORE_SUBJECTS[stream]);
+/** The student's subjects: their stream's core (with their own third language) and their second subject. */
+export function allowedSubjects(stream: PlatformStream, secondSubject: string | null, thirdLanguage: string | null = null): Set<BacSubject> {
+  const allowed = new Set<BacSubject>(coreSubjects(stream, thirdLanguage));
   if (secondSubject && (SECOND_SUBJECT_OPTIONS[stream] as string[]).includes(secondSubject)) {
     allowed.add(secondSubject as BacSubject);
   }
@@ -86,13 +89,20 @@ export function allowedSubjects(stream: PlatformStream, secondSubject: string | 
 export function accessibleLessons(
   stream: PlatformStream,
   secondSubject: string | null,
-  switches: ContentSwitches
+  switches: ContentSwitches,
+  thirdLanguage: string | null = null
 ): Lesson[] {
-  const allowed = allowedSubjects(stream, secondSubject);
+  const allowed = allowedSubjects(stream, secondSubject, thirdLanguage);
   return Array.from(allowed).flatMap(subject => subjectLessons(stream, subject, switches));
 }
 
-export type AccessStudent = { stream: string | null; streamLockedAt: Date | null; secondSubject: string | null };
+export type AccessStudent = {
+  stream: string | null;
+  streamLockedAt: Date | null;
+  secondSubject: string | null;
+  /** Foreign-languages stream: german | spanish | italian. */
+  thirdLanguage?: string | null;
+};
 
 export type AccessDecision =
   | { ok: true; stream: PlatformStream; subject: BacSubject }
@@ -119,7 +129,7 @@ export function checkLessonAccess(
   if (!lesson.levels.includes("bac") || (lesson.streams && !lesson.streams.includes(stream))) {
     return { ok: false, reason: ACCESS_ERRORS.streamLocked };
   }
-  if (!allowedSubjects(stream, student.secondSubject).has(subject)) {
+  if (!allowedSubjects(stream, student.secondSubject, student.thirdLanguage).has(subject)) {
     return { ok: false, reason: ACCESS_ERRORS.subjectNotAllowed };
   }
   if (switches.disabledSubjects.has(subject) || switches.disabledLessons.has(lesson.key)) {
@@ -145,7 +155,7 @@ export function checkSubjectAccess(
     return { ok: false, reason: ACCESS_ERRORS.streamRequired };
   }
   const stream = student.stream;
-  if (!allowedSubjects(stream, student.secondSubject).has(subject as BacSubject)) {
+  if (!allowedSubjects(stream, student.secondSubject, student.thirdLanguage).has(subject as BacSubject)) {
     return { ok: false, reason: ACCESS_ERRORS.subjectNotAllowed };
   }
   if (!subjectLessons(stream, subject as BacSubject, switches).length) {

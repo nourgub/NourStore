@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACCESS_ERRORS, PLAN_DETAILS, STREAM_CORE_SUBJECTS, planSavingDa } from "@shared/bacPlatform";
+import { ACCESS_ERRORS, PLAN_DETAILS, STREAM_CORE_SUBJECTS, coreSubjects, isThirdLanguage, planSavingDa } from "@shared/bacPlatform";
 import { getLesson } from "../curriculum";
 import {
   NO_SWITCHES,
@@ -46,6 +46,21 @@ describe("stream content and availability", () => {
     const lettres = accessibleLessons("lettres", null, NO_SWITCHES);
     expect(lettres.filter(lesson => lesson.subject === "math")).toHaveLength(0);
     expect(lettres.some(lesson => lesson.subject === "philosophy")).toBe(true);
+  });
+
+  it("gives the languages stream its chosen third language", () => {
+    expect(coreSubjects("langues", "german")).toEqual(["french", "english", "german", "arabic"]);
+    expect(coreSubjects("langues", "italian")).toContain("italian");
+    // Not chosen yet (or junk): the generic slot stays, nothing is granted.
+    expect(coreSubjects("langues", null)).toContain("third_language");
+    expect(coreSubjects("langues", "russian")).toContain("third_language");
+    // Other streams never take a third language.
+    expect(coreSubjects("sciences", "spanish")).toEqual(STREAM_CORE_SUBJECTS.sciences);
+    expect(isThirdLanguage("spanish")).toBe(true);
+    expect(isThirdLanguage("english")).toBe(false);
+    const spanish = subscriptionContent("langues", null, NO_SWITCHES, "spanish");
+    expect(spanish.core.map(entry => entry.key)).toEqual(["french", "english", "spanish", "arabic"]);
+    expect(spanish.core.find(entry => entry.key === "spanish")?.available).toBe(false);
   });
 
   it("hides what an admin switched off", () => {

@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { CheckCircle2, ClipboardCheck, Lock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { inferRouterOutputs } from "@trpc/server";
-import type { BacSubject, PlatformStream } from "@shared/bacPlatform";
+import { THIRD_LANGUAGES, type BacSubject, type PlatformStream, type ThirdLanguage } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import type { AppRouter } from "../../../../server/routers";
 import { MasteryBar, QuestionRunner, ResultItems } from "./components";
@@ -28,11 +28,33 @@ export function SubjectChips({ offers }: { offers: Offer[] }) {
   );
 }
 
+/** German / Spanish / Italian: the specialisation of the languages stream. */
+export function LanguageChoice({ value, onChange }: { value: ThirdLanguage | null; onChange: (language: ThirdLanguage) => void }) {
+  const b = useB();
+  return (
+    <div className="tfq-row" role="radiogroup" aria-label={b.thirdLanguageLabel} style={{ flexWrap: "wrap", gap: 8 }}>
+      {THIRD_LANGUAGES.map(language => (
+        <button
+          key={language}
+          type="button"
+          role="radio"
+          aria-checked={value === language}
+          className={`tfq-btn small ${value === language ? "" : "ghost"}`}
+          onClick={() => onChange(language)}
+        >
+          {b.subjects[language]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function StreamPicker() {
   const b = useB();
   const utils = trpc.useUtils();
   const streams = trpc.bac.streams.useQuery();
   const [pending, setPending] = useState<PlatformStream | null>(null);
+  const [language, setLanguage] = useState<ThirdLanguage | null>(null);
   const choose = trpc.bac.chooseStream.useMutation({
     onSuccess: async ({ stream }) => {
       toast.success(b.streamChosen[stream as PlatformStream]);
@@ -56,13 +78,26 @@ export function StreamPicker() {
             <SubjectChips offers={entry.content.core} />
             <h3 className="tfq-muted" style={{ marginTop: 12 }}>{b.secondOptions}</h3>
             <SubjectChips offers={entry.secondChoices} />
+            {entry.key === "langues" && (
+              <>
+                <h3 className="tfq-muted" style={{ marginTop: 12 }}>{b.thirdLanguageLabel}</h3>
+                <LanguageChoice value={language} onChange={setLanguage} />
+              </>
+            )}
             {pending === entry.key ? (
               <div className="tfq-confirm" role="alertdialog" aria-label={b.confirm}>
                 <p>
-                  <Lock size={14} /> {b.confirmStream(b.streams[entry.key])}
+                  <Lock size={14} />{" "}
+                  {b.confirmStream(entry.key === "langues" && language ? `${b.streams[entry.key]} (${b.subjects[language]})` : b.streams[entry.key])}
                 </p>
+                {entry.key === "langues" && !language && <p className="tfq-muted">{b.pickLanguageFirst}</p>}
                 <div className="tfq-row">
-                  <button type="button" className="tfq-btn" disabled={choose.isPending} onClick={() => choose.mutate({ stream: entry.key })}>
+                  <button
+                    type="button"
+                    className="tfq-btn"
+                    disabled={choose.isPending || (entry.key === "langues" && !language)}
+                    onClick={() => choose.mutate({ stream: entry.key, language: entry.key === "langues" ? language : null })}
+                  >
                     {choose.isPending ? "…" : b.confirm}
                   </button>
                   <button type="button" className="tfq-btn ghost" onClick={() => setPending(null)}>
@@ -77,6 +112,36 @@ export function StreamPicker() {
             )}
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/** Languages-stream accounts locked before the specialisations existed. */
+export function ThirdLanguagePicker() {
+  const b = useB();
+  const utils = trpc.useUtils();
+  const [language, setLanguage] = useState<ThirdLanguage | null>(null);
+  const choose = trpc.bac.chooseThirdLanguage.useMutation({
+    onSuccess: async ({ language }) => {
+      toast.success(b.languageChosen(b.subjects[language]));
+      await utils.bac.invalidate();
+    },
+    onError: error => toast.error(bacError(b, error)),
+  });
+  return (
+    <section className="tfq-narrow">
+      <div className="tfq-kicker">01 · {b.streams.langues}</div>
+      <h1>{b.thirdLanguageTitle}</h1>
+      <p className="tfq-muted">{b.thirdLanguageText}</p>
+      <div className="tfq-card">
+        <LanguageChoice value={language} onChange={setLanguage} />
+        <p className="tfq-muted" style={{ marginTop: 12 }}>
+          <Lock size={14} /> {language ? b.confirmStream(`${b.streams.langues} (${b.subjects[language]})`) : b.pickLanguageFirst}
+        </p>
+        <button type="button" className="tfq-btn tfq-block" disabled={!language || choose.isPending} onClick={() => language && choose.mutate({ language })}>
+          {choose.isPending ? "…" : b.confirm}
+        </button>
       </div>
     </section>
   );

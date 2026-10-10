@@ -54,7 +54,7 @@ import { darjaSuggestions, useTeacherStyle, useTeacherVoice } from "./teacherSty
 import { speakArabic, unlockAudio } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
-import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker } from "./Onboarding";
+import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker, ThirdLanguagePicker } from "./Onboarding";
 import { StudentDashboard } from "./Dashboard";
 import { DailyPlanView } from "./DailyPlan";
 import { StreamRequestPage, SubscriptionPage } from "./Subscription";
@@ -268,6 +268,7 @@ function LearnerRoutes({ route }: { route: string | null }) {
   // The server refuses every other page's data until then anyway.
   if (data.step === "profile") return <RegisterForm student={null} onDone={() => undefined} />;
   if (data.step === "stream") return <StreamPicker />;
+  if (data.step === "language") return <ThirdLanguagePicker />;
   if (route === "profile") return <ProfileRoute />;
   if (data.step === "second" || route === "second-subject") return <SecondSubjectPicker state={data} />;
   if (route === "stream-request") return <StreamRequestPage />;

@@ -6,7 +6,7 @@ import { Bell } from "lucide-react";
 import type { BacSubject, PlatformStream } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import { Content, useLang } from "./i18n";
-import { formatDate, useB } from "./bacI18n";
+import { formatDate, streamLabel, useB } from "./bacI18n";
 import type { BacOutputs } from "./Onboarding";
 import { SubscriptionBadge } from "./Dashboard";
 
@@ -20,7 +20,7 @@ export function ChildBacInfo({ bac }: { bac: ChildBac | null }) {
     <div className="tfq-card">
       <div className="tfq-chips">
         <span className="tfq-chip info">
-          {b.parentStream}: {bac.stream ? b.streams[bac.stream as PlatformStream] : "—"}
+          {b.parentStream}: {streamLabel(b, bac.stream, bac.thirdLanguage)}
         </span>
         <span className="tfq-chip">
           {b.secondSubject}: {bac.secondSubject ? b.subjects[bac.secondSubject as BacSubject] : b.noSecond}

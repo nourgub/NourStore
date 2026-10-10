@@ -8,6 +8,7 @@ import {
   PLATFORM_STREAMS,
   SUBSCRIPTION_PLANS,
   TEACHER_ACTIONS,
+  THIRD_LANGUAGES,
 } from "@shared/bacPlatform";
 import { protectedProcedure, router } from "../_core/trpc";
 import { adminProcedure, learnerProcedure, parentProcedure, rateLimit } from "../_core/procedures";
@@ -37,8 +38,13 @@ export const bacRouter = router({
 
   chooseStream: learnerProcedure
     .use(rateLimit("bac-stream", 10, HOUR))
-    .input(z.object({ stream }))
-    .mutation(({ ctx, input }) => platform.chooseStream(ctx.user.id, input.stream)),
+    .input(z.object({ stream, language: z.enum(THIRD_LANGUAGES).nullish() }))
+    .mutation(({ ctx, input }) => platform.chooseStream(ctx.user.id, input.stream, input.language)),
+
+  chooseThirdLanguage: learnerProcedure
+    .use(rateLimit("bac-language", 10, HOUR))
+    .input(z.object({ language: z.enum(THIRD_LANGUAGES) }))
+    .mutation(({ ctx, input }) => platform.chooseThirdLanguage(ctx.user.id, input.language)),
 
   chooseSecondSubject: learnerProcedure
     .use(rateLimit("bac-second", 10, HOUR))
@@ -47,8 +53,8 @@ export const bacRouter = router({
 
   requestStreamChange: learnerProcedure
     .use(rateLimit("bac-stream-request", 5, 24 * HOUR))
-    .input(z.object({ toStream: stream, reason: z.string().trim().min(10).max(1000) }))
-    .mutation(({ ctx, input }) => platform.requestStreamChange(ctx.user.id, input.toStream, input.reason)),
+    .input(z.object({ toStream: stream, toLanguage: z.enum(THIRD_LANGUAGES).nullish(), reason: z.string().trim().min(10).max(1000) }))
+    .mutation(({ ctx, input }) => platform.requestStreamChange(ctx.user.id, input.toStream, input.reason, input.toLanguage)),
 
   myStreamRequests: learnerProcedure.query(({ ctx }) => platform.myStreamRequests(ctx.user.id)),
 

@@ -1,7 +1,7 @@
 // Tafawoq BAC platform — interface strings (ar / fr / en) for the stream,
 // subscription, plan, tests, bank, revision, parent and admin screens.
 // Lesson content itself stays in its curriculum's language (see <Content>).
-import type { BacSubject, BadgeKey, ErrorType, PaymentMethod, PlacementLevel, PlatformStream, SubscriptionPlan } from "@shared/bacPlatform";
+import { isThirdLanguage, type BacSubject, type BadgeKey, type ErrorType, type PaymentMethod, type PlacementLevel, type PlatformStream, type SubscriptionPlan } from "@shared/bacPlatform";
 import type { Lang } from "@/lib/language";
 import { useLang } from "./i18n";
 
@@ -21,6 +21,9 @@ const ar = {
     french: "اللغة الفرنسية",
     english: "اللغة الإنجليزية",
     third_language: "اللغة الأجنبية الثالثة",
+    german: "اللغة الألمانية",
+    spanish: "اللغة الإسبانية",
+    italian: "اللغة الإيطالية",
     islamic: "العلوم الإسلامية",
   } as Record<BacSubject, string>,
   streamChosen: {
@@ -45,6 +48,9 @@ const ar = {
     REFERRAL_NOT_NEW: "كود الإحالة مخصص للاشتراك الأول فقط.",
     REQUEST_PENDING: "لديك طلب تغيير شعبة قيد المراجعة.",
     SAME_STREAM: "هذه هي شعبتك الحالية.",
+    LANGUAGE_REQUIRED: "اختر لغتك الثالثة (الألمانية أو الإسبانية أو الإيطالية).",
+    LANGUAGE_ALREADY_LOCKED: "لغتك الثالثة محددة. لتغييرها قدّم طلباً إلى الإدارة.",
+    NOT_LANGUAGES_STREAM: "اللغة الثالثة خاصة بشعبة اللغات الأجنبية.",
     WEEKLY_DONE: "أنجزت اختبار هذا الأسبوع. يتوفر اختبار جديد يوم الإثنين.",
     NO_CONTENT_YET: "لا يوجد محتوى جاهز لموادك بعد.",
     generic: "حدث خطأ. حاول مرة أخرى.",
@@ -58,6 +64,11 @@ const ar = {
   chooseStreamText: "تحدّد الشعبة المواد التي يشملها حسابك. بعد الاختيار تُغلق الشعب الأخرى، ولا يمكن تغيير الشعبة إلا بطلب إلى الإدارة.",
   coreSubjects: "المواد الأساسية",
   secondOptions: "المواد التي يمكن اختيارها كمادة ثانية",
+  thirdLanguageTitle: "اختر لغتك الثالثة",
+  thirdLanguageText: "شعبة اللغات الأجنبية لها ثلاثة تخصصات. تُحدَّد لغتك الثالثة مع الشعبة، ولا تتغير إلا بطلب إلى الإدارة.",
+  thirdLanguageLabel: "اللغة الثالثة",
+  pickLanguageFirst: "اختر اللغة الثالثة أولاً.",
+  languageChosen: (language: string) => `تم تحديد ${language} كلغة ثالثة.`,
   chooseThisStream: "اختيار هذه الشعبة",
   confirmStream: (stream: string) => `تأكيد اختيار ${stream}؟ لن تستطيع تغييرها لاحقاً إلا بطلب إلى الإدارة.`,
   confirm: "تأكيد",
@@ -463,6 +474,9 @@ const fr: BacStrings = {
     french: "Français",
     english: "Anglais",
     third_language: "Troisième langue étrangère",
+    german: "Allemand",
+    spanish: "Espagnol",
+    italian: "Italien",
     islamic: "Sciences islamiques",
   },
   streamChosen: {
@@ -487,6 +501,9 @@ const fr: BacStrings = {
     REFERRAL_NOT_NEW: "Le code de parrainage est réservé au premier abonnement.",
     REQUEST_PENDING: "Une demande de changement de filière est déjà en cours d'examen.",
     SAME_STREAM: "C'est déjà votre filière.",
+    LANGUAGE_REQUIRED: "Choisissez votre troisième langue (allemand, espagnol ou italien).",
+    LANGUAGE_ALREADY_LOCKED: "Votre troisième langue est fixée. Pour la changer, faites une demande à l'administration.",
+    NOT_LANGUAGES_STREAM: "La troisième langue concerne uniquement la filière langues étrangères.",
     WEEKLY_DONE: "Test de la semaine terminé. Un nouveau test sera disponible lundi.",
     NO_CONTENT_YET: "Aucun contenu prêt pour vos matières pour l'instant.",
     generic: "Une erreur s'est produite. Réessayez.",
@@ -499,6 +516,11 @@ const fr: BacStrings = {
   chooseStreamText: "La filière détermine les matières de votre compte. Après le choix, les autres filières sont fermées ; seul un changement demandé à l'administration est possible.",
   coreSubjects: "Matières principales",
   secondOptions: "Matières possibles comme deuxième matière",
+  thirdLanguageTitle: "Choisissez votre troisième langue",
+  thirdLanguageText: "La filière langues étrangères a trois spécialités. Votre troisième langue est fixée avec la filière et ne change que sur demande à l'administration.",
+  thirdLanguageLabel: "Troisième langue",
+  pickLanguageFirst: "Choisissez d'abord la troisième langue.",
+  languageChosen: (language: string) => `${language} est votre troisième langue.`,
   chooseThisStream: "Choisir cette filière",
   confirmStream: (stream: string) => `Confirmer « ${stream} » ? Vous ne pourrez la changer que par une demande à l'administration.`,
   confirm: "Confirmer",
@@ -870,6 +892,9 @@ const en: BacStrings = {
     french: "French",
     english: "English",
     third_language: "Third foreign language",
+    german: "German",
+    spanish: "Spanish",
+    italian: "Italian",
     islamic: "Islamic studies",
   },
   streamChosen: {
@@ -894,6 +919,9 @@ const en: BacStrings = {
     REFERRAL_NOT_NEW: "Referral codes are for a first subscription only.",
     REQUEST_PENDING: "You already have a stream change request under review.",
     SAME_STREAM: "That's already your stream.",
+    LANGUAGE_REQUIRED: "Choose your third language (German, Spanish or Italian).",
+    LANGUAGE_ALREADY_LOCKED: "Your third language is set. Ask the administration to change it.",
+    NOT_LANGUAGES_STREAM: "The third language only applies to the foreign-languages stream.",
     WEEKLY_DONE: "This week's test is done. A new one opens on Monday.",
     NO_CONTENT_YET: "No content is ready for your subjects yet.",
     generic: "Something went wrong. Please try again.",
@@ -906,6 +934,11 @@ const en: BacStrings = {
   chooseStreamText: "Your stream decides which subjects your account includes. Once chosen, the other streams are closed; only the administration can change it, on request.",
   coreSubjects: "Core subjects",
   secondOptions: "Subjects you can pick as a second subject",
+  thirdLanguageTitle: "Choose your third language",
+  thirdLanguageText: "The foreign-languages stream has three specialisations. Your third language is set with the stream and only changes through a request to the administration.",
+  thirdLanguageLabel: "Third language",
+  pickLanguageFirst: "Pick the third language first.",
+  languageChosen: (language: string) => `${language} is now your third language.`,
   chooseThisStream: "Choose this stream",
   confirmStream: (stream: string) => `Confirm “${stream}”? You'll only be able to change it by asking the administration.`,
   confirm: "Confirm",
@@ -1282,4 +1315,11 @@ export function formatDate(value: Date | string | null | undefined, lang: Lang) 
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;
   return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-DZ" : "en-GB", { year: "numeric", month: "long", day: "numeric" });
+}
+
+/** "Foreign-languages stream (German)" — the stream with its specialisation. */
+export function streamLabel(b: BacStrings, stream: string | null | undefined, language?: string | null) {
+  if (!stream) return "—";
+  const name = b.streams[stream as PlatformStream] ?? stream;
+  return isThirdLanguage(language) ? `${name} (${b.subjects[language]})` : name;
 }

@@ -26,6 +26,9 @@ export const BAC_SUBJECTS = [
   "french",
   "english",
   "third_language",
+  "german",
+  "spanish",
+  "italian",
   "islamic",
 ] as const;
 export type BacSubject = (typeof BAC_SUBJECTS)[number];
@@ -40,6 +43,26 @@ export const STREAM_CORE_SUBJECTS: Record<PlatformStream, BacSubject[]> = {
   lettres: ["arabic", "philosophy", "history_geography", "french", "english"],
   langues: ["french", "english", "third_language", "arabic"],
 };
+
+/**
+ * The foreign-languages stream has three specialisations: the student's
+ * third language (German, Spanish or Italian) is chosen with the stream,
+ * locked with it, and takes the place of "third_language" among the core
+ * subjects.
+ */
+export const THIRD_LANGUAGES = ["german", "spanish", "italian"] as const;
+export type ThirdLanguage = (typeof THIRD_LANGUAGES)[number];
+
+export function isThirdLanguage(value: unknown): value is ThirdLanguage {
+  return typeof value === "string" && (THIRD_LANGUAGES as readonly string[]).includes(value);
+}
+
+/** The core subjects of this student's stream, with their own third language. */
+export function coreSubjects(stream: PlatformStream, thirdLanguage?: string | null): BacSubject[] {
+  return STREAM_CORE_SUBJECTS[stream].map(subject =>
+    subject === "third_language" && isThirdLanguage(thirdLanguage) ? thirdLanguage : subject
+  );
+}
 
 /** Subjects a student of the stream may pick as their second subject. */
 export const SECOND_SUBJECT_OPTIONS: Record<PlatformStream, BacSubject[]> = {

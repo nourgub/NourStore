@@ -1201,6 +1201,8 @@ export const tafawoqStudents = mysqlTable("tafawoqStudents", {
   // BAC platform: the stream is locked once chosen; only an admin changes it.
   streamLockedAt: timestamp("streamLockedAt"),
   secondSubject: varchar("secondSubject", { length: 32 }),
+  // Foreign-languages stream: german | spanish | italian, locked with the stream.
+  thirdLanguage: varchar("thirdLanguage", { length: 16 }),
   placementDoneAt: timestamp("placementDoneAt"),
   shareChatsWithParent: int("shareChatsWithParent").default(0).notNull(),
   bonusDaysCredit: int("bonusDaysCredit").default(0).notNull(),
@@ -1416,6 +1418,8 @@ export const tafawoqStreamRequests = mysqlTable(
     userId: int("userId").notNull().references(() => users.id),
     fromStream: varchar("fromStream", { length: 16 }).notNull(),
     toStream: varchar("toStream", { length: 16 }).notNull(),
+    fromLanguage: varchar("fromLanguage", { length: 16 }),
+    toLanguage: varchar("toLanguage", { length: 16 }),
     reason: text("reason").notNull(),
     status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
     reviewedBy: int("reviewedBy").references(() => users.id),
@@ -1434,6 +1438,8 @@ export const tafawoqStreamChanges = mysqlTable("tafawoqStreamChanges", {
   studentName: varchar("studentName", { length: 100 }).notNull(),
   fromStream: varchar("fromStream", { length: 16 }).notNull(),
   toStream: varchar("toStream", { length: 16 }).notNull(),
+  fromLanguage: varchar("fromLanguage", { length: 16 }),
+  toLanguage: varchar("toLanguage", { length: 16 }),
   reason: text("reason").notNull(),
   adminId: int("adminId").notNull().references(() => users.id),
   adminName: varchar("adminName", { length: 200 }),

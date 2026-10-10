@@ -16,7 +16,9 @@ import {
   SECOND_SUBJECT_OPTIONS,
   STREAM_CORE_SUBJECTS,
   SUBSCRIPTION_PLANS,
+  THIRD_LANGUAGES,
   isPlatformStream,
+  isThirdLanguage,
   planSavingDa,
   type BacSubject,
   type ErrorType,
@@ -24,6 +26,7 @@ import {
   type PlatformStream,
   type SubscriptionPlan,
   type TeacherAction,
+  type ThirdLanguage,
 } from "@shared/bacPlatform";
 import type { PublicQuestion } from "@shared/tafawoq";
 import * as bac from "../../db/bacPlatform";
@@ -155,12 +158,16 @@ export async function state(userId: number) {
       goals: student.goals,
       stream: locked ? (student.stream as PlatformStream) : null,
       secondSubject: student.secondSubject as BacSubject | null,
+      thirdLanguage: isThirdLanguage(student.thirdLanguage) ? student.thirdLanguage : null,
       placementDone: Boolean(student.placementDoneAt),
       shareChatsWithParent: student.shareChatsWithParent === 1,
     },
   };
   if (!locked) return { step: "stream" as const, ...base };
   const stream = student.stream as PlatformStream;
+  // Languages-stream accounts locked before the specialisations existed
+  // pick their third language once before anything else.
+  if (stream === "langues" && !isThirdLanguage(student.thirdLanguage)) return { step: "language" as const, ...base };
   const choices = secondSubjectChoices(stream, switches);
   const [subscription, pendingRequest, changeAllowed, ownChanges] = await Promise.all([
     subscriptionSummary(userId),
@@ -168,8 +175,8 @@ export async function state(userId: number) {
     settingFlag("bac.secondSubjectChange", true),
     bac.countOwnSecondSubjectChanges(student.id, await cycleStart(student)),
   ]);
-  const content = subscriptionContent(stream, student.secondSubject as BacSubject | null, switches);
-  const accessible = accessibleLessons(stream, student.secondSubject, switches);
+  const content = subscriptionContent(stream, student.secondSubject as BacSubject | null, switches, student.thirdLanguage);
+  const accessible = accessibleLessons(stream, student.secondSubject, switches, student.thirdLanguage);
   const needsSecond = !student.secondSubject && choices.some(choice => choice.available);
   const step = needsSecond
     ? ("second" as const)
@@ -184,7 +191,7 @@ export async function state(userId: number) {
     secondSubjectChange: { allowed: changeAllowed, used: ownChanges, remaining: changeAllowed ? Math.max(0, 1 - ownChanges) : 0 },
     subscription,
     pendingStreamRequest: pendingRequest
-      ? { id: pendingRequest.id, toStream: pendingRequest.toStream, createdAt: pendingRequest.createdAt }
+      ? { id: pendingRequest.id, toStream: pendingRequest.toStream, toLanguage: pendingRequest.toLanguage, createdAt: pendingRequest.createdAt }
       : null,
     lessons: accessible.map(lesson => ({ key: lesson.key, title: lesson.title, subject: lessonSubject(lesson)! })),
   };
@@ -200,18 +207,36 @@ export async function streamsCatalog() {
   }));
 }
 
-export async function chooseStream(userId: number, stream: PlatformStream) {
+/** The languages stream needs its specialisation; other streams take none. */
+function streamLanguage(stream: PlatformStream, language: string | null | undefined): ThirdLanguage | null {
+  if (stream !== "langues") return null;
+  if (!isThirdLanguage(language)) throw new TRPCError({ code: "BAD_REQUEST", message: "LANGUAGE_REQUIRED" });
+  return language;
+}
+
+export async function chooseStream(userId: number, stream: PlatformStream, language?: ThirdLanguage | null) {
   const student = await tafawoq.studentOrThrow(userId);
+  const thirdLanguage = streamLanguage(stream, language);
   if (student.streamLockedAt && isPlatformStream(student.stream)) {
     await bac.logEvent(userId, "stream_change_blocked", { current: student.stream, requested: stream });
     forbidden("STREAM_ALREADY_LOCKED");
   }
-  if (!(await bac.lockStream(student.id, stream))) {
+  if (!(await bac.lockStream(student.id, stream, thirdLanguage))) {
     await bac.logEvent(userId, "stream_change_blocked", { requested: stream });
     forbidden("STREAM_ALREADY_LOCKED");
   }
-  await bac.logEvent(userId, "stream_chosen", { stream, previous: student.stream });
-  return { stream };
+  await bac.logEvent(userId, "stream_chosen", { stream, language: thirdLanguage, previous: student.stream });
+  return { stream, language: thirdLanguage };
+}
+
+/** One-time choice for languages-stream students locked without a third language. */
+export async function chooseThirdLanguage(userId: number, language: ThirdLanguage) {
+  const student = await lockedStudent(userId);
+  if (student.stream !== "langues") forbidden("NOT_LANGUAGES_STREAM");
+  if (!isThirdLanguage(language)) throw new TRPCError({ code: "BAD_REQUEST", message: "LANGUAGE_REQUIRED" });
+  if (!(await bac.lockThirdLanguage(student.id, language))) forbidden("LANGUAGE_ALREADY_LOCKED");
+  await bac.logEvent(userId, "third_language_chosen", { language });
+  return { language };
 }
 
 export async function chooseSecondSubject(userId: number, subject: BacSubject) {
@@ -235,12 +260,25 @@ export async function chooseSecondSubject(userId: number, subject: BacSubject) {
   return { secondSubject: subject, changed: Boolean(previous) };
 }
 
-export async function requestStreamChange(userId: number, toStream: PlatformStream, reason: string) {
+export async function requestStreamChange(userId: number, toStream: PlatformStream, reason: string, toLanguage?: ThirdLanguage | null) {
   const student = await lockedStudent(userId);
-  if (student.stream === toStream) throw new TRPCError({ code: "BAD_REQUEST", message: "SAME_STREAM" });
+  const targetLanguage = streamLanguage(toStream, toLanguage);
+  const fromLanguage = isThirdLanguage(student.thirdLanguage) ? student.thirdLanguage : null;
+  // Within the languages stream, switching the specialisation is a change too.
+  if (student.stream === toStream && fromLanguage === targetLanguage) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "SAME_STREAM" });
+  }
   if (await bac.getPendingStreamRequest(student.id)) throw new TRPCError({ code: "CONFLICT", message: "REQUEST_PENDING" });
-  const id = await bac.createStreamRequest({ studentId: student.id, userId, fromStream: student.stream, toStream, reason: reason.trim() });
-  await bac.logEvent(userId, "stream_change_requested", { requestId: id, from: student.stream, to: toStream });
+  const id = await bac.createStreamRequest({
+    studentId: student.id,
+    userId,
+    fromStream: student.stream,
+    toStream,
+    fromLanguage,
+    toLanguage: targetLanguage,
+    reason: reason.trim(),
+  });
+  await bac.logEvent(userId, "stream_change_requested", { requestId: id, from: student.stream, to: toStream, fromLanguage, toLanguage: targetLanguage });
   return { id };
 }
 
@@ -273,7 +311,7 @@ export async function subscriptionPage(userId: number) {
   return {
     plans: SUBSCRIPTION_PLANS.map(plan => ({ key: plan, ...PLAN_DETAILS[plan], savingDa: planSavingDa(plan) })),
     stream,
-    content: stream ? subscriptionContent(stream, student!.secondSubject as BacSubject | null, switches) : null,
+    content: stream ? subscriptionContent(stream, student!.secondSubject as BacSubject | null, switches, student!.thirdLanguage) : null,
     summary,
     history: history.map(row => ({
       id: row.id,
@@ -433,7 +471,7 @@ export async function startPlacementTest(userId: number) {
     const paper = JSON.parse(open.paperJson) as Paper;
     return { examId: open.id, questions: await paperQuestions(paper), subjects: subjectsOfPaper(paper) };
   }
-  const lessons = accessibleLessons(student.stream, student.secondSubject, await contentSwitches());
+  const lessons = accessibleLessons(student.stream, student.secondSubject, await contentSwitches(), student.thirdLanguage);
   if (!lessons.length) throw new TRPCError({ code: "NOT_FOUND", message: "NO_CONTENT_YET" });
   const parts = placementPaper(lessons, randomSeed(), 20);
   const paper: Paper = [];
@@ -567,7 +605,7 @@ export async function placementResult(userId: number) {
 
 async function standings(student: Student & { stream: PlatformStream }) {
   const switches = await contentSwitches();
-  const lessons = accessibleLessons(student.stream, student.secondSubject, switches);
+  const lessons = accessibleLessons(student.stream, student.secondSubject, switches, student.thirdLanguage);
   const allStates = await store.getAllSkillStates(student.id);
   const points = new Map(paperLessons(student.stream).map(entry => [entry.lesson.key, entry.points]));
   return lessons.map(lesson => {
@@ -868,9 +906,10 @@ export async function dashboard(userId: number) {
   return {
     displayName: student.displayName,
     stream: student.stream,
+    thirdLanguage: student.thirdLanguage,
     secondSubject: student.secondSubject as BacSubject | null,
     subscription: summary,
-    content: subscriptionContent(student.stream, student.secondSubject as BacSubject | null, switches),
+    content: subscriptionContent(student.stream, student.secondSubject as BacSubject | null, switches, student.thirdLanguage),
     overallProgress: overall,
     subjects: subjectProgress(entries),
     lessons: entries.map(entry => ({
@@ -1164,8 +1203,8 @@ export async function teacherAction(
 export async function bankList(userId: number) {
   const student = await lockedStudent(userId);
   const switches = await contentSwitches();
-  const lessons = accessibleLessons(student.stream, student.secondSubject, switches);
-  const allowed = allowedSubjects(student.stream, student.secondSubject);
+  const lessons = accessibleLessons(student.stream, student.secondSubject, switches, student.thirdLanguage);
+  const allowed = allowedSubjects(student.stream, student.secondSubject, student.thirdLanguage);
   const generated = generatedTopics(lessons, student.stream).map(topic => ({
     ...topic,
     subject: lessonSubject(getLesson(topic.lessonKey)!)!,
@@ -1195,7 +1234,7 @@ export async function bankOpen(userId: number, topicId: string, seed?: number) {
   await requireSubscription(userId);
   if (topicId.startsWith("db:")) {
     const row = await bac.getBankTopic(Number(topicId.slice(3)));
-    const allowed = allowedSubjects(student.stream, student.secondSubject);
+    const allowed = allowedSubjects(student.stream, student.secondSubject, student.thirdLanguage);
     if (!row || !row.published || !row.streams.split(",").includes(student.stream) || !allowed.has(row.subject as BacSubject)) {
       await bac.logEvent(userId, "access_denied", { reason: ACCESS_ERRORS.streamLocked, topicId });
       throw new TRPCError({ code: "FORBIDDEN", message: ACCESS_ERRORS.streamLocked });
@@ -1259,7 +1298,7 @@ export async function bankAnswerOfficial(userId: number, topicId: string, answer
   const student = await lockedStudent(userId);
   await requireSubscription(userId);
   const row = await bac.getBankTopic(Number(topicId.replace(/^db:/, "")));
-  const allowed = allowedSubjects(student.stream, student.secondSubject);
+  const allowed = allowedSubjects(student.stream, student.secondSubject, student.thirdLanguage);
   if (!row || !row.published || !row.streams.split(",").includes(student.stream) || !allowed.has(row.subject as BacSubject)) {
     throw new TRPCError({ code: "FORBIDDEN", message: ACCESS_ERRORS.streamLocked });
   }
@@ -1281,7 +1320,7 @@ export async function revisionPack(userId: number) {
   const student = await lockedStudent(userId);
   await requireSubscription(userId);
   const switches = await contentSwitches();
-  const lessons = accessibleLessons(student.stream, student.secondSubject, switches);
+  const lessons = accessibleLessons(student.stream, student.secondSubject, switches, student.thirdLanguage);
   const rng = createRng(randomSeed());
   const subjects = new Map<string, Array<ReturnType<typeof revisionLesson>>>();
   for (const lesson of lessons) {
@@ -1384,6 +1423,7 @@ export async function parentOverview(parentUserId: number) {
         ...report,
         bac: {
           stream: student.streamLockedAt && isPlatformStream(student.stream) ? student.stream : null,
+          thirdLanguage: student.thirdLanguage,
           secondSubject: student.secondSubject,
           subscription: { status: summary.status, endsAt: summary.endsAt, daysLeft: summary.daysLeft, expiringSoon: summary.expiringSoon },
           weekly: weekly.filter(row => row.score !== null).reverse().map(row => ({ week: row.weekKey, score: row.score! })),
@@ -1472,12 +1512,14 @@ export async function adminResolveStreamRequest(adminId: number, requestId: numb
   }
   const student = await bac.getStudentById(request.studentId);
   if (approve && student) {
-    await bac.adminSetStream(student.id, request.toStream);
+    await bac.adminSetStream(student.id, request.toStream, request.toStream === "langues" ? request.toLanguage : null);
     await bac.recordStreamChange({
       studentId: student.id,
       studentName: student.displayName,
       fromStream: request.fromStream,
       toStream: request.toStream,
+      fromLanguage: request.fromLanguage,
+      toLanguage: request.toLanguage,
       reason: request.reason,
       adminId,
       adminName: await adminName(adminId),
@@ -1489,7 +1531,7 @@ export async function adminResolveStreamRequest(adminId: number, requestId: numb
     action: approve ? "bac.stream_request_approved" : "bac.stream_request_rejected",
     targetType: "tafawoqStreamRequest",
     targetId: request.id,
-    details: { from: request.fromStream, to: request.toStream },
+    details: { from: request.fromStream, to: request.toStream, fromLanguage: request.fromLanguage, toLanguage: request.toLanguage },
   });
   await bac.logEvent(adminId, approve ? "stream_request_approved" : "stream_request_rejected", { requestId, studentId: request.studentId });
   await bac.insertNotifications([
@@ -1574,7 +1616,12 @@ export async function adminContent() {
       key: subject,
       enabled: !switches.disabledSubjects.has(subject),
       hasContent: lessons.length > 0,
-      streams: PLATFORM_STREAMS.filter(stream => STREAM_CORE_SUBJECTS[stream].includes(subject) || SECOND_SUBJECT_OPTIONS[stream].includes(subject)),
+      streams: PLATFORM_STREAMS.filter(
+        stream =>
+          STREAM_CORE_SUBJECTS[stream].includes(subject) ||
+          SECOND_SUBJECT_OPTIONS[stream].includes(subject) ||
+          (stream === "langues" && (THIRD_LANGUAGES as readonly string[]).includes(subject))
+      ),
       lessons: lessons.map(lesson => ({
         key: lesson.key,
         title: lesson.title,

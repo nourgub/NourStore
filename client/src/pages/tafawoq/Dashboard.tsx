@@ -25,7 +25,7 @@ import type { BacSubject, ErrorType } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import { MasteryBar, percent } from "./components";
 import { Content, useLang } from "./i18n";
-import { bacError, formatDate, useB } from "./bacI18n";
+import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubjectChips } from "./Onboarding";
 
 export function SubscriptionBadge({ status }: { status: string }) {
@@ -56,7 +56,7 @@ export function StudentDashboard() {
           <div className="tfq-kicker">{b.dashboard}</div>
           <h1>{b.hello(data.displayName)}</h1>
           <div className="tfq-chips">
-            <span className="tfq-chip info">{b.streams[data.stream]}</span>
+            <span className="tfq-chip info">{streamLabel(b, data.stream, data.thirdLanguage)}</span>
             <span className="tfq-chip">
               {b.secondSubject}: {data.secondSubject ? b.subjects[data.secondSubject] : b.noSecond}
             </span>

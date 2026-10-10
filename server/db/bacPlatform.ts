@@ -87,22 +87,44 @@ export async function getStudentById(studentId: number) {
   return rows[0];
 }
 
-/** Locks the stream; false when it was already locked (only the first choice counts). */
-export async function lockStream(studentId: number, stream: string) {
+/** Now, truncated: MySQL rounds fractional TIMESTAMPs, possibly into the next second. */
+function wholeSecond() {
+  return new Date(Math.floor(Date.now() / 1000) * 1000);
+}
+
+/**
+ * Locks the stream (and, for the foreign-languages stream, its third
+ * language); false when it was already locked (only the first choice counts).
+ */
+export async function lockStream(studentId: number, stream: string, thirdLanguage: string | null = null) {
   const db = await requireDb();
   const [result] = await db
     .update(tafawoqStudents)
-    .set({ stream: stream as never, schoolLevel: "bac", streamLockedAt: new Date(), secondSubject: null })
+    .set({ stream: stream as never, schoolLevel: "bac", streamLockedAt: wholeSecond(), secondSubject: null, thirdLanguage })
     .where(and(eq(tafawoqStudents.id, studentId), isNull(tafawoqStudents.streamLockedAt)));
   return result.affectedRows === 1;
 }
 
-/** Admin only: moves a student to another stream (their second subject is reset). */
-export async function adminSetStream(studentId: number, stream: string) {
+/**
+ * Sets the third language of a student already locked into the languages
+ * stream without one (accounts created before languages were offered);
+ * false when a language was already set.
+ */
+export async function lockThirdLanguage(studentId: number, thirdLanguage: string) {
+  const db = await requireDb();
+  const [result] = await db
+    .update(tafawoqStudents)
+    .set({ thirdLanguage })
+    .where(and(eq(tafawoqStudents.id, studentId), eq(tafawoqStudents.stream, "langues" as never), isNull(tafawoqStudents.thirdLanguage)));
+  return result.affectedRows === 1;
+}
+
+/** Admin only: moves a student to another stream / third language (their second subject is reset). */
+export async function adminSetStream(studentId: number, stream: string, thirdLanguage: string | null = null) {
   const db = await requireDb();
   await db
     .update(tafawoqStudents)
-    .set({ stream: stream as never, schoolLevel: "bac", streamLockedAt: new Date(), secondSubject: null })
+    .set({ stream: stream as never, schoolLevel: "bac", streamLockedAt: wholeSecond(), secondSubject: null, thirdLanguage })
     .where(eq(tafawoqStudents.id, studentId));
 }
 
@@ -179,6 +201,7 @@ export async function listStudents(input: { search?: string; stream?: string; li
       userId: tafawoqStudents.userId,
       displayName: tafawoqStudents.displayName,
       stream: tafawoqStudents.stream,
+      thirdLanguage: tafawoqStudents.thirdLanguage,
       streamLockedAt: tafawoqStudents.streamLockedAt,
       secondSubject: tafawoqStudents.secondSubject,
       placementDoneAt: tafawoqStudents.placementDoneAt,
@@ -223,6 +246,8 @@ export async function createStreamRequest(input: {
   userId: number;
   fromStream: string;
   toStream: string;
+  fromLanguage?: string | null;
+  toLanguage?: string | null;
   reason: string;
 }) {
   const db = await requireDb();
@@ -267,6 +292,8 @@ export async function listStreamRequests(status?: "pending" | "approved" | "reje
       studentName: tafawoqStudents.displayName,
       fromStream: tafawoqStreamRequests.fromStream,
       toStream: tafawoqStreamRequests.toStream,
+      fromLanguage: tafawoqStreamRequests.fromLanguage,
+      toLanguage: tafawoqStreamRequests.toLanguage,
       reason: tafawoqStreamRequests.reason,
       status: tafawoqStreamRequests.status,
       reviewNote: tafawoqStreamRequests.reviewNote,
@@ -300,6 +327,8 @@ export async function recordStreamChange(input: {
   studentName: string;
   fromStream: string;
   toStream: string;
+  fromLanguage?: string | null;
+  toLanguage?: string | null;
   reason: string;
   adminId: number;
   adminName: string | null;

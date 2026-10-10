@@ -115,14 +115,16 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     expect(await events(sara.id, "stream_chosen")).toHaveLength(1);
     expect((await events(sara.id, "stream_change_blocked")).length).toBeGreaterThanOrEqual(2);
 
-    // Sciences has no second subject ready yet: straight to placement.
+    // Philosophy is ready as a second subject; the others are "coming soon".
     const state = await caller.bac.state();
-    expect(state.step).toBe("placement");
-    if (state.step === "placement") {
+    expect(state.step).toBe("second");
+    if (state.step === "second") {
       expect(state.content.everythingAvailable).toBe(false);
-      expect(state.secondChoices.every(choice => !choice.available)).toBe(true);
+      expect(state.secondChoices.filter(choice => choice.available).map(choice => choice.key)).toEqual(["philosophy"]);
     }
-    await expect(caller.bac.chooseSecondSubject({ subject: "philosophy" })).rejects.toMatchObject({ message: "SUBJECT_UNAVAILABLE" });
+    await expect(caller.bac.chooseSecondSubject({ subject: "arabic" })).rejects.toMatchObject({ message: "SUBJECT_UNAVAILABLE" });
+    await caller.bac.chooseSecondSubject({ subject: "philosophy" });
+    expect((await caller.bac.state()).step).toBe("placement");
 
     // A lesson of the literary streams (arithmetic) is refused by the server.
     await expect(caller.tafawoq.startPlacement({ lessonKey: "math-arithmetic" })).rejects.toMatchObject({ code: "FORBIDDEN", message: "STREAM_LOCKED" });
@@ -167,8 +169,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
 
     const answers = await paperAnswers(test.questions, index => index % 2 === 0);
     const result = await caller.bac.submitPlacement({ examId: test.examId, answers });
-    expect(result.subjects).toHaveLength(1);
-    expect(result.subjects[0].subject).toBe("math");
+    expect(result.subjects.map(entry => entry.subject).sort()).toEqual(["math", "philosophy", "physics"]);
     expect(["beginner", "needs_support", "intermediate", "good", "advanced"]).toContain(result.subjects[0].level);
     expect(result.review.length).toBeGreaterThan(0);
     expect(result.priorities.length).toBeGreaterThan(0);
@@ -338,8 +339,13 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
 
   it("changes a stream only through an admin-approved request, logged", async () => {
     const caller = appRouter.createCaller(ctxFor(yacine));
-    await expect(caller.bac.requestStreamChange({ toStream: "langues", reason: "court" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    const request = await caller.bac.requestStreamChange({ toStream: "langues", reason: "أريد التحويل إلى شعبة اللغات الأجنبية" });
+    await expect(caller.bac.requestStreamChange({ toStream: "langues", toLanguage: "german", reason: "court" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // The languages stream needs its specialisation.
+    await expect(caller.bac.requestStreamChange({ toStream: "langues", reason: "أريد التحويل إلى شعبة اللغات الأجنبية" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "LANGUAGE_REQUIRED",
+    });
+    const request = await caller.bac.requestStreamChange({ toStream: "langues", toLanguage: "german", reason: "أريد التحويل إلى شعبة اللغات الأجنبية" });
     await expect(caller.bac.requestStreamChange({ toStream: "sciences", reason: "طلب ثانٍ أثناء انتظار الأول" })).rejects.toMatchObject({ code: "CONFLICT" });
     await expect(caller.bacAdmin.resolveStreamRequest({ requestId: request.id, approve: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
     const adminCaller = appRouter.createCaller(ctxFor(admin));
@@ -348,9 +354,19 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     const db = await getDb();
     const [student] = await db!.select().from(tafawoqStudents).where(eq(tafawoqStudents.userId, yacine.id));
     expect(student.stream).toBe("langues");
+    expect(student.thirdLanguage).toBe("german");
     expect(student.secondSubject).toBeNull();
+    const state = await caller.bac.state();
+    expect(state.student?.thirdLanguage).toBe("german");
+    expect("content" in state && state.content.core.map(entry => entry.key)).toEqual(["french", "english", "german", "arabic"]);
     const [change] = await db!.select().from(tafawoqStreamChanges).where(eq(tafawoqStreamChanges.studentId, student.id));
-    expect(change).toMatchObject({ studentName: "ياسين", fromStream: "lettres", toStream: "langues", adminId: admin.id });
+    expect(change).toMatchObject({ studentName: "ياسين", fromStream: "lettres", toStream: "langues", fromLanguage: null, toLanguage: "german", adminId: admin.id });
+    // Switching the specialisation inside the stream is a request too.
+    const toSpanish = await caller.bac.requestStreamChange({ toStream: "langues", toLanguage: "spanish", reason: "أفضل دراسة الإسبانية بدل الألمانية" });
+    await adminCaller.bacAdmin.resolveStreamRequest({ requestId: toSpanish.id, approve: true });
+    const [after] = await db!.select().from(tafawoqStudents).where(eq(tafawoqStudents.userId, yacine.id));
+    expect(after.thirdLanguage).toBe("spanish");
+    await expect(caller.bac.chooseThirdLanguage({ language: "italian" })).rejects.toMatchObject({ message: "LANGUAGE_ALREADY_LOCKED" });
     expect(change.reason).toContain("اللغات");
     expect(change.adminName).toBe("admin");
   });

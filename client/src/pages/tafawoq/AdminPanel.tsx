@@ -17,7 +17,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { MasteryBar, percent } from "./components";
 import { useLang } from "./i18n";
-import { bacError, formatDate, useB } from "./bacI18n";
+import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubscriptionBadge } from "./Dashboard";
 
 const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "bank", "coupons", "notify", "analytics", "events", "settings"] as const;
@@ -169,7 +169,7 @@ function Students() {
                         {row.email}
                       </small>
                     </td>
-                    <td>{row.stream && isPlatformStream(row.stream) && row.streamLockedAt ? b.streams[row.stream] : "—"}</td>
+                    <td>{row.stream && isPlatformStream(row.stream) && row.streamLockedAt ? streamLabel(b, row.stream, row.thirdLanguage) : "—"}</td>
                     <td>
                       {row.stream && isPlatformStream(row.stream) ? (
                         <select
@@ -243,7 +243,7 @@ function Requests() {
                   <small className="tfq-muted">{dateTime(row.createdAt, lang)}</small>
                 </div>
                 <p>
-                  {b.streams[row.fromStream as PlatformStream] ?? row.fromStream} → {b.streams[row.toStream as PlatformStream] ?? row.toStream}
+                  {streamLabel(b, row.fromStream, row.fromLanguage)} → {streamLabel(b, row.toStream, row.toLanguage)}
                 </p>
                 <p dir="auto" style={{ whiteSpace: "pre-line" }}>
                   <strong>{b.reason}:</strong> {row.reason}
@@ -297,8 +297,8 @@ function Changes() {
               {rows.map(row => (
                 <tr key={row.id}>
                   <td dir="auto">{row.studentName}</td>
-                  <td>{b.streams[row.fromStream as PlatformStream] ?? row.fromStream}</td>
-                  <td>{b.streams[row.toStream as PlatformStream] ?? row.toStream}</td>
+                  <td>{streamLabel(b, row.fromStream, row.fromLanguage)}</td>
+                  <td>{streamLabel(b, row.toStream, row.toLanguage)}</td>
                   <td dir="auto">{row.reason}</td>
                   <td dir="auto">{row.adminName ?? row.adminId}</td>
                   <td>{dateTime(row.createdAt, lang)}</td>

@@ -5,11 +5,11 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { CreditCard, Gift, Repeat } from "lucide-react";
 import { toast } from "sonner";
-import { PAYMENT_METHODS, PLATFORM_STREAMS, type PaymentMethod, type PlatformStream, type SubscriptionPlan } from "@shared/bacPlatform";
+import { PAYMENT_METHODS, PLATFORM_STREAMS, type PaymentMethod, type PlatformStream, type SubscriptionPlan, type ThirdLanguage } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import { useLang } from "./i18n";
-import { bacError, formatDate, useB } from "./bacI18n";
-import { SubjectChips } from "./Onboarding";
+import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
+import { LanguageChoice, SubjectChips } from "./Onboarding";
 import { SubscriptionBadge } from "./Dashboard";
 
 export function SubscriptionPage() {
@@ -243,17 +243,21 @@ export function StreamRequestPage() {
   const state = trpc.bac.state.useQuery();
   const requests = trpc.bac.myStreamRequests.useQuery();
   const [toStream, setToStream] = useState<PlatformStream | "">("");
+  const [toLanguage, setToLanguage] = useState<ThirdLanguage | null>(null);
   const [reason, setReason] = useState("");
   const send = trpc.bac.requestStreamChange.useMutation({
     onSuccess: async () => {
       toast.success(b.requestSentStream);
       setReason("");
       setToStream("");
+      setToLanguage(null);
       await utils.bac.invalidate();
     },
     onError: error => toast.error(bacError(b, error)),
   });
   const current = state.data?.student?.stream ?? null;
+  const currentLanguage = state.data?.student?.thirdLanguage ?? null;
+  const needsLanguage = toStream === "langues";
   const pending = state.data && "pendingStreamRequest" in state.data ? state.data.pendingStreamRequest : null;
   return (
     <section className="tfq-narrow">
@@ -266,7 +270,7 @@ export function StreamRequestPage() {
       <p className="tfq-muted">{b.streamRequestText}</p>
       <div className="tfq-card">
         <p>
-          {b.currentStream}: <strong>{current ? b.streams[current] : "—"}</strong>
+          {b.currentStream}: <strong>{streamLabel(b, current, currentLanguage)}</strong>
         </p>
         {pending ? (
           <div className="tfq-banner">{b.errors.REQUEST_PENDING}</div>
@@ -275,28 +279,50 @@ export function StreamRequestPage() {
             className="tfq-form"
             onSubmit={event => {
               event.preventDefault();
-              if (toStream) send.mutate({ toStream, reason });
+              if (toStream && (!needsLanguage || toLanguage)) send.mutate({ toStream, toLanguage: needsLanguage ? toLanguage : null, reason });
             }}
           >
             <label className="tfq-field">
               {b.newStream}
-              <select className="tfq-select" value={toStream} onChange={event => setToStream(event.target.value as PlatformStream)} required>
+              <select
+                className="tfq-select"
+                value={toStream}
+                onChange={event => {
+                  setToStream(event.target.value as PlatformStream);
+                  setToLanguage(null);
+                }}
+                required
+              >
                 <option value="" disabled>
                   —
                 </option>
-                {PLATFORM_STREAMS.filter(entry => entry !== current).map(entry => (
+                {/* Languages-stream students may ask to switch their specialisation. */}
+                {PLATFORM_STREAMS.filter(entry => entry !== current || entry === "langues").map(entry => (
                   <option key={entry} value={entry}>
                     {b.streams[entry]}
                   </option>
                 ))}
               </select>
             </label>
+            {needsLanguage && (
+              <div className="tfq-field">
+                {b.thirdLanguageLabel}
+                <LanguageChoice value={toLanguage} onChange={setToLanguage} />
+                {current === "langues" && toLanguage === currentLanguage && <span className="tfq-muted">{b.errors.SAME_STREAM}</span>}
+              </div>
+            )}
             <label className="tfq-field">
               {b.reason}
               <textarea className="tfq-textarea" dir="auto" value={reason} minLength={10} maxLength={1000} required onChange={event => setReason(event.target.value)} />
               <span className="tfq-muted" style={{ fontWeight: 400 }}>{b.reasonHint}</span>
             </label>
-            <button type="submit" className="tfq-btn" disabled={send.isPending || !toStream || reason.trim().length < 10}>
+            <button type="submit" className="tfq-btn" disabled={
+                send.isPending ||
+                !toStream ||
+                (needsLanguage && (!toLanguage || (current === "langues" && toLanguage === currentLanguage))) ||
+                reason.trim().length < 10
+              }
+            >
               {send.isPending ? "…" : b.sendRequest}
             </button>
           </form>
@@ -309,7 +335,7 @@ export function StreamRequestPage() {
             {requests.data.map(row => (
               <li key={row.id}>
                 <strong>
-                  {b.streams[row.fromStream as PlatformStream] ?? row.fromStream} → {b.streams[row.toStream as PlatformStream] ?? row.toStream}
+                  {streamLabel(b, row.fromStream, row.fromLanguage)} → {streamLabel(b, row.toStream, row.toLanguage)}
                 </strong>
                 <span>
                   <span className={`tfq-chip ${row.status === "approved" ? "good" : row.status === "pending" ? "info" : ""}`}>{b.requestStatus[row.status]}</span>{" "}
