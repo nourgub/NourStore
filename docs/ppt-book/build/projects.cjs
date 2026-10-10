@@ -239,7 +239,7 @@ const exo = (cor) => build(cor ? 'Exercices-CORRIGE.pptx' : 'Exercices-PowerPoin
   cor ? 'Nourix Academy · تمارين PowerPoint: الحلول' : 'Nourix Academy · تمارين PowerPoint', (pres, C, T) => {
     const brief = (s, t) => s.addText(t, { x: 0.5, y: 4.45, w: 9, h: 0.65, fontSize: 12, italic: true, color: '595959', isTextBox: true, ...R });
     pres.addSection({ title: 'التمارين' });
-    S(pres, 'TITRE', 'التمارين', cor ? 'تمارين PowerPoint: الحلول' : 'تمارين PowerPoint', 'تمرين لكل فصل من الفصول 3 إلى 10');
+    S(pres, 'TITRE', 'التمارين', cor ? 'تمارين PowerPoint: الحلول' : 'تمارين PowerPoint', 'تمرين لكل فصل تطبيقي من الفصول 3 إلى 11');
     // ch3: paragraph -> bullets
     let s = S(pres, 'CONTENU', 'التمارين', 'تمرين الفصل 3: من فقرة إلى نقاط');
     if (!cor) s.addText('لكي يكون العرض ناجحاً يجب أن تحدد هدفك أولاً ثم أن تكتب فكرة واحدة في كل شريحة وأن تستعمل صوراً واضحة وأن تتدرب على العرض قبل يوم التقديم.', { x: 0.5, y: 1.3, w: 9, h: 2.5, fontSize: 16, color: C.text1, isTextBox: true, ...R });
@@ -263,8 +263,28 @@ const exo = (cor) => build(cor ? 'Exercices-CORRIGE.pptx' : 'Exercices-PowerPoin
     if (!cor) s.addTable(rtlRows(rows.map((r, i) => i ? r : r.map(t => ({ text: t, options: H })))), { x: 5.0, y: 1.3, w: 4.5, colW: [2.25, 2.25], fontSize: 14, fontFace: 'Arial', align: 'center', border: { type: 'solid', color: 'D9D9D9', pt: 0.75 }, rowH: 0.5 });
     else s.addChart(pres.charts.BAR, [{ name: 'المبيعات', labels: ['الثلاثي 1', 'الثلاثي 2', 'الثلاثي 3', 'الثلاثي 4'], values: [120, 150, 135, 190] }], chartOpts(C, T, { x: 0.5, y: 1.2, w: 9, h: 3.2, barDir: 'col', showValue: true, dataLabelPosition: 'outEnd', chartColors: [T.colors.accent1] }));
     brief(s, 'المطلوب: Insertion ثم Graphique ثم Histogramme groupé، وانسخ الأرقام في نافذة Excel، ثم أضف Étiquettes de données. أعلى عمود: الثلاثي 4 (190).');
-    // ch9-10: transition + animation order
-    s = S(pres, 'CONTENU', 'التمارين', 'تمرين الفصلين 9 و10: الانتقال والحركة');
+    // ch9: design principles (weak slide -> improved slide)
+    s = S(pres, 'CONTENU', 'التمارين', cor ? 'المبيعات ارتفعت 25 % هذا العام' : 'النتائج');
+    if (!cor) {
+      s.addText('خلال هذه السنة حققت الشركة نتائج جيدة جدا حيث ارتفعت المبيعات بنسبة 25 بالمائة مقارنة بالسنة الماضية كما تحسن رضا الزبائن وتم فتح فرعين جديدين في مدينتين مختلفتين وانضم إلى الفريق موظفون جدد في قسم المبيعات والتسويق.', { x: 0.5, y: 1.2, w: 5.6, h: 2.0, fontSize: 12, color: '8C8C8C', isTextBox: true, ...R });
+      s.addShape('rect', { x: 6.4, y: 1.3, w: 1.4, h: 1.0, fill: { color: '7030A0' }, line: { color: '7030A0' } });
+      s.addShape('ellipse', { x: 8.1, y: 2.1, w: 1.2, h: 1.2, fill: { color: '00B050' }, line: { color: '00B050' } });
+      s.addShape('rect', { x: 6.9, y: 3.0, w: 0.9, h: 0.9, fill: { color: 'FFC000' }, line: { color: 'FFC000' } });
+      s.addText('+25 %', { x: 1.0, y: 3.3, w: 1.6, h: 0.6, fontSize: 14, color: 'FF0000', isTextBox: true });
+    } else {
+      s.addText('+25 %', { x: 5.0, y: 1.15, w: 4.5, h: 1.0, fontSize: 54, bold: true, color: C.accent1, align: 'right', isTextBox: true });
+      s.addText('نمو المبيعات مقارنة بالسنة الماضية', { x: 0.5, y: 1.4, w: 4.4, h: 0.6, fontSize: 20, color: C.text1, valign: 'middle', isTextBox: true, ...R });
+      [['رضا أعلى', 'لدى الزبائن'], ['فرعان جديدان', 'في مدينتين'], ['فريق أكبر', 'في المبيعات']].forEach((t, i) => {
+        const x = 6.6 - i * 3.05;
+        s.addShape('roundRect', { x, y: 2.45, w: 2.9, h: 1.75, rectRadius: 0.12, fill: { color: C.background2 }, line: { color: C.background2 } });
+        s.addText(String(i + 1), { x: x + 2.25, y: 2.6, w: 0.5, h: 0.5, shape: 'ellipse', fill: { color: C.accent1 }, color: C.background1, fontSize: 16, bold: true, align: 'center', valign: 'middle', isTextBox: true });
+        s.addText(t[0], { x: x + 0.15, y: 3.1, w: 2.6, h: 0.5, fontSize: 20, bold: true, color: C.text2, isTextBox: true, ...R });
+        s.addText(t[1], { x: x + 0.15, y: 3.6, w: 2.6, h: 0.45, fontSize: 18, color: C.text1, isTextBox: true, ...R });
+      });
+    }
+    brief(s, cor ? 'الحل: عنوان يقول الرسالة، ورقم كبير، وثلاث بطاقات محاذية بلونين من السمة، ولا نص أصغر من 18.' : 'المطلوب: حسن هذه الشريحة بقواعد الفصل 9: عنوان يقول الرسالة، ورقم كبير، وثلاث بطاقات محاذية، ولا نص أصغر من 18.');
+    // ch10-11: transition + animation order
+    s = S(pres, 'CONTENU', 'التمارين', 'تمرين الفصلين 10 و11: الانتقال والحركة');
     ['أولاً', 'ثانياً', 'ثالثاً'].forEach((t, i) => card(s, C, 6.6 - i * 3.05, 1.3, 2.9, 2.6, t, cor ? ['Apparaître · Au clic', 'Apparaître · Après la précédente · 0,5 s', 'Apparaître · Après la précédente · 0,5 s'][i] : '', { icon: String(i + 1) }));
     brief(s, cor ? 'الحل: انتقال Fondu للشريحة، ثم Apparaître لكل بطاقة: الأولى Au clic، والباقي Après la précédente بتأخير 0,5 ثانية (التفاصيل في الملاحظات).' : 'المطلوب: أضف انتقالاً للشريحة، ثم اجعل البطاقات تظهر واحدة بعد الأخرى بالترتيب 1 ثم 2 ثم 3 (Volet Animation).');
     if (cor) s.addNotes('البطاقة 1: Apparaître، Démarrer: Au clic. البطاقة 2 و3: Apparaître، Démarrer: Après la précédente، Délai: 00,50. الانتقال: Fondu، Durée: 00,70.');

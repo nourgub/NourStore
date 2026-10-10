@@ -122,7 +122,7 @@ const slide = (w, inner, o = {}) => `<div style="position:relative;width:${w}px;
 function win(o) {
   const tab = o.tab || 'Accueil';
   const tabs = ['Fichier', ...(o.pre || []), ...TABS.slice(1)]; if (o.ctx) tabs.push(...o.ctx);
-  const tabsHtml = tabs.map(t => `<div class="tab${t === tab ? ' act' : ''}${CONTEXT[t] ? ' ctx' : ''}"${M(o.tabM && o.tabM[t], 'b')}>${t}</div>`).join('');
+  const tabsHtml = tabs.map(t => `<div class="tab${t === tab ? ' act' : ''}${CONTEXT[t] ? ' ctx' : ''}"${M(o.tabM && o.tabM[t], o.tabMp || 'b')}>${t}</div>`).join('');
   const ribbon = (R[tab] || R.Accueil)(o.m || {}).join('');
   const slides = o.slides || [SL.title(), SL.content('خطة العرض', SL.cards()), SL.content('لماذا الماء ثمين؟'), SL.content('أين يذهب الماء؟'), SL.content('كيف نقتصد؟')];
   const sel = o.sel ?? 0;
@@ -133,7 +133,7 @@ function win(o) {
     <div class="tb-right"><span class="avatar">NA</span><span class="wc">—</span><span class="wc">▢</span><span class="wc">✕</span></div></div>
   <div class="tabs"${M(o.mTabs, (o.mp && o.mp.mTabs) || 'b')}>${tabsHtml}<div class="tabs-right"><span class="pill">💬</span><span class="pill">⏺ Enregistrer</span><span class="pill">▶ ▾</span><span class="pill share"${M(o.mShare, 'b')}>⇪ Partager ▾</span></div></div>
   <div class="ribbon"${M(o.mRibbon, 'b')}>${ribbon}<div class="collapse">⌃</div></div>
-  <div class="work">${thumbs}<div class="pcenter">${o.center || `<div class="pslide">${slide(o.slideW || 860, o.current || slides[sel], { m: o.mSlide, mp: o.mSlideP || 'tr' })}</div><div class="notes"${M(o.mNotes, 'r')}>${o.notes || 'Cliquez pour ajouter des notes'}</div>`}</div>${o.right ? `<div class="side right">${o.right}</div>` : ''}</div>
+  <div class="work">${thumbs}<div class="pcenter">${o.center || `<div class="pslide">${slide(o.slideW || 860, o.current || slides[sel], { m: o.mSlide, mp: o.mSlideP || 'tr' })}</div><div class="notes"${M(o.mNotes, o.notesMp || 'c')}>${o.notes || 'Cliquez pour ajouter des notes'}</div>`}</div>${o.right ? `<div class="side right">${o.right}</div>` : ''}</div>
   <div class="status"${M(o.mStatus, (o.mp && o.mp.mStatus) || 't')}><div>Diapositive ${sel + 1} sur ${slides.length} &nbsp;&nbsp; 🗎 Français (France) &nbsp;&nbsp; ♿ Accessibilité : vérification terminée</div>
     <div class="zoomz"><span>≡ Notes</span><span>💬</span> <span class="vsel">▭</span> <span>▦</span> <span>📖</span> <span>▶</span> &nbsp; — <span class="slider"><i></i></span> + &nbsp; 68 % ⤢</div></div>
   ${(o.over || []).join('')}

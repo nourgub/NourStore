@@ -40,7 +40,7 @@ if os.path.exists(tj):
     d=re.sub(r'<w:p><w:r><w:fldChar w:fldCharType="begin" w:dirty="true" /><w:instrText xml:space="preserve">TOC .*?</w:p>',lambda m:''.join(paras),d,count=1,flags=re.S)
 
 # section: A4, margins, footer
-sect=('<w:sectPr><w:footerReference w:type="default" r:id="rIdFooter1"/>'
+sect=('<w:sectPr><w:headerReference w:type="default" r:id="rIdHeader1"/><w:footerReference w:type="default" r:id="rIdFooter1"/>'
       '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1020" w:right="1020" w:bottom="1020" w:left="1020" w:header="600" w:footer="600" w:gutter="0"/>'
       '<w:titlePg/><w:bidi/></w:sectPr>')
 d=re.sub(r'<w:sectPr.*?</w:sectPr>',sect,d,flags=re.S) if '<w:sectPr' in d else d.replace('</w:body>',sect+'</w:body>')
@@ -49,24 +49,70 @@ if 'xmlns:r=' not in d[:2000]:
 _prev=[False]
 def _h1(m):
     para=m.group(0); isH=para.startswith('<w:p><w:pPr><w:pStyle w:val="Heading1" />')
-    if isH and not _prev[0] and re.search(r'<w:t[^>]*>(الجزء|المقدمة|الملاحق|الفصل|الملحق)',para): para=para.replace('<w:pStyle w:val="Heading1" />','<w:pStyle w:val="Heading1" /><w:pageBreakBefore/>',1)
+    if isH and not _prev[0] and re.search(r'<w:t[^>]*>(الجزء|المقدمة|الملاحق|الفصل|الملحق|ماذا ستحصل|طريقة تحميل|كيف تستخدم)',para): para=para.replace('<w:pStyle w:val="Heading1" />','<w:pStyle w:val="Heading1" /><w:pageBreakBefore/>',1)
     _prev[0]=isH; return para
 d=re.sub(r'<w:p>(?:(?!<w:p>).)*?</w:p>',_h1,d,flags=re.S)
 d=re.sub(r'<w:tr>(?!<w:trPr>)','<w:tr><w:trPr><w:cantSplit/></w:trPr>',d)
 d=re.sub(r'<w:tr><w:trPr>(?!<w:cantSplit)','<w:tr><w:trPr><w:cantSplit/>',d)
+# undo the width scaling done in build.py (see PK there)
+d=re.sub(r'(<wp:extent|<a:ext) cx="(\d+)" cy="(\d+)"',lambda m:f'{m.group(1)} cx="{round(int(m.group(2))*5940000/5334000)}" cy="{round(int(m.group(3))*5940000/5334000)}"',d)
+def kn(para):
+    if '<w:keepNext/>' in para[:300]: return para
+    m=re.match(r'<w:p><w:pPr>(<w:pStyle w:val="[^"]*" ?/>)?',para)
+    if m: return para[:m.end()]+'<w:keepNext/>'+para[m.end():]
+    return para.replace('<w:p>','<w:p><w:pPr><w:keepNext/></w:pPr>',1)
+def _img(m):
+    para=m.group(0)
+    if '<w:drawing>' not in para or 'keepNext' in para: return para
+    return kn(para)
+d=re.sub(r'<w:p>(?:(?!<w:p>).)*?</w:p>',_img,d,flags=re.S)
+def _tbl(m):
+    tb=m.group(0)
+    tb=re.sub(r'(</w:tblGrid><w:tr><w:trPr><w:cantSplit/>)',r'\1<w:tblHeader/>',tb,count=1)
+    rows=re.findall(r'<w:tr>.*?</w:tr>',tb,re.S)
+    ncol=len(re.findall(r'<w:gridCol ',tb))
+    if len(rows)<=8 or (ncol<=2 and len(rows)<=10):
+        for row in rows[:-1]:
+            nr=re.sub(r'<w:p>(?:(?!<w:p>).)*?</w:p>',lambda q:kn(q.group(0)),row,flags=re.S)
+            tb=tb.replace(row,nr,1)
+    return tb
+d=re.sub(r'<w:tbl>.*?</w:tbl>',_tbl,d,flags=re.S)
+# chapter summaries stay in one block (no single orphan line on a new page)
+def _sum(m):
+    paras=re.findall(r'<w:p>(?:(?!<w:p>).)*?</w:p>',m.group(0),re.S)
+    out=m.group(0)
+    for q in paras[1:-1]: out=out.replace(q,kn(q),1)
+    return out
+def _quiz(m):
+    paras=re.findall(r'<w:p>(?:(?!<w:p>).)*?</w:p>',m.group(0),re.S)
+    out=m.group(0)
+    for q in paras[1:]: out=out.replace(q,kn(q),1)
+    return out
+# the short quiz travels with the summary, so a chapter never ends on a page holding only the summary
+d=re.sub(r'<w:p><w:pPr><w:pStyle w:val="Heading2" />(?:(?!<w:p>).)*?اختبار قصير.*?(?=<w:p><w:pPr><w:pStyle w:val="Heading2" />)',_quiz,d,flags=re.S)
+d=re.sub(r'<w:p><w:pPr><w:pStyle w:val="Heading2" />(?:(?!<w:p>).)*?خلاصة الفصل.*?(?=<w:p><w:pPr><w:pStyle w:val="Heading[12]" />|<w:sectPr)',_sum,d,flags=re.S)
+# paragraph that introduces a table or figure (ends with ':') stays with it
+d=re.sub(r'<w:p><w:pPr>(?:(?!<w:p>).)*?:</w:t></w:r></w:p>',lambda m:kn(m.group(0)),d,flags=re.S)
 files['word/document.xml']=d.encode()
+
+# header
+HC='<w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="17"/><w:szCs w:val="19"/><w:rtl/></w:rPr>'
+files['word/header1.xml']=('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+ '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr>'
+ '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="4" w:color="D4A84B"/></w:pBdr><w:tabs><w:tab w:val="end" w:pos="9866"/></w:tabs><w:bidi/><w:spacing w:after="0"/></w:pPr>'
+ f'<w:r>{HC}<w:t xml:space="preserve">PowerPoint العملي: من المبتدئ إلى المستوى المتوسط</w:t></w:r><w:r>{HC}<w:tab/></w:r><w:r>{HC}<w:t>Nourix Academy</w:t></w:r></w:p></w:hdr>').encode()
 
 # footer
 files['word/footer1.xml']=('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
  '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:bidi/><w:jc w:val="center"/></w:pPr>'
- '<w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">PowerPoint العملي  ·  Nourix Academy  ·  </w:t></w:r>'
+ '<w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">صفحة </w:t></w:r>'
  '<w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>'
  '<w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:color w:val="8A6A5E"/><w:sz w:val="18"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>').encode()
 r=files['word/_rels/document.xml.rels'].decode()
-r=r.replace('</Relationships>','<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>')
+r=r.replace('</Relationships>','<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/><Relationship Id="rIdHeader1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/></Relationships>')
 files['word/_rels/document.xml.rels']=r.encode()
 ct=files['[Content_Types].xml'].decode()
-ct=(ct if 'Extension="png"' in ct else ct.replace('<Default ','<Default Extension="png" ContentType="image/png"/><Default ',1)).replace('</Types>','<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>')
+ct=(ct if 'Extension="png"' in ct else ct.replace('<Default ','<Default Extension="png" ContentType="image/png"/><Default ',1)).replace('</Types>','<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/></Types>')
 for ext,mt in (('jpg','image/jpeg'),('jpeg','image/jpeg'),('png','image/png')):
     if f'Extension="{ext}"' not in ct: ct=ct.replace('<Default ',f'<Default Extension="{ext}" ContentType="{mt}"/><Default ',1)
 files['[Content_Types].xml']=ct.encode()
@@ -84,12 +130,12 @@ def setstyle(sid,ppr='',rpr='',extra_remove=True):
 F='<w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Arial" w:eastAsia="Calibri"/>'
 s=re.sub(r'<w:docDefaults>.*?</w:docDefaults>',
  '<w:docDefaults><w:rPrDefault><w:rPr>'+F+'<w:sz w:val="21"/><w:szCs w:val="23"/><w:lang w:val="fr-FR" w:bidi="ar-SA"/></w:rPr></w:rPrDefault>'
- '<w:pPrDefault><w:pPr><w:spacing w:after="100" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>',s,flags=re.S)
+ '<w:pPrDefault><w:pPr><w:spacing w:after="90" w:line="258" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>',s,flags=re.S)
 def H(sz,color,before,after,extra=''):
     return (f'<w:keepNext/><w:keepLines/>{extra}<w:spacing w:before="{before}" w:after="{after}"/>',
             f'<w:b/><w:bCs/><w:color w:val="{color}"/><w:sz w:val="{sz}"/><w:szCs w:val="{sz}"/>')
 p,rr=H(44,'5A1A0A',480,240,'<w:pBdr><w:bottom w:val="single" w:sz="18" w:space="8" w:color="D4A84B"/></w:pBdr>');setstyle('Heading1',p+'<w:outlineLvl w:val="0"/>',rr)
-p,rr=H(32,'C43E1C',360,120);setstyle('Heading2',p+'<w:outlineLvl w:val="1"/>',rr)
+p,rr=H(32,'C43E1C',260,100);setstyle('Heading2',p+'<w:outlineLvl w:val="1"/>',rr)
 p,rr=H(28,'8C2A12',240,80);setstyle('Heading3',p+'<w:outlineLvl w:val="2"/>',rr)
 p,rr=H(26,'1F2937',200,60);setstyle('Heading4',p+'<w:outlineLvl w:val="3"/>',rr)
 setstyle('BodyText','<w:spacing w:before="40" w:after="100"/>')
@@ -117,7 +163,7 @@ if 'w:styleId="SubtitleFR"' in s:
     s=s[:m.start()]+m.group(1)+'<w:name w:val="SubtitleFR"/><w:basedOn w:val="Normal"/><w:next w:val="BodyText"/><w:pPr><w:keepNext/><w:spacing w:before="0" w:after="240"/></w:pPr><w:rPr><w:i/><w:iCs/><w:color w:val="C43E1C"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr>'+m.group(3)+s[m.end():]
 if 'w:styleId="Copyright"' in s:
     m=re.search(r'(<w:style [^>]*w:styleId="Copyright"[^>]*>)(.*?)(</w:style>)',s,re.S)
-    s=s[:m.start()]+m.group(1)+'<w:name w:val="Copyright"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="0" w:after="160" w:line="264" w:lineRule="auto"/><w:jc w:val="both"/></w:pPr><w:rPr><w:sz w:val="19"/><w:szCs w:val="21"/><w:color w:val="374151"/></w:rPr>'+m.group(3)+s[m.end():]
+    s=s[:m.start()]+m.group(1)+'<w:name w:val="Copyright"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:before="0" w:after="160" w:line="264" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="19"/><w:szCs w:val="21"/><w:color w:val="374151"/></w:rPr>'+m.group(3)+s[m.end():]
 
 def addstyle(sid,ppr,rpr):
     global s
@@ -126,9 +172,24 @@ def addstyle(sid,ppr,rpr):
     else: print('missing style',sid)
 addstyle('ShotCaption','<w:keepNext/><w:spacing w:before="40" w:after="60"/><w:jc w:val="center"/>','<w:b/><w:bCs/><w:color w:val="C43E1C"/><w:sz w:val="20"/><w:szCs w:val="22"/>')
 addstyle('Legend','<w:pBdr><w:right w:val="single" w:sz="18" w:space="6" w:color="D4A84B"/></w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="FBEFEA"/><w:spacing w:before="0" w:after="0" w:line="252" w:lineRule="auto"/><w:ind w:left="300" w:right="300"/>','<w:sz w:val="20"/><w:szCs w:val="22"/><w:color w:val="2A1A14"/>')
+def box(sid,fill,line,rcol='2A1A14',full=False,thick=24):
+    th='single'
+    b=(f'<w:top w:val="{th}" w:sz="{8 if full else 4}" w:space="5" w:color="{line}"/>'
+       f'<w:left w:val="{th}" w:sz="{8 if full else 4}" w:space="6" w:color="{line}"/>'
+       f'<w:bottom w:val="{th}" w:sz="{8 if full else 4}" w:space="5" w:color="{line}"/>'
+       f'<w:right w:val="{th}" w:sz="{thick}" w:space="6" w:color="{line}"/>')
+    addstyle(sid,f'<w:keepLines/><w:pBdr>{b}</w:pBdr><w:shd w:val="clear" w:color="auto" w:fill="{fill}"/><w:spacing w:before="120" w:after="160" w:line="270" w:lineRule="auto"/><w:ind w:left="160" w:right="160"/>',
+             f'<w:color w:val="{rcol}"/><w:sz w:val="21"/><w:szCs w:val="23"/>')
+box('InfoBox','F7EFDC','D4A84B','4A2A10')
+box('TipBox','EAF5EE','2E7D4F','1F3D2B')
+box('WarnBox','FCEBE7','C43E1C','5A1A0A')
+box('NoteBox','EEF2F7','64748B','1F2937')
+box('ExerciseBox','FFF8EA','D4A84B','2A1A14',full=True)
+box('CheckBox','EAF5EE','2E7D4F','1F3D2B',full=True)
+box('DownloadBox','F7EFDC','5A1A0A','2A1A14',full=True,thick=36)
 files['word/styles.xml']=s.encode()
 core=('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
- '<dc:title>PowerPoint العملي</dc:title><dc:subject>من المبتدئ إلى المستوى المتوسط، بالصور و6 مشاريع حقيقية</dc:subject><dc:creator>Nourix Academy</dc:creator><dc:language>ar</dc:language>'
+ '<dc:title>PowerPoint العملي</dc:title><dc:subject>من المبتدئ إلى المستوى المتوسط، شرح مصور و6 مشاريع عملية</dc:subject><dc:creator>Nourix Academy</dc:creator><dc:language>ar</dc:language>'
  '<cp:keywords>Microsoft PowerPoint، PowerPoint، عروض تقديمية، Nourix Academy</cp:keywords><dcterms:created xsi:type="dcterms:W3CDTF">2026-10-01T00:00:00Z</dcterms:created></cp:coreProperties>')
 files['docProps/core.xml']=core.encode()
 zout=zipfile.ZipFile(dst,'w',zipfile.ZIP_DEFLATED)

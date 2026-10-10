@@ -4,8 +4,11 @@ B=os.path.abspath(S+'/..')+'/'
 LOGO=S+'/logo.png'
 from PIL import Image
 NUM='①②③④⑤⑥⑦⑧⑨⑩'
-files=['ch00.md']+[f'ch{i:02d}.md' for i in range(1,14)]+['annexes.md']
-jobs=[];shots=[]
+# pandoc caps images at its own default text width (14.8 cm); widths are scaled down here and back up in post.py
+PK=5334000/5940000
+files=['ch00.md']+[f'ch{i:02d}.md' for i in range(1,15)]+['annexes.md']
+jobs=[];shots=[];FIG=[0];CUR=['']
+TIGHT=json.load(open(S+'/tight.json')) if os.path.exists(S+'/tight.json') else {}
 def esc(t): return html.escape(t)
 def shot(m):
     body=m.group(1);d={};leg=[]
@@ -18,7 +21,7 @@ def shot(m):
     ill=f'{S}/ill/{sid}.png'
     if not real and os.path.exists(ill): real=ill
     if real:
-        im=Image.open(real);w=min(16.5,12*im.width/im.height);src=real
+        im=Image.open(real);w=min(16.5,TIGHT.get(CUR[0],11)*im.width/im.height);src=real
     else:
         os.makedirs(S+'/ph',exist_ok=True);src=f'{S}/ph/{sid}.png';w=15.5
         items=''.join(f'<div style="display:flex;gap:14px;align-items:baseline;margin:4px 0"><span style="color:#D4A84B;font-size:30px">{NUM[i]}</span><span>{esc(x)}</span></div>' for i,x in enumerate(leg))
@@ -33,14 +36,21 @@ def shot(m):
 <div style="font-size:30px;color:#D3DEEE;line-height:1.55"><b style="color:#F0D58C">كيف تصوّرها:</b> {esc(d['take'])}</div>
 <div style="position:absolute;bottom:40px;left:60px;font-size:22px;color:#8FA3C4;direction:ltr">shots/{sid}.png · Nourix Academy</div>
 </div></div>'''))
-    out=f'![]({src}){{width={w:.2f}cm}}\n\n::: {{custom-style="ShotCaption"}}\nالشكل {int(sid[1:])}: {d["title"]}\n:::\n\n'
+    FIG[0]+=1
+    out=f'![]({src}){{width={w*PK:.3f}cm}}\n\n::: {{custom-style="ShotCaption"}}\nالشكل {FIG[0]}: {d["title"]}\n:::\n\n'
     if leg: out+='::: {custom-style="Legend"}\n'+'\n\n'.join(f'{NUM[i]}  '+(x if re.search(r'[\u0600-\u06FF]',x) else '\u202a'+x+'\u202c') for i,x in enumerate(leg))+'\n:::\n'
     return out
 out=[]
 for f in files:
+    CUR[0]=f
     t=open(B+f,encoding='utf8').read()
     t=re.sub(r'```shot\n(.*?)```',shot,t,flags=re.S)
-    t=re.sub(r'^(# .*?)\s*\(\*\*(.+?)\*\*\)\s*$',lambda m:m.group(1)+'\n\n::: {custom-style="SubtitleFR"}\n'+m.group(2)+'\n:::',t,flags=re.M)
+    # quiz options: right-to-left marks keep (أ) (ب) (ج) in order when the options are in French
+    t=re.sub(r'^(\d+\. .*\(أ\).*)$',lambda m:re.sub(r' ?\((أ|ب|ج)\) ?',lambda q:'\u200f ('+q.group(1)+')\u200f ',m.group(1)).rstrip()+'\u200f',t,flags=re.M)
+    # mistakes / tips sections become coloured boxes
+    t=re.sub(r'(^## ⚠️ أخطاء شائعة\n\n)(.*?)(?=\n## |\n# |\Z)',lambda m:m.group(1)+'::: {custom-style="WarnBox"}\n'+m.group(2).strip()+'\n:::\n',t,flags=re.S|re.M)
+    t=re.sub(r'(^## ⭐ نصائح احترافية\n\n)(.*?)(?=\n## |\n# |\Z)',lambda m:m.group(1)+'::: {custom-style="TipBox"}\n'+m.group(2).strip()+'\n:::\n',t,flags=re.S|re.M)
+    t=re.sub(r'^(# .*?)\s*\(\*\*(.+?)\*\*\)\s*$',lambda m:m.group(1)+'\n\n::: {custom-style="SubtitleFR"}\n'+m.group(2).replace('**','')+'\n:::',t,flags=re.M)
     t=re.sub(r'\*\*([^*\n]+?)\*\*',lambda m:'**\u202a'+m.group(1)+'\u202c**' if re.search(r'[A-Za-z0-9←→↑↓]',m.group(1)) and not re.search(r'[\u0600-\u06FF]',m.group(1)) else m.group(0),t)
     t=re.sub(r'(?<!`)`([^`\n]+)`(?!`)',lambda m:'`\u200e'+m.group(1)+'\u200e`',t)
     out.append(t)
@@ -49,6 +59,6 @@ jobs.append(dict(out=S+'/cover.png',w=1240,h=1754,html=open(S+'/cover.html',enco
 json.dump(jobs,open(S+'/jobs.json','w'),ensure_ascii=False)
 if not os.environ.get('NORENDER'): subprocess.run(['node',S+'/render.cjs'],check=True)
 json.dump(shots,open(S+'/shots.json','w',encoding='utf8'),ensure_ascii=False,indent=1)
-md=f'![]({S}/cover.png){{width=16.3cm}}\n\n'+open(S+'/front.md',encoding='utf8').read()+'\n\n'+'\n\n'.join(out)
+md=f'![]({S}/cover.png){{width='+f'{17.2*PK:.3f}'+'cm}}\n\n'+open(S+'/front.md',encoding='utf8').read()+'\n\n'+'\n\n'.join(out)
 open(S+'/book.md','w',encoding='utf8').write(md)
 print(len(shots),'shots',sum(1 for j in jobs if '/ph/' in j['out']),'placeholders')
