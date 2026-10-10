@@ -1,6 +1,6 @@
 { pkgs }: {
   deps = [
-    pkgs.nodejs_20
+    pkgs.nodejs_22
     pkgs.mariadb
     # Only needed by scripts/replit-fetch-mysql-binary.mjs's fallback path
     # (a directly-downloaded MySQL binary, used only if the mariadb

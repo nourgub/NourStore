@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleAuthRoutes } from "./googleAuth";
 import { registerGoogleCalendarRoutes } from "./googleCalendar";
 import { registerProtectedFileRoutes } from "../protectedFiles";
+import { registerTafawoqTtsRoutes } from "../tafawoq/ttsRoute";
 import { registerSitemap } from "../sitemap";
 import { registerCertificateDownload } from "../certificateDownload";
 import { registerPaymentWebhooks } from "../paymentsWebhook";
@@ -75,6 +76,7 @@ async function startServer() {
   registerGoogleAuthRoutes(app);
   registerGoogleCalendarRoutes(app);
   registerProtectedFileRoutes(app);
+  registerTafawoqTtsRoutes(app);
   registerSitemap(app);
   registerCertificateDownload(app);
   registerPaymentWebhooks(app);

@@ -21,6 +21,11 @@ set -uo pipefail
 DATA_DIR="$(pwd)/.replit-data"
 MYSQL_DATA_DIR="$DATA_DIR/mysql"
 MYSQL_SOCKET="$DATA_DIR/mysqld.sock"
+# mysqld refuses a socket path longer than 107 characters; a deeply nested
+# project folder would hit that, so fall back to a short path in /tmp.
+if [ "${#MYSQL_SOCKET}" -gt 100 ]; then
+  MYSQL_SOCKET="/tmp/mysqld-$(id -u)-$(printf '%s' "$DATA_DIR" | cksum | cut -d' ' -f1).sock"
+fi
 SECRETS_FILE="$DATA_DIR/generated.env"
 MYSQL_PORT=3306
 DB_READY=0
@@ -94,7 +99,11 @@ start_mysqld_from() {
   done
 
   if [ "$DB_READY" -eq 1 ]; then
-    "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS nourix_academy;"
+    # Via Node (mysql2) first: the downloaded binary's `mysql` client needs
+    # libncurses.so.5, absent on recent images, while mysqld runs fine.
+    if ! node scripts/create-database.mjs "$MYSQL_PORT" nourix_academy; then
+      "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS nourix_academy;" || true
+    fi
     export DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/nourix_academy"
     echo "[replit-start] Applying database migrations..."
     if ! node scripts/migrate.mjs; then
@@ -178,6 +187,16 @@ fi
 if [ -n "${REPLIT_DB_URL_OVERRIDE:-}" ]; then
   export DATABASE_URL="$REPLIT_DB_URL_OVERRIDE"
 fi
+
+# --- The teacher's natural voice (Piper, free) ------------------------------
+# Downloaded once (~90 MB, + ~60 MB per language voice: German, Spanish, Italian, French, English) in the background so the app starts right away;
+# the server picks it up as soon as it's there (server/tafawoq/tts.ts).
+# Until then — or if this fails — the browser's own voice is used.
+if [ ! -x "$DATA_DIR/piper/piper/piper" ] || [ ! -f "$DATA_DIR/piper/ar_JO-kareem-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/de_DE-thorsten-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/es_ES-davefx-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/it_IT-paola-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/fr_FR-siwis-medium.onnx" ] || [ ! -f "$DATA_DIR/piper/en_US-joe-medium.onnx" ]; then
+  echo "[replit-start] Fetching the teacher's natural voice (Piper) in the background..."
+  (node scripts/fetch-piper.mjs "$DATA_DIR/piper" >> "$DATA_DIR/piper-fetch.log" 2>&1 &)
+fi
+export TAFAWOQ_PIPER_DIR="$DATA_DIR/piper"
 
 # --- Finally, start the app -----------------------------------------------
 # process.env.PORT (Replit sets this) takes priority over APP_PORT, and

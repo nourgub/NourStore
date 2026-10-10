@@ -28,6 +28,7 @@ const Workspace = lazy(() => import("./pages/Workspace"));
 const Search = lazy(() => import("./pages/Search"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const CertificateVerify = lazy(() => import("./pages/CertificateVerify"));
+const TafawoqApp = lazy(() => import("./pages/tafawoq/TafawoqApp"));
 
 // The former LearningFlows.tsx bundled learner-facing flows AND the entire
 // teacher/institution/admin panel into one file, so both ended up in the
@@ -81,12 +82,17 @@ function Router() {
     <Suspense fallback={<RouteFallback />}>
       <Switch>
         <Route path="/" component={Home} />
+        {/* Old links to /academy keep working. The maths teacher (Tafawoq)
+            lives at /tafawoq; it also ships as a standalone project. */}
+        <Route path="/academy" component={Home} />
         <Route path="/login" component={() => <AuthPage mode="login" />} />
         <Route
           path="/register"
           component={() => <AuthPage mode="register" />}
         />
         <Route path="/workspace" component={Workspace} />
+        <Route path="/tafawoq/:lessonKey" component={TafawoqApp} />
+        <Route path="/tafawoq" component={TafawoqApp} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/placement" component={PlacementTest} />
         <Route path="/quiz/:unitId" component={UnitQuiz} />

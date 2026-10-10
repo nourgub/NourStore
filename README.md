@@ -147,6 +147,56 @@ SMOKE_TEST_ROLES=admin SMOKE_TEST_SKIP_ANON=true DATABASE_URL="mysql://..." JWT_
 Last full run (both invocations): 204/204 checks passed, 0 failures — see
 `docs/verification-history.md` for the date and what it found along the way.
 
+## Tafawoq AI Teacher (`/tafawoq`)
+
+A personal teacher that treats every student differently, based on their
+real level — **free to run: no AI subscription or API key needed.**
+Interface in Arabic, French and English; lesson content follows its
+curriculum's language (the Algerian curriculum, in Arabic). Lives in
+`server/tafawoq/`, `server/routers/tafawoq.ts`, `client/src/pages/tafawoq/`
+and migration `drizzle/0025_add_tafawoq_ai_teacher.sql`.
+
+| Step | How (all deterministic, no model call) |
+|---|---|
+| Student profile | name, age, school level, goals |
+| Level assessment | 10-question placement covering every skill of the lesson, easy → hard |
+| Unlimited exercises | **parametric generators** (`generators/`, `lessons/*.ts`): each draws fresh numbers, *computes* the answer and a worked solution, and builds every wrong option by applying one named wrong rule — so a chosen distractor reveals the misconception |
+| Automatic correction | MCQ by key; typed answers by **mathematical equivalence** (`mathExpr.ts`): `2(3x²−2)`, `6x^2-4` and `−4 + 6·x²` are all accepted for `6x² − 4` |
+| Student model / knowledge tracing | Bayesian Knowledge Tracing per skill (`studentModel.ts`) |
+| Learning analytics | tier, strengths, weaknesses, recurring errors, learning speed (timing + accuracy), completion |
+| Recommendation / plan | next skills to teach, respecting each lesson's prerequisite graph |
+| Tutor | understands "explain / example / why do I make this mistake / simpler / challenge me" (ar/fr/en) and answers from the student model, the lesson's remedies and freshly generated worked examples |
+| Teaching by dialogue | "علّمني بالحوار": instead of handing over the rule, the teacher asks a chain of small questions the student can answer (`Skill.dialogue`, `dialogue.ts`), hints after a miss without giving the answer, reveals after a second miss, and lets the student reach the rule. Works in the chat, the live voice session and the phone call |
+| BAC-style problems | "موضوع بكالوريا": one statement and 4–6 chained questions like a real BAC exercise, ending with the discriminating question (`Lesson.problems`, `problems.ts`); numbers drawn and every answer computed, each part graded on its own skill |
+| Mock BAC & road to the mark | a full paper out of 20 per stream (`bac.ts`), marked once and kept; a predicted maths mark from mastery and mock exams with its range, the student's target, the BAC countdown (`TAFAWOQ_BAC_DATE`, else estimated), the weekly pace and today's most valuable task |
+| Teacher in Darja | "الأستاذ يتكلم: الدارجة": the teacher's sentences (greetings, praise, hints, dialogue, oral quiz, call) said in Algerian Darja, maths untouched (`darja.ts`); Darja requests ("سقسيني", "ما فهمتش", "معلاباليش"), Darja numbers ("طناش") and French maths terms ("la dérivée") are understood |
+| Natural teacher voice | the student picks a male or a female teacher ("الصوت: أستاذ / أستاذة"); synthesised on the server — first from a prepared voice pack when `TAFAWOQ_VOICE_PACK_MALE/FEMALE` are set (everything the teacher says, recorded once with an open model on a free GPU and imported: free and unlimited, `voice-dataset/pack/`), then (`tts.ts`, `POST /api/tafawoq/tts`, signed-in, rate limited, cached per sentence and voice for good, the fixed sentences prepared ahead in the background (`ttsWarmup.ts`); the free monthly allowance is spread over the month and, beyond its pro-rata line, sentences with maths are assembled from cached pieces in the same voice, so it never runs out; what is generated and spoken is drawn from `TAFAWOQ_SPOKEN_VARIANTS` fixed variants so it is voiced once for every student; with `STORAGE_PROVIDER=s3` the recordings survive redeploys): Azure Speech's Algerian voices (Ismael ♂, Amina ♀) when `AZURE_SPEECH_KEY`/`AZURE_SPEECH_REGION` are set (cap `TAFAWOQ_AZURE_MONTHLY_CHARS`, inside the free F0 tier), then Google Cloud TTS WaveNet when `GOOGLE_TTS_API_KEY` is set (monthly cap `TAFAWOQ_TTS_MONTHLY_CHARS`, default inside the free quota), otherwise Piper (MIT, local, free — `scripts/fetch-piper.mjs`, fetched by `replit-start.sh`); the browser's best voice only as a last resort |
+| Language lessons' voices | in German, Spanish, Italian, French and English lessons the language itself is read by a voice of that language and the student can choose to be taught in it (style «Deutsch / Español / Italiano / Français / English»). Free Piper voices fetched by `scripts/fetch-piper.mjs`, each recorded by a consenting speaker: Thorsten (de, CC0), davefx (es, CC0), Paola (it, CC0), Joe (en, CC0), Cori (en, public domain) and **SIWIS (fr) — CC-BY 4.0, credit: "SIWIS French Speech Synthesis Database", University of Edinburgh / Idiap (https://datashare.is.ed.ac.uk/handle/10283/2353)**; Azure/Google voices of the language when their keys are set |
+| Phone-call lesson | the teacher "calls" the student: greeting by name, dialogue on the weakest skill, three graded oral questions, spoken summary |
+| Personal lesson & video | built from the student model with generated examples; the video is rendered in the browser as animated slides narrated by the browser's own speech synthesis |
+
+Curriculum: BAC mathematics — limits & continuity, derivatives,
+exponential, logarithm, sequences, complex numbers, antiderivatives &
+integrals, probability, space geometry — plus middle-school lessons
+(equations, fractions) and Ohm's law. Each lesson is a skill graph,
+misconceptions + remedies, and generators; `server/tafawoq/generators.test.ts`
+runs 300 random draws of every generator and fails on a wrong key, a
+distractor equal to the answer, an untagged distractor, or broken
+formatting. Adding a country means adding a curriculum (`CURRICULA` in
+`curriculum.ts`) and its lessons; the engine is curriculum-agnostic.
+
+**Optional Claude.** If `ANTHROPIC_API_KEY` is set, lessons, exercises,
+tutor replies and video scripts are generated by Claude on top of the same
+student model (`ai.ts`); anything that fails or doesn't validate falls back
+to the free path. Leave it unset and nothing is ever sent to any AI service.
+
+Tests: `server/tafawoq/tafawoq.test.ts`, `server/tafawoq/generators.test.ts`,
+`server/tafawoq/dialogue.test.ts` (every skill has a dialogue whose answers
+are accepted and whose hints don't give them away; full dialogues replayed),
+`server/tafawoq/problems.test.ts` (200 draws of every BAC problem),
+and `server/tafawoq/tafawoq.realDb.e2e.test.ts` (the full loop against real
+MySQL, part of `npm run test:db`).
+
 ## Project structure
 
 ```
@@ -226,3 +276,34 @@ scripts/
   `PHASE_VISUAL_AUDIT.md`, `todo.md`) — historical engineering logs from
   past hardening passes, kept for the record of what was verified and how;
   not required reading to work on the code today
+
+## منصة البكالوريا (BAC platform)
+
+Streams: **العلوم التجريبية**, **الآداب والفلسفة**, **اللغات الأجنبية**. Server code in
+`server/tafawoq/platform/` (rules: `catalog.ts`, `plan.ts`, `papers.ts`, `diagnosis.ts`,
+`teacher.ts`; orchestration: `service.ts`; guard: `access.ts`), routers in
+`server/routers/bac.ts` (`bac.*` students/parents, `bacAdmin.*` admins), migration
+`drizzle/0032_add_tafawoq_bac_platform.sql`, screens in `client/src/pages/tafawoq/`.
+
+- **Stream lock**: chosen once (`bac.chooseStream`), locked in the database; profile edits can't
+  change it; another stream's lessons are refused by the server (`STREAM_LOCKED`) and logged.
+  Changes only via a request an admin approves; every change is kept in `tafawoqStreamChanges`.
+- **Second subject**: one at a time, from the stream's options, only if it has content; one own
+  change per subscription cycle (admin can turn changes off in Settings).
+- **Subscription 3000 DA/month** (3/6/12-month offers, coupons, referral free days). No payment
+  is simulated: a request stays `pending_payment` until an admin confirms it. Everything except
+  the placement test needs an active subscription (checked server-side).
+- **Content honesty**: a subject is offered only if the curriculum has lessons for it; otherwise
+  it is shown as "قريباً". Today only mathematics has BAC content, so it's available to sciences
+  (core) and to lettres/langues (as second subject). Generated bank topics carry no year; real
+  dated topics can be published by an admin.
+- Placement test across subjects (5 levels), daily plan + streak, mistake diagnosis stored per
+  answer (`tafawoqAttempts.errorType`), weekly test /20, mock BAC with autosave and time
+  analysis, topic bank, offline quick revision, teacher quick requests in the fixed format
+  (title / explanation / law / example / question, read aloud on request), points & badges (no
+  public ranking), parent follow-up (chats only with the student's consent), admin panel and an
+  event log (`tafawoqEvents`, never passwords).
+- Tests: `server/tafawoq/platform/platform.test.ts` and the real-DB
+  `server/tafawoq/platform/bacPlatform.realDb.e2e.test.ts` (in `npm run test:db`).
+
+Payment instructions shown to students are set by an admin (Admin → Settings).

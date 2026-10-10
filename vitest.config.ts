@@ -15,21 +15,27 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "node",
-    include: [
-      "server/**/*.test.ts",
-      "server/**/*.spec.ts",
-      "client/**/*.test.tsx",
-      "client/**/*.test.ts",
-      "shared/**/*.test.ts",
-    ],
-    // Frontend component tests need a real DOM (jsdom); server tests run
-    // fine in plain Node — this lets both coexist without slowing down the
-    // much more numerous server tests with an unnecessary DOM.
-    environmentMatchGlobs: [
-      ["client/**/*.test.tsx", "jsdom"],
-      ["client/**/*.test.ts", "jsdom"],
-    ],
     setupFiles: ["./client/src/test-setup.ts"],
+    // Frontend component tests need a real DOM (jsdom); server tests run
+    // fine in plain Node — two projects let both coexist without slowing
+    // down the much more numerous server tests with an unnecessary DOM.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "server",
+          environment: "node",
+          include: ["server/**/*.test.ts", "server/**/*.spec.ts", "shared/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "client",
+          environment: "jsdom",
+          include: ["client/**/*.test.tsx", "client/**/*.test.ts"],
+        },
+      },
+    ],
   },
 });
