@@ -52,6 +52,7 @@ import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
 import { RoadmapCard } from "./RoadmapCard";
 import { FOREIGN_REQUESTS, darjaSuggestions, foreignSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
 import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
+import type { BacSubject } from "@shared/bacPlatform";
 import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
@@ -191,11 +192,12 @@ function HomeCallCard({
   placedKeys,
   bac,
 }: {
-  lessons: Array<{ key: string; title: string }>;
+  lessons: Array<{ key: string; title: string; subject: string }>;
   placedKeys: string[];
   bac: boolean;
 }) {
   const t = useT();
+  const b = useB();
   const lang = useLang();
   const [chosenStyle, setStyle] = useTeacherStyle();
   const [calling, setCalling] = useState(false);
@@ -204,6 +206,8 @@ function HomeCallCard({
   const lessonKey = today && placedKeys.includes(today) ? today : placedKeys.find(key => lessons.some(lesson => lesson.key === key));
   const lesson = lessons.find(entry => entry.key === lessonKey);
   const style = styleIn(chosenStyle, lesson?.key);
+  // The teacher of today's lesson's subject calls: philosophy, German, history…
+  const subjectName = b.subjects[(lesson?.subject ?? "math") as BacSubject] ?? b.subjects.math;
   return (
     <section className="tfq-card tfq-home-call">
       {calling && lesson && (
@@ -211,7 +215,7 @@ function HomeCallCard({
           lessonKey={lesson.key}
           lang={lang}
           style={style}
-          teacherName="أستاذ الرياضيات"
+          teacherName={`أستاذ ${b.subjects[(lesson.subject as BacSubject)] ?? lesson.title}`}
           onClose={() => setCalling(false)}
         />
       )}
@@ -219,7 +223,7 @@ function HomeCallCard({
         <Phone size={30} />
       </div>
       <div style={{ flex: 1, minWidth: 220 }}>
-        <h2 style={{ margin: 0 }}>{t.homeCallTitle}</h2>
+        <h2 style={{ margin: 0 }}>{t.homeCallTitle(subjectName)}</h2>
         <Content className="tfq-muted">{lesson ? t.homeCallText(lesson.title) : t.homeCallFirst}</Content>
         <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
           <span className="tfq-muted">{t.teacherStyle}</span>
@@ -327,14 +331,14 @@ function DashboardHome({ lessons }: { lessons: Array<{ key: string; title: strin
   const overview = trpc.tafawoq.overview.useQuery();
   const dashboard = trpc.bac.dashboard.useQuery();
   const active = dashboard.data?.subscription.active ?? false;
-  const mathLessons = lessons.filter(lesson => lesson.subject === "math");
+
   return (
     <>
       <StudentDashboard />
-      {active && mathLessons.length > 0 && (
+      {active && lessons.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <HomeCallCard
-            lessons={mathLessons.map(lesson => ({ key: lesson.key, title: lesson.title }))}
+            lessons={lessons}
             placedKeys={(overview.data?.lessons ?? []).map(entry => entry.key)}
             bac
           />

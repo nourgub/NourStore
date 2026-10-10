@@ -891,9 +891,14 @@ function pickOralItem(lesson: Lesson, context: StudentContext, seen: Set<string>
     const generator = rng.pick(generators.filter(entry => score(entry) === best));
     return instantiate(generator, spokenSeed(seed => seen.has(instantiate(generator, seed).id)));
   }
+  // Bank-only lessons (languages, literature, history…): a question not yet
+  // answered first — of the focus skill, then of the lesson — closest to
+  // the target difficulty; only when all were answered does one come back.
   const bank = lesson.bank.filter(question => question.skill === focus?.key);
-  const pool = bank.length ? bank : lesson.bank;
-  return [...pool].sort((a, b) => Math.abs(a.difficulty - target) - Math.abs(b.difficulty - target))[0];
+  const unseen = (pool: BankQuestion[]) => pool.filter(question => !seen.has(question.id));
+  const pool = [unseen(bank), unseen(lesson.bank), bank, lesson.bank].find(candidates => candidates.length)!;
+  const closest = Math.min(...pool.map(question => Math.abs(question.difficulty - target)));
+  return rng.pick(pool.filter(question => Math.abs(question.difficulty - target) === closest));
 }
 
 export function oralQuestionText(item: StoredItem): string {

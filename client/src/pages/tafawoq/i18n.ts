@@ -59,7 +59,7 @@ const ar = {
   examAgain: "موضوع آخر",
   examBack: "العودة إلى الدروس",
   examHistory: "علاماتك في البكالوريا التجريبية",
-  homeCallTitle: "أستاذ الرياضيات يتصل بك",
+  homeCallTitle: (subject: string) => `أستاذ ${subject} يتصل بك`,
   exTitle: "ارفع تمرينك",
   exCard: "صوّر تمرينك أو اكتبه، واحصل على الحل المفصّل خطوة بخطوة.",
   exIntro:
@@ -376,7 +376,7 @@ const fr: TafawoqStrings = {
   examAgain: "Un autre sujet",
   examBack: "Retour aux leçons",
   examHistory: "Tes notes au BAC blanc",
-  homeCallTitle: "Ton prof de maths t’appelle",
+  homeCallTitle: (subject: string) => `Ton professeur (${subject}) t’appelle`,
   exTitle: "Envoie ton exercice",
   exCard: "Prends ton exercice en photo ou écris-le, et reçois la solution détaillée.",
   exIntro:
@@ -684,7 +684,7 @@ const en: TafawoqStrings = {
   examAgain: "Another paper",
   examBack: "Back to lessons",
   examHistory: "Your mock BAC marks",
-  homeCallTitle: "Your maths teacher calls you",
+  homeCallTitle: (subject: string) => `Your teacher (${subject}) calls you`,
   exTitle: "Send your exercise",
   exCard: "Photograph or type your exercise and get the detailed solution.",
   exIntro:
