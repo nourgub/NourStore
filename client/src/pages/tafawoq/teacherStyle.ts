@@ -74,6 +74,24 @@ export const FOREIGN_REQUESTS: Record<
     notUnderstood: "Non ho capito",
     greeting: "Sono qui con te. Chiedimi quello che vuoi sulla lezione, di' «Un esempio», oppure «Fammi una domanda» e ti faccio una domanda.",
   },
+  fr: {
+    quiz: "Interroge-moi",
+    dialogue: "En dialogue",
+    example: "Un exemple, s'il te plaît",
+    why: "Pourquoi je me trompe ?",
+    understood: "J'ai compris, merci",
+    notUnderstood: "Je n'ai pas compris",
+    greeting: "Je suis avec toi. Demande-moi ce que tu veux sur la leçon, dis «Un exemple», ou dis «Interroge-moi» et je te pose une question.",
+  },
+  en: {
+    quiz: "Ask me",
+    dialogue: "In dialogue",
+    example: "An example, please",
+    why: "Why do I make mistakes?",
+    understood: "I understand, thanks",
+    notUnderstood: "I didn't understand",
+    greeting: "I'm with you now. Ask me anything about the lesson, say «An example», or say «Ask me» and I'll ask you a question.",
+  },
 };
 
 /** Chat suggestions in the taught language. */

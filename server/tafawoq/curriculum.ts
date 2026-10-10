@@ -23,6 +23,12 @@ import { PHILOSOPHY_LESSONS } from "./lessons/philosophy";
 import { GERMAN_LESSONS } from "./lessons/german";
 import { SPANISH_LESSONS } from "./lessons/spanish";
 import { ITALIAN_LESSONS } from "./lessons/italian";
+import { FRENCH_LESSONS } from "./lessons/french";
+import { ENGLISH_LESSONS } from "./lessons/english";
+import { ARABIC_LESSONS } from "./lessons/arabic";
+import { NATURAL_SCIENCES_LESSONS } from "./lessons/naturalSciences";
+import { HISTORY_GEOGRAPHY_LESSONS } from "./lessons/historyGeography";
+import { ISLAMIC_LESSONS } from "./lessons/islamic";
 import { BAC_LESSONS } from "./lessons";
 
 export type Skill = {
@@ -136,7 +142,19 @@ export const CURRICULA: Record<CurriculumKey, { country: string; language: "ar" 
   dz: { country: "DZ", language: "ar", name: "المنهاج الجزائري" },
 };
 
-export type SubjectKey = "math" | "physics" | "philosophy" | "german" | "spanish" | "italian";
+export type SubjectKey =
+  | "math"
+  | "physics"
+  | "philosophy"
+  | "german"
+  | "spanish"
+  | "italian"
+  | "french"
+  | "english"
+  | "arabic"
+  | "natural_sciences"
+  | "history_geography"
+  | "islamic";
 
 export const SUBJECTS: Record<SubjectKey, { name: string }> = {
   math: { name: "الرياضيات" },
@@ -145,6 +163,12 @@ export const SUBJECTS: Record<SubjectKey, { name: string }> = {
   german: { name: "اللغة الألمانية" },
   spanish: { name: "اللغة الإسبانية" },
   italian: { name: "اللغة الإيطالية" },
+  french: { name: "اللغة الفرنسية" },
+  english: { name: "اللغة الإنجليزية" },
+  arabic: { name: "اللغة العربية وآدابها" },
+  natural_sciences: { name: "علوم الطبيعة والحياة" },
+  history_geography: { name: "التاريخ والجغرافيا" },
+  islamic: { name: "العلوم الإسلامية" },
 };
 
 const derivatives: Lesson = {
@@ -1906,6 +1930,12 @@ export const LESSONS: Lesson[] = [
   ...GERMAN_LESSONS,
   ...SPANISH_LESSONS,
   ...ITALIAN_LESSONS,
+  ...FRENCH_LESSONS,
+  ...ENGLISH_LESSONS,
+  ...ARABIC_LESSONS,
+  ...NATURAL_SCIENCES_LESSONS,
+  ...HISTORY_GEOGRAPHY_LESSONS,
+  ...ISLAMIC_LESSONS,
 ];
 
 /**

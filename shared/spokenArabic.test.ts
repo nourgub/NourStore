@@ -82,6 +82,10 @@ describe("spokenParts (language lessons)", () => {
     expect(spokenParts("❓ (1/4) «¿Compras los libros?»", "es")[0].text).toBe("Pregunta 1: ¿Compras los libros?");
     expect(foreignLanguageOfLesson("es-tenses")).toBe("es");
     expect(foreignLanguageOfSubject("italian")).toBe("it");
+    expect(spokenParts("❓ (2/4) «Où est-ce que tu habites ?» Réponds en français.", "fr")[0].text).toBe(
+      "Question 2: Où est-ce que tu habites ? Réponds en français."
+    );
+    expect(foreignLanguageOfLesson("en-tenses")).toBe("en");
   });
 
   it("is plain Arabic (maths included) outside language lessons", () => {

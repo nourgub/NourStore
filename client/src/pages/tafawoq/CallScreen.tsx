@@ -19,10 +19,10 @@ import { RECOGNITION_LANG, canListen, listenOnce, speakArabic, unlockAudio, useS
 type Phase = "ringing" | "connecting" | "speaking" | "listening" | "thinking" | "ended";
 
 const QUESTIONS_PER_CALL = 3;
-const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again|wiederhol|noch ?einmal|nochmal|repite|otra vez|ripeti|di nuovo/i;
+const REPEAT = /أعد|اعد|كرر|كرّر|عاود|répète|repete|repeat|again|wiederhol|noch ?einmal|nochmal|repite|otra vez|ripeti|di nuovo|repeat/i;
 // Graded-answer openings, in Fusha, in Darja (server/tafawoq/darja.ts) and in the taught languages (server/tafawoq/foreign.ts).
 const GRADED =
-  /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح|Nicht ganz\.|Kein Problem\. Die richtige Antwort|Casi\.|No pasa nada\. La respuesta correcta|Non proprio\.|Nessun problema\. La risposta giusta)/;
+  /^(✔|ليس تماماً|لا بأس\. الجواب الصحيح|ماشي هكا|ماعليش\. الجواب الصحيح|Nicht ganz\.|Kein Problem\. Die richtige Antwort|Casi\.|No pasa nada\. La respuesta correcta|Non proprio\.|Nessun problema\. La risposta giusta|Pas tout à fait\.|Pas de souci\. La bonne réponse|Not quite\.|No problem\. The right answer)/;
 const SAY = {
   fusha: {
     hello: (name: string, teacher: string) => `ألو؟ السلام عليكم يا ${name}! معك ${teacher}. هل تسمعني جيداً؟`,
@@ -87,6 +87,28 @@ const FOREIGN_SAY: Record<ForeignLang, CallWords> = {
     askAgain: "E adesso ti ripeto la domanda.",
     checkUnderstood: "Adesso controlliamo se hai capito.",
   },
+  fr: {
+    hello: name => `Allô ? Bonjour ${name} ! C'est ton professeur de français. Tu m'entends bien ?`,
+    howAreYou: "Comment vas-tu aujourd'hui ?",
+    topic: (skill, mistake) => `Très bien. Aujourd'hui, on travaille «${skill}».${mistake ? ` Tu fais parfois cette erreur : ${mistake}.` : ""} Tu es prêt ?`,
+    go: "C'est parti !",
+    helloAgain: "Allô ? Tu m'entends ?",
+    clear: "C'est clair ?",
+    next: "Bien, la question suivante.",
+    askAgain: "Et maintenant, je te repose la question.",
+    checkUnderstood: "Maintenant, vérifions que tu as compris.",
+  },
+  en: {
+    hello: name => `Hello ${name}! It's your English teacher. Can you hear me well?`,
+    howAreYou: "How are you today?",
+    topic: (skill, mistake) => `Good. Today we're working on «${skill}».${mistake ? ` You sometimes make this mistake: ${mistake}.` : ""} Are you ready?`,
+    go: "Let's go!",
+    helloAgain: "Hello? Can you hear me?",
+    clear: "Is that clear?",
+    next: "Good, the next question.",
+    askAgain: "And now I'll ask the question again.",
+    checkUnderstood: "Now let's check you've understood.",
+  },
 };
 
 /** What the student's call requests are, in the teacher's language. */
@@ -100,7 +122,7 @@ const MIC_BLOCKED = new Set(["not-allowed", "service-not-allowed", "audio-captur
 
 /** What the teacher says aloud: the worked solution stays on screen only. */
 function spokenPart(text: string) {
-  return text.split(/\n(?:الحل|Solution|Erklärung \(auf Arabisch\)|Explicación \(en árabe\)|Spiegazione \(in arabo\)) ?:/)[0].trim();
+  return text.split(/\n(?:الحل|Solution|Erklärung \(auf Arabisch\)|Explicación \(en árabe\)|Spiegazione \(in arabo\)|Explication \(en arabe\) |Explanation \(in Arabic\)) ?:/)[0].trim();
 }
 
 /** Marks the message that closes a dialogue (server/tafawoq/dialogue.ts). */
@@ -109,7 +131,7 @@ const DIALOGUE_STEP = "❓ (";
 
 /** The tutor's "say «اختبرني»…" tails make no sense mid-call. */
 function forCall(text: string) {
-  return text.replace(/\n?(?:(?:قل|قول) «اختبرني»|Sag «Frag mich»|Di «Pregúntame»|Di' «Fammi una domanda»)[^\n]*/g, "").trim();
+  return text.replace(/\n?(?:(?:قل|قول) «اختبرني»|Sag «Frag mich»|Di «Pregúntame»|Di' «Fammi una domanda»|Dis «Interroge-moi»|Say «Ask me»)[^\n]*/g, "").trim();
 }
 
 /** Two-tone ring, synthesised (no audio file). Returns a stop function. */

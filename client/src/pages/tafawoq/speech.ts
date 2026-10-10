@@ -49,6 +49,8 @@ const DEFAULT_LANG: Record<SpokenPart["lang"], string> = {
   de: TAUGHT_LANGUAGES.de.bcp47,
   es: TAUGHT_LANGUAGES.es.bcp47,
   it: TAUGHT_LANGUAGES.it.bcp47,
+  fr: TAUGHT_LANGUAGES.fr.bcp47,
+  en: TAUGHT_LANGUAGES.en.bcp47,
 };
 
 /** One piece in the device's voice; resolves when it is said (or cannot be). */

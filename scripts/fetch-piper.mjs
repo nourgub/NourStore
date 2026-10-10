@@ -1,8 +1,9 @@
 // Downloads Piper (free, open-source, MIT — github.com/rhasspy/piper) and
 // its Arabic voice "Kareem" (ar_JO, medium) for the Tafawoq teacher's
 // natural voice, then the voices that read the language lessons' own words:
-// "Thorsten" (German), "davefx" (Spanish), "Paola" (Italian) — all CC0,
-// recorded by consenting speakers. Idempotent: does nothing when all are there.
+// "Thorsten" (German), "davefx" (Spanish), "Paola" (Italian), "Joe" (English)
+// — CC0 —, "Cori" (English, public domain) and "SIWIS" (French, CC-BY 4.0,
+// credited in the README), all recorded by consenting speakers. Idempotent: does nothing when all are there.
 // Prints the directory on success; exits non-zero (and the app falls back
 // to the browser's voice) on failure.
 //
@@ -15,7 +16,14 @@ import { Readable } from "stream";
 
 const PIPER_URL = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz";
 const VOICE_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ar/ar_JO/kareem/medium/ar_JO-kareem-medium";
-const LANGUAGE_VOICES = ["de/de_DE/thorsten/medium/de_DE-thorsten-medium", "es/es_ES/davefx/medium/es_ES-davefx-medium", "it/it_IT/paola/medium/it_IT-paola-medium"];
+const LANGUAGE_VOICES = [
+  "de/de_DE/thorsten/medium/de_DE-thorsten-medium",
+  "es/es_ES/davefx/medium/es_ES-davefx-medium",
+  "it/it_IT/paola/medium/it_IT-paola-medium",
+  "fr/fr_FR/siwis/medium/fr_FR-siwis-medium",
+  "en/en_US/joe/medium/en_US-joe-medium",
+  "en/en_GB/cori/medium/en_GB-cori-medium",
+];
 const VOICES_ROOT = "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0";
 
 const target = path.resolve(process.argv[2] ?? path.join(process.cwd(), ".replit-data", "piper"));

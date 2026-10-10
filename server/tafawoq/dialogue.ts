@@ -85,6 +85,28 @@ const PHRASES: Record<
     answer: answer => `La risposta: ${answer}.`,
     notQuite: answer => `Non proprio. La risposta: ${answer}.`,
   },
+  fr: {
+    praise: ["✔ Exactement !", "✔ Oui, très bien !", "✔ C'est juste !", "✔ Excellent !"],
+    start: skillName => `Découvrons ensemble «${skillName}» en dialogue. Je ne te donne pas la règle toute faite : tu la trouves toi-même, étape par étape.`,
+    done: name => `${DIALOGUE_DONE} Bravo ${name}, tu as trouvé la règle tout seul :`,
+    next: "Dis «Interroge-moi» pour que je vérifie que tu l'as comprise, ou «En dialogue» pour découvrir une autre idée.",
+    resume: "Revenons à notre question :",
+    thinkWithMe: "Pas de souci, réfléchis avec moi.",
+    notYet: "Pas encore, mais tu es proche.",
+    answer: answer => `La réponse : ${answer}.`,
+    notQuite: answer => `Pas tout à fait. La réponse : ${answer}.`,
+  },
+  en: {
+    praise: ["✔ Exactly!", "✔ Yes, well done!", "✔ That's right!", "✔ Excellent!"],
+    start: skillName => `Let's discover «${skillName}» together in a dialogue. I won't give you the rule ready-made: you'll find it yourself, step by step.`,
+    done: name => `${DIALOGUE_DONE} Great, ${name}! You found the rule yourself:`,
+    next: "Say «Ask me» so I can check you've understood it, or «In dialogue» to discover another idea.",
+    resume: "Let's go back to our question:",
+    thinkWithMe: "No problem, think with me.",
+    notYet: "Not yet, but you're close.",
+    answer: answer => `The answer: ${answer}.`,
+    notQuite: answer => `Not quite. The answer: ${answer}.`,
+  },
 };
 
 /** The skill's dialogue in that language (a taught language only where the skill has its edition in it). */

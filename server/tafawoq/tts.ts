@@ -61,7 +61,9 @@ type Paid = "azure" | "google";
  * words go to a voice of that language — free and open Piper voices, each
  * recorded by a consenting speaker and released CC0: "Thorsten" (German),
  * "davefx" (Spanish), "Paola" (Italian, a woman's voice; Piper has no good
- * male Italian voice, so she also answers for the male teacher). Azure /
+ * male Italian voice, so she also answers for the male teacher), "SIWIS"
+ * (French, CC-BY 4.0, likewise a woman's voice), "Joe" and "Cori" (English,
+ * CC0 / public domain). Azure /
  * Google voices of the language when those keys are set.
  */
 export type SpeechLang = "ar" | ForeignLang;
@@ -83,6 +85,16 @@ const PIPER_MODELS: Record<SpeechLang, Record<VoiceGender, string | undefined>> 
     male: process.env.PIPER_MODEL_IT,
     female: process.env.PIPER_MODEL_IT_FEMALE ?? path.join(PIPER_DIR, "it_IT-paola-medium.onnx"),
   },
+  // SIWIS (CC-BY 4.0, credited in the README): a woman's voice, also for the male teacher.
+  fr: {
+    male: process.env.PIPER_MODEL_FR,
+    female: process.env.PIPER_MODEL_FR_FEMALE ?? path.join(PIPER_DIR, "fr_FR-siwis-medium.onnx"),
+  },
+  // Joe (CC0) and Cori (public domain).
+  en: {
+    male: process.env.PIPER_MODEL_EN ?? path.join(PIPER_DIR, "en_US-joe-medium.onnx"),
+    female: process.env.PIPER_MODEL_EN_FEMALE ?? path.join(PIPER_DIR, "en_GB-cori-medium.onnx"),
+  },
 };
 const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
@@ -92,6 +104,8 @@ const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   de: { male: "de-DE-Wavenet-B", female: "de-DE-Wavenet-A" },
   es: { male: "es-ES-Wavenet-B", female: "es-ES-Wavenet-C" },
   it: { male: "it-IT-Wavenet-C", female: "it-IT-Wavenet-A" },
+  fr: { male: "fr-FR-Wavenet-B", female: "fr-FR-Wavenet-A" },
+  en: { male: "en-GB-Wavenet-B", female: "en-GB-Wavenet-A" },
 };
 const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
@@ -101,6 +115,8 @@ const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   de: { male: "de-DE-ConradNeural", female: "de-DE-KatjaNeural" },
   es: { male: "es-ES-AlvaroNeural", female: "es-ES-ElviraNeural" },
   it: { male: "it-IT-DiegoNeural", female: "it-IT-ElsaNeural" },
+  fr: { male: "fr-FR-HenriNeural", female: "fr-FR-DeniseNeural" },
+  en: { male: "en-GB-RyanNeural", female: "en-GB-SoniaNeural" },
 };
 /**
  * A prepared voice ("voice pack"): every sentence the teacher says, recorded

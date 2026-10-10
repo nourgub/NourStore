@@ -168,7 +168,7 @@ describe("the teacher speaking German", () => {
     expect(detectIntent("Danke!")).toBe("thanks");
   });
 
-  it("understands requests in Spanish and Italian", () => {
+  it("understands requests in Spanish, Italian, French and English", () => {
     for (const [message, intent] of [
       ["Pregúntame", "quiz"],
       ["No lo sé", "giveUp"],
@@ -182,6 +182,14 @@ describe("the teacher speaking German", () => {
       ["Un esempio, per favore", "example"],
       ["Non ho capito", "simpler"],
       ["Grazie!", "thanks"],
+      ["Interroge-moi", "quiz"],
+      ["Je ne sais pas", "giveUp"],
+      ["En dialogue", "dialogue"],
+      ["Je n'ai pas compris", "simpler"],
+      ["Ask me", "quiz"],
+      ["I don't know", "giveUp"],
+      ["I didn't understand", "simpler"],
+      ["An example, please", "example"],
     ] as const) {
       expect(detectIntent(message), message).toBe(intent);
     }

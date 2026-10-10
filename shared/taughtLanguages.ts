@@ -1,11 +1,14 @@
 // The foreign languages taught as a BAC subject (the languages stream's
-// third language): their lessons are "de-…", "es-…", "it-…". In those
+// third language, and French and English for every stream): their lessons
+// are "de-…", "es-…", "it-…", "fr-…", "en-…". In those
 // lessons the language itself is read by a voice of that language, and the
 // student can choose to be taught in it (teacher style "foreign").
 export const TAUGHT_LANGUAGES = {
   de: { subject: "german", bcp47: "de-DE", label: "Deutsch", question: "Frage", hint: "Tipp" },
   es: { subject: "spanish", bcp47: "es-ES", label: "Español", question: "Pregunta", hint: "Pista" },
   it: { subject: "italian", bcp47: "it-IT", label: "Italiano", question: "Domanda", hint: "Suggerimento" },
+  fr: { subject: "french", bcp47: "fr-FR", label: "Français", question: "Question", hint: "Indice" },
+  en: { subject: "english", bcp47: "en-GB", label: "English", question: "Question", hint: "Hint" },
 } as const;
 
 export type ForeignLang = keyof typeof TAUGHT_LANGUAGES;

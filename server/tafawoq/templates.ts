@@ -290,7 +290,7 @@ const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
   ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me|im dialog|bring mir .*bei|schritt für schritt|en diálogo|en dialogo|paso a paso|enséñame|in dialogo|passo dopo passo|insegnami/],
   ["thanks", /شكر|merci|thank|danke|gracias|grazie|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
   ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong|warum|wieso|fehler|por qué|porqué|perché|errore|error/],
-  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|don.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer|no entiendo|no (?:lo )?he entendido|no entendí|más fácil|mas facil|non ho capito|non capisco|più facile/],
+  ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|pas compris|don.t understand|didn.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer|no entiendo|no (?:lo )?he entendido|no entendí|más fácil|mas facil|non ho capito|non capisco|più facile/],
   ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder|schwerer|herausforderung|más difícil|reto|più difficile|sfida/],
   ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example|beispiel|ejemplo|esempio/],
 ];

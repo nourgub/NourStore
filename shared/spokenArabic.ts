@@ -144,8 +144,8 @@ export function spokenChunks(text: string, max = 180): string[] {
 export type SpokenPart = { text: string; lang: "ar" | ForeignLang };
 export { foreignLanguageOfLesson, foreignLanguageOfSubject, type ForeignLang } from "./taughtLanguages";
 
-// German, Spanish and Italian letters.
-const LATIN = "A-Za-zÄÖÜäöüßÁÉÍÓÚÑáéíóúñÀÈÌÒÙàèìòùç";
+// German, Spanish, Italian, French and English letters.
+const LATIN = "A-Za-zÄÖÜäöüßÁÉÍÓÚÑáéíóúñÀÈÌÒÙàèìòùçÇÂÊÎÔÛËÏŸâêîôûëïÿŒœÆæ";
 /** A run of the taught language: Latin words with the spaces and punctuation between them. */
 const FOREIGN_RUN = new RegExp(`[¿¡${LATIN}](?:[${LATIN}0-9'’\\-.,!?¿¡;:()…%«» ]*[${LATIN}0-9.!?%»])?`, "g");
 const STARTS_FOREIGN = new RegExp(`^\\s*[«¿¡"]*[${LATIN}]`);

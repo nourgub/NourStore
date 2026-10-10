@@ -237,7 +237,13 @@ export async function gradeShortAnswer(input: {
 
 export type TutorTurn = { role: "tutor" | "student"; content: string };
 
-const LANGUAGE_NAMES: Record<ForeignLang, string> = { de: "اللغة الألمانية", es: "اللغة الإسبانية", it: "اللغة الإيطالية" };
+const LANGUAGE_NAMES: Record<ForeignLang, string> = {
+  de: "اللغة الألمانية",
+  es: "اللغة الإسبانية",
+  it: "اللغة الإيطالية",
+  fr: "اللغة الفرنسية",
+  en: "اللغة الإنجليزية",
+};
 
 export async function tutorReply(
   context: StudentContext,
