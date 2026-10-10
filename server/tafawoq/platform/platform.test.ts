@@ -29,9 +29,12 @@ describe("stream content and availability", () => {
     expect(sciences.core.map(entry => entry.key)).toEqual(STREAM_CORE_SUBJECTS.sciences);
     expect(sciences.core.find(entry => entry.key === "math")?.available).toBe(true);
     expect(sciences.core.find(entry => entry.key === "physics")?.available).toBe(true);
-    // No BAC natural-sciences lessons yet: "coming soon", never "everything".
-    expect(sciences.core.find(entry => entry.key === "natural_sciences")?.available).toBe(false);
-    expect(sciences.everythingAvailable).toBe(false);
+    expect(sciences.core.find(entry => entry.key === "natural_sciences")?.available).toBe(true);
+    expect(sciences.everythingAvailable).toBe(true);
+    // A subject an admin switched off is "coming soon" again, never "everything".
+    const noNature = subscriptionContent("sciences", null, { disabledSubjects: new Set(["natural_sciences"]), disabledLessons: new Set<string>() });
+    expect(noNature.core.find(entry => entry.key === "natural_sciences")?.available).toBe(false);
+    expect(noNature.everythingAvailable).toBe(false);
   });
 
   it("lets literary streams take maths as their second subject", () => {
@@ -124,7 +127,9 @@ describe("server-side access decision", () => {
     expect(checkSubjectAccess(locked("sciences"), "math", NO_SWITCHES, open)).toMatchObject({ ok: true });
     expect(checkSubjectAccess(locked("sciences"), "philosophy", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectNotAllowed });
     expect(checkSubjectAccess(locked("sciences"), "physics", NO_SWITCHES, open)).toMatchObject({ ok: true });
-    expect(checkSubjectAccess(locked("sciences"), "natural_sciences", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectUnavailable });
+    expect(checkSubjectAccess(locked("sciences"), "natural_sciences", NO_SWITCHES, open)).toMatchObject({ ok: true });
+    const off = { disabledSubjects: new Set(["natural_sciences"]), disabledLessons: new Set<string>() };
+    expect(checkSubjectAccess(locked("sciences"), "natural_sciences", off, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectUnavailable });
     expect(checkSubjectAccess(locked("lettres"), "math", NO_SWITCHES, open)).toMatchObject({ reason: ACCESS_ERRORS.subjectNotAllowed });
   });
 });

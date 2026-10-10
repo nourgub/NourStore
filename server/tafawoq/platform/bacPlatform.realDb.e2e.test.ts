@@ -115,14 +115,13 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     expect(await events(sara.id, "stream_chosen")).toHaveLength(1);
     expect((await events(sara.id, "stream_change_blocked")).length).toBeGreaterThanOrEqual(2);
 
-    // Philosophy is ready as a second subject; the others are "coming soon".
+    // Second subjects with lessons can be chosen; one outside the stream's options cannot.
     const state = await caller.bac.state();
     expect(state.step).toBe("second");
     if (state.step === "second") {
-      expect(state.content.everythingAvailable).toBe(false);
-      expect(state.secondChoices.filter(choice => choice.available).map(choice => choice.key)).toEqual(["philosophy"]);
+      expect(state.secondChoices.filter(choice => choice.available).map(choice => choice.key)).toContain("philosophy");
     }
-    await expect(caller.bac.chooseSecondSubject({ subject: "arabic" })).rejects.toMatchObject({ message: "SUBJECT_UNAVAILABLE" });
+    await expect(caller.bac.chooseSecondSubject({ subject: "math" })).rejects.toMatchObject({ message: "SUBJECT_NOT_ALLOWED" });
     await caller.bac.chooseSecondSubject({ subject: "philosophy" });
     expect((await caller.bac.state()).step).toBe("placement");
 
@@ -169,7 +168,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
 
     const answers = await paperAnswers(test.questions, index => index % 2 === 0);
     const result = await caller.bac.submitPlacement({ examId: test.examId, answers });
-    expect(result.subjects.map(entry => entry.subject).sort()).toEqual(["math", "philosophy", "physics"]);
+    expect(result.subjects.map(entry => entry.subject).sort()).toEqual(["math", "natural_sciences", "philosophy", "physics"]);
     expect(["beginner", "needs_support", "intermediate", "good", "advanced"]).toContain(result.subjects[0].level);
     expect(result.review.length).toBeGreaterThan(0);
     expect(result.priorities.length).toBeGreaterThan(0);
