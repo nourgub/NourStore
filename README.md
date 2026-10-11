@@ -75,6 +75,28 @@ The following are the **actual recorded results from the saved experiment run**,
 
 The results are **not directly comparable to the thesis** because the dataset names conflict within the thesis and the exact Optdigits archive/version, preprocessing, parameters, split, alignment, and evaluation procedure are not documented well enough to confirm equivalence. See [`docs/experiment.md`](docs/experiment.md) and the saved [CSV table](results/tables/optdigits_results.csv).
 
+## Robustness study: 20 seeds and a k-NN conflict resolver (extension)
+
+The single run above uses one K-Means seed (42). To check whether the result holds, `python -m kmch.robustness --seeds 20` re-runs the same pipeline with K-Means seeds 0–19 and adds a second conflict-resolution method. **This is an extension beyond the thesis**; the original experiment above is unchanged.
+
+- **Thesis method:** conflicts are assigned by incremental K-Means (online nearest-centroid update, row order).
+- **Extension:** a k-NN classifier (k=10) is trained on the agreed samples, using their *consensus* labels as pseudo-labels, then classifies all conflicts in one batch. Reference labels are still used only for scoring.
+
+| Method (20 seeds, all 5,620 samples) | Accuracy mean ± std | NMI mean ± std | ARI mean ± std | Runs with accuracy above CHA |
+|---|---:|---:|---:|---:|
+| K-Means | 0.7926 ± 0.0023 | 0.7566 ± 0.0021 | 0.6713 ± 0.0020 | 1 / 20 |
+| CHA (Ward) | 0.7952 ± 0.0000 | 0.8097 ± 0.0000 | 0.6972 ± 0.0000 | — |
+| KMCH + incremental K-Means (thesis method) | 0.7790 ± 0.0141 | 0.7451 ± 0.0047 | 0.6471 ± 0.0147 | 3 / 20 |
+| **KMCH + k-NN on agreed points (extension)** | **0.8135 ± 0.0083** | 0.8010 ± 0.0049 | **0.7185 ± 0.0073** | **20 / 20** |
+
+What this shows:
+
+1. **The seed-42 result was favourable.** K-Means settles into one of two solutions depending on the seed. With seed 42 the thesis method reaches 0.8053; averaged over 20 seeds it reaches 0.7790, below both K-Means and CHA alone.
+2. **Agreement is a reliable signal.** The points where K-Means and CHA agree (about 79%) are about 88% correct. The weak step is how conflicts are resolved, not the consensus itself.
+3. **Learning from the agreed points fixes it.** The k-NN resolver beats CHA on accuracy in every run and on mean ARI. Its mean NMI (0.801) remains slightly below CHA's (0.810).
+
+Outputs: `results/tables/optdigits_multiseed_runs.csv` (one row per seed and method), `results/tables/optdigits_multiseed_summary.csv`, and `results/figures/optdigits_multiseed_accuracy.png`. Limits: one dataset, k=10 neighbours chosen a priori (not tuned), and CHA is deterministic so its spread is zero.
+
 ## Visualizations
 
 Figures are saved under [`results/figures/`](results/figures/):
@@ -111,6 +133,7 @@ kmch-clustering/
 │   ├── incremental.py
 │   ├── metrics.py
 │   ├── experiment.py              # pipeline and experiment command
+│   ├── robustness.py              # 20-seed study + k-NN extension
 │   └── cli.py                     # general demo/CSV command
 └── tests/test_core.py
 ```
@@ -153,9 +176,9 @@ pytest -q
 
 ## Limitations and future work
 
-The conflict update, tie-breaking and ordering are explicit repository choices because the thesis does not specify them fully. K-Means needs a chosen cluster count and can favor compact Euclidean groups; Ward linkage also uses Euclidean geometry. The pre-resolution score covers only agreed samples. This is one run and no confidence interval or seed-sensitivity analysis is reported. The thesis’s dataset/result inconsistencies preclude a controlled reproduction claim.
+The conflict update, tie-breaking and ordering are explicit repository choices because the thesis does not specify them fully. K-Means needs a chosen cluster count and can favor compact Euclidean groups; Ward linkage also uses Euclidean geometry. The pre-resolution score covers only agreed samples. The main table is one run; the 20-seed robustness study above reports the spread across seeds on Optdigits only. The thesis’s dataset/result inconsistencies preclude a controlled reproduction claim.
 
-Reasonable next steps are repeated-seed evaluation, documented checks against other cluster alignment and conflict-resolution methods, runtime/memory profiling, and a benchmark protocol pinned to exact dataset versions. Such extensions should be reported separately from the core thesis-inspired workflow.
+Reasonable next steps are evaluation on more datasets, comparison with established ensemble methods (for example evidence accumulation / co-association), documented checks against other cluster alignment and conflict-resolution methods, runtime/memory profiling, and a benchmark protocol pinned to exact dataset versions. Such extensions should be reported separately from the core thesis-inspired workflow.
 
 ## Attribution
 

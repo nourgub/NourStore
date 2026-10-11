@@ -116,3 +116,38 @@ def test_end_to_end_kmch_pipeline():
     assert set(result["metrics"]) == {
         "kmeans", "cha", "kmch_before_resolution", "kmch_after_resolution"
     }
+
+
+def test_knn_resolution_keeps_agreed_rows_and_ignores_row_order():
+    from kmch.incremental import resolve_conflicts_knn
+
+    features = np.array([[0.0], [0.1], [0.2], [9.8], [9.9], [10.0], [0.3], [9.7]])
+    consensus = np.array(["a", "a", "a", "b", "b", "b", None, None], dtype=object)
+    conflicts = np.array([False] * 6 + [True, True])
+    output = resolve_conflicts_knn(features, consensus, conflicts, n_neighbors=3)
+    assert output[:6].tolist() == consensus[:6].tolist()
+    assert output[6:].tolist() == ["a", "b"]
+    reversed_output = resolve_conflicts_knn(features[::-1], consensus[::-1], conflicts[::-1], n_neighbors=3)
+    assert reversed_output[::-1].tolist() == output.tolist()
+
+
+def test_knn_resolution_rejects_no_agreed_samples():
+    from kmch.incremental import resolve_conflicts_knn
+
+    with pytest.raises(ValueError, match="no agreed samples"):
+        resolve_conflicts_knn(np.array([[0.0], [1.0]]), np.array([None, None], dtype=object),
+                              np.array([True, True]))
+
+
+def test_multiseed_study_reports_every_method_and_seed():
+    from kmch.robustness import run_seeds, summarize
+
+    features, labels = make_demo_data(random_state=5)
+    per_seed = run_seeds(features, labels, seeds=[0, 1, 2], n_clusters=4)
+    assert len(per_seed) == 3 * 4
+    assert set(per_seed["method_key"]) == {"kmeans", "cha", "kmch_incremental", "kmch_knn"}
+    scores = per_seed[["accuracy", "nmi", "ari"]].to_numpy()
+    assert ((scores >= -1) & (scores <= 1)).all()
+    summary = summarize(per_seed)
+    assert summary["seeds"].eq(3).all()
+    assert summary.loc[summary["method"] == "CHA (Ward)", "accuracy_above_cha_runs"].item() == 0
