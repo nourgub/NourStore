@@ -545,6 +545,11 @@ export async function submitAssessment(
       let correct = deterministic.status === "correct";
       let misconception = deterministic.status === "incorrect" ? deterministic.misconception : null;
       let feedback: string | null = null;
+      // How this answer was marked, shown to the student: "auto" (checked by
+      // the answer's rules — choice, number, equivalent expression), "ai"
+      // (an unusual form judged by the AI: may be wrong), "unchecked" (an
+      // unusual form nothing could verify: counted wrong, compare yourself).
+      let gradedBy: "auto" | "ai" | "unchecked" = deterministic.status === "unmatched" ? "unchecked" : "auto";
       if (deterministic.status === "unmatched" && ai.isAiConfigured()) {
         try {
           const verdict = await ai.gradeShortAnswer({
@@ -556,6 +561,7 @@ export async function submitAssessment(
           correct = verdict.correct;
           feedback = verdict.feedback;
           misconception = verdict.correct ? null : verdict.misconception ?? null;
+          gradedBy = "ai";
         } catch (error) {
           logAiFailure("short-answer grading", error);
         }
@@ -564,7 +570,7 @@ export async function submitAssessment(
         submitted?.responseMs !== undefined
           ? Math.round(Math.min(30 * 60_000, Math.max(0, submitted.responseMs)))
           : null;
-      return { item, given, correct, misconception, feedback, responseMs };
+      return { item, given, correct, misconception, feedback, responseMs, gradedBy };
     })
   );
 
@@ -618,6 +624,7 @@ export async function submitAssessment(
     correctAnswer: entry.item.answer,
     explanation: entry.item.explanation,
     feedback: entry.feedback,
+    gradedBy: entry.gradedBy,
     misconception: entry.misconception
       ? lesson.misconceptions[entry.misconception] ?? entry.misconception
       : null,

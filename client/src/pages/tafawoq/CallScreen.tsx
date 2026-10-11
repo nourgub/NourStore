@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Phone, PhoneOff, RotateCcw, Send } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { M } from "./components";
+import { M, VoiceBadge } from "./components";
 import { useT } from "./i18n";
 import { FOREIGN_REQUESTS, type TeacherStyle } from "./teacherStyle";
 import { TAUGHT_LANGUAGES, foreignLanguageOfLesson, type ForeignLang } from "@shared/taughtLanguages";
@@ -509,6 +509,7 @@ export function CallScreen({
         <div className="tfq-call-name" dir="rtl" lang="ar">
           {teacherName}
         </div>
+        <VoiceBadge />
         <div className="tfq-live-status" aria-live="polite">
           {status}
           {phase !== "ringing" && phase !== "ended" && <span className="tfq-call-clock"> · {clock}</span>}

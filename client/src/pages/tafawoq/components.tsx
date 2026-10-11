@@ -8,6 +8,7 @@ import { bacError, useB } from "./bacI18n";
 import type { ErrorType } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useHeardVoice } from "./speech";
 
 type Outputs = inferRouterOutputs<AppRouter>["tafawoq"];
 export type SubmitResult = Outputs["submitAssessment"];
@@ -320,6 +321,11 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
             {item.correct ? "" : <> · {t.correctAnswer}: <bdi dir="ltr">{item.correctAnswer}</bdi></>}
           </div>
           {item.feedback && <Content><p style={{ marginTop: 6 }}>{item.feedback}</p></Content>}
+          {"gradedBy" in item && item.gradedBy !== "auto" && (
+            <p className="tfq-muted" style={{ fontSize: 13, marginTop: 4 }} role="note">
+              {item.gradedBy === "ai" ? t.gradedByAi : t.gradedUnchecked}
+            </p>
+          )}
           {!item.correct && (
             <Content className="tfq-example">
               <strong>{t.solution}</strong>
@@ -498,6 +504,20 @@ function Diagnosis({ item }: { item: SubmitResult["items"][number] }) {
           <ResultItems items={result.items} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Says which voice the student is hearing — Algerian, another Arabic voice, or the device's. */
+export function VoiceBadge() {
+  const t = useT();
+  const heard = useHeardVoice();
+  if (!heard) return null;
+  const label = heard === "algerian" ? t.voiceAlgerian : heard === "arabic" ? t.voiceArabic : t.voiceDevice;
+  return (
+    <div className="tfq-muted" style={{ textAlign: "center", fontSize: 12 }} title={t.voiceNote}>
+      {label}
+      {heard !== "algerian" && <> · {t.voiceNote}</>}
     </div>
   );
 }

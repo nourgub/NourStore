@@ -7,7 +7,7 @@ import { authenticateRequest } from "../_core/session";
 import { getTafawoqStudentByUser } from "../db/tafawoq";
 import { hasActiveSubscription } from "./platform/access";
 import { checkRateLimit } from "../rateLimit";
-import { MAX_TTS_CHARS, speak, ttsProviders } from "./tts";
+import { MAX_TTS_CHARS, engineAccent, engines, speak, ttsProviders } from "./tts";
 import { startTtsWarmup } from "./ttsWarmup";
 import { isForeignLang } from "@shared/taughtLanguages";
 
@@ -26,7 +26,16 @@ export function registerTafawoqTtsRoutes(app: Express) {
   startTtsWarmup();
   app.get("/api/tafawoq/tts/status", (_req: Request, res: Response) => {
     const providers = ttsProviders();
-    res.json({ available: providers.pack || providers.azure || providers.google || providers.piper });
+    // The first voice tried for each teacher, and whether it is Algerian
+    // ("algerian") or another Arabic voice ("arabic"); null = the device's voice.
+    const first = (gender: "male" | "female") => {
+      const engine = engines(gender, "ar")[0];
+      return engine ? { provider: engine.provider, accent: engineAccent(engine) } : null;
+    };
+    res.json({
+      available: providers.pack || providers.azure || providers.google || providers.piper,
+      voices: { male: first("male"), female: first("female") },
+    });
   });
 
   app.post("/api/tafawoq/tts", async (req: Request, res: Response) => {
@@ -72,7 +81,7 @@ export function registerTafawoqTtsRoutes(app: Express) {
       }
       res.setHeader("Content-Type", voice.contentType);
       res.setHeader("Cache-Control", "private, max-age=86400");
-      res.setHeader("X-Tafawoq-Voice", `${voice.provider}; ${voice.gender}`);
+      res.setHeader("X-Tafawoq-Voice", `${voice.provider}; ${voice.gender}; ${voice.accent}`);
       res.send(voice.audio);
     } catch (error) {
       console.warn("[tafawoq] TTS failed:", error instanceof Error ? error.message : error);

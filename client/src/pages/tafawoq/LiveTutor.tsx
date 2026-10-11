@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GraduationCap, Mic, MicOff, Send, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { M } from "./components";
+import { M, VoiceBadge } from "./components";
 import { useT } from "./i18n";
 import { FOREIGN_REQUESTS, type TeacherStyle } from "./teacherStyle";
 import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
@@ -156,6 +156,7 @@ export function LiveTutor({
         <div className="tfq-live-status" aria-live="polite">
           {status}
         </div>
+        <VoiceBadge />
 
         <div className="tfq-live-transcript">
           {heard && (

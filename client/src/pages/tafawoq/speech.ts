@@ -2,7 +2,7 @@
 // and the teacher's voice (synthesised on the server, the browser's own
 // voice as a fallback). Maths is rewritten for the ear first
 // (shared/spokenArabic.ts).
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { foreignLanguageOfLesson, spokenParts, type ForeignLang, type SpokenPart } from "@shared/spokenArabic";
 import { TAUGHT_LANGUAGES } from "@shared/taughtLanguages";
 import { readTeacherVoice } from "./teacherStyle";
@@ -104,6 +104,32 @@ function browserSpeak(chunks: SpokenPart[], handlers: SpeakHandlers, started: bo
 
 /** null = not tried yet; false = the server has no natural voice (use the browser's). */
 let serverVoice: boolean | null = null;
+
+/**
+ * Which voice the student last heard for the Arabic teacher, told plainly on
+ * screen: "algerian" (an Algerian voice), "arabic" (a natural Arabic voice
+ * that is not Algerian), "device" (the phone's or browser's own voice).
+ * Comes from the server's X-Tafawoq-Voice header — never guessed from the
+ * teaching style (Darja text can be read by a non-Algerian voice).
+ */
+export type HeardVoice = "algerian" | "arabic" | "device";
+let heardVoice: HeardVoice | null = null;
+const heardListeners = new Set<() => void>();
+function setHeardVoice(next: HeardVoice) {
+  if (heardVoice === next) return;
+  heardVoice = next;
+  heardListeners.forEach(listener => listener());
+}
+export function useHeardVoice(): HeardVoice | null {
+  return useSyncExternalStore(
+    listener => {
+      heardListeners.add(listener);
+      return () => heardListeners.delete(listener);
+    },
+    () => heardVoice,
+    () => null
+  );
+}
 let player: HTMLAudioElement | null = null;
 const SILENT_MP3 = "data:audio/mpeg;base64,//NAxAAAAANIAAAAAExBTUUDAAkIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/80LEAAAAA0gAAAAATEFNRQMACQgABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRQMACQgABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/zQsQAAAADSAAAAABMQU1FAwAJCAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/zQMQAAAADSAAAAABMQU1FAwAJCAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//NCxAAAAANIAAAAAExBTUUDAAkIAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
@@ -147,6 +173,10 @@ async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Prom
     }
     if (!response.ok) return null;
     serverVoice = true;
+    if (lang === "ar") {
+      const accent = (response.headers.get("X-Tafawoq-Voice") ?? "").split(";")[2]?.trim();
+      setHeardVoice(accent === "algerian" ? "algerian" : "arabic");
+    }
     return await response.blob();
   } catch {
     return null;
@@ -182,7 +212,10 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
     handlers.onEnd?.();
     return () => {};
   }
-  if (serverVoice === false || typeof Audio === "undefined") return browserSpeak(chunks, handlers, false);
+  if (serverVoice === false || typeof Audio === "undefined") {
+    setHeardVoice("device");
+    return browserSpeak(chunks, handlers, false);
+  }
 
   let stopped = false;
   let stopFallback: () => void = () => {};
@@ -212,6 +245,7 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
       }
       if (!ok) {
         // No natural voice (or it can't play here): say the rest with the browser's.
+        setHeardVoice("device");
         stopFallback = browserSpeak(chunks.slice(index), handlers, index > 0);
         return;
       }

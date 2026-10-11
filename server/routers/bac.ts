@@ -15,6 +15,11 @@ import { adminProcedure, learnerProcedure, parentProcedure, rateLimit, teacherPr
 import * as platform from "../tafawoq/platform/service";
 import * as tutoring from "../tafawoq/platform/tutoring";
 import * as bacDb from "../db/bacPlatform";
+import * as reviews from "../db/contentReviews";
+import { allBacLessons, contentInventory } from "../tafawoq/contentInventory";
+import { usageSince } from "../db/usage";
+import { logAdminAction } from "../db/adminAudit";
+import { TRPCError } from "@trpc/server";
 
 const HOUR = 60 * 60 * 1000;
 const id = z.number().int().positive();
@@ -277,6 +282,43 @@ export const bacTutorRouter = router({
 
 export const bacAdminRouter = router({
   overview: adminProcedure.query(() => platform.adminOverview()),
+
+  // Content inventory and the teachers' pedagogical review ---------------------------
+  contentInventory: adminProcedure.query(async () => ({
+    inventory: contentInventory(),
+    lessons: allBacLessons(),
+    reviews: await reviews.listContentReviews(),
+  })),
+  setContentReview: adminProcedure
+    .input(
+      z.object({
+        lessonKey: z.string().min(1).max(80),
+        status: z.enum(["unreviewed", "in_review", "approved", "needs_changes"]),
+        reviewerName: z.string().trim().max(120).optional(),
+        note: z.string().trim().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!allBacLessons().some(lesson => lesson.key === input.lessonKey))
+        throw new TRPCError({ code: "NOT_FOUND", message: "NOT_FOUND" });
+      // An approval names the teacher who reviewed it.
+      if (input.status === "approved" && !input.reviewerName)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "REVIEWER_REQUIRED" });
+      await reviews.saveContentReview({
+        lessonKey: input.lessonKey,
+        status: input.status,
+        reviewerName: input.reviewerName || null,
+        note: input.note || null,
+        updatedBy: ctx.user.id,
+      });
+      await logAdminAction({ actorId: ctx.user.id, action: "content_review", targetType: "lesson", targetId: input.lessonKey, details: { status: input.status, reviewer: input.reviewerName ?? null } });
+      return { ok: true };
+    }),
+
+  // Daily usage counters (numbers only): AI calls and tokens, emails, bookings.
+  usage: adminProcedure
+    .input(z.object({ days: z.number().int().min(1).max(90).default(14) }))
+    .query(({ input }) => usageSince(input.days)),
 
   // Sessions with a human teacher ----------------------------------------------------
   tutors: adminProcedure.query(() => tutoring.adminTutors()),

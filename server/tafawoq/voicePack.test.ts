@@ -1,8 +1,8 @@
-import { mkdtempSync } from "fs";
+import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
 import { describe, expect, it, vi } from "vitest";
-import { checkRecording, readWav } from "../../scripts/voice-pack/import";
+import { checkRecording, packDeclaration, readWav } from "../../scripts/voice-pack/import";
 
 const tone = (rate: number, ms: number) => {
   const pcm = Buffer.alloc(Math.round((rate * ms) / 1000) * 2);
@@ -45,9 +45,37 @@ describe("voice pack", () => {
     expect(checkRecording("إكس", 0.05)).toBe("silent");
   });
 
-  it("plays what was prepared: sentences, a student's sentence without the name, maths assembled from its pieces", async () => {
+  it("refuses to import a pack without the speaker's consent, the model licence and an honest accent", () => {
+    expect(() => packDeclaration("jordanian", "contract signed 2026-03", "Chatterbox, MIT")).toThrow(/accent/);
+    expect(() => packDeclaration("algerian", "", "Chatterbox, MIT")).toThrow(/consent/);
+    expect(() => packDeclaration("algerian", "contract signed 2026-03", "")).toThrow(/licence/);
+    expect(packDeclaration("algerian", "contract signed 2026-03", "Chatterbox, MIT").accent).toBe("algerian");
+  });
+
+  it("never plays a pack without its consent declaration, and labels accents honestly", async () => {
     vi.resetModules();
     vi.stubEnv("TAFAWOQ_TTS_CACHE_DIR", mkdtempSync(path.join(tmpdir(), "pack-")));
+    vi.stubEnv("TAFAWOQ_VOICE_PACK_FEMALE", "test-pack");
+    vi.stubEnv("PIPER_MODEL", "/nonexistent.onnx");
+    try {
+      const tts = await import("./tts");
+      expect(tts.ttsProviders().pack).toBe(false);
+      expect(tts.engines("female").some(engine => engine.provider === "pack")).toBe(false);
+      // Kareem (Piper ar_JO) and Google ar-XA are Arabic, not Algerian; Azure ar-DZ is Algerian.
+      expect(tts.engineAccent({ provider: "piper", voice: "ar_JO-kareem-medium" })).toBe("arabic");
+      expect(tts.engineAccent({ provider: "google", voice: "ar-XA-Wavenet-B" })).toBe("arabic");
+      expect(tts.engineAccent({ provider: "azure", voice: "ar-DZ-IsmaelNeural" })).toBe("algerian");
+      expect(tts.engineAccent({ provider: "azure", voice: "ar-AE-FatimaNeural" })).toBe("arabic");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("plays what was prepared: sentences, a student's sentence without the name, maths assembled from its pieces", async () => {
+    vi.resetModules();
+    const cacheDir = mkdtempSync(path.join(tmpdir(), "pack-"));
+    writeFileSync(path.join(cacheDir, "voice-pack-info.json"), JSON.stringify(packDeclaration("algerian", "test consent reference", "test model, MIT")));
+    vi.stubEnv("TAFAWOQ_TTS_CACHE_DIR", cacheDir);
     vi.stubEnv("TAFAWOQ_VOICE_PACK_FEMALE", "test-pack");
     vi.stubEnv("PIPER_MODEL", "/nonexistent.onnx");
     try {
@@ -59,7 +87,7 @@ describe("voice pack", () => {
       await sentence("السلام عليكم!");
       for (const text of ["إذن الجواب:", "6", "إكس", "ناقص", "5"]) await piece(text);
 
-      expect((await tts.speak("أتمنى أن تكون بخير.", "female"))?.provider).toBe("pack");
+      expect(await tts.speak("أتمنى أن تكون بخير.", "female")).toMatchObject({ provider: "pack", accent: "algerian" });
       expect((await tts.speak("السلام عليكم يا سارة!", "female", "سارة"))?.provider).toBe("pack");
       expect((await tts.speak("إذن الجواب: 6 إكس ناقص 5.", "female"))?.provider).toBe("pack");
       // Not prepared, and no other voice here: the browser takes over.

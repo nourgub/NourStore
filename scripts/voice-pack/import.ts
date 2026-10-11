@@ -1,15 +1,23 @@
 // Imports a rendered voice pack into the teacher's voice cache (and the
 // object storage, with STORAGE_PROVIDER=s3), checking every recording:
 //
-//   npx tsx scripts/voice-pack/import.ts --manifest voice-dataset/pack/out/manifest.jsonl --wavs path/to/wavs
+//   npx tsx scripts/voice-pack/import.ts --manifest voice-dataset/pack/out/manifest.jsonl --wavs path/to/wavs \
+//     --accent algerian --speaker-consent "contract 2026-03 (signed, kept by the owner)" \
+//     --model-licence "Chatterbox, MIT"
+//
+// The three declarations are required and written next to the recordings
+// (voice-pack-info.json): the server never plays a pack without them — no
+// person's voice without their written permission, no model whose licence
+// was not checked. --accent says what students will be told they hear:
+// "algerian" only for an Algerian speaker, otherwise "arabic".
 //
 // WAV files are expected where the manifest's `file` says, with .wav for
 // the extension: mono, 16-bit or float, at TAFAWOQ_VOICE_PACK_RATE (24 kHz).
 // A recording whose length does not fit its text (cut short, or the model
 // rambling on) is refused and listed in rejected.jsonl, to render again.
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import { CACHE_DIR, PACK_RATE, pcmToMp3, store, trimSilence } from "../../server/tafawoq/tts";
+import { CACHE_DIR, PACK_INFO_FILE, PACK_RATE, pcmToMp3, store, trimSilence, type VoicePackInfo } from "../../server/tafawoq/tts";
 
 function arg(name: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -65,7 +73,16 @@ export function checkRecording(text: string, seconds: number): string | null {
   return null;
 }
 
+/** The pack's declarations, refused when one is missing or vague. */
+export function packDeclaration(accent: string, consent: string, licence: string, now = new Date()): VoicePackInfo {
+  if (accent !== "algerian" && accent !== "arabic") throw new Error('--accent must be "algerian" or "arabic"');
+  if (consent.trim().length < 8) throw new Error("--speaker-consent must reference the speaker's signed consent");
+  if (licence.trim().length < 3) throw new Error("--model-licence must name the model and its licence");
+  return { accent, speakerConsentRef: consent.trim(), modelLicence: licence.trim(), importedAt: now.toISOString() };
+}
+
 async function main() {
+  const info = packDeclaration(arg("accent"), arg("speaker-consent"), arg("model-licence"));
   const manifest = arg("manifest");
   const wavs = path.resolve(arg("wavs"));
   const entries = readFileSync(manifest, "utf8")
@@ -95,6 +112,8 @@ async function main() {
       rejected.push(JSON.stringify({ ...entry, reason: error instanceof Error ? error.message : String(error) }));
     }
   }
+  mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(path.join(CACHE_DIR, PACK_INFO_FILE), JSON.stringify(info, null, 2));
   const rejectedFile = path.join(path.dirname(manifest), "rejected.jsonl");
   writeFileSync(rejectedFile, rejected.join("\n") + (rejected.length ? "\n" : ""));
   console.log(`${imported} imported, ${rejected.length} refused (→ ${rejectedFile}), ${missing} not rendered yet.`);

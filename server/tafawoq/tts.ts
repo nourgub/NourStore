@@ -34,7 +34,7 @@
 // truly exhausted.
 import { createHash } from "crypto";
 import { spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { mkdir, readFile, rename, writeFile } from "fs/promises";
 import path from "path";
 import { Mp3Encoder } from "@breezystack/lamejs";
@@ -137,7 +137,61 @@ const MONTHLY_CAPS: Record<Paid, number> = {
 const REQUESTS_PER_MINUTE: Record<Paid, number> = { azure: 18, google: 300 };
 const PAID_RATE = 24_000;
 
-export type Voice = { audio: Buffer; contentType: "audio/mpeg"; provider: Provider; gender: VoiceGender };
+export type Voice = { audio: Buffer; contentType: "audio/mpeg"; provider: Provider; gender: VoiceGender; accent: VoiceAccent };
+
+/**
+ * What the student actually hears, said plainly in the interface:
+ *   - "algerian": an Algerian voice — Azure's ar-DZ voices, or a voice pack
+ *     whose import declared an Algerian speaker (scripts/voice-pack/import.ts);
+ *   - "arabic": a natural Arabic voice that is NOT Algerian — Piper's Kareem
+ *     (ar_JO, Jordanian), Google's ar-XA, other Azure locales;
+ *   - "device": the browser's own voice (decided on the client).
+ * Never inferred from the teaching style: Darja text read by Kareem is still
+ * a Jordanian voice.
+ */
+export type VoiceAccent = "algerian" | "arabic";
+
+/**
+ * The declaration written by scripts/voice-pack/import.ts next to the
+ * recordings: whose voice it is (with a reference to the signed consent),
+ * which model rendered it and under what licence. A pack without one is
+ * never played: no voice of a person without their recorded permission.
+ */
+export type VoicePackInfo = {
+  accent: VoiceAccent;
+  speakerConsentRef: string;
+  modelLicence: string;
+  importedAt: string;
+};
+export const PACK_INFO_FILE = "voice-pack-info.json";
+let packInfoCache: { at: number; mtime: number; info: VoicePackInfo | null } | null = null;
+export function voicePackInfo(): VoicePackInfo | null {
+  const file = path.join(CACHE_DIR, PACK_INFO_FILE);
+  const now = Date.now();
+  if (packInfoCache && now - packInfoCache.at < 60_000) return packInfoCache.info;
+  let info: VoicePackInfo | null = null;
+  let mtime = 0;
+  try {
+    mtime = statSync(file).mtimeMs;
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<VoicePackInfo>;
+    if (
+      (parsed.accent === "algerian" || parsed.accent === "arabic") &&
+      typeof parsed.speakerConsentRef === "string" && parsed.speakerConsentRef.trim() &&
+      typeof parsed.modelLicence === "string" && parsed.modelLicence.trim()
+    )
+      info = parsed as VoicePackInfo;
+  } catch {
+    info = null;
+  }
+  packInfoCache = { at: now, mtime, info };
+  return info;
+}
+
+export function engineAccent(engine: Pick<Engine, "provider" | "voice">): VoiceAccent {
+  if (engine.provider === "pack") return voicePackInfo()?.accent ?? "arabic";
+  if (engine.provider === "azure") return /^ar-DZ-/i.test(engine.voice) ? "algerian" : "arabic";
+  return "arabic";
+}
 
 const piperReady = (gender: VoiceGender, lang: SpeechLang = "ar") => {
   const model = PIPER_MODELS[lang][gender];
@@ -146,7 +200,7 @@ const piperReady = (gender: VoiceGender, lang: SpeechLang = "ar") => {
 
 export function ttsProviders() {
   return {
-    pack: Boolean(VOICE_PACKS.male || VOICE_PACKS.female),
+    pack: Boolean((VOICE_PACKS.male || VOICE_PACKS.female) && voicePackInfo()),
     azure: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
     piper: piperReady("male") || piperReady("female"),
@@ -418,7 +472,7 @@ function enginesFor(gender: VoiceGender, lang: SpeechLang): Engine[] {
   const providers = ttsProviders();
   const list: Engine[] = [];
   // Voice packs hold the Arabic teacher's sentences only.
-  const pack = lang === "ar" ? VOICE_PACKS[gender] : undefined;
+  const pack = lang === "ar" && voicePackInfo() ? VOICE_PACKS[gender] : undefined;
   if (pack) {
     const notLive = async (): Promise<Buffer> => {
       throw new Error("a voice pack only plays what was prepared");
@@ -592,7 +646,7 @@ export async function speak(text: string, gender: VoiceGender = "male", name?: s
     const external = engine.provider === "azure" || engine.provider === "google";
     if (external && nameless !== clean && !HAS_WORD.test(nameless)) continue;
     const sentences = external ? [nameless] : named;
-    const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender });
+    const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender, accent: engineAccent(engine) });
     try {
       for (const sentence of sentences) {
         // Maths pieces are an Arabic thing; a German sentence is always said whole.

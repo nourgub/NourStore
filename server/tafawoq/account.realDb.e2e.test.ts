@@ -208,4 +208,22 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — account
     await adminCaller.accountAdmin.resolve({ id: open.id, action: "reject", note: "اشتراك قيد التسوية" });
     expect((await reload(user)).email).toBe(user.email);
   });
+
+  it("records a lesson's pedagogical review only by an admin, and an approval names the teacher", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    const learner = await fixtureUser("not-admin");
+    await expect(
+      appRouter.createCaller(ctxFor(learner)).bacAdmin.setContentReview({ lessonKey: "math-derivatives", status: "approved", reviewerName: "x" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller.bacAdmin.setContentReview({ lessonKey: "math-derivatives", status: "approved" })).rejects.toMatchObject({
+      message: "REVIEWER_REQUIRED",
+    });
+    await expect(adminCaller.bacAdmin.setContentReview({ lessonKey: "no-such-lesson", status: "in_review" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await adminCaller.bacAdmin.setContentReview({ lessonKey: "math-derivatives", status: "in_review", note: `run ${RUN}` });
+    const data = await adminCaller.bacAdmin.contentInventory();
+    expect(data.reviews.find(review => review.lessonKey === "math-derivatives")?.status).toBe("in_review");
+    expect(data.inventory.some(row => row.stream === "sciences" && row.subject === "math" && row.lessons.length > 0)).toBe(true);
+    // Back to its initial state so a repeated run starts the same.
+    await adminCaller.bacAdmin.setContentReview({ lessonKey: "math-derivatives", status: "unreviewed" });
+  });
 });

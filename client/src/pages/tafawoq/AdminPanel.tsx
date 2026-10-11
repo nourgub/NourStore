@@ -507,6 +507,8 @@ function ContentSwitches() {
   const content = trpc.bacAdmin.content.useQuery();
   const set = trpc.bacAdmin.setContent.useMutation(useAdminMutationOptions());
   return (
+    <>
+    <ContentReviews />
     <Loading query={content}>
       {data =>
         data.subjects.map(subject => (
@@ -537,6 +539,157 @@ function ContentSwitches() {
           </div>
         ))
       }
+    </Loading>
+    </>
+  );
+}
+
+/** Inventory per stream/subject and each lesson's review by a named teacher. */
+function ContentReviews() {
+  const b = useB();
+  const r = b.review;
+  const query = trpc.bacAdmin.contentInventory.useQuery();
+  const save = trpc.bacAdmin.setContentReview.useMutation(useAdminMutationOptions());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ status: "unreviewed", reviewerName: "", note: "" });
+  return (
+    <Loading query={query}>
+      {data => {
+        const byKey = new Map(data.reviews.map(review => [review.lessonKey, review]));
+        const approved = data.lessons.filter(lesson => byKey.get(lesson.key)?.status === "approved").length;
+        return (
+          <div className="tfq-card">
+            <h3 style={{ marginTop: 0 }}>{r.title}</h3>
+            <p className="tfq-muted">{r.intro}</p>
+            <p>
+              <strong>{r.summary(approved, data.lessons.length)}</strong>
+            </p>
+            <details>
+              <summary>{r.inventory}</summary>
+              <div className="tfq-table-wrap">
+                <table className="tfq-table">
+                  <tbody>
+                    {data.inventory.map(row => (
+                      <tr key={`${row.stream}-${row.subject}`}>
+                        <td>{b.streams[row.stream]}</td>
+                        <td>{b.subjects[row.subject] ?? row.subject}</td>
+                        <td>{row.lessons.length ? `${row.lessons.length} ${r.lessons}` : <strong>{r.none}</strong>}</td>
+                        <td>
+                          {row.lessons.reduce((n, lesson) => n + lesson.mcq + lesson.short, 0)} {r.questions} ·{" "}
+                          {row.lessons.reduce((n, lesson) => n + lesson.generators, 0)} {r.generators}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            {data.lessons.map(lesson => {
+              const review = byKey.get(lesson.key);
+              const status = review?.status ?? "unreviewed";
+              return (
+                <div key={lesson.key} className="tfq-skill-row" style={{ flexWrap: "wrap" }}>
+                  <span dir="auto">
+                    {lesson.title} <small className="tfq-muted">({b.subjects[lesson.subject] ?? lesson.subject})</small>
+                  </span>
+                  <span className={`tfq-chip ${status === "approved" ? "good" : ""}`}>
+                    {r.statuses[status]}
+                    {review?.reviewerName ? ` — ${review.reviewerName}` : ""}
+                  </span>
+                  {editing === lesson.key ? (
+                    <form
+                      className="tfq-row"
+                      style={{ width: "100%" }}
+                      onSubmit={event => {
+                        event.preventDefault();
+                        save.mutate(
+                          {
+                            lessonKey: lesson.key,
+                            status: draft.status as "unreviewed",
+                            reviewerName: draft.reviewerName.trim() || undefined,
+                            note: draft.note.trim() || undefined,
+                          },
+                          { onSuccess: () => setEditing(null) }
+                        );
+                      }}
+                    >
+                      <select className="tfq-select" aria-label={r.title} value={draft.status} onChange={event => setDraft({ ...draft, status: event.target.value })}>
+                        {Object.keys(r.statuses).map(key => (
+                          <option key={key} value={key}>
+                            {r.statuses[key]}
+                          </option>
+                        ))}
+                      </select>
+                      <input className="tfq-input" placeholder={r.reviewer} aria-label={r.reviewer} value={draft.reviewerName} onChange={event => setDraft({ ...draft, reviewerName: event.target.value })} />
+                      <input className="tfq-input" placeholder={r.note} aria-label={r.note} value={draft.note} onChange={event => setDraft({ ...draft, note: event.target.value })} />
+                      <button type="submit" className="tfq-btn small" disabled={save.isPending}>
+                        {r.save}
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      className="tfq-btn ghost small"
+                      onClick={() => {
+                        setDraft({ status, reviewerName: review?.reviewerName ?? "", note: review?.note ?? "" });
+                        setEditing(lesson.key);
+                      }}
+                    >
+                      ✎
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }}
+    </Loading>
+  );
+}
+
+/** Daily counters from tafawoqUsage — numbers only, no names or content. */
+function UsageCard() {
+  const b = useB();
+  const r = b.review;
+  const query = trpc.bacAdmin.usage.useQuery({ days: 14 });
+  return (
+    <Loading query={query}>
+      {rows => {
+        const days = Array.from(new Set(rows.map(row => row.day)));
+        const metrics = Array.from(new Set(rows.map(row => row.metric)));
+        return (
+          <div className="tfq-card">
+            <h3 style={{ marginTop: 0 }}>{r.usageTitle}</h3>
+            {!rows.length ? (
+              <p className="tfq-muted">{r.usageNone}</p>
+            ) : (
+              <div className="tfq-table-wrap">
+                <table className="tfq-table">
+                  <thead>
+                    <tr>
+                      <th />
+                      {metrics.map(metric => (
+                        <th key={metric}>{r.metrics[metric] ?? metric}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {days.map(day => (
+                      <tr key={day}>
+                        <td dir="ltr">{day}</td>
+                        {metrics.map(metric => (
+                          <td key={metric}>{rows.find(row => row.day === day && row.metric === metric)?.amount ?? 0}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      }}
     </Loading>
   );
 }
@@ -862,6 +1015,8 @@ function Analytics() {
   const b = useB();
   const data = trpc.bacAdmin.analytics.useQuery();
   return (
+    <>
+    <UsageCard />
     <Loading query={data}>
       {stats => (
         <div className="tfq-dash-grid">
@@ -913,6 +1068,7 @@ function Analytics() {
         </div>
       )}
     </Loading>
+    </>
   );
 }
 
