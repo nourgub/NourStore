@@ -265,8 +265,12 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       // Parents pick their own account type at sign-up; it can't be changed afterwards.
       await appRouter.createCaller(ctxFor(parent)).auth.chooseRole({ role: "parent" });
       await expect(
-        appRouter.createCaller(ctxFor(parent)).auth.chooseRole({ role: "teacher" })
+        appRouter.createCaller(ctxFor(parent)).auth.chooseRole({ role: "learner" })
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      // A teacher account is never self-chosen (an admin grants it).
+      await expect(
+        appRouter.createCaller(ctxFor(strangerParent)).auth.chooseRole({ role: "teacher" as never })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       await appRouter.createCaller(ctxFor(strangerParent)).auth.chooseRole({ role: "parent" });
       const db = await getDb();
       const [parentRow] = await db!.select().from(users).where(eq(users.id, parent.id));

@@ -1,26 +1,9 @@
 User-agent: *
-Allow: /
-Allow: /courses
-Allow: /courses/
-Allow: /pricing
+Allow: /tafawoq
 Allow: /legal
 Allow: /legal/
-Allow: /verify/certificate
-Allow: /lab
 
-# Anything behind a login wall shows a sign-in prompt, not real content —
-# no value to a crawler, and a wasted crawl-budget/index-bloat risk if
-# indexed (a search result that just says "please sign in" is a bad result).
-Disallow: /dashboard
-Disallow: /workspace
-Disallow: /admin
-Disallow: /teacher
-Disallow: /institution
-Disallow: /parent
-Disallow: /notifications
-Disallow: /lesson/
-Disallow: /quiz
-Disallow: /exam/
-Disallow: /search
-
-Sitemap: /sitemap.xml
+# Pages behind a login show a sign-in prompt, not real content — no value to
+# a crawler. /tafawoq itself is the public landing page.
+Disallow: /tafawoq/
+Disallow: /api/

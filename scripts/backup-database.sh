@@ -11,7 +11,7 @@
 # so this stays correct if those are ever changed — never hardcodes them.
 #
 # Automate this with cron for real, unattended backups, e.g. nightly at 3am:
-#   0 3 * * * cd /path/to/nourix-academy && ./scripts/backup-database.sh >> backups/backup.log 2>&1
+#   0 3 * * * cd /path/to/tafawoq && ./scripts/backup-database.sh >> backups/backup.log 2>&1
 #
 # See scripts/restore-database.sh for the matching restore procedure —
 # a backup that has never been test-restored is not a verified backup.
@@ -29,13 +29,15 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
   set +a
 fi
 
+# Same defaults as docker-compose.yml, kept from before the rename to
+# Tafawoq (docs/LEGACY.md); .env overrides them.
 MYSQL_DATABASE="${MYSQL_DATABASE:-nourix_academy}"
 MYSQL_USER="${MYSQL_USER:-nourix}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:?ERROR: MYSQL_PASSWORD is not set. Fill in .env first (see .env.example).}"
 
 mkdir -p "$OUTPUT_DIR"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-OUT_FILE="$OUTPUT_DIR/nourix-backup-${TIMESTAMP}.sql.gz"
+OUT_FILE="$OUTPUT_DIR/tafawoq-backup-${TIMESTAMP}.sql.gz"
 
 echo "Backing up database '$MYSQL_DATABASE' to $OUT_FILE ..."
 

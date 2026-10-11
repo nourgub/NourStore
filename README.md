@@ -1,49 +1,43 @@
-# Nourix Academy
+# Tafawoq — تفوّق
 
-A full-stack e-learning platform for exam-prep tutoring in the Algerian
-market (BEM/middle-school and BAC/secondary-school, plus a primary stage) —
-trilingual (Arabic/French/English, with real right-to-left layout for
-Arabic), self-hostable with zero mandatory third-party account.
+A BAC preparation platform for Algerian secondary-school students: lessons,
+unlimited exercises with automatic correction, placement and weekly tests,
+mock BAC papers, an AI teacher that explains out loud (in Arabic, Algerian
+Darja and the taught languages) and live sessions with human teachers.
+Interface in Arabic, French and English, with a real right-to-left layout.
+**Free to run**: no AI subscription or API key is needed, and nothing
+requires an account with a third-party company.
+
+The app lives at `/tafawoq` (`/` redirects there).
 
 ## Tech stack
 
 - **Client**: React 19, TypeScript, Vite, TailwindCSS, wouter (routing),
   TanStack Query, tRPC client
 - **Server**: Node.js, Express, tRPC, Drizzle ORM
-- **Database**: MySQL 8 (self-hostable via `docker-compose.yml`, or any
-  managed MySQL provider)
+- **Database**: MySQL 8 (self-hostable via `docker-compose.yml`, any managed
+  MySQL, or the local MySQL `scripts/replit-start.sh` runs on Replit)
 - **Auth**: email/password (built-in, no external service) or Google OAuth
   2.0 (optional)
 - **Tests**: Vitest (unit + real-database integration tests)
 
-## Main features
+## Roles
 
-- Five roles with server-enforced permission boundaries: **admin**,
-  **teacher**, **institution**, **parent**, **learner**
-- Course authoring: courses → units → lessons → quizzes, with draft/
-  published states and per-lesson progress tracking
-- Three school stages (primary/middle/secondary) and an admin-editable
-  subject catalog (add a new subject from the UI, no code change needed)
-- Real, server-generated PDF certificates with a locally-generated QR code
-  (no third-party API call)
-- Payments: a working manual flow today (WhatsApp receipt review + admin
-  approval), plus scaffolds for BaridiMob and SlickPay for when real
-  merchant credentials are available (see `DEPLOYMENT.md`)
-- Admin operations: create accounts, review payment receipts, enroll a
-  learner into a course directly, reset a learner's password (there is no
-  outbound email in this codebase, so this is the account-recovery path —
-  see the comment on `adminResetPassword` in `server/db/usersAuth.ts`),
-  promote roles, and a real append-only admin audit log
-- Gamification (streaks/badges), coupons, and a referral system
-- An "algorithm lab" with real sandboxed code execution and hidden test
-  cases
-- Installable PWA (offline fallback page, install prompt), `robots.txt`,
-  and a dynamic `sitemap.xml` that stays in sync with published courses
+Enforced by the server (`server/_core/procedures.ts`), whatever a page shows:
+
+- **learner** (student) and **parent** — the only roles a visitor can pick
+  for themselves at first sign-in (a parent sees nothing until a student
+  gives them a one-time code).
+- **teacher** — granted by an admin only (Admin → الحسابات): a teacher sees
+  students' submitted exercises and answers them, and runs live sessions.
+- **admin** — the first one comes from `OWNER_OPEN_ID` (see `.env.example`),
+  later ones from an existing admin.
 
 ## Local development
 
-Requirements: Node.js 20+, and either Docker (for the self-hosted MySQL
-below) or your own MySQL 8 instance.
+Requirements: Node.js 22.12+, and either Docker (for the self-hosted MySQL
+below) or your own MySQL 8 instance. On Replit, just click **Run** — see
+`REPLIT.md`.
 
 ```bash
 npm install
@@ -53,6 +47,7 @@ cp .env.example .env
 docker compose up -d          # self-hosted MySQL + Redis, zero external service
 node scripts/migrate.mjs      # applies every drizzle/*.sql migration, in order
 npm run dev                   # http://localhost:3000
+node scripts/fetch-piper.mjs  # optional: the free natural teacher voices
 ```
 
 ### Commands
@@ -63,98 +58,35 @@ npm run dev                   # http://localhost:3000
 | `npm run build` | Production build (client + server bundle) |
 | `npm start` | Run the production build (`npm run build` first) |
 | `npm run check` | TypeScript typecheck, no build output |
-| `npm test` | Run the whole test suite (real-database tests skip themselves honestly if `DATABASE_URL` isn't set — see below) |
-| `npm run test:unit` | Run only the fast, database-free tests — always safe, no infra needed |
-| `npm run test:db` | Run only `server/realDb.e2e.test.ts` against a real MySQL instance (needs `DATABASE_URL`) |
-| `npm run test:db:repeat [count]` | Run `test:db` `count` times (default 5), stopping at the first failure — checks for flakiness, not just a single pass |
-| `npm run test:all` | Same as `npm test` — both names exist so either convention works |
+| `npm test` | The whole test suite (real-database tests skip themselves if `DATABASE_URL` isn't set) |
+| `npm run test:unit` | Only the fast, database-free tests — always safe, no infra needed |
+| `npm run test:db` | The real-database tests (`server/tafawoq/**/*.realDb.e2e.test.ts`) against `DATABASE_URL` |
+| `npm run test:db:repeat [count]` | Run `test:db` `count` times (default 5), stopping at the first failure |
 | `npm run migrate` | Apply every not-yet-applied migration in `drizzle/*.sql` |
 | `npm run format` | Prettier, writes in place |
 
-**Note on `db:push`**: this script runs `drizzle-kit generate && drizzle-kit
-migrate` — but every migration since `0017_fix_whatsapp_session_multi_
-invoice.sql` was hand-written directly, not generated by drizzle-kit, so
-`drizzle-kit`'s own migration journal (`drizzle/meta/_journal.json`) has
-been out of sync with the real migration files since then. **The actual,
-always-used migration path is `node scripts/migrate.mjs`** (also what runs
-automatically on every deploy — see the `Dockerfile`'s `CMD`), which reads
-every `drizzle/*.sql` file directly and tracks what's applied in its own
-`_migrations` table. Don't run `db:push` expecting it to apply the recent
-migrations — it won't see them.
+**Migrations**: the real migration path is `node scripts/migrate.mjs` (also
+what runs on every Docker deploy and in `replit-start.sh`). It reads every
+`drizzle/*.sql` file in filename order and records each applied file in its
+own `_migrations` table. Migrations are hand-written, so `drizzle-kit`'s
+journal (`drizzle/meta/_journal.json`) is out of date — don't use `db:push`.
 
 ### Real-database tests
 
-`server/realDb.e2e.test.ts` (19 scenarios: the full login → enroll → lesson →
-quiz → final exam → certificate journey, plus payment-receipt and
-cross-user-isolation edge cases) runs real SQL against a real MySQL
-schema — it's skipped (not faked as passing) when `DATABASE_URL` isn't set,
-and a few smaller suites skip themselves the other way (only when a real
-database *is* present, to avoid double-covering the same behavior). Verified
-to actually pass end-to-end against a local MariaDB 10.11 instance with every
-migration applied, and to clean up every row it creates:
+`npm run test:db` runs the full student loop, the BAC platform (stream lock,
+subscriptions, plans, papers, parents, admin) and sessions with teachers
+against a real MySQL schema, and cleans up after itself. Never point
+`DATABASE_URL` at a production database:
 
 ```bash
-DATABASE_URL="mysql://user:pass@localhost:3306/nourix_academy" JWT_SECRET=... npm run test:db
+DATABASE_URL="mysql://user:pass@localhost:3306/tafawoq_test" JWT_SECRET=a-test-secret-of-16-chars npm run test:db
 ```
 
-**Stability**: `npm run test:unit` never touches a database and is always
-safe to run anywhere. `npm run test:db` only runs `realDb.e2e.test.ts`
-against whatever `DATABASE_URL` points at — never point it at a production
-database. To check for intermittent (timing-dependent) failures rather than
-trusting a single green run, `npm run test:db:repeat [count]` (default 5)
-reruns it that many times and stops at the first failure. An earlier
-hardening pass (see `PRELAUNCH_CHECKLIST.md`) once documented an
-intermittent failure in `feature.contracts.test.ts` when the full suite ran
-in parallel against a real `DATABASE_URL`; 14 repeated attempts to reproduce
-it (documented in `docs/verification-history.md`) found nothing, but that
-isn't proof it can never recur — if you see it, check that file's header
-comment for the two most likely causes.
-
-### Real-browser smoke test
-
-`scripts/browser-smoke-test.ts` drives an actual Chromium instance (via
-Playwright) across every major page at 4 viewports (390/412/768/1280px) and
-3 languages (AR/FR/EN), as an anonymous visitor and as each of
-learner/teacher/admin — checking for horizontal overflow, browser console
-errors, failed/5xx requests, and that a gated page never leaks real content
-to an unauthenticated visitor. It's a real functional check, not a
-screenshot: it exits non-zero with a specific failure list if anything is
-wrong. Run it against a **production build** (`npm run build && npm start`
-in one terminal), not `npm run dev` — the dev server's unbundled per-module
-requests make every page load dramatically slower and were mistaken for a
-real hang more than once before this was understood.
-
-```bash
-npm run build && npm start   # in one terminal
-DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts   # in another
-```
-
-See the script's own header comment for every env var it reads
-(`SMOKE_TEST_BASE_URL`, `SMOKE_TEST_SKIP_ANON`, `SMOKE_TEST_ROLES`,
-`PLAYWRIGHT_CHROMIUM_PATH`). **`SMOKE_TEST_ROLES` matters in a
-resource-constrained sandbox**: a full anonymous+learner+teacher+admin run
-in one Node process was found to reproducibly freeze the entire process
-after roughly 40 minutes of sustained Chromium work (confirmed with a
-heartbeat log that itself stops ticking during the freeze — the whole event
-loop stalls, not one specific stuck call). A full, reliable run there is two
-invocations instead of one:
-
-```bash
-SMOKE_TEST_ROLES=learner,teacher DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts
-SMOKE_TEST_ROLES=admin SMOKE_TEST_SKIP_ANON=true DATABASE_URL="mysql://..." JWT_SECRET=... npx tsx scripts/browser-smoke-test.ts
-```
-
-Last full run (both invocations): 204/204 checks passed, 0 failures — see
-`docs/verification-history.md` for the date and what it found along the way.
-
-## Tafawoq AI Teacher (`/tafawoq`)
+## The AI teacher
 
 A personal teacher that treats every student differently, based on their
-real level — **free to run: no AI subscription or API key needed.**
-Interface in Arabic, French and English; lesson content follows its
-curriculum's language (the Algerian curriculum, in Arabic). Lives in
-`server/tafawoq/`, `server/routers/tafawoq.ts`, `client/src/pages/tafawoq/`
-and migration `drizzle/0025_add_tafawoq_ai_teacher.sql`.
+real level. Lives in `server/tafawoq/`, `server/routers/tafawoq.ts` and
+`client/src/pages/tafawoq/`.
 
 | Step | How (all deterministic, no model call) |
 |---|---|
@@ -175,10 +107,12 @@ and migration `drizzle/0025_add_tafawoq_ai_teacher.sql`.
 | Phone-call lesson | the teacher "calls" the student: greeting by name, dialogue on the weakest skill, three graded oral questions, spoken summary |
 | Personal lesson & video | built from the student model with generated examples; the video is rendered in the browser as animated slides narrated by the browser's own speech synthesis |
 
-Curriculum: BAC mathematics — limits & continuity, derivatives,
-exponential, logarithm, sequences, complex numbers, antiderivatives &
-integrals, probability, space geometry — plus middle-school lessons
-(equations, fractions) and Ohm's law. Each lesson is a skill graph,
+Curriculum (`server/tafawoq/lessons/`): BAC mathematics — limits &
+continuity, derivatives, exponential, logarithm, sequences, complex numbers,
+antiderivatives & integrals, probability, space geometry — physics,
+natural sciences, philosophy, Arabic, history-geography, Islamic education,
+French, English, German, Spanish and Italian, plus a few middle-school
+lessons (equations, fractions). Each lesson is a skill graph,
 misconceptions + remedies, and generators; `server/tafawoq/generators.test.ts`
 runs 300 random draws of every generator and fails on a wrong key, a
 distractor equal to the answer, an untagged distractor, or broken
@@ -197,87 +131,7 @@ are accepted and whose hints don't give them away; full dialogues replayed),
 and `server/tafawoq/tafawoq.realDb.e2e.test.ts` (the full loop against real
 MySQL, part of `npm run test:db`).
 
-## Project structure
-
-```
-client/src/
-  pages/            top-level routed pages
-  pages/flows/       StaffFlows.tsx (StaffSpace/InstitutionSpace — the tab shell and
-                     course-authoring state) and LearnerFlows.tsx (learner/parent
-                     panels), plus their shared Shell/i18n (shared.tsx)
-  pages/flows/staff/ the ~20 admin/teacher sub-panels StaffFlows.tsx composes, one
-                     domain per file (CourseManagement, UserManagement, Billing-
-                     Management, ...) — see staff/ for the full list
-  components/        shared UI components
-  _core/             auth hook, trpc client setup
-  lib/               small focused utilities (language, subject icons, document meta)
-server/
-  routers.ts          composes appRouter from the 19 domain routers below — ~40 lines
-  routers/            one file per domain (admin, content, teacher, payments, ...),
-                      each exporting a single xRouter; shared procedure builders
-                      (adminProcedure, teacherProcedure, ...) live in _core/procedures.ts
-  db/                 one file per domain (courses, subscriptions, quizzes, users, ...)
-  _core/              env config, session/cookies, Google OAuth, Express wiring
-  *Provider.ts         payment provider integrations (baridimob, slickpay)
-drizzle/
-  schema.ts           the full database schema
-  *.sql                migrations, applied in filename order by scripts/migrate.mjs
-scripts/
-  migrate.mjs          the real migration runner (see above)
-  verify-*.ts          real-database verification scripts from past hardening passes
-```
-
-## Known limitations (stated honestly, not silently left undocumented)
-
-- **No outbound email anywhere in this codebase.** Every flow that would
-  conventionally use email (password reset, notifications) is deliberately
-  WhatsApp- or admin-mediated instead. See `adminResetPassword` for the
-  account-recovery path.
-- **`server/routers.ts`, `client/src/pages/flows/StaffFlows.tsx`,
-  `server/db/{courses,quizzes,subscriptions}.ts`, and
-  `client/src/pages/flows/staff/{CourseManagement,BillingManagement}.tsx`
-  have all been split.** `routers.ts` is a ~40-line composition file
-  importing 19 domain routers from `server/routers/`; `StaffFlows.tsx` is
-  down to ~1000 lines with its ~20 admin/teacher sub-panels split into
-  `client/src/pages/flows/staff/`; `server/db/courses.ts`,
-  `quizzes.ts`, and `subscriptions.ts` are now thin barrel re-exports over
-  domain files (`courses/{catalog,authoring,progress}.ts`, etc.); the two
-  staff-panel files are barrels over their now-independent panel
-  components. Three remaining page components (`Dashboard.tsx`,
-  `Home.tsx`, `CourseDetail.tsx`) had their static translation data moved
-  out into sibling `.i18n.ts` files, but each one's actual JSX render body
-  (~800-1000 lines, driven by 8-15 queries/mutations and many derived
-  local variables) was judged not worth splitting further — see
-  `docs/verification-history.md`'s "Large-file splits" section for the
-  full reasoning and current sizes.
-- **No real payment gateway is live.** BaridiMob and SlickPay both need
-  real credentials from their respective providers before they do anything
-  beyond reporting themselves honestly as "not configured" — see
-  `DEPLOYMENT.md`.
-- **The privacy policy and terms of service text is real, specific text
-  (not placeholder lorem) but has never been reviewed by a lawyer.**
-- Lighthouse performance score is ~66/100 (accessibility is 100) — the
-  main lever left is deeper code-splitting of the shared vendor JS bundle,
-  documented as deliberately not attempted in `docs/archive/PHASE_VISUAL_AUDIT.md` given
-  its size and risk relative to the working build it would touch.
-
-## Further reading
-
-- `DEPLOYMENT.md` — how to deploy this (Docker, Railway, Render, environment
-  variables, payment provider setup)
-- `REBRANDING.md` — every place the "Nourix Academy" name appears, if you're
-  running this under a different name
-- `PRELAUNCH_CHECKLIST.md` — the checklist this project's hardening passes
-  were tracked against
-- `docs/current-status.md` — the current, non-historical snapshot: what's
-  verified working right now, and what's genuinely still open
-- `docs/archive/` (`AUDIT.md`, `IMPLEMENTATION.md`, `PHASE1_STATUS.md`
-  through `PHASE7_STATUS.md`, `PHASE6_ENDPOINT_AUDIT.md`,
-  `PHASE_VISUAL_AUDIT.md`, `todo.md`) — historical engineering logs from
-  past hardening passes, kept for the record of what was verified and how;
-  not required reading to work on the code today
-
-## منصة البكالوريا (BAC platform)
+## The BAC platform
 
 Streams: **العلوم التجريبية**, **الآداب والفلسفة**, **اللغات الأجنبية**. Server code in
 `server/tafawoq/platform/` (rules: `catalog.ts`, `plan.ts`, `papers.ts`, `diagnosis.ts`,
@@ -317,3 +171,46 @@ Streams: **العلوم التجريبية**, **الآداب والفلسفة**,
   `server/tafawoq/platform/tutoring.realDb.e2e.test.ts` (in `npm run test:db`).
 
 Payment instructions shown to students are set by an admin (Admin → Settings).
+
+## Project structure
+
+```
+client/src/
+  pages/tafawoq/     every Tafawoq screen (student, parent, teacher, admin)
+  pages/             Auth (sign in / register), Legal (privacy / terms), NotFound
+  components/        shared UI components (role picker, update banner, ui/ kit)
+  _core/, lib/       auth hook, tRPC client, language, document meta
+server/
+  routers.ts         composes appRouter: auth, parent, admin (accounts & logs),
+                     diagnostics, tafawoq, bac, bacAdmin, bacTutor
+  routers/           one file per router
+  tafawoq/           the AI teacher, lessons, generators, voices
+  tafawoq/platform/  the BAC platform rules (streams, plans, papers, sessions)
+  db/                persistence, one file per domain
+  _core/             env config, session/cookies, Google OAuth, Express wiring
+shared/              types and rules used by both client and server
+drizzle/
+  schema.ts          the full database schema (including legacy tables, see docs/LEGACY.md)
+  *.sql              migrations, applied in filename order by scripts/migrate.mjs
+scripts/             migrate, Replit start, voices, backups, endpoint audit
+```
+
+## Known limitations
+
+- **No outbound email.** Password recovery goes through an admin (Admin →
+  الحسابات → set a new password); notifications are in-app.
+- **Payment is manual**: a subscription request stays pending until an admin
+  confirms the payment (CCP, BaridiMob…). No payment gateway is integrated.
+- **The privacy policy and terms are a draft** (`client/src/pages/Legal.tsx`)
+  written for Tafawoq but never reviewed by a lawyer — have them checked
+  against Law 18-07 before charging.
+- The repository once contained the code of an earlier product on the same
+  base; what remains of it (database tables, migration names, Docker volume
+  names) and why is listed in `docs/LEGACY.md`.
+
+## Further reading
+
+- `REPLIT.md` — running on Replit, fully self-contained
+- `DEPLOYMENT.md` — Docker, other hosts, environment variables, backups
+- `docs/LEGACY.md` — what remains from before the platform was Tafawoq-only
+- `voice-dataset/pack/README.md` — preparing a recorded voice pack

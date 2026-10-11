@@ -4,7 +4,7 @@
 // always rendered with that language's direction (see <Content>).
 import { createContext, createElement, useCallback, useContext, useState, type ReactNode } from "react";
 import type { BacStream, LearningSpeed, SchoolLevel, Tier } from "@shared/tafawoq";
-import { setStoredLanguage, type Lang } from "@/lib/language";
+import { getStoredLanguage, setStoredLanguage, type Lang } from "@/lib/language";
 
 const ar = {
   brand: "تفوّق — أستاذك الذكي الخاص",
@@ -93,7 +93,8 @@ const ar = {
   homeCallFirst: "قبل المكالمة الأولى: اختبار قصير من 10 أسئلة ليعرف الأستاذ مستواك.",
   homeCallGo: "اتصل بي الآن",
   homeCallPlacement: "ابدأ الاختبار القصير",
-  academyLink: "منصة Nourix Academy للإعلام الآلي",
+  privacyLink: "سياسة الخصوصية",
+  termsLink: "شروط الاستخدام",
   teacherStyle: "الأستاذ يتكلم:",
   styleFusha: "الفصحى",
   styleDarja: "الدارجة",
@@ -410,7 +411,8 @@ const fr: TafawoqStrings = {
   homeCallFirst: "Avant le premier appel : un court test de 10 questions pour que le prof connaisse ton niveau.",
   homeCallGo: "Appelle-moi maintenant",
   homeCallPlacement: "Commencer le court test",
-  academyLink: "Plateforme d'informatique Nourix Academy",
+  privacyLink: "Politique de confidentialité",
+  termsLink: "Conditions d’utilisation",
   teacherStyle: "Le prof parle :",
   styleFusha: "arabe standard",
   styleDarja: "darija",
@@ -718,7 +720,8 @@ const en: TafawoqStrings = {
   homeCallFirst: "Before the first call: a short 10-question test so the teacher knows your level.",
   homeCallGo: "Call me now",
   homeCallPlacement: "Start the short test",
-  academyLink: "Nourix Academy computer-science platform",
+  privacyLink: "Privacy policy",
+  termsLink: "Terms of service",
   teacherStyle: "The teacher speaks:",
   styleFusha: "Standard Arabic",
   styleDarja: "Algerian Darja",
@@ -943,12 +946,7 @@ const en: TafawoqStrings = {
 export const STRINGS: Record<Lang, TafawoqStrings> = { ar, fr, en };
 
 function storedLang(): Lang {
-  try {
-    const value = localStorage.getItem("nourix-language");
-    return value === "fr" || value === "en" ? value : "ar";
-  } catch {
-    return "ar";
-  }
+  return getStoredLanguage() ?? "ar";
 }
 
 export function useTafawoqLang() {

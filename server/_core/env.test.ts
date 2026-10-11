@@ -16,7 +16,6 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
     "S3_BUCKET",
     "S3_ACCESS_KEY_ID",
     "S3_SECRET_ACCESS_KEY",
-    "CRON_SECRET",
     "OWNER_OPEN_ID",
   ];
   const previous: Record<string, string | undefined> = {};
@@ -121,7 +120,7 @@ describe("server startup env validation (checkEnv)", () => {
     expect(warnings.some(m => m.toLowerCase().includes("s3"))).toBe(false);
   });
 
-  it("warns in production when CRON_SECRET or OWNER_OPEN_ID is unset, without failing startup", async () => {
+  it("warns in production when OWNER_OPEN_ID is unset, without failing startup", async () => {
     const checkEnv = await loadCheckEnvWith({
       JWT_SECRET: "a".repeat(32),
       DATABASE_URL: "mysql://user:pass@localhost:3306/db",
@@ -129,7 +128,6 @@ describe("server startup env validation (checkEnv)", () => {
     });
     const { fatal, warnings } = checkEnv();
     expect(fatal).toEqual([]);
-    expect(warnings.some(m => m.includes("CRON_SECRET"))).toBe(true);
     expect(warnings.some(m => m.includes("OWNER_OPEN_ID"))).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
-# Fully self-hosted MySQL — zero external service, zero account with any
-# company. Runs on any machine that has Docker installed (a normal, free,
+# Tafawoq with a fully self-hosted MySQL — zero external service, zero
+# account with any company. Runs on any machine that has Docker installed (a normal, free,
 # offline software install — not a "sign up for an account" step).
 #
 # Usage:
@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_use_a_real_password}
+      # Defaults kept from before the rename (see the note above volumes:).
       MYSQL_DATABASE: ${MYSQL_DATABASE:-nourix_academy}
       MYSQL_USER: ${MYSQL_USER:-nourix}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changeme_use_a_real_password}
@@ -61,44 +62,17 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
       REDIS_URL: redis://redis:6379
-      CRON_SECRET: ${CRON_SECRET:-}
+      # Optional: Claude-written content for the AI teacher (it runs fully without it).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       NODE_ENV: production
     volumes:
       - nourix_uploads:/app/uploads
 
-  # Fully self-hosted cron — zero external scheduling service, zero
-  # account with any company. Only starts doing anything once CRON_SECRET
-  # is set (see .env.example); otherwise the app's /api/scheduled/* routes
-  # refuse the unauthenticated requests anyway, so this is safe to leave
-  # running unconfigured.
-  cron:
-    image: curlimages/curl:8.10.1
-    restart: unless-stopped
-    depends_on:
-      - app
-    environment:
-      CRON_SECRET: ${CRON_SECRET:-}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        echo "Self-hosted cron sidecar started. Hitting app:3000/api/scheduled/* every hour."
-        while true; do
-          if [ -n "$$CRON_SECRET" ]; then
-            curl -sf -X POST http://app:3000/api/scheduled/expiring-subscriptions \
-              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
-              || echo "expiring-subscriptions sweep failed (app may still be starting)";
-            curl -sf -X POST http://app:3000/api/scheduled/stale-receipts \
-              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
-              || echo "stale-receipts sweep failed (app may still be starting)";
-            curl -sf -X POST http://app:3000/api/scheduled/payment-reminders \
-              -H "Content-Type: application/json" -d "{\"secret\":\"$$CRON_SECRET\"}" \
-              || echo "payment-reminders sweep failed (app may still be starting)";
-          else
-            echo "CRON_SECRET not set — skipping sweep this cycle.";
-          fi
-          sleep 3600;
-        done
-
+# The volume names and the default database/user names (nourix_*) predate
+# the platform's rename to Tafawoq. They are kept on purpose: renaming a
+# volume would start an existing deployment on a new, EMPTY database. A new
+# deployment can set MYSQL_DATABASE/MYSQL_USER to anything in .env. See
+# docs/LEGACY.md.
 volumes:
   nourix_mysql_data:
   nourix_uploads:

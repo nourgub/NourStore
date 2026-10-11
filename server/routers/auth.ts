@@ -19,7 +19,7 @@ import {
   markUserSignedIn,
   chooseOwnRole,
   getUserByOpenId,
-} from "../db";
+} from "../db/usersAuth";
 import { logEvent } from "../db/bacPlatform";
 
 /** "a***@example.com": enough to spot repeated failures, without the full address. */
@@ -155,10 +155,12 @@ export const authRouter = router({
   // "admin" is intentionally not an option here — see chooseOwnRole in db.ts.
   chooseRole: protectedProcedure
     .use(rateLimit("choose-role", 5, 60 * 60 * 1000))
-    // "parent" is self-selectable: a parent account sees nothing until a
-    // child shares a one-time code with it (parent.acceptInvite), so it
-    // grants no access on its own. "admin" never is.
-    .input(z.object({ role: z.enum(["learner", "parent", "teacher", "institution"]) }))
+    // Only roles that grant nothing on their own are self-selectable: a
+    // parent sees nothing until a child shares a one-time code with it
+    // (parent.acceptInvite). A teacher sees students' submitted exercises,
+    // so that role is granted by an admin (admin.updateUserRole), never
+    // self-chosen; "admin" never is.
+    .input(z.object({ role: z.enum(["learner", "parent"]) }))
     .mutation(async ({ ctx, input }) => {
       const result = await chooseOwnRole(ctx.user.id, input.role);
       if (!result.ok)

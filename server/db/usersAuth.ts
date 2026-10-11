@@ -223,16 +223,6 @@ export async function getAllUsers() {
     .orderBy(desc(users.createdAt));
 }
 
-export async function getAdminUserIds(): Promise<number[]> {
-  const db = await getDb();
-  if (!db) return [];
-  const rows = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.role, "admin"));
-  return rows.map(r => r.id);
-}
-
 export async function updateUserRole(
   userId: number,
   role: "learner" | "parent" | "teacher" | "institution" | "admin"
@@ -284,7 +274,7 @@ export async function adminResetPassword(
 
 export async function chooseOwnRole(
   userId: number,
-  role: "learner" | "parent" | "teacher" | "institution"
+  role: "learner" | "parent"
 ): Promise<{ ok: true } | { ok: false; reason: "already_chosen" }> {
   const db = await getDb();
   if (!db) return { ok: false, reason: "already_chosen" };

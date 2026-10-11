@@ -1,4 +1,4 @@
-# Builds and runs the Nourix Academy app in a container — pairs with
+# Builds and runs Tafawoq in a container — pairs with
 # docker-compose.yml's MySQL service, or with any host (Railway, a bare
 # VPS, etc.) that just points DATABASE_URL at a real MySQL instance.
 #

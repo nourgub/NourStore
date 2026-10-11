@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { setStoredLanguage } from "@/lib/language";
+import { getStoredLanguage, setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 
@@ -91,15 +91,15 @@ function localizeAuthError(message: string, lang: Lang): string {
 
 const copy = {
   ar: {
-    loginTitle: "مرحبًا بك في Nourix Academy",
-    loginHint: "سجّل الدخول لمتابعة دروسك ونتائجك ولوحتك الخاصة.",
+    loginTitle: "مرحبًا بك في تفوّق",
+    loginHint: "سجّل الدخول لمتابعة تحضيرك للبكالوريا: دروسك ونتائجك وخطتك.",
     login: "تسجيل الدخول",
     registerTitle: "إنشاء حساب جديد",
     registerHint:
-      "أنشئ حسابك عبر بوابة المصادقة الآمنة، ثم سيظهر لك المسار المناسب حسب دورك.",
+      "أنشئ حسابك، ثم اختر شعبتك وابدأ اختبار تحديد المستوى.",
     register: "إنشاء الحساب",
     home: "العودة للرئيسية",
-    privacy: "مصادقة آمنة للأدوار التعليمية",
+    privacy: "كلمة مرورك مشفّرة ولا يراها أحد",
     already: "لديك حساب؟",
     new: "مستخدم جديد؟",
     or: "أو عبر البريد الإلكتروني",
@@ -111,16 +111,16 @@ const copy = {
     submitRegister: "إنشاء حساب بالبريد الإلكتروني",
   },
   fr: {
-    loginTitle: "Bienvenue sur Nourix Academy",
+    loginTitle: "Bienvenue sur Tafawoq",
     loginHint:
-      "Connectez-vous pour retrouver vos cours, résultats et espace personnel.",
+      "Connectez-vous pour reprendre votre préparation au BAC : leçons, résultats et plan.",
     login: "Se connecter",
     registerTitle: "Créer un compte",
     registerHint:
-      "Créez votre compte via le portail sécurisé, puis accédez à votre espace selon votre rôle.",
+      "Créez votre compte, puis choisissez votre filière et passez le test de positionnement.",
     register: "Créer mon compte",
     home: "Retour à l’accueil",
-    privacy: "Authentification sécurisée pour chaque rôle",
+    privacy: "Votre mot de passe est chiffré, personne ne le voit",
     already: "Vous avez déjà un compte ?",
     new: "Nouvel utilisateur ?",
     or: "ou par e-mail",
@@ -132,16 +132,16 @@ const copy = {
     submitRegister: "Créer un compte par e-mail",
   },
   en: {
-    loginTitle: "Welcome to Nourix Academy",
+    loginTitle: "Welcome to Tafawoq",
     loginHint:
-      "Log in to continue your lessons, results and personal workspace.",
+      "Log in to continue your BAC preparation: lessons, results and plan.",
     login: "Log in",
     registerTitle: "Create an account",
     registerHint:
-      "Create your account through the secure authentication portal, then access the workspace for your role.",
+      "Create your account, then pick your stream and take the placement test.",
     register: "Create account",
     home: "Back home",
-    privacy: "Secure authentication for every role",
+    privacy: "Your password is encrypted; nobody can see it",
     already: "Already have an account?",
     new: "New here?",
     or: "or with email",
@@ -161,7 +161,7 @@ export default function AuthPage({
 }) {
   const { isAuthenticated, loading, error, refresh } = useAuth();
   const [lang, setLang] = useState<Lang>(
-    () => (localStorage.getItem("nourix-language") as Lang) || "ar"
+    () => getStoredLanguage() ?? "ar"
   );
   const t = copy[lang];
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -173,7 +173,7 @@ export default function AuthPage({
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("next")
         : null;
-    return value && /^\/(?!\/)/.test(value) && !value.includes("\\") ? value : "/workspace";
+    return value && /^\/(?!\/)/.test(value) && !value.includes("\\") ? value : "/tafawoq";
   })();
   useEffect(() => {
     if (!loading && isAuthenticated) window.location.href = next;
@@ -220,15 +220,15 @@ export default function AuthPage({
   const googleEnabled = authConfig?.googleEnabled ?? false;
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="nourix-app auth-page">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="app-shell auth-page">
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between">
-          <Link href="/" className="brand-lockup">
+          <Link href="/tafawoq" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
-              N
+              T
             </span>
             <span className="brand-wordmark">
-              Nourix <b>Academy</b>
+              Tafawoq <b>AI Teacher</b>
             </span>
           </Link>
           <div className="flex items-center gap-3">
@@ -253,9 +253,9 @@ export default function AuthPage({
       </header>
       <main className="auth-main">
         <section className="auth-card">
-          <div className="auth-mark">N</div>
+          <div className="auth-mark">T</div>
           <div className="section-kicker">
-            NOURIX / {register ? "REGISTER" : "LOGIN"}
+            TAFAWOQ / {register ? "REGISTER" : "LOGIN"}
           </div>
           <h1>{register ? t.registerTitle : t.loginTitle}</h1>
           <p>{register ? t.registerHint : t.loginHint}</p>
@@ -366,7 +366,7 @@ export default function AuthPage({
 
           <div className="auth-switch">
             {register ? t.already : t.new}{" "}
-            <Link href={`${register ? "/login" : "/register"}${next !== "/workspace" ? `?next=${encodeURIComponent(next)}` : ""}`}>
+            <Link href={`${register ? "/login" : "/register"}${next !== "/tafawoq" ? `?next=${encodeURIComponent(next)}` : ""}`}>
               {register ? t.login : t.register}
             </Link>
           </div>
@@ -374,7 +374,7 @@ export default function AuthPage({
             <ShieldCheck size={16} />
             <span>{t.privacy}</span>
           </div>
-          <Link href="/" className="catalog-home-link">
+          <Link href="/tafawoq" className="catalog-home-link">
             {t.home}
           </Link>
         </section>

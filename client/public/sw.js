@@ -1,4 +1,4 @@
-// Nourix Academy service worker — a real, working offline capability, not a
+// Tafawoq service worker — a real, working offline capability, not a
 // placeholder. Strategy: network-first for navigation/API requests (so
 // content is always fresh when online), falling back to the cache when
 // offline; cache-first for static built assets (JS/CSS/images), since those
@@ -11,7 +11,7 @@
 // real scope of what a service worker can deliver without a dedicated
 // offline-data-sync architecture (a separate, much larger project).
 
-const CACHE_NAME = "nourix-shell-v2";
+const CACHE_NAME = "tafawoq-shell-v1";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {

@@ -174,8 +174,12 @@ function Landing() {
         ))}
       </div>
       <p style={{ marginTop: 18, fontSize: 13 }}>
-        <a className="tfq-muted" href="/" style={{ textDecoration: "underline" }}>
-          {t.academyLink}
+        <a className="tfq-muted" href="/legal/privacy" style={{ textDecoration: "underline" }}>
+          {t.privacyLink}
+        </a>
+        {" · "}
+        <a className="tfq-muted" href="/legal/terms" style={{ textDecoration: "underline" }}>
+          {t.termsLink}
         </a>
       </p>
     </section>

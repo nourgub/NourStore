@@ -25,10 +25,6 @@ export const teacherProcedure = roleProcedure(
   ["teacher", "admin"],
   "Teacher access required"
 );
-export const institutionProcedure = roleProcedure(
-  ["institution", "admin"],
-  "Institution access required"
-);
 export const learnerProcedure = roleProcedure(
   ["learner", "admin"],
   "Learner access required"

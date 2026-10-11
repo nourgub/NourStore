@@ -101,10 +101,17 @@ start_mysqld_from() {
   if [ "$DB_READY" -eq 1 ]; then
     # Via Node (mysql2) first: the downloaded binary's `mysql` client needs
     # libncurses.so.5, absent on recent images, while mysqld runs fine.
-    if ! node scripts/create-database.mjs "$MYSQL_PORT" nourix_academy; then
-      "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS nourix_academy;" || true
+    # The database is "tafawoq". A Repl created before the platform was
+    # renamed keeps its existing database (named "nourix_academy", see
+    # docs/LEGACY.md) so no account or subscription is ever left behind.
+    local db_name="tafawoq"
+    if [ -d "$MYSQL_DATA_DIR/nourix_academy" ]; then
+      db_name="nourix_academy"
     fi
-    export DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/nourix_academy"
+    if ! node scripts/create-database.mjs "$MYSQL_PORT" "$db_name"; then
+      "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS \`$db_name\`;" || true
+    fi
+    export DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/$db_name"
     echo "[replit-start] Applying database migrations..."
     if ! node scripts/migrate.mjs; then
       echo "[replit-start] WARNING: migrations failed — continuing without a guaranteed schema. See output above."

@@ -9,7 +9,7 @@ import { startLogin } from "./const";
 import "./index.css";
 
 // A default staleTime of 0 (React Query's own default) means every query
-// — including the public course catalog and subjects list, which change
+// — including the lesson catalog and subscription offers, which change
 // rarely — refetches on every component mount and window refocus. 30s is
 // a real, meaningful caching win for exactly the kind of mostly-static,
 // public data this app serves most often, on exactly the slow/metered
@@ -132,11 +132,11 @@ createRoot(document.getElementById("root")!).render(
 // calls skipWaiting() automatically). When a waiting worker is detected, we
 // dispatch a real DOM event the UI listens for (see UpdateBanner in App.tsx)
 // instead of silently swapping the app under the person while they're using
-// it. Clicking "update" calls window.__nourixApplyUpdate(), which tells the
+// it. Clicking "update" calls window.__tafawoqApplyUpdate(), which tells the
 // waiting worker to take over and reloads once it does.
 declare global {
   interface Window {
-    __nourixApplyUpdate?: () => void;
+    __tafawoqApplyUpdate?: () => void;
   }
 }
 
@@ -146,7 +146,7 @@ if ("serviceWorker" in navigator) {
       .register("/sw.js")
       .then(registration => {
         const notifyUpdateAvailable = () =>
-          window.dispatchEvent(new CustomEvent("nourix:sw-update-available"));
+          window.dispatchEvent(new CustomEvent("tafawoq:sw-update-available"));
 
         if (registration.waiting && navigator.serviceWorker.controller)
           notifyUpdateAvailable();
@@ -165,7 +165,7 @@ if ("serviceWorker" in navigator) {
           });
         });
 
-        window.__nourixApplyUpdate = () => {
+        window.__tafawoqApplyUpdate = () => {
           if (!registration.waiting) return;
           registration.waiting.postMessage("SKIP_WAITING");
         };

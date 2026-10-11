@@ -9,52 +9,6 @@ export const ENV = {
   // update by an existing admin — nobody can grant themselves "admin".
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
-  // Payment provider abstraction — unset by default. No provider is wired up
-  // in this codebase; these exist so a real integration can be dropped in
-  // without touching the invoice/subscription model. See DEPLOYMENT.md.
-  paymentProvider: process.env.PAYMENT_PROVIDER ?? "",
-  paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? "",
-  // BaridiMob / Algérie Poste (BaridiWEB) merchant credentials. Algérie
-  // Poste does not publish a public self-serve API — these values only
-  // exist once a real merchant agreement has been signed via
-  // https://baridiweb.poste.dz and Algérie Poste has issued integration
-  // details directly. Until all three are set, the BaridiMob provider
-  // reports itself as unconfigured rather than attempting a fake charge.
-  baridimobMerchantId: process.env.BARIDIMOB_MERCHANT_ID ?? "",
-  baridimobApiKey: process.env.BARIDIMOB_API_KEY ?? "",
-  baridimobApiBaseUrl: process.env.BARIDIMOB_API_BASE_URL ?? "",
-  // SlickPay — unlike BaridiMob, this one has a real public REST API
-  // (base URLs and the merchants/invoices endpoint confirmed directly from
-  // slick-pay-algeria's own official SDK source, not guessed) with a free
-  // self-serve sandbox at slick-pay.com — no merchant agreement required
-  // just to get a public_key and start testing. Until this is set, the
-  // SlickPay provider reports itself as unconfigured rather than attempting
-  // a fake charge, same as every other payment provider here.
-  slickpayPublicKey: process.env.SLICKPAY_PUBLIC_KEY ?? "",
-  slickpaySandbox: process.env.SLICKPAY_SANDBOX !== "false",
-  // Chargily Pay — a real, fully-documented public REST API (confirmed
-  // directly from https://dev.chargily.com/pay-v2/api-reference, not
-  // guessed) with a free sandbox: get a secret key from
-  // https://pay.chargily.com/dashboard/developers-corner (test keys start
-  // "test_sk_"). Until CHARGILY_SECRET_KEY is set, the Chargily provider
-  // reports itself as unconfigured rather than attempting a fake charge,
-  // same as every other payment provider here.
-  chargilySecretKey: process.env.CHARGILY_SECRET_KEY ?? "",
-  chargilySandbox: process.env.CHARGILY_SANDBOX !== "false",
-  // WhatsApp Cloud API (Meta) — unlike BaridiMob, this is a real public API
-  // (developers.facebook.com/docs/whatsapp/cloud-api). Still requires a
-  // real Meta Business/WhatsApp Business Platform setup: a verified phone
-  // number, a permanent access token, and a webhook verify token you choose.
-  whatsappAccessToken: process.env.WHATSAPP_ACCESS_TOKEN ?? "",
-  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID ?? "",
-  whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN ?? "",
-  // Meta's App Secret — used to verify the X-Hub-Signature-256 header on
-  // every inbound webhook POST, exactly like Stripe/PAYMENT_WEBHOOK_SECRET
-  // below. Without it, anyone who discovers the webhook URL could send
-  // forged "payment receipt" messages; this is not optional for a real,
-  // live WhatsApp Business integration (Meta requires an App Secret to
-  // exist regardless — this just also uses it for verification).
-  whatsappAppSecret: process.env.WHATSAPP_APP_SECRET ?? "",
   // Auth provider — "google" (default) is a real, standard Google OAuth 2.0
   // flow (server/_core/googleAuth.ts). "email" restricts the main sign-in
   // button to the built-in email+password forms only (server/_core/
@@ -79,16 +33,8 @@ export const ENV = {
   // Redis can be self-hosted with zero external account, see the `redis`
   // service in docker-compose.yml.
   redisUrl: process.env.REDIS_URL ?? "",
-  // Scheduled jobs (cron): unset by default. The app exposes real HTTP
-  // endpoints under /api/scheduled/* (server/scheduledJobs.ts) that any
-  // external scheduler can call — a self-hosted cron container (see the
-  // `cron` service in docker-compose.yml), a plain crontab line, or a
-  // GitHub Actions scheduled workflow. Until CRON_SECRET is set, those
-  // endpoints refuse to run anything (501) rather than silently accepting
-  // unauthenticated requests that trigger real notifications.
-  cronSecret: process.env.CRON_SECRET ?? "",
-  // Tafawoq AI Teacher (server/tafawoq/) — Claude API key. Optional, like
-  // every other integration here: without it the teacher still runs the
+  // AI teacher (server/tafawoq/) — Claude API key. Optional, like every
+  // other integration here: without it the teacher still runs the
   // full placement → analysis → lesson → exercises → video loop from the
   // curated curriculum templates, and the UI labels that content as such.
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
@@ -108,8 +54,8 @@ export const ENV = {
 //             of only being discoverable later via /api/health or a
 //             confusing runtime error.
 //
-// This deliberately does NOT require every optional integration (payment
-// providers, S3, Redis, WhatsApp, cron) — the app's whole design is to
+// This deliberately does NOT require every optional integration (S3, Redis,
+// the AI and voice providers) — the app's whole design is to
 // degrade those honestly rather than pretend they're configured. What it
 // DOES enforce is that nothing here silently produces an insecure or
 // nonsensical deployment.
@@ -173,14 +119,6 @@ export function checkEnv(): EnvCheckResult {
           "File uploads would fail outright. Set the missing S3 variables, or set STORAGE_PROVIDER=local."
       );
     }
-  }
-
-  if (ENV.isProduction && !ENV.cronSecret) {
-    warnings.push(
-      "CRON_SECRET is not set. Scheduled jobs (/api/scheduled/*) will refuse " +
-        "to run (501) — certificate reminders, subscription expiry, etc. " +
-        "will not fire automatically until it is set."
-    );
   }
 
   if (!ENV.anthropicApiKey) {

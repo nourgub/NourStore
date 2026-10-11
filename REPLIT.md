@@ -1,4 +1,4 @@
-# Running this on Replit — fully self-contained
+# Running Tafawoq on Replit — fully self-contained
 
 Everything runs inside the Repl itself: the app **and** a real MySQL
 server. No external database account, no `corepack`, no separate
@@ -13,12 +13,17 @@ GHSA-5xrq-8626-4rwp / GHSA-82fw-gwwq-j7x9 advisories — needs ≥ 22.12.
 
 ## Creating the database
 
-`scripts/replit-start.sh` creates `nourix_academy` with
+`scripts/replit-start.sh` creates the database `tafawoq` with
 `scripts/create-database.mjs` (the app's own `mysql2` driver), falling
 back to the `mysql` client only if that fails. The downloaded MySQL
 binary's client needs `libncurses.so.5`, which recent images lack — before
 this, the server started but the database was never created and every
-migration failed with "Unknown database 'nourix_academy'".
+migration failed with "Unknown database".
+
+A Repl created before the platform was renamed already has its data in a
+database named `nourix_academy`; the script detects it and keeps using it,
+so no account, subscription or progress is left behind (see
+`docs/LEGACY.md`).
 
 ## How it boots (`.replit` → `scripts/replit-start.sh`)
 
@@ -40,7 +45,7 @@ migration failed with "Unknown database 'nourix_academy'".
      layer succeeded.
 
 Every later **Run** reuses the same data directory and secret — accounts,
-courses, everything survives restarts, exactly like any other file in the
+progress, subscriptions, everything survives restarts, exactly like any other file in the
 Repl. Verified directly for both layers below: registered an account,
 killed every process, reran the script from scratch, and the same account
 still logged in afterward.
@@ -97,7 +102,7 @@ succeed.
 The script does **not** abort — it prints a clear warning and starts the
 app anyway, without `DATABASE_URL`. The app itself (`server/_core/env.ts`)
 already treats a missing database as a non-fatal, degraded mode outside
-production: the homepage and static UI still load; only the features that
+production: the pages and static UI still load; only the features that
 read/write real data won't work until a database is connected. Verified
 directly: with every MySQL-providing mechanism unavailable, the app still
 started and `GET /` returned `200`.
@@ -110,7 +115,9 @@ warning and continues to start the app rather than exiting.
 
 | Feature | What to add, in Replit's **Secrets** panel |
 |---|---|
-| Sign in with Google / auto Google Meet links | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| Sign in with Google | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| Claude-written content for the AI teacher (it runs fully without it) | `ANTHROPIC_API_KEY` |
+| More natural paid voices (free Piper voices are used otherwise) | `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION`, or `GOOGLE_TTS_API_KEY` (see `.env.example`) |
 | File storage on S3 instead of local disk | `STORAGE_PROVIDER=s3` + the `S3_*` variables (see `.env.example`) |
 | Point at a real external MySQL instead of the local one | Set a Secret named `REPLIT_DB_URL_OVERRIDE` to that connection string — it always wins over the local database the script starts |
 

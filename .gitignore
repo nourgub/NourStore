@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+# Hosting-platform project files carry real secrets (a database URL, keys)
+.project-config.json
 
 # Dependencies
 node_modules/

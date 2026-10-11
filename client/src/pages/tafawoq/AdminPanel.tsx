@@ -1,6 +1,7 @@
 // BAC platform — the admin panel. Every action calls an adminProcedure:
 // the server refuses it for any other role, whatever this page shows.
 import { AdminTutors } from "./Sessions";
+import { AdminAccounts, AdminLogs } from "./AdminAccounts";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Shield } from "lucide-react";
@@ -21,7 +22,7 @@ import { useLang } from "./i18n";
 import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubscriptionBadge } from "./Dashboard";
 
-const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors"] as const;
+const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors", "accounts", "logs"] as const;
 type Tab = (typeof TABS)[number];
 
 function useAdminMutationOptions() {
@@ -72,6 +73,8 @@ export function AdminPanel() {
       {tab === "events" && <Events />}
       {tab === "settings" && <Settings />}
       {tab === "tutors" && <AdminTutors />}
+      {tab === "accounts" && <AdminAccounts />}
+      {tab === "logs" && <AdminLogs />}
     </section>
   );
 }

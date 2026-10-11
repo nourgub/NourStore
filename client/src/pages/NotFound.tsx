@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
+import { getStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 const labels = {
@@ -26,12 +27,12 @@ const labels = {
 export default function NotFound() {
   const [, setLocation] = useLocation();
   const [lang] = useState<Lang>(
-    () => (localStorage.getItem("nourix-language") as Lang) || "ar"
+    () => getStoredLanguage() ?? "ar"
   );
   const t = labels[lang];
 
   const handleGoHome = () => {
-    setLocation("/");
+    setLocation("/tafawoq");
   };
 
   return (

@@ -1,6 +1,6 @@
 {
-  "appId": "com.nourixacademy.app",
-  "appName": "Nourix Academy",
+  "appId": "com.tafawoq.app",
+  "appName": "Tafawoq",
   "webDir": "dist/public",
   "server": {
     "androidScheme": "https"

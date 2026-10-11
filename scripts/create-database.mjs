@@ -7,7 +7,7 @@
 // Usage: node scripts/create-database.mjs <port> <database>
 import mysql from "mysql2/promise";
 
-const [port = "3306", database = "nourix_academy"] = process.argv.slice(2);
+const [port = "3306", database = "tafawoq"] = process.argv.slice(2);
 if (!/^[A-Za-z0-9_]+$/.test(database)) {
   console.error(`Refusing unsafe database name: ${database}`);
   process.exit(2);
