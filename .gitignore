@@ -25,3 +25,5 @@ uploads/
 # Self-contained Replit setup: generated secrets + local MySQL data
 # directory (see scripts/replit-start.sh) — never commit either.
 .replit-data/
+playwright-report/
+test-results/

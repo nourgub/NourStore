@@ -21,6 +21,14 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      // A refusal (no subscription, not allowed, not found, invalid) gives
+      // the same answer every time: show it at once instead of after three
+      // retries. Network failures and server errors are still retried.
+      retry: (failureCount, error) => {
+        const status = error instanceof TRPCClientError ? (error.data as { httpStatus?: number } | undefined)?.httpStatus : undefined;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 3;
+      },
     },
   },
 });

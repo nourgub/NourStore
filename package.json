@@ -16,7 +16,8 @@
     "test:db:repeat": "node scripts/test-db-repeat.mjs",
     "test:all": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "node scripts/migrate.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.130.0",
@@ -54,6 +55,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@tailwindcss/vite": "^4.1.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",

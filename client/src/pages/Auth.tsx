@@ -411,7 +411,13 @@ export default function AuthPage({
             </>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <form
+            style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            onSubmit={event => {
+              event.preventDefault();
+              if (!submitting && email && password && (!register || name)) submitEmailForm();
+            }}
+          >
             {register && (
               <div style={{ display: "grid", gap: 4 }}>
                 <label htmlFor="auth-name" className="quiet-label">
@@ -432,6 +438,7 @@ export default function AuthPage({
               <Input
                 id="auth-email"
                 type="email"
+                autoComplete="email"
                 placeholder={t.email}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -444,6 +451,7 @@ export default function AuthPage({
               <Input
                 id="auth-password"
                 type="password"
+                autoComplete={register ? "new-password" : "current-password"}
                 placeholder={t.password}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
@@ -460,11 +468,11 @@ export default function AuthPage({
               </small>
             )}
             <Button
+              type="submit"
               className="quiet-button"
               disabled={
                 submitting || !email || !password || (register && !name)
               }
-              onClick={submitEmailForm}
             >
               {register ? t.submitRegister : t.submitLogin}
             </Button>
@@ -473,7 +481,7 @@ export default function AuthPage({
                 {t.forgot}
               </Link>
             )}
-          </div>
+          </form>
 
           <div className="auth-switch">
             {register ? t.already : t.new}{" "}
