@@ -181,6 +181,13 @@ def confirm():
         return jsonify({"error": str(exc)}), 409
 
 
+@app.get("/api/wilayas")
+def wilaya_list():
+    """Codes, names and server-side delivery fees, for the wilaya picker."""
+    return jsonify([{"code": w["code"], "name_fr": w["name_fr"], "name_ar": w["name_ar"], "delivery_fee": w["delivery_fee"]}
+                    for w in db.list_wilayas()])
+
+
 @app.get("/api/products")
 def products():
     return jsonify(db.list_products(request.args.get("keyword", ""), request.args.get("category", "")))
