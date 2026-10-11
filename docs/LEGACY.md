@@ -55,9 +55,15 @@ Other leftovers in the schema:
 | `drizzle/0000_nourix_initial.sql`, `drizzle/meta/_journal.json` | `nourix` | `scripts/migrate.mjs` records applied migrations by file name; renaming would re-run it on every existing database. |
 | `drizzle/0007_seed_contact_channels.sql` | `nourix_academy` (an Instagram URL) | Historical migration, never edited. |
 | `docker-compose.yml` volumes | `nourix_mysql_data`, `nourix_uploads`, `nourix_redis_data` | Renaming a volume starts an existing deployment on a new, empty one. |
-| `docker-compose.yml`, `.env.example`, `scripts/backup-database.sh`, `scripts/restore-database.sh` | default database `nourix_academy`, user `nourix` | MySQL creates the database only when the volume is first initialised; an existing deployment must keep the names it was created with. A new deployment can set `MYSQL_DATABASE`/`MYSQL_USER` to anything in `.env`. |
 | `scripts/replit-start.sh` | database `nourix_academy` | New Repls get a database named `tafawoq`; a Repl that already has `nourix_academy` keeps using it, so no data is left behind. |
 | `client/src/lib/language.ts`, `client/index.html` | localStorage key `nourix-language` | Read once and moved to `tafawoq-language`, so returning visitors keep their language. |
+
+Docker defaults are now `tafawoq` / `tafawoq`. MySQL creates the database
+and user only when its volume is first initialised, so **a deployment created
+before the rename must keep `MYSQL_DATABASE=nourix_academy` and
+`MYSQL_USER=nourix` in its `.env`** (the old `.env.example` already put them
+there). The backup and restore scripts no longer guess a database name: they
+require `MYSQL_DATABASE` and `MYSQL_USER` from `.env`.
 
 To move an existing Docker deployment to new names: back up, create the new
 database/user, restore into it, update `.env`, then remove the old volume
@@ -92,11 +98,32 @@ Safe to delete from your secrets: `PAYMENT_PROVIDER`,
 - The JSON request limit dropped from 170 MB (academy video uploads) to
   12 MB (a 6 MB exercise photo, base64-encoded).
 
-## Security note
+## Security note — secrets to rotate by hand
 
-A hosting-platform file, `.project-config.json`, had been committed with
-real-looking credentials (a database URL with its password, `JWT_SECRET`,
-API keys) while the repository is public. It was deleted and is now in
-`.gitignore`, but it remains in git history: treat those credentials as
-exposed and rotate them at their providers. Purging it from history needs a
-history rewrite (`git filter-repo`) and a force-push — a separate decision.
+A hosting-platform file, `.project-config.json`, was committed (first in
+`3a723ef`, a copy as `tafawoq/.project-config.json` in `8ef768d`) while the
+repository is **public**. It holds a TiDB `DATABASE_URL` with its password,
+a `JWT_SECRET`, Manus "forge" API keys, an analytics id and an artifact git
+token. It is deleted on this branch and listed in `.gitignore` and
+`.dockerignore`, but:
+
+- it is **still present in the current files** of `main` and of the branches
+  `claude/ai-book-authoring-prompt-n2cvl0`, `claude/amal-run-t48ma3`,
+  `claude/math-lesson-plan-sbf2si`, `claude/organize-writing-pdf-wy7gme`,
+  `claude/secondary-schedule-timetable-rdqz6b` and
+  `claude/tafawoq-baccalaureate-platform-9vloo1` (twice there);
+- it stays in git history on every branch.
+
+To do by hand, in this order:
+
+1. Change the TiDB database password (or delete that cluster if unused).
+2. Revoke the Manus forge keys and anything else the file names; never
+   reuse that `JWT_SECRET`.
+3. Delete the file from `main` and the branches above (GitHub web: open the
+   file → delete), or make the repository private.
+4. Optional: purge it from history (`git filter-repo` + force-push +
+   contacting GitHub support for cached views). Rotating (1–2) is what
+   actually protects you; a purge alone does not.
+
+A scan of every file and of the whole history found no other real secret:
+the other password-like strings are test fixtures (e.g. `Very-long-password-42`).

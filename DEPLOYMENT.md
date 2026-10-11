@@ -1,5 +1,8 @@
 # Deploying Tafawoq
 
+Node **22.22.2** everywhere (`.nvmrc`, `package.json` "engines", the
+Dockerfile's `node:22.22.2-slim`).
+
 Three ways to run it, from simplest to most controlled. Whatever the host,
 keep secrets (database URL, `JWT_SECRET`, API keys) in the host's secrets
 panel — never in a committed file.
@@ -14,24 +17,30 @@ otherwise data may not survive a redeploy.
 ## 2. Docker (any VPS)
 
 ```bash
-cp .env.example .env      # fill in real values
+cp .env.example .env      # replace EVERY change_me value
 docker compose up -d      # MySQL + Redis + the app
 ```
 
-The app container applies every not-yet-applied migration on start
-(`node scripts/migrate.mjs`), so this is safe on every `docker compose up`.
-MySQL's data lives in a Docker volume that survives restarts and
-`docker compose down` (only `down -v` erases it).
-
-The volume names and default database/user (`nourix_*`) predate the rename to
-Tafawoq and are kept on purpose: renaming them would start an existing
-deployment on an empty database. See `docs/LEGACY.md`.
-
-**Teacher voices**: the image does not download the free Piper voices. Run
-`node scripts/fetch-piper.mjs /app/uploads/piper` once inside the app
-container (the `uploads` volume keeps them) and set
-`TAFAWOQ_PIPER_DIR=/app/uploads/piper`; until then the browser's own voice is
-used.
+- **Required secrets**: compose refuses to start without `JWT_SECRET`,
+  `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` and `REDIS_PASSWORD`, and the
+  server refuses the `.env.example` placeholders when `NODE_ENV=production`.
+- **Network**: only the app (`APP_PORT`, default 3000) is reachable from
+  outside. MySQL and Redis are published on `127.0.0.1` only (Docker's
+  published ports bypass firewalls like ufw); Redis requires its password.
+  Put a reverse proxy with HTTPS (Caddy, nginx) in front of port 3000.
+- **Migrations** run on every start (`node scripts/migrate.mjs`, tracked in a
+  `_migrations` table), so `docker compose up` is always safe.
+- **Data** lives in Docker volumes that survive restarts and
+  `docker compose down` (only `down -v` erases them). The volume names
+  (`nourix_*`) predate the rename to Tafawoq and are kept on purpose:
+  renaming them would start an existing deployment on an empty database. A
+  deployment created before the rename must keep `MYSQL_DATABASE=nourix_academy`
+  and `MYSQL_USER=nourix` in its `.env`. See `docs/LEGACY.md`.
+- **Teacher voices**: on first start the container downloads the free Piper
+  voices in the background into `TAFAWOQ_PIPER_DIR` (`/app/uploads/piper`,
+  in the uploads volume; log in `/tmp/piper-fetch.log`). Until they are
+  there, the browser's own voice is used. Generated speech is cached in
+  `/app/uploads/tts-cache`.
 
 ## 3. Railway (or any host that builds a Dockerfile)
 

@@ -48,9 +48,9 @@ import { FOREIGN_LANGS, type ForeignLang } from "@shared/taughtLanguages";
 
 export const MAX_TTS_CHARS = 600;
 
-export const CACHE_DIR = path.resolve(process.env.TAFAWOQ_TTS_CACHE_DIR ?? path.join(process.cwd(), "uploads", "tts-cache"));
-const PIPER_DIR = path.resolve(process.env.TAFAWOQ_PIPER_DIR ?? path.join(process.cwd(), ".replit-data", "piper"));
-const PIPER_BIN = process.env.PIPER_BIN ?? path.join(PIPER_DIR, "piper", "piper");
+export const CACHE_DIR = path.resolve(process.env.TAFAWOQ_TTS_CACHE_DIR || path.join(process.cwd(), "uploads", "tts-cache"));
+const PIPER_DIR = path.resolve(process.env.TAFAWOQ_PIPER_DIR || path.join(process.cwd(), ".replit-data", "piper"));
+const PIPER_BIN = process.env.PIPER_BIN || path.join(PIPER_DIR, "piper", "piper");
 
 export type VoiceGender = "male" | "female";
 type Provider = "pack" | "azure" | "google" | "piper";
@@ -70,36 +70,36 @@ export type SpeechLang = "ar" | ForeignLang;
 
 const PIPER_MODELS: Record<SpeechLang, Record<VoiceGender, string | undefined>> = {
   ar: {
-    male: process.env.PIPER_MODEL ?? path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx"),
+    male: process.env.PIPER_MODEL || path.join(PIPER_DIR, "ar_JO-kareem-medium.onnx"),
     female: process.env.PIPER_MODEL_FEMALE,
   },
   de: {
-    male: process.env.PIPER_MODEL_DE ?? path.join(PIPER_DIR, "de_DE-thorsten-medium.onnx"),
+    male: process.env.PIPER_MODEL_DE || path.join(PIPER_DIR, "de_DE-thorsten-medium.onnx"),
     female: process.env.PIPER_MODEL_DE_FEMALE,
   },
   es: {
-    male: process.env.PIPER_MODEL_ES ?? path.join(PIPER_DIR, "es_ES-davefx-medium.onnx"),
+    male: process.env.PIPER_MODEL_ES || path.join(PIPER_DIR, "es_ES-davefx-medium.onnx"),
     female: process.env.PIPER_MODEL_ES_FEMALE,
   },
   it: {
     male: process.env.PIPER_MODEL_IT,
-    female: process.env.PIPER_MODEL_IT_FEMALE ?? path.join(PIPER_DIR, "it_IT-paola-medium.onnx"),
+    female: process.env.PIPER_MODEL_IT_FEMALE || path.join(PIPER_DIR, "it_IT-paola-medium.onnx"),
   },
   // SIWIS (CC-BY 4.0, credited in the README): a woman's voice, also for the male teacher.
   fr: {
     male: process.env.PIPER_MODEL_FR,
-    female: process.env.PIPER_MODEL_FR_FEMALE ?? path.join(PIPER_DIR, "fr_FR-siwis-medium.onnx"),
+    female: process.env.PIPER_MODEL_FR_FEMALE || path.join(PIPER_DIR, "fr_FR-siwis-medium.onnx"),
   },
   // Joe (CC0) and Cori (public domain).
   en: {
-    male: process.env.PIPER_MODEL_EN ?? path.join(PIPER_DIR, "en_US-joe-medium.onnx"),
-    female: process.env.PIPER_MODEL_EN_FEMALE ?? path.join(PIPER_DIR, "en_GB-cori-medium.onnx"),
+    male: process.env.PIPER_MODEL_EN || path.join(PIPER_DIR, "en_US-joe-medium.onnx"),
+    female: process.env.PIPER_MODEL_EN_FEMALE || path.join(PIPER_DIR, "en_GB-cori-medium.onnx"),
   },
 };
 const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
-    male: process.env.TAFAWOQ_TTS_VOICE ?? "ar-XA-Wavenet-B",
-    female: process.env.TAFAWOQ_TTS_VOICE_FEMALE ?? "ar-XA-Wavenet-A",
+    male: process.env.TAFAWOQ_TTS_VOICE || "ar-XA-Wavenet-B",
+    female: process.env.TAFAWOQ_TTS_VOICE_FEMALE || "ar-XA-Wavenet-A",
   },
   de: { male: "de-DE-Wavenet-B", female: "de-DE-Wavenet-A" },
   es: { male: "es-ES-Wavenet-B", female: "es-ES-Wavenet-C" },
@@ -109,8 +109,8 @@ const GOOGLE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
 };
 const AZURE_VOICES: Record<SpeechLang, Record<VoiceGender, string>> = {
   ar: {
-    male: process.env.TAFAWOQ_AZURE_VOICE_MALE ?? "ar-DZ-IsmaelNeural",
-    female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE ?? "ar-DZ-AminaNeural",
+    male: process.env.TAFAWOQ_AZURE_VOICE_MALE || "ar-DZ-IsmaelNeural",
+    female: process.env.TAFAWOQ_AZURE_VOICE_FEMALE || "ar-DZ-AminaNeural",
   },
   de: { male: "de-DE-ConradNeural", female: "de-DE-KatjaNeural" },
   es: { male: "es-ES-AlvaroNeural", female: "es-ES-ElviraNeural" },
@@ -128,10 +128,10 @@ const VOICE_PACKS: Record<VoiceGender, string | undefined> = {
   male: process.env.TAFAWOQ_VOICE_PACK_MALE || undefined,
   female: process.env.TAFAWOQ_VOICE_PACK_FEMALE || undefined,
 };
-export const PACK_RATE = Number(process.env.TAFAWOQ_VOICE_PACK_RATE ?? 24_000);
+export const PACK_RATE = Number(process.env.TAFAWOQ_VOICE_PACK_RATE || 24_000);
 const MONTHLY_CAPS: Record<Paid, number> = {
-  azure: Number(process.env.TAFAWOQ_AZURE_MONTHLY_CHARS ?? 450_000),
-  google: Number(process.env.TAFAWOQ_TTS_MONTHLY_CHARS ?? 3_500_000),
+  azure: Number(process.env.TAFAWOQ_AZURE_MONTHLY_CHARS || 450_000),
+  google: Number(process.env.TAFAWOQ_TTS_MONTHLY_CHARS || 3_500_000),
 };
 /** Requests a minute: Azure's free tier allows 20 (not adjustable); a margin for clock drift. */
 const REQUESTS_PER_MINUTE: Record<Paid, number> = { azure: 18, google: 300 };
@@ -211,12 +211,21 @@ export function wavData(wav: Buffer): Buffer {
 
 // ---------------------------------------------------------------------------
 // Piper: raw PCM from the local engine (`--output_raw`). One synthesis at a
-// time keeps a small server responsive.
+// time keeps a small server responsive; a bounded queue and a time limit
+// keep a burst of requests or a stuck process from piling up (the caller
+// then falls back to the next voice, and finally to the browser's own).
 // ---------------------------------------------------------------------------
 
+export const PIPER_MAX_WAITING = 40;
+export const PIPER_TIMEOUT_MS = 30_000;
 let queue: Promise<unknown> = Promise.resolve();
+let waiting = 0;
 function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
-  const run = queue.then(task, task);
+  if (waiting >= PIPER_MAX_WAITING) return Promise.reject(new Error("piper busy"));
+  waiting += 1;
+  const run = queue.then(task, task).finally(() => {
+    waiting -= 1;
+  });
   queue = run.catch(() => undefined);
   return run;
 }
@@ -229,10 +238,22 @@ function piperPcm(model: string, text: string): Promise<Buffer> {
           env: { ...process.env, LD_LIBRARY_PATH: path.dirname(PIPER_BIN) },
           stdio: ["pipe", "pipe", "ignore"],
         });
+        const timer = setTimeout(() => {
+          child.kill("SIGKILL");
+          reject(new Error("piper timed out"));
+        }, PIPER_TIMEOUT_MS);
         const chunks: Buffer[] = [];
         child.stdout.on("data", chunk => chunks.push(chunk));
-        child.on("error", reject);
-        child.on("close", code => (code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error(`piper exited with ${code}`))));
+        child.on("error", error => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        child.on("close", code => {
+          clearTimeout(timer);
+          if (code === 0) resolve(Buffer.concat(chunks));
+          else reject(new Error(`piper exited with ${code}`));
+        });
+        child.stdin.on("error", () => undefined);
         child.stdin.end(text);
       })
   );

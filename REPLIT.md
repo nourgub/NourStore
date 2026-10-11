@@ -6,10 +6,12 @@ sign-ups. Import the repo, click **Run**.
 
 ## Node version
 
-Node **22** (`nodejs-22` in `.replit`, `pkgs.nodejs_22` in `replit.nix`,
-`"engines": { "node": ">=22.12.0" }` in `package.json`): Vite 7 needs
-Node ≥ 20.19, and Vitest 5 — the first release without the critical
-GHSA-5xrq-8626-4rwp / GHSA-82fw-gwwq-j7x9 advisories — needs ≥ 22.12.
+Node **22.22.2** — the version pinned in `.nvmrc`, `package.json`
+("engines": `^22.22.2 || >=24.15.0`) and the Dockerfile. `.replit` asks for
+the `nodejs-22` module; check `node -v` in the Shell. If Replit gives an
+older 22.x, the app still runs (its own dependencies need ≥ 20), but
+`npm install` warns about the test tools (jsdom needs ≥ 22.22.2) and the
+tests should then be run elsewhere.
 
 ## Creating the database
 

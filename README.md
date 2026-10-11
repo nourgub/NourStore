@@ -35,7 +35,9 @@ Enforced by the server (`server/_core/procedures.ts`), whatever a page shows:
 
 ## Local development
 
-Requirements: Node.js 22.12+, and either Docker (for the self-hosted MySQL
+Requirements: **Node.js 22.22.2** (the 22 LTS line; `.nvmrc`, `package.json`
+"engines" and the Docker image all pin it — the test tooling, jsdom, needs
+≥ 22.22.2, the app itself runs on ≥ 20), and either Docker (for the self-hosted MySQL
 below) or your own MySQL 8 instance. On Replit, just click **Run** — see
 `REPLIT.md`.
 
@@ -199,6 +201,10 @@ scripts/             migrate, Replit start, voices, backups, endpoint audit
 
 - **No outbound email.** Password recovery goes through an admin (Admin →
   الحسابات → set a new password); notifications are in-app.
+- **`npm audit`**: 0 vulnerabilities in production dependencies. Four
+  moderate ones remain in a dev-only tool (`drizzle-kit` → an old `esbuild`
+  dev server); the only fix is a breaking downgrade, and the project does
+  not use drizzle-kit for its migrations (`scripts/migrate.mjs`).
 - **Payment is manual**: a subscription request stays pending until an admin
   confirms the payment (CCP, BaridiMob…). No payment gateway is integrated.
 - **The privacy policy and terms are a draft** (`client/src/pages/Legal.tsx`)

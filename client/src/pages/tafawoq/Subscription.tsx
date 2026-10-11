@@ -162,7 +162,12 @@ export function SubscriptionPage() {
               <strong>{quote.data ? b.da(quote.data.amountDa) : "…"}</strong>
             </div>
             <PaymentInstructions text={data.paymentInstructions} />
-            <p className="tfq-muted">{b.manualNotice}</p>
+            <p className="tfq-muted">
+              {b.manualNotice}{" "}
+              <a href="/legal/terms" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+                {b.termsPrivacy}
+              </a>
+            </p>
             <button type="submit" className="tfq-btn" disabled={request.isPending || (Boolean(appliedCoupon) && Boolean(quote.error))}>
               {request.isPending ? "…" : b.requestSub}
             </button>

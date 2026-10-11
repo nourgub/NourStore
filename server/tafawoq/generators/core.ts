@@ -218,7 +218,7 @@ export function times(k: number, body: string): string {
  * by every student (server/tafawoq/ttsWarmup.ts prepares it ahead, variant 1
  * first). Written practice and exams keep unlimited variety (randomSeed).
  */
-export const SPOKEN_VARIANTS = Math.max(1, Number(process.env.TAFAWOQ_SPOKEN_VARIANTS ?? 30));
+export const SPOKEN_VARIANTS = Math.max(1, Number(process.env.TAFAWOQ_SPOKEN_VARIANTS || 30));
 
 /**
  * A seed among the spoken variants. With `used` (what this student already

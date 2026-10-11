@@ -130,4 +130,21 @@ describe("server startup env validation (checkEnv)", () => {
     expect(fatal).toEqual([]);
     expect(warnings.some(m => m.includes("OWNER_OPEN_ID"))).toBe(true);
   });
+
+  it("refuses the example placeholders for JWT_SECRET and the database password in production only", async () => {
+    const production = await loadCheckEnvWith({
+      JWT_SECRET: "change_me_generate_with_openssl_rand_hex_32",
+      DATABASE_URL: "mysql://tafawoq:changeme_use_a_real_password@mysql:3306/db",
+      NODE_ENV: "production",
+    });
+    const { fatal } = production();
+    expect(fatal.some(m => m.includes("JWT_SECRET is still the example placeholder"))).toBe(true);
+    expect(fatal.some(m => m.includes("DATABASE_URL still uses the example placeholder"))).toBe(true);
+
+    const local = await loadCheckEnvWith({
+      JWT_SECRET: "change_me_generate_with_openssl_rand_hex_32",
+      DATABASE_URL: "mysql://tafawoq:changeme_use_a_real_password@localhost:3306/db",
+    });
+    expect(local().fatal).toEqual([]);
+  });
 });

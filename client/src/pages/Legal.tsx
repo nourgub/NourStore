@@ -14,21 +14,21 @@ const nav = {
     privacy: "سياسة الخصوصية",
     terms: "شروط الاستخدام",
     draftNotice:
-      "هذا نص مسودة يغطي النقاط الأساسية المطلوبة، وليس وثيقة معتمدة قانونيًا. يجب مراجعته من محامٍ مختص في القانون الجزائري (القانون 18-07 لحماية المعطيات ذات الطابع الشخصي) قبل النشر الرسمي.",
+      "مسودة للتجربة: هذا النص يغطي النقاط الأساسية لكنه ليس وثيقة معتمدة قانونيًا. يجب أن يراجعه محامٍ مختص في القانون الجزائري (القانون 18-07 لحماية المعطيات ذات الطابع الشخصي) قبل الإطلاق التجاري وقبل تحصيل أي اشتراك.",
   },
   fr: {
     back: "Accueil",
     privacy: "Politique de confidentialité",
     terms: "Conditions d’utilisation",
     draftNotice:
-      "Ceci est un texte de brouillon couvrant les points essentiels — ce n’est pas un document juridiquement validé. Il doit être révisé par un avocat spécialisé en droit algérien (loi 18-07 sur la protection des données à caractère personnel) avant publication officielle.",
+      "Brouillon pour la phase d’essai : ce texte couvre les points essentiels mais n’est pas un document juridiquement validé. Il doit être révisé par un avocat spécialisé en droit algérien (loi 18-07 sur la protection des données à caractère personnel) avant le lancement commercial et avant tout encaissement d’abonnement.",
   },
   en: {
     back: "Home",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     draftNotice:
-      "This is a draft covering the essential points — it is not a legally certified document. It should be reviewed by a lawyer specialized in Algerian law (Law 18-07 on personal data protection) before official publication.",
+      "Draft for the trial phase: this text covers the essential points but is not a legally certified document. It must be reviewed by a lawyer specialised in Algerian law (Law 18-07 on personal data protection) before the commercial launch and before any subscription is charged.",
   },
 } as const;
 

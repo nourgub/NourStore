@@ -1,31 +1,35 @@
 # Tafawoq with a fully self-hosted MySQL — zero external service, zero
-# account with any company. Runs on any machine that has Docker installed (a normal, free,
-# offline software install — not a "sign up for an account" step).
+# account with any company. Runs on any machine that has Docker installed.
 #
 # Usage:
-#   1. Copy .env.example to .env and fill in real values (see below).
+#   1. cp .env.example .env   and fill in real values — at least
+#      JWT_SECRET, MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD and REDIS_PASSWORD
+#      (compose refuses to start without them; the server also refuses
+#      the example placeholders in production, see server/_core/env.ts).
 #   2. docker compose up -d
 #
-# That's it — the app container's own startup (see Dockerfile) applies
-# every not-yet-applied drizzle/*.sql migration automatically before
-# starting the server, tracked in a real _migrations table, so this is
-# safe to leave running on every future `docker compose up` too. MySQL's
-# data is stored in a Docker-managed volume that survives restarts and
-# `docker compose down` (only `docker compose down -v` erases it, which
-# is exactly how Docker volumes are supposed to work).
+# The app container applies every not-yet-applied drizzle/*.sql migration
+# on start (tracked in a _migrations table), so this is safe on every
+# `docker compose up`. Data lives in Docker volumes that survive restarts
+# and `docker compose down` (only `docker compose down -v` erases them).
+#
+# Only the app is reachable from outside. MySQL and Redis are published on
+# 127.0.0.1 only (handy for a local client or backups on this machine, never
+# reachable from the network — Docker's published ports bypass host
+# firewalls like ufw, so binding to loopback matters).
 
 services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme_use_a_real_password}
-      # Defaults kept from before the rename (see the note above volumes:).
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-nourix_academy}
-      MYSQL_USER: ${MYSQL_USER:-nourix}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-changeme_use_a_real_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      # An existing deployment keeps the names in its .env (see docs/LEGACY.md).
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tafawoq}
+      MYSQL_USER: ${MYSQL_USER:-tafawoq}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
     volumes:
       - nourix_mysql_data:/var/lib/mysql
     healthcheck:
@@ -37,12 +41,11 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    # Only needed if you want rate limiting to work correctly across
-    # multiple app instances behind a load balancer — a single-instance
-    # deployment works fine without this at all (the app falls back to
-    # in-memory rate limiting automatically when REDIS_URL isn't set).
+    # Shared rate limits when several app instances run behind a load
+    # balancer; a single instance works without it (in-memory fallback).
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - nourix_redis_data:/data
 
@@ -55,24 +58,51 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
     environment:
-      DATABASE_URL: mysql://${MYSQL_USER:-nourix}:${MYSQL_PASSWORD:-changeme_use_a_real_password}@mysql:3306/${MYSQL_DATABASE:-nourix_academy}
-      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+      DATABASE_URL: mysql://${MYSQL_USER:-tafawoq}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-tafawoq}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (openssl rand -hex 32)}
+      OWNER_OPEN_ID: ${OWNER_OPEN_ID:-}
       AUTH_PROVIDER: ${AUTH_PROVIDER:-google}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Files (exercise photos, recorded voices): local disk in the uploads
+      # volume, or any S3-compatible bucket.
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
-      REDIS_URL: redis://redis:6379
-      # Optional: Claude-written content for the AI teacher (it runs fully without it).
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-}
+      # AI teacher: optional Claude-written content (it runs fully without it).
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      NODE_ENV: production
+      TAFAWOQ_MODEL: ${TAFAWOQ_MODEL:-}
+      TAFAWOQ_BAC_DATE: ${TAFAWOQ_BAC_DATE:-}
+      # Teacher voices. Piper (free) is fetched into the uploads volume on
+      # first start; the paid voices are used only when their keys are set.
+      TAFAWOQ_PIPER_DIR: ${TAFAWOQ_PIPER_DIR:-/app/uploads/piper}
+      TAFAWOQ_TTS_CACHE_DIR: ${TAFAWOQ_TTS_CACHE_DIR:-/app/uploads/tts-cache}
+      TAFAWOQ_VOICE_PACK_MALE: ${TAFAWOQ_VOICE_PACK_MALE:-}
+      TAFAWOQ_VOICE_PACK_FEMALE: ${TAFAWOQ_VOICE_PACK_FEMALE:-}
+      TAFAWOQ_VOICE_PACK_RATE: ${TAFAWOQ_VOICE_PACK_RATE:-}
+      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
+      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
+      TAFAWOQ_AZURE_VOICE_MALE: ${TAFAWOQ_AZURE_VOICE_MALE:-}
+      TAFAWOQ_AZURE_VOICE_FEMALE: ${TAFAWOQ_AZURE_VOICE_FEMALE:-}
+      TAFAWOQ_AZURE_MONTHLY_CHARS: ${TAFAWOQ_AZURE_MONTHLY_CHARS:-}
+      GOOGLE_TTS_API_KEY: ${GOOGLE_TTS_API_KEY:-}
+      TAFAWOQ_TTS_MONTHLY_CHARS: ${TAFAWOQ_TTS_MONTHLY_CHARS:-}
+      TAFAWOQ_TTS_VOICE: ${TAFAWOQ_TTS_VOICE:-}
+      TAFAWOQ_TTS_VOICE_FEMALE: ${TAFAWOQ_TTS_VOICE_FEMALE:-}
+      TAFAWOQ_TTS_WARMUP: ${TAFAWOQ_TTS_WARMUP:-}
+      TAFAWOQ_SPOKEN_VARIANTS: ${TAFAWOQ_SPOKEN_VARIANTS:-}
     volumes:
       - nourix_uploads:/app/uploads
 
-# The volume names and the default database/user names (nourix_*) predate
-# the platform's rename to Tafawoq. They are kept on purpose: renaming a
-# volume would start an existing deployment on a new, EMPTY database. A new
-# deployment can set MYSQL_DATABASE/MYSQL_USER to anything in .env. See
-# docs/LEGACY.md.
+# The volume names (nourix_*) predate the platform's rename to Tafawoq and
+# are kept on purpose: renaming a volume would start an existing deployment
+# on a new, EMPTY database. See docs/LEGACY.md.
 volumes:
   nourix_mysql_data:
   nourix_uploads:

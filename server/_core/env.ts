@@ -14,15 +14,15 @@ export const ENV = {
   // button to the built-in email+password forms only (server/_core/
   // emailAuth.ts, which work either way regardless of this setting).
   // There is no third-party identity service involved in either path.
-  authProvider: process.env.AUTH_PROVIDER ?? "google",
+  authProvider: process.env.AUTH_PROVIDER || "google",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   // Storage provider abstraction — "local" (default) writes to this
   // server's own disk, zero external service. "s3" switches to any
   // S3-compatible object storage. See server/storageProviders/.
-  storageProvider: process.env.STORAGE_PROVIDER ?? "local",
+  storageProvider: process.env.STORAGE_PROVIDER || "local",
   s3Bucket: process.env.S3_BUCKET ?? "",
-  s3Region: process.env.S3_REGION ?? "auto",
+  s3Region: process.env.S3_REGION || "auto",
   s3Endpoint: process.env.S3_ENDPOINT ?? "", // leave empty for real AWS S3; set for R2/B2/MinIO
   s3AccessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
   s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
@@ -60,6 +60,11 @@ export const ENV = {
 // DOES enforce is that nothing here silently produces an insecure or
 // nonsensical deployment.
 // ---------------------------------------------------------------------------
+/** True for the "change me" values the example files ship with. */
+export function isPlaceholderSecret(value: string): boolean {
+  return /change_?me/i.test(value);
+}
+
 export type EnvCheckResult = {
   fatal: string[];
   warnings: string[];
@@ -77,6 +82,21 @@ export function checkEnv(): EnvCheckResult {
       "JWT_SECRET is missing or shorter than 16 characters. Session cookies " +
         "would be signed with a weak/empty secret, making them forgeable. " +
         "Set a long, random JWT_SECRET before starting the server."
+    );
+  }
+
+  // The placeholders shipped in .env.example / docker-compose.yml are for a
+  // local try-out only: a production server must never run on them.
+  if (ENV.isProduction && isPlaceholderSecret(ENV.cookieSecret)) {
+    fatal.push(
+      "JWT_SECRET is still the example placeholder. Generate a real one " +
+        "(openssl rand -hex 32) and set it in your host's secrets."
+    );
+  }
+  if (ENV.isProduction && isPlaceholderSecret(ENV.databaseUrl)) {
+    fatal.push(
+      "DATABASE_URL still uses the example placeholder password. Set a real " +
+        "MYSQL_PASSWORD (and MYSQL_ROOT_PASSWORD) before starting in production."
     );
   }
 

@@ -1,7 +1,7 @@
 // Tafawoq AI Teacher — the personal teacher (interface in ar / fr / en).
 //   /tafawoq             profile registration + choosing subject & lesson
 //   /tafawoq/:lessonKey  placement test → analysis → personal workspace
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import {
   BarChart3,
@@ -46,10 +46,6 @@ import {
 } from "./components";
 import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
 import { LiveTutor } from "./LiveTutor";
-import { CallScreen } from "./CallScreen";
-import { ExamHistory, ExamView } from "./ExamView";
-import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
-import { SessionsPage, TutorSessions } from "./Sessions";
 import { RoadmapCard } from "./RoadmapCard";
 import { FOREIGN_REQUESTS, darjaSuggestions, foreignSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
 import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
@@ -61,13 +57,33 @@ import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker, Thir
 import { StudentDashboard } from "./Dashboard";
 import { DailyPlanView } from "./DailyPlan";
 import { StreamRequestPage, SubscriptionPage } from "./Subscription";
-import { WeeklyTestPage } from "./WeeklyTest";
-import { TopicBankPage } from "./TopicBank";
 import { AchievementsPage, RevisionPage } from "./Revision";
-import { AdminPanel } from "./AdminPanel";
 import { ChildBacInfo, MyNotifications } from "./ParentBac";
 import { StructuredMessage, TeacherQuickActions, useVoiceMode } from "./TeacherPanel";
 import "./tafawoq.css";
+
+// Screens only some visitors open (admin, teacher, a call, an exam…) are
+// loaded on demand, so a student's first page downloads less. The daily
+// pages (dashboard, lesson, plan, revision — revision must open offline)
+// stay in the main bundle.
+const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.AdminPanel })));
+const TeacherInbox = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.TeacherInbox })));
+const ExerciseHelp = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.ExerciseHelp })));
+const TutorSessions = lazy(() => import("./Sessions").then(m => ({ default: m.TutorSessions })));
+const SessionsPage = lazy(() => import("./Sessions").then(m => ({ default: m.SessionsPage })));
+const CallScreen = lazy(() => import("./CallScreen").then(m => ({ default: m.CallScreen })));
+const ExamView = lazy(() => import("./ExamView").then(m => ({ default: m.ExamView })));
+const ExamHistory = lazy(() => import("./ExamView").then(m => ({ default: m.ExamHistory })));
+const WeeklyTestPage = lazy(() => import("./WeeklyTest").then(m => ({ default: m.WeeklyTestPage })));
+const TopicBankPage = lazy(() => import("./TopicBank").then(m => ({ default: m.TopicBankPage })));
+
+function PageLoading() {
+  return (
+    <p className="tfq-muted" aria-busy="true">
+      …
+    </p>
+  );
+}
 
 function errorMessage(t: TafawoqStrings, error: { message: string }) {
   if (error.message.includes("Database not configured")) return t.errors.database;
@@ -119,25 +135,27 @@ export default function TafawoqApp() {
           </div>
         </header>
         <main className="tfq-main">
-          {loading ? (
-            <p className="tfq-muted">{t.loading}</p>
-          ) : !isAuthenticated ? (
-            // Quick revision opens from the copy saved on the device, even offline.
-            params?.lessonKey === "revision" && hasOfflineRevision() ? <RevisionPage /> : <Landing />
-          ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
-            <ParentView />
-          ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
-            <TeacherHome />
-          ) : user?.role === "admin" && params?.lessonKey === "admin" ? (
-            <AdminPanel />
-          ) : user && user.role !== "learner" && user.role !== "admin" ? (
-            <div className="tfq-card tfq-empty">
-              <h2>{t.staffOnly}</h2>
-              <p className="tfq-muted">{t.staffOnlyDesc}</p>
-            </div>
-          ) : (
-            <LearnerRoutes route={params?.lessonKey ?? null} />
-          )}
+          <Suspense fallback={<PageLoading />}>
+            {loading ? (
+              <p className="tfq-muted">{t.loading}</p>
+            ) : !isAuthenticated ? (
+              // Quick revision opens from the copy saved on the device, even offline.
+              params?.lessonKey === "revision" && hasOfflineRevision() ? <RevisionPage /> : <Landing />
+            ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
+              <ParentView />
+            ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
+              <TeacherHome />
+            ) : user?.role === "admin" && params?.lessonKey === "admin" ? (
+              <AdminPanel />
+            ) : user && user.role !== "learner" && user.role !== "admin" ? (
+              <div className="tfq-card tfq-empty">
+                <h2>{t.staffOnly}</h2>
+                <p className="tfq-muted">{t.staffOnlyDesc}</p>
+              </div>
+            ) : (
+              <LearnerRoutes route={params?.lessonKey ?? null} />
+            )}
+          </Suspense>
         </main>
       </div>
     </StringsProvider>
@@ -216,13 +234,15 @@ function HomeCallCard({
   return (
     <section className="tfq-card tfq-home-call">
       {calling && lesson && (
-        <CallScreen
-          lessonKey={lesson.key}
-          lang={lang}
-          style={style}
-          teacherName={`أستاذ ${b.subjects[(lesson.subject as BacSubject)] ?? lesson.title}`}
-          onClose={() => setCalling(false)}
-        />
+        <Suspense fallback={null}>
+          <CallScreen
+            lessonKey={lesson.key}
+            lang={lang}
+            style={style}
+            teacherName={`أستاذ ${b.subjects[(lesson.subject as BacSubject)] ?? lesson.title}`}
+            onClose={() => setCalling(false)}
+          />
+        </Suspense>
       )}
       <div className="tfq-home-call-icon" aria-hidden>
         <Phone size={30} />
@@ -780,7 +800,9 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
     <div className="tfq-card">
       {live && <LiveTutor lessonKey={lessonKey} lang={lang} style={style} onClose={() => setLive(false)} />}
       {call && (
-        <CallScreen lessonKey={lessonKey} lang={lang} style={style} teacherName={teacherName} onClose={() => setCall(false)} />
+        <Suspense fallback={null}>
+          <CallScreen lessonKey={lessonKey} lang={lang} style={style} teacherName={teacherName} onClose={() => setCall(false)} />
+        </Suspense>
       )}
       <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
         <span className="tfq-muted">{t.teacherStyle}</span>

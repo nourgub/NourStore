@@ -1,4 +1,5 @@
-# Builds and runs Tafawoq in a container — pairs with
+# Builds and runs Tafawoq in a container (Node 22.22.2, the version pinned in
+# package.json "engines" and .nvmrc) — pairs with
 # docker-compose.yml's MySQL service, or with any host (Railway, a bare
 # VPS, etc.) that just points DATABASE_URL at a real MySQL instance.
 #
@@ -20,14 +21,14 @@
 # including on Replit, happened to have devDependencies installed too,
 # which is exactly why this had never been caught before.
 
-FROM node:22-slim AS build
+FROM node:22.22.2-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-slim AS runtime
+FROM node:22.22.2-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
@@ -44,4 +45,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # Dockerfile-based host (Railway, etc.) needs done automatically, since it
 # has no separate "run this once after deploy" step the way
 # docker-compose's manual step 3 assumes.
-CMD ["sh", "-c", "node scripts/migrate.mjs && node dist/index.js"]
+# The free Piper teacher voices are fetched once, in the background, into
+# TAFAWOQ_PIPER_DIR (the uploads volume in docker-compose.yml) — the server
+# starts right away and uses the browser's voice until they are ready.
+# Files already there are skipped, so an interrupted download completes.
+CMD ["sh", "-c", "node scripts/migrate.mjs && (if [ -n \"$TAFAWOQ_PIPER_DIR\" ]; then node scripts/fetch-piper.mjs \"$TAFAWOQ_PIPER_DIR\" > /tmp/piper-fetch.log 2>&1 & fi) && exec node dist/index.js"]

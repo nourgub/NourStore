@@ -186,4 +186,27 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — session
       code: "FORBIDDEN",
     });
   });
+
+  it("lets an admin grant the teacher role and reset a password, each recorded in the admin log", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    const newcomer = await fixtureUser("future-teacher");
+    // A non-admin can't, whatever the role asked for.
+    await expect(
+      appRouter.createCaller(ctxFor(teacherUser)).admin.updateUserRole({ userId: newcomer.id, role: "teacher" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(await adminCaller.admin.updateUserRole({ userId: newcomer.id, role: "teacher" })).toBe(true);
+    const db = await getDb();
+    const [row] = await db!.select().from(users).where(eq(users.id, newcomer.id));
+    expect(row.role).toBe("teacher");
+
+    // Password reset: the old password stops working, the new one signs in.
+    await adminCaller.admin.resetPassword({ userId: newcomer.id, newPassword: "a-new-password-2026" });
+    const visitor = appRouter.createCaller(ctxFor(null));
+    await expect(visitor.auth.loginWithEmail({ email: newcomer.email!, password: "a-long-test-password" })).rejects.toThrow();
+    await expect(visitor.auth.loginWithEmail({ email: newcomer.email!, password: "a-new-password-2026" })).resolves.toBeTruthy();
+
+    const log = await adminCaller.admin.auditLog({ limit: 50 });
+    const mine = log.filter(entry => entry.targetId === String(newcomer.id)).map(entry => entry.action);
+    expect(mine).toEqual(expect.arrayContaining(["update_user_role", "reset_password"]));
+  });
 });
