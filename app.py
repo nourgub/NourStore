@@ -1,8 +1,5 @@
 import hmac
 import os
-import threading
-import time
-from collections import defaultdict, deque
 from functools import wraps
 
 from dotenv import load_dotenv
@@ -10,88 +7,75 @@ from dotenv import load_dotenv
 load_dotenv()  # read .env before anything below looks at the environment
 
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+import config
 import db
+import ratelimit
 from agent import run_agent
 
 MIN_ADMIN_TOKEN_LENGTH = 16
 UNSAFE_ADMIN_TOKENS = {"change-me", "غيّر-هذا-الرمز-إلى-قيمة-سرية-قوية"}
 MAX_MESSAGE_CHARS = 2000
 MAX_HISTORY_MESSAGES = 10
+MAX_HISTORY_ENTRIES = 50
+DAILY_CAP_MESSAGE = "وصل العرض التجريبي إلى حدّه اليومي. عُد غدًا. · The demo has reached today's limit, please come back tomorrow."
+RATE_LIMIT_MESSAGE = "طلبات كثيرة في وقت قصير، انتظر بضع دقائق. · Trop de demandes, réessayez dans quelques minutes."
 
 app = Flask(__name__)
 app.json.ensure_ascii = False  # return Arabic as readable UTF-8
+app.config["MAX_CONTENT_LENGTH"] = config.max_request_bytes()
+if config.trusted_proxy_count():
+    # Trust X-Forwarded-For/Proto only from the configured number of proxies in front of the app.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=config.trusted_proxy_count(), x_proto=config.trusted_proxy_count())
 
-
-class RateLimiter:
-    """Small in-process sliding-window limiter, keyed by client IP.
-
-    Enough for a single-server store; with several workers or servers, move
-    this to Redis or the reverse proxy so the limit is shared.
-    """
-
-    def __init__(self, limit, window_seconds):
-        self.limit, self.window = limit, window_seconds
-        self.hits = defaultdict(deque)
-        self.lock = threading.Lock()
-
-    def allow(self, key):
-        current = time.monotonic()
-        with self.lock:
-            hits = self.hits[key]
-            while hits and current - hits[0] > self.window:
-                hits.popleft()
-            if len(hits) >= self.limit:
-                return False
-            hits.append(current)
-            return True
-
-
-chat_limiter = RateLimiter(int(os.getenv("CHAT_LIMIT_PER_10_MIN", "30")), 600)
-
-
-class DailyCap:
-    """Caps assistant replies per UTC day across all visitors (0 = no cap).
-
-    Meant for a public demo: whatever happens, the API bill stays bounded.
-    Also set a monthly spend limit in the Anthropic Console.
-    """
-
-    def __init__(self, limit):
-        self.limit, self.day, self.count = limit, None, 0
-        self.lock = threading.Lock()
-
-    def allow(self):
-        if self.limit <= 0:
-            return True
-        today = time.strftime("%Y-%m-%d", time.gmtime())
-        with self.lock:
-            if today != self.day:
-                self.day, self.count = today, 0
-            if self.count >= self.limit:
-                return False
-            self.count += 1
-            return True
-
-
-daily_cap = DailyCap(int(os.getenv("DAILY_CHAT_LIMIT", "0")))
-DAILY_CAP_MESSAGE = "وصل العرض التجريبي إلى حدّه اليومي. عُد غدًا. · The demo has reached today's limit, please come back tomorrow."
-confirm_limiter = RateLimiter(10, 600)
+limiter = ratelimit.build_limiter()
 
 
 def client_key():
+    """Client IP. Behind a proxy this is only meaningful with TRUSTED_PROXY_COUNT set."""
     return request.remote_addr or "unknown"
 
 
-def rate_limited(limiter):
+def within_limit(category, key=None):
+    limit, window = ratelimit.limits()[category]
+    return limiter.hit(f"{category}:{key or client_key()}", limit, window)
+
+
+def rate_limited(category):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            if not limiter.allow(client_key()):
-                return jsonify({"error": "Too many requests. Please wait a few minutes."}), 429
+            if not within_limit(category):
+                return jsonify({"error": RATE_LIMIT_MESSAGE, "code": "rate_limited"}), 429
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
+class BadRequest(ValueError):
+    pass
+
+
+def json_body():
+    """The request's JSON object, or BadRequest for anything else."""
+    if not request.is_json:
+        raise BadRequest("Send a JSON body with Content-Type: application/json.")
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        raise BadRequest("The JSON body must be an object.")
+    return payload
+
+
+@app.errorhandler(BadRequest)
+def bad_request(exc):
+    return jsonify({"error": str(exc), "code": "bad_request"}), 400
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def too_large(exc):
+    return jsonify({"error": "Request body too large.", "code": "too_large"}), 413
 
 
 def admin_token():
@@ -113,6 +97,15 @@ def admin_required(fn):
             return jsonify({"error": "Unauthorized"}), 401
         return fn(*args, **kwargs)
     return wrapper
+
+
+def validate_history(history):
+    """Reject malformed history outright; content-level filtering is done by clean_history."""
+    if history is None:
+        return []
+    if not isinstance(history, list) or len(history) > MAX_HISTORY_ENTRIES:
+        raise BadRequest(f"history must be a list of at most {MAX_HISTORY_ENTRIES} messages.")
+    return history
 
 
 def clean_history(history):
@@ -154,31 +147,31 @@ def health():
 
 
 @app.post("/api/chat")
-@rate_limited(chat_limiter)
+@rate_limited("chat")
 def chat():
-    payload = request.get_json(silent=True) or {}
-    message = str(payload.get("message", "")).strip()
-    if not message or len(message) > MAX_MESSAGE_CHARS:
-        return jsonify({"error": f"Message is required and must be under {MAX_MESSAGE_CHARS} characters."}), 400
-    if not daily_cap.allow():
-        return jsonify({"reply": DAILY_CAP_MESSAGE, "proposal": None}), 429
-    messages = clean_history(payload.get("history", []))
-    messages.append({"role": "user", "content": message})
+    payload = json_body()
+    message = payload.get("message")
+    if not isinstance(message, str) or not message.strip() or len(message) > MAX_MESSAGE_CHARS:
+        raise BadRequest(f"message is required and must be under {MAX_MESSAGE_CHARS} characters.")
+    history = validate_history(payload.get("history"))
+    if not within_limit("daily_chat", key="all"):
+        return jsonify({"reply": DAILY_CAP_MESSAGE, "proposal": None, "code": "daily_limit"}), 429
+    messages = clean_history(history)
+    messages.append({"role": "user", "content": message.strip()})
     result = run_agent(messages)
     return jsonify({"reply": result["reply"], "proposal": result["proposal"]})
 
 
 @app.post("/api/orders/confirm")
-@rate_limited(confirm_limiter)
+@rate_limited("confirm")
 def confirm():
-    payload = request.get_json(silent=True) or {}
-    proposal_id = str(payload.get("proposal_id", ""))
-    if not proposal_id:
-        return jsonify({"error": "proposal_id is required"}), 400
+    proposal_id = json_body().get("proposal_id")
+    if not isinstance(proposal_id, str) or not 8 <= len(proposal_id) <= 64:
+        raise BadRequest("proposal_id is required")
     try:
         return jsonify(db.confirm_order(proposal_id)), 201
     except db.OrderError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return jsonify({"error": str(exc), "code": exc.code}), 409
 
 
 @app.get("/api/wilayas")
@@ -194,15 +187,17 @@ def products():
 
 
 @app.get("/api/orders")
+@rate_limited("admin")
 @admin_required
 def orders():
     return jsonify(db.list_orders(request.args.get("status", "")))
 
 
 @app.patch("/api/orders/<int:order_id>/status")
+@rate_limited("admin")
 @admin_required
 def order_status(order_id):
-    payload = request.get_json(silent=True) or {}
+    payload = json_body()
     try:
         db.update_order_status(order_id, str(payload.get("status", "")))
         return jsonify({"ok": True})
