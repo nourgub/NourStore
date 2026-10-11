@@ -10,7 +10,7 @@ class ExtractedRequest(BaseModel):
     customer_id: str|None=None
     order_id: str|None=None
     intent: str|None=None
-    amount: float=Field(default=0, ge=0)
+    amount: float|None=Field(default=None, ge=0)
     reason: str=Field(default="", max_length=500)
     urgency: str="normal"
 
@@ -18,11 +18,31 @@ class LLMProvider(ABC):
     @abstractmethod
     def extract_request(self, message:str, customer_id:str|None=None)->ExtractedRequest: ...
 
+_CURRENCY=r"(?<![a-z])(?:\$|€|£|usd|eur|euros?|dollars?|dzd|da)"
+_NUMBER=r"([0-9]+(?:[.,][0-9]+)?)"
+# A number counts as an amount when a currency marker or the word "amount" is next to it.
+_AMOUNT_PATTERNS=(
+    re.compile(_CURRENCY+r"\s*"+_NUMBER, re.I),
+    re.compile(_NUMBER+r"\s*"+_CURRENCY+r"(?![a-z])(?!\s*[0-9])", re.I),
+    re.compile(r"(?:amount|montant|total)\s*(?:of|is|de|:)?\s*"+_NUMBER, re.I),
+)
+_ORDER=re.compile(r"(?:order|commande)\s*#?([A-Za-z0-9-]+)", re.I)
+SENSITIVE_TERMS=("urgent","security","sécurité","hacked","fraud","stolen","unauthori","chargeback","dispute","lawyer","legal")
+
+def extract_amount(message):
+    """Return the largest amount mentioned, or None when no amount can be read.
+
+    Taking the largest value is the conservative choice for the approval limit check.
+    """
+    text=_ORDER.sub(" ",message)  # order numbers are identifiers, not amounts
+    values=[float(m.group(1).replace(',','.')) for pattern in _AMOUNT_PATTERNS for m in pattern.finditer(text)]
+    return max(values) if values else None
+
 class MockLLMProvider(LLMProvider):
     def extract_request(self,message,customer_id=None):
-        order=re.search(r"(?:order|commande)\s*#?([A-Za-z0-9-]+)",message,re.I)
-        amount=re.search(r"(?:\$|€)\s*([0-9]+(?:\.[0-9]+)?)",message)
-        return ExtractedRequest(customer_id=customer_id,order_id=order.group(1) if order else None,amount=float(amount.group(1)) if amount else 0.0,reason=message[:500],urgency="high" if any(x in message.lower() for x in ["urgent","security","sécurité"]) else "normal")
+        order=_ORDER.search(message)
+        lowered=message.lower()
+        return ExtractedRequest(customer_id=customer_id,order_id=order.group(1) if order else None,amount=extract_amount(message),reason=message[:500],urgency="high" if any(term in lowered for term in SENSITIVE_TERMS) else "normal")
 
 class OpenAICompatibleProvider(LLMProvider):
     def extract_request(self,message,customer_id=None):

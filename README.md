@@ -59,7 +59,7 @@ Markdown documents in `data/documents/` are chunked and indexed using a lightwei
 
 ## Workflow and API
 
-The states are `RECEIVED`, `CLASSIFIED`, `PROCESSING`, `AUTO_APPROVED`, `REQUIRES_HUMAN_REVIEW`, `APPROVED_BY_HUMAN`, `REJECTED`, `COMPLETED` and `FAILED`. Transitions are centralized and invalid transitions are rejected. A refund can be auto-approved only when confidence, policy evidence, order information, amount limit and risk rules all pass. Cancellations and failures require human review.
+The states are `RECEIVED`, `CLASSIFIED`, `PROCESSING`, `AUTO_APPROVED`, `REQUIRES_HUMAN_REVIEW`, `APPROVED_BY_HUMAN`, `REJECTED`, `COMPLETED` and `FAILED`. Transitions are centralized and invalid transitions are rejected. A refund can be auto-approved only when confidence, risk/urgency, policy evidence, order information, a readable amount and the amount limit all pass. Urgency and sensitive terms (hacked, fraud, chargeback, ...) are checked before any intent-specific rule; a refund whose amount cannot be read (or is 0) always goes to a human. The confidence used by the rules is the raw classifier probability, never adjusted by keyword rules. Cancellations and failures require human review.
 
 Available endpoints: `POST /requests`, `GET /requests`, `GET /requests/{id}`, `GET /workflows/{id}`, `POST /workflows/{id}/approve`, `POST /workflows/{id}/reject`, `GET /audit/{workflow_id}` and `GET /health`.
 
@@ -74,8 +74,8 @@ python scripts/run_experiment.py
 uvicorn app.main:app --reload
 ```
 
-The test suite covers ML component behavior, RAG, structured output validation, provider failure, API validation, workflow transitions, human review, database field validation, audit events and prompt-injection scenarios. Configuration defaults are documented in `.env.example`; Python and dependency versions are declared in `pyproject.toml`.
+The test suite covers ML component behavior, safety regressions (amount parsing, unknown amounts, urgency precedence, raw confidence, dashboard HTML escaping), RAG, structured output validation, provider failure, API validation, workflow transitions, human review, database field validation, audit events and prompt-injection scenarios. Configuration defaults are documented in `.env.example`; Python and dependency versions are declared in `pyproject.toml`.
 
 ## Limitations
 
-Authentication, authorization, encryption, high-availability storage, queue durability, production observability, multilingual model evaluation and legal/compliance approval are out of scope. The confidence threshold is a configurable engineering decision, not a scientifically optimal calibration. Mock adapters must remain disconnected from real financial systems.
+Authentication, authorization, encryption, high-availability storage, queue durability, production observability, multilingual model evaluation and legal/compliance approval are out of scope. The in-app intent classifier is a small demo model trained on a few dozen hand-written phrases; it is separate from the Banking77 experiment and has not been evaluated on real traffic. The confidence threshold is a configurable engineering decision, not a scientifically optimal calibration. Mock adapters must remain disconnected from real financial systems.
