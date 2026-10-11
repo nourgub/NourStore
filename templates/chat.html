@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ store_name }}</title><link rel="stylesheet" href="/static/app.css"></head>
+<body>
+<main class="shell">
+  <section class="hero"><span class="eyebrow">مساعد المبيعات الذكي</span><h1>{{ store_name }}</h1><p>اسأل عن المنتجات، الأسعار، المخزون، التوصيل أو حالة طلبك.</p></section>
+  <section class="chat-card"><div id="messages" class="messages"><div class="bubble bot">مرحبًا، كيف يمكنني مساعدتك اليوم؟</div></div><form id="chat-form"><input id="message" autocomplete="off" placeholder="مثال: هل يوجد Samsung A55؟" maxlength="2000"><button>إرسال</button></form></section>
+</main>
+<script>
+const form=document.getElementById('chat-form'), input=document.getElementById('message'), box=document.getElementById('messages'); let history=[];
+function add(text,kind){const el=document.createElement('div');el.className='bubble '+kind;el.textContent=text;box.appendChild(el);box.scrollTop=box.scrollHeight;}
+form.addEventListener('submit',async e=>{e.preventDefault();const text=input.value.trim();if(!text)return;add(text,'user');history.push({role:'user',content:text});input.value='';const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history})});const data=await res.json();add(data.reply||data.error||'حدث خطأ غير متوقع','bot');history.push({role:'assistant',content:data.reply||data.error});});
+</script>
+</body></html>
