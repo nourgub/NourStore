@@ -25,14 +25,9 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(ROOT / ".env")
 
 
-# claude-haiku-5-5 list prices in USD per million tokens, for prompts up to 100K tokens
-# (checked 2026-10). Update them if you change model or Anthropic changes pricing.
-PRICE_PER_MTOK = {"input_tokens": 0.10, "output_tokens": 0.50,
-                  "cache_read_input_tokens": 0.01, "cache_creation_input_tokens": 0.125}
-
-
 def cost_usd(usage):
-    return sum(usage.get(key, 0) * price for key, price in PRICE_PER_MTOK.items()) / 1_000_000
+    from agent import cost_usd as agent_cost  # one price table, kept in agent.py
+    return agent_cost(usage)
 
 
 def check(case, called, proposals, reply):

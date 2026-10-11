@@ -14,6 +14,7 @@ import admin_api
 import auth
 import config
 import db
+import observability
 import ratelimit
 import security
 import web
@@ -34,6 +35,7 @@ ORDER_MESSAGES = {
                       "Le stock a changé avant la confirmation : ce produit n'est plus disponible en cette quantité."),
 }
 
+observability.setup_logging()
 app = Flask(__name__)
 app.json.ensure_ascii = False  # return Arabic as readable UTF-8
 app.config["MAX_CONTENT_LENGTH"] = config.max_request_bytes()
@@ -43,6 +45,7 @@ if config.trusted_proxy_count():
 
 limiter = web.limiter = ratelimit.build_limiter()
 app.register_blueprint(admin_api.bp)
+observability.init_app(app)
 app.before_request(security.preflight)
 app.after_request(security.apply_headers)
 
