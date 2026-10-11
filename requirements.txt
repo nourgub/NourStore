@@ -1,3 +1,4 @@
 Flask>=3.0,<4
-anthropic>=0.40,<1
+anthropic>=0.125,<1
+python-dotenv>=1.0,<2
 gunicorn>=22,<24

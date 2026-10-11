@@ -1,7 +1,84 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>إدارة {{ store_name }}</title><link rel="stylesheet" href="/static/app.css"></head>
-<body><main class="shell"><section class="hero"><span class="eyebrow">لوحة الإدارة</span><h1>الطلبات الواردة</h1><p>أدخل رمز الإدارة لعرض الطلبات وتحديث حالتها.</p></section><section class="panel"><div class="toolbar"><input id="token" placeholder="رمز الإدارة" type="password"><button onclick="loadOrders()">عرض الطلبات</button></div><div id="result" class="table-wrap"></div></section></main>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إدارة {{ store_name }}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main class="shell">
+  <section class="hero">
+    <span class="eyebrow">لوحة الإدارة</span>
+    <h1>الطلبات الواردة</h1>
+    <p>أدخل رمز الإدارة لعرض الطلبات وتحديث حالتها.</p>
+  </section>
+  <section class="panel">
+    <form class="toolbar" id="login">
+      <input id="token" placeholder="رمز الإدارة" type="password" autocomplete="current-password" aria-label="رمز الإدارة">
+      <button>عرض الطلبات</button>
+    </form>
+    <p id="message" class="muted" role="status"></p>
+    <div id="result" class="table-wrap"></div>
+  </section>
+</main>
 <script>
-async function loadOrders(){const token=document.getElementById('token').value;const r=await fetch('/api/orders',{headers:{'X-Admin-Token':token}});const data=await r.json();if(!r.ok){document.getElementById('result').textContent=data.error;return;}document.getElementById('result').innerHTML='<table><tr><th>رقم</th><th>العميل</th><th>الهاتف</th><th>الولاية</th><th>المجموع</th><th>الحالة</th></tr>'+data.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>${o.phone}</td><td>${o.wilaya}</td><td>${o.total} DA</td><td><select onchange="changeStatus(${o.id},this.value)"><option>${o.status}</option><option>confirmed</option><option>shipped</option><option>delivered</option><option>cancelled</option></select></td></tr>`).join('')+'</table>';window.adminToken=token;}
-async function changeStatus(id,status){await fetch('/api/orders/'+id+'/status',{method:'PATCH',headers:{'Content-Type':'application/json','X-Admin-Token':window.adminToken},body:JSON.stringify({status})});}
-</script></body></html>
+// Order data comes from customers, so it is rendered with textContent only.
+const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+let adminToken = '';
+
+function el(tag, text) {
+  const node = document.createElement(tag);
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  return node;
+}
+function say(text) { document.getElementById('message').textContent = text; }
+
+async function loadOrders() {
+  const res = await fetch('/api/orders', {headers: {'X-Admin-Token': adminToken}});
+  const data = await res.json();
+  const result = document.getElementById('result');
+  if (!res.ok) { result.replaceChildren(); say(data.error); return; }
+  say(data.length ? '' : 'لا توجد طلبات بعد.');
+  const table = el('table');
+  const head = el('tr');
+  ['رقم', 'العميل', 'الهاتف', 'الولاية', 'المنتجات', 'المجموع', 'الحالة'].forEach(h => head.append(el('th', h)));
+  table.append(head);
+  data.forEach(order => {
+    const row = el('tr');
+    const items = order.items.map(i => `${i.quantity} × ${i.name}`).join('، ');
+    [order.id, order.customer, order.phone, order.wilaya, items, order.total + ' DA'].forEach(v => row.append(el('td', v)));
+    const select = el('select');
+    select.setAttribute('aria-label', 'حالة الطلب ' + order.id);
+    STATUSES.forEach(s => {
+      const option = el('option', s);
+      option.value = s;
+      option.selected = s === order.status;
+      select.append(option);
+    });
+    select.addEventListener('change', () => changeStatus(order.id, select.value));
+    const cell = el('td');
+    cell.append(select);
+    row.append(cell);
+    table.append(row);
+  });
+  result.replaceChildren(table);
+}
+
+async function changeStatus(id, status) {
+  const res = await fetch('/api/orders/' + encodeURIComponent(id) + '/status', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-Admin-Token': adminToken},
+    body: JSON.stringify({status}),
+  });
+  say(res.ok ? `تم تحديث الطلب ${id}.` : 'تعذّر تحديث الحالة.');
+}
+
+document.getElementById('login').addEventListener('submit', e => {
+  e.preventDefault();
+  adminToken = document.getElementById('token').value;
+  loadOrders();
+});
+</script>
+</body>
+</html>
