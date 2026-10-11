@@ -14,6 +14,7 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "store.db"))
     monkeypatch.setenv("SEED_DEMO_DATA", "true")
     monkeypatch.setenv("ADMIN_TOKEN", "a-very-long-admin-secret")
+    monkeypatch.setenv("DEMO_MODE", "true")  # the shared token only works in demo mode
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     import db
     import agent
@@ -209,14 +210,28 @@ def test_admin_works_with_header_token(store):
 def test_admin_is_disabled_with_a_weak_or_default_token(store, monkeypatch, token):
     monkeypatch.setenv("ADMIN_TOKEN", token)
     response = store.client.get("/api/orders", headers={"X-Admin-Token": token})
-    assert response.status_code == 503
+    assert response.status_code == 401
 
 
-@pytest.mark.parametrize("page", ["admin.html", "chat.html"])
-def test_pages_never_render_data_as_html(page):
+def test_shared_admin_token_is_refused_outside_demo_mode(store, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "false")
+    response = store.client.get("/api/orders", headers={"X-Admin-Token": "a-very-long-admin-secret"})
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize("path", ["static/admin.js", "static/chat.js"])
+def test_scripts_never_render_data_as_html(path):
+    code = (ROOT / path).read_text(encoding="utf-8")
+    assert "innerHTML" not in code and "insertAdjacentHTML" not in code and "outerHTML" not in code
+    assert "document.write" not in code and "eval(" not in code
+    assert "textContent" in code
+
+
+@pytest.mark.parametrize("page", ["admin.html", "chat.html", "privacy.html"])
+def test_pages_have_no_inline_scripts_or_handlers(page):
     html = (ROOT / "templates" / page).read_text(encoding="utf-8")
-    assert "innerHTML" not in html and "insertAdjacentHTML" not in html and "onclick=" not in html
-    assert "textContent" in html
+    assert "<script>" not in html and "onclick=" not in html and "onload=" not in html
+    assert "innerHTML" not in html
 
 
 # ---- untrusted browser history -----------------------------------------------------------

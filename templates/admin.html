@@ -9,76 +9,75 @@
 <body>
 <main class="shell">
   <section class="hero">
-    <span class="eyebrow">لوحة الإدارة</span>
-    <h1>الطلبات الواردة</h1>
-    <p>أدخل رمز الإدارة لعرض الطلبات وتحديث حالتها.</p>
+    <span class="eyebrow">لوحة الإدارة · {{ store_name }}</span>
+    <h1>الطلبات والمنتجات</h1>
   </section>
-  <section class="panel">
-    <form class="toolbar" id="login">
-      <input id="token" placeholder="رمز الإدارة" type="password" autocomplete="current-password" aria-label="رمز الإدارة">
-      <button>عرض الطلبات</button>
+
+  <section class="panel" id="login-panel">
+    <form id="login-form" class="stack-form">
+      <label for="username">اسم المستخدم</label>
+      <input id="username" autocomplete="username" required maxlength="40">
+      <label for="password">كلمة المرور</label>
+      <input id="password" type="password" autocomplete="current-password" required maxlength="200">
+      <button>دخول</button>
     </form>
-    <p id="message" class="muted" role="status"></p>
-    <div id="result" class="table-wrap"></div>
+    <p class="muted" id="login-message" role="status"></p>
+  </section>
+
+  <section class="panel" id="app-panel" hidden>
+    <div class="toolbar between">
+      <nav class="tabs" aria-label="الأقسام">
+        <button type="button" class="tab" data-tab="orders">الطلبات</button>
+        <button type="button" class="tab" data-tab="products" data-role="admin">المنتجات</button>
+        <button type="button" class="tab" data-tab="users" data-role="admin">المستخدمون</button>
+      </nav>
+      <div class="who"><span id="who"></span> <button type="button" class="secondary" id="logout">خروج</button></div>
+    </div>
+    <p class="muted" id="message" role="status"></p>
+
+    <div id="tab-orders" class="tab-body">
+      <form class="toolbar" id="order-filter">
+        <input id="order-q" placeholder="رقم الطلب، الهاتف، الاسم أو الولاية" maxlength="100" aria-label="بحث في الطلبات">
+        <select id="order-status" aria-label="الحالة"><option value="">كل الحالات</option></select>
+        <button>بحث</button>
+      </form>
+      <div class="table-wrap" id="orders"></div>
+      <div class="pager" id="orders-pager"></div>
+    </div>
+
+    <div id="tab-products" class="tab-body" hidden>
+      <form class="toolbar" id="product-filter">
+        <input id="product-q" placeholder="اسم المنتج أو الفئة" maxlength="100" aria-label="بحث في المنتجات">
+        <button>بحث</button>
+      </form>
+      <details class="card-form">
+        <summary>إضافة منتج</summary>
+        <form id="product-form" class="grid-form">
+          <input id="p-name" placeholder="الاسم" required maxlength="120" aria-label="الاسم">
+          <input id="p-category" placeholder="الفئة" maxlength="40" aria-label="الفئة">
+          <input id="p-price" type="number" min="0" step="1" placeholder="السعر (DA)" required aria-label="السعر">
+          <input id="p-stock" type="number" min="0" step="1" placeholder="المخزون" required aria-label="المخزون">
+          <button>إضافة</button>
+        </form>
+      </details>
+      <div class="table-wrap" id="products"></div>
+      <div class="pager" id="products-pager"></div>
+    </div>
+
+    <div id="tab-users" class="tab-body" hidden>
+      <details class="card-form">
+        <summary>إضافة مستخدم</summary>
+        <form id="user-form" class="grid-form">
+          <input id="u-name" placeholder="اسم المستخدم" required maxlength="40" aria-label="اسم المستخدم">
+          <input id="u-password" type="password" placeholder="كلمة مرور (12 حرفًا أو أكثر)" required minlength="12" maxlength="200" autocomplete="new-password" aria-label="كلمة المرور">
+          <select id="u-role" aria-label="الدور"><option value="staff">staff</option><option value="admin">admin</option></select>
+          <button>إضافة</button>
+        </form>
+      </details>
+      <div class="table-wrap" id="users"></div>
+    </div>
   </section>
 </main>
-<script>
-// Order data comes from customers, so it is rendered with textContent only.
-const STATUSES = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
-let adminToken = '';
-
-function el(tag, text) {
-  const node = document.createElement(tag);
-  if (text !== undefined && text !== null) node.textContent = String(text);
-  return node;
-}
-function say(text) { document.getElementById('message').textContent = text; }
-
-async function loadOrders() {
-  const res = await fetch('/api/orders', {headers: {'X-Admin-Token': adminToken}});
-  const data = await res.json();
-  const result = document.getElementById('result');
-  if (!res.ok) { result.replaceChildren(); say(data.error); return; }
-  say(data.length ? '' : 'لا توجد طلبات بعد.');
-  const table = el('table');
-  const head = el('tr');
-  ['رقم', 'العميل', 'الهاتف', 'الولاية', 'المنتجات', 'المجموع', 'الحالة'].forEach(h => head.append(el('th', h)));
-  table.append(head);
-  data.forEach(order => {
-    const row = el('tr');
-    const items = order.items.map(i => `${i.quantity} × ${i.name}`).join('، ');
-    [order.id, order.customer, order.phone, order.wilaya, items, order.total + ' DA'].forEach(v => row.append(el('td', v)));
-    const select = el('select');
-    select.setAttribute('aria-label', 'حالة الطلب ' + order.id);
-    STATUSES.forEach(s => {
-      const option = el('option', s);
-      option.value = s;
-      option.selected = s === order.status;
-      select.append(option);
-    });
-    select.addEventListener('change', () => changeStatus(order.id, select.value));
-    const cell = el('td');
-    cell.append(select);
-    row.append(cell);
-    table.append(row);
-  });
-  result.replaceChildren(table);
-}
-
-async function changeStatus(id, status) {
-  const res = await fetch('/api/orders/' + encodeURIComponent(id) + '/status', {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json', 'X-Admin-Token': adminToken},
-    body: JSON.stringify({status}),
-  });
-  say(res.ok ? `تم تحديث الطلب ${id}.` : 'تعذّر تحديث الحالة.');
-}
-
-document.getElementById('login').addEventListener('submit', e => {
-  e.preventDefault();
-  adminToken = document.getElementById('token').value;
-  loadOrders();
-});
-</script>
+<script src="/static/admin.js"></script>
 </body>
 </html>

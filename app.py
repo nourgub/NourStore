@@ -1,27 +1,38 @@
-import hmac
+import getpass
 import os
-from functools import wraps
 
 from dotenv import load_dotenv
 
 load_dotenv()  # read .env before anything below looks at the environment
 
+import click
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import admin_api
+import auth
 import config
 import db
 import ratelimit
+import security
+import web
 from agent import run_agent
+from web import BadRequest, json_body, rate_limited, within_limit
 
-MIN_ADMIN_TOKEN_LENGTH = 16
-UNSAFE_ADMIN_TOKENS = {"change-me", "غيّر-هذا-الرمز-إلى-قيمة-سرية-قوية"}
 MAX_MESSAGE_CHARS = 2000
 MAX_HISTORY_MESSAGES = 10
 MAX_HISTORY_ENTRIES = 50
 DAILY_CAP_MESSAGE = "وصل العرض التجريبي إلى حدّه اليومي. عُد غدًا. · The demo has reached today's limit, please come back tomorrow."
-RATE_LIMIT_MESSAGE = "طلبات كثيرة في وقت قصير، انتظر بضع دقائق. · Trop de demandes, réessayez dans quelques minutes."
+
+# Customer-facing texts for order problems, by OrderError code: (Arabic, French).
+ORDER_MESSAGES = {
+    "proposal_not_found": ("لم نجد ملخص الطلب هذا.", "Ce récapitulatif de commande est introuvable."),
+    "already_confirmed": ("تم تأكيد هذا الطلب من قبل.", "Cette commande est déjà confirmée."),
+    "proposal_expired": ("انتهت صلاحية ملخص الطلب. اطلبه من المساعد مرة أخرى.", "Ce récapitulatif a expiré. Redemandez-le à l'assistant."),
+    "stock_changed": ("تغيّر المخزون قبل التأكيد، ولم يعد هذا المنتج متوفرًا بهذه الكمية.",
+                      "Le stock a changé avant la confirmation : ce produit n'est plus disponible en cette quantité."),
+}
 
 app = Flask(__name__)
 app.json.ensure_ascii = False  # return Arabic as readable UTF-8
@@ -30,42 +41,10 @@ if config.trusted_proxy_count():
     # Trust X-Forwarded-For/Proto only from the configured number of proxies in front of the app.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=config.trusted_proxy_count(), x_proto=config.trusted_proxy_count())
 
-limiter = ratelimit.build_limiter()
-
-
-def client_key():
-    """Client IP. Behind a proxy this is only meaningful with TRUSTED_PROXY_COUNT set."""
-    return request.remote_addr or "unknown"
-
-
-def within_limit(category, key=None):
-    limit, window = ratelimit.limits()[category]
-    return limiter.hit(f"{category}:{key or client_key()}", limit, window)
-
-
-def rate_limited(category):
-    def decorator(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            if not within_limit(category):
-                return jsonify({"error": RATE_LIMIT_MESSAGE, "code": "rate_limited"}), 429
-            return fn(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-class BadRequest(ValueError):
-    pass
-
-
-def json_body():
-    """The request's JSON object, or BadRequest for anything else."""
-    if not request.is_json:
-        raise BadRequest("Send a JSON body with Content-Type: application/json.")
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
-        raise BadRequest("The JSON body must be an object.")
-    return payload
+limiter = web.limiter = ratelimit.build_limiter()
+app.register_blueprint(admin_api.bp)
+app.before_request(security.preflight)
+app.after_request(security.apply_headers)
 
 
 @app.errorhandler(BadRequest)
@@ -78,25 +57,8 @@ def too_large(exc):
     return jsonify({"error": "Request body too large.", "code": "too_large"}), 413
 
 
-def admin_token():
-    """The configured admin token, or None when it is missing or unsafe."""
-    token = os.getenv("ADMIN_TOKEN", "")
-    if len(token) < MIN_ADMIN_TOKEN_LENGTH or token in UNSAFE_ADMIN_TOKENS:
-        return None
-    return token
-
-
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        expected = admin_token()
-        if expected is None:
-            return jsonify({"error": "Admin access is disabled: set a strong ADMIN_TOKEN (16+ characters) in .env."}), 503
-        supplied = request.headers.get("X-Admin-Token", "")  # header only: query strings end up in logs
-        if not hmac.compare_digest(supplied.encode(), expected.encode()):
-            return jsonify({"error": "Unauthorized"}), 401
-        return fn(*args, **kwargs)
-    return wrapper
+def store_name():
+    return os.getenv("STORE_NAME", "متجري الذكي")
 
 
 def validate_history(history):
@@ -131,20 +93,31 @@ def clean_history(history):
     return cleaned
 
 
+# ---- pages ----------------------------------------------------------------------------------
+
 @app.get("/")
 def home():
-    return render_template("chat.html", store_name=os.getenv("STORE_NAME", "متجري الذكي"))
+    return render_template("chat.html", store_name=store_name())
 
 
 @app.get("/admin")
 def admin():
-    return render_template("admin.html", store_name=os.getenv("STORE_NAME", "متجري الذكي"))
+    return render_template("admin.html", store_name=store_name())
+
+
+@app.get("/privacy")
+def privacy():
+    return render_template("privacy.html", store_name=store_name(),
+                           retention_days=config.order_retention_days(),
+                           proposal_hours=config.proposal_retention_hours())
 
 
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
 
+
+# ---- public API -----------------------------------------------------------------------------
 
 @app.post("/api/chat")
 @rate_limited("chat")
@@ -171,7 +144,23 @@ def confirm():
     try:
         return jsonify(db.confirm_order(proposal_id)), 201
     except db.OrderError as exc:
-        return jsonify({"error": str(exc), "code": exc.code}), 409
+        ar, fr = ORDER_MESSAGES.get(exc.code, (str(exc), str(exc)))
+        return jsonify({"error": f"{ar} · {fr}", "code": exc.code}), 409
+
+
+@app.post("/api/orders/status")
+@rate_limited("status")
+def order_status_lookup():
+    """Customers check an order with its number AND the phone used. POST keeps the phone out of URLs and logs."""
+    payload = json_body()
+    order_id, phone = payload.get("order_id"), payload.get("phone")
+    if isinstance(order_id, bool) or not isinstance(order_id, (int, str)) or not isinstance(phone, str) or len(phone) > 20:
+        raise BadRequest("order_id and phone are required")
+    status = db.order_status_for_customer(order_id, phone)
+    if not status:
+        return jsonify({"error": "لم نجد طلبًا بهذا الرقم وهذا الهاتف. · Aucune commande avec ce numéro et ce téléphone.",
+                        "code": "not_found"}), 404
+    return jsonify(status)
 
 
 @app.get("/api/wilayas")
@@ -186,23 +175,35 @@ def products():
     return jsonify(db.list_products(request.args.get("keyword", ""), request.args.get("category", "")))
 
 
-@app.get("/api/orders")
-@rate_limited("admin")
-@admin_required
-def orders():
-    return jsonify(db.list_orders(request.args.get("status", "")))
+# ---- management commands --------------------------------------------------------------------
+
+@app.cli.command("migrate")
+def migrate_command():
+    """Apply pending database migrations."""
+    applied = db.migrations.migrate(db.db_path())
+    click.echo(f"Applied migrations: {applied or 'none (already up to date)'}")
 
 
-@app.patch("/api/orders/<int:order_id>/status")
-@rate_limited("admin")
-@admin_required
-def order_status(order_id):
-    payload = json_body()
+@app.cli.command("create-user")
+@click.option("--username", required=True)
+@click.option("--role", type=click.Choice(auth.ROLES), default="staff", show_default=True)
+def create_user_command(username, role):
+    """Create a staff account. The password is read from STAFF_PASSWORD or asked interactively."""
+    password = os.getenv("STAFF_PASSWORD") or getpass.getpass("Password (12+ characters): ")
     try:
-        db.update_order_status(order_id, str(payload.get("status", "")))
-        return jsonify({"ok": True})
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        user = auth.create_user(username, password, role)
+    except auth.AuthError as exc:
+        raise click.ClickException(str(exc))
+    click.echo(f"Created {user['role']} '{user['username']}'.")
+
+
+@app.cli.command("purge-data")
+def purge_data_command():
+    """Apply the retention policy: anonymise old closed orders, delete old proposals and sessions."""
+    orders = db.anonymize_old_orders(config.order_retention_days())
+    proposals = db.delete_old_proposals(config.proposal_retention_hours())
+    sessions = auth.delete_expired_sessions()
+    click.echo(f"Anonymised {orders} orders, deleted {proposals} proposals and {sessions} expired sessions.")
 
 
 db.init_db()
