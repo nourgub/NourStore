@@ -11,17 +11,39 @@
   <section class="hero">
     <span class="eyebrow">مساعد المبيعات الذكي</span>
     <h1>{{ store_name }}</h1>
-    <p>اسأل عن المنتجات، الأسعار، المخزون، التوصيل أو حالة طلبك.</p>
+    <p>اسأل عن المنتجات، الأسعار، المخزون، التوصيل أو حالة طلبك. · Posez vos questions en arabe, darija ou français.</p>
   </section>
+
   <section class="chat-card">
     <div id="messages" class="messages" aria-live="polite">
       <div class="bubble bot">مرحبًا، كيف يمكنني مساعدتك اليوم؟</div>
     </div>
-    <form id="chat-form">
+    <form id="chat-form" class="chat-form">
       <input id="message" autocomplete="off" placeholder="مثال: هل يوجد Samsung A55؟" maxlength="2000" aria-label="رسالتك">
       <button id="send">إرسال</button>
     </form>
   </section>
+
+  <section class="side-grid">
+    <div class="panel">
+      <h2>رسوم التوصيل</h2>
+      <label for="wilaya" class="muted">اختر ولايتك</label>
+      <select id="wilaya"><option value="">— الولاية —</option></select>
+      <p id="fee" class="muted" role="status"></p>
+      <button type="button" id="use-wilaya" class="secondary" disabled>أرسل الولاية للمساعد</button>
+    </div>
+    <div class="panel">
+      <h2>متابعة طلب</h2>
+      <form id="status-form" class="stack-form">
+        <input id="order-id" inputmode="numeric" placeholder="رقم الطلب" maxlength="10" required aria-label="رقم الطلب">
+        <input id="order-phone" inputmode="tel" placeholder="رقم الهاتف المستعمل في الطلب" maxlength="20" required aria-label="رقم الهاتف">
+        <button>عرض الحالة</button>
+      </form>
+      <p id="status-result" class="muted" role="status"></p>
+    </div>
+  </section>
+
+  <footer class="footer"><a href="/privacy">سياسة الخصوصية · Confidentialité</a></footer>
 </main>
 <script src="/static/chat.js"></script>
 </body>
