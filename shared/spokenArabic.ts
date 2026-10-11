@@ -26,6 +26,9 @@ const LETTERS: Record<string, string> = {
   x: "إكس", y: "واي", z: "زد", n: "إن", m: "إم", k: "كا", t: "تي", p: "بي", q: "كيو", r: "آر",
   a: "أ", b: "بي", c: "سي", d: "دي", f: "إف", g: "جي", h: "إتش", u: "يو", v: "في", w: "دبليو",
   i: "آي", e: "إي", A: "أ", B: "بي", C: "سي", D: "دي", M: "إم", P: "بي", I: "آي",
+  // Physics quantities (E, Q, U, T…) and nuclide symbols (Z, X, N).
+  E: "إي", F: "إف", G: "جي", H: "إتش", K: "كا", L: "إل", N: "إن", Q: "كيو", R: "آر",
+  T: "تي", U: "يو", V: "في", W: "دبليو", X: "إكس", Y: "واي", Z: "زد",
 };
 const WORDS: Array<[RegExp, string]> = [
   [/\blim\b/g, " نهاية "],
@@ -63,6 +66,10 @@ export function toSpokenArabic(text: string): string {
   out = out.replace(/[₀₁₂₃₄₅₆₇₈₉ₙ₊]+/g, run =>
     " " + Array.from(run).map(char => SUBSCRIPT_DIGITS[char]).join("").replace(/\+/g, " زائد ")
   );
+  // Written subscripts: u_C, E_C, ᴬ_Z X → "يو سي", "إي سي", "أ زد إكس"; ᴬ is a mass number.
+  out = out.replace(/_\(([^)]*)\)|_/g, (_, group) => ` ${group ?? ""} `).replace(/ᴬ/g, " أ ");
+  // Greek letters of physics.
+  out = out.replace(/τ/g, " تاو ").replace(/λ/g, " لامدا ").replace(/ω/g, " أوميغا ").replace(/α/g, " ألفا ").replace(/β/g, " بيتا ").replace(/γ/g, " غاما ").replace(/μ/g, " ميو ");
   // f′(x) → إف مشتقة إكس ; (uv)′ → … مشتقة ; z̄ → مرافق زد ; |z| → طويلة زد
   out = out
     .replace(/([a-zA-Z)])′/g, "$1 مشتقة ")
