@@ -11,6 +11,7 @@ switch those to `SERIAL`/`IDENTITY` and `%s` in this file and in db.py.
 """
 import json
 import sqlite3
+import time
 from datetime import datetime, timezone
 
 import wilayas
@@ -168,19 +169,39 @@ def applied_versions(conn):
     return {row[0] for row in conn.execute("SELECT version FROM schema_migrations")}
 
 
+def _retry_locked(action, attempts=50):
+    """Switching to WAL and creating the bookkeeping table can fail with 'database is locked'
+    immediately (without waiting) when several workers start at once; retry briefly."""
+    for attempt in range(attempts):
+        try:
+            return action()
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == attempts - 1:
+                raise
+            time.sleep(0.02 * (1 + attempt % 5))
+
+
 def migrate(path):
-    """Apply every pending migration in order. Returns the versions applied now."""
+    """Apply every pending migration in order. Returns the versions applied now.
+
+    Safe to run from several workers at the same time: each migration re-checks,
+    under the write lock, whether another worker already applied it.
+    """
     conn = sqlite3.connect(path, timeout=10, isolation_level=None)
     try:
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
+        _retry_locked(lambda: conn.execute("PRAGMA journal_mode = WAL"))
         applied_now = []
-        done = applied_versions(conn)
+        done = _retry_locked(lambda: applied_versions(conn))
         for version, name, step in MIGRATIONS:
             if version in done:
                 continue
             conn.execute("BEGIN IMMEDIATE")
             try:
+                # Another worker may have applied it while we waited for the write lock.
+                if conn.execute("SELECT 1 FROM schema_migrations WHERE version=?", (version,)).fetchone():
+                    conn.execute("COMMIT")
+                    continue
                 step(conn)
                 conn.execute("INSERT INTO schema_migrations(version,name,applied_at) VALUES (?,?,?)",
                              (version, name, _now()))

@@ -2,6 +2,8 @@
 .venv
 .env
 data
+backups
 __pycache__
 .pytest_cache
 evals/results
+tests

@@ -6,3 +6,4 @@ data/*.db
 data/*.db-*
 .pytest_cache/
 evals/results/
+backups/

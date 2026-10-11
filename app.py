@@ -209,7 +209,15 @@ def purge_data_command():
     click.echo(f"Anonymised {orders} orders, deleted {proposals} proposals and {sessions} expired sessions.")
 
 
+if app.debug and not config.env_bool("ALLOW_DEBUG", False):
+    # The interactive debugger can run code: never let FLASK_DEBUG switch it on by accident.
+    app.debug = False
+    app.logger.warning("debug mode refused; set ALLOW_DEBUG=true only on a developer machine")
+
 db.init_db()
 
 if __name__ == "__main__":
-    app.run(host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "5000")), debug=False)
+    host = os.getenv("HOST", "127.0.0.1")
+    if host == "0.0.0.0" and not os.path.exists("/.dockerenv"):
+        app.logger.warning("HOST=0.0.0.0 exposes the app on every network interface; use it only in a container or behind a proxy")
+    app.run(host=host, port=int(os.getenv("PORT", "5000")), debug=False)
