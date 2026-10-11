@@ -294,16 +294,26 @@ Streams: **العلوم التجريبية**, **الآداب والفلسفة**,
   is simulated: a request stays `pending_payment` until an admin confirms it. Everything except
   the placement test needs an active subscription (checked server-side).
 - **Content honesty**: a subject is offered only if the curriculum has lessons for it; otherwise
-  it is shown as "قريباً". Today only mathematics has BAC content, so it's available to sciences
-  (core) and to lettres/langues (as second subject). Generated bank topics carry no year; real
-  dated topics can be published by an admin.
+  it is shown as "قريباً". Every subject of the three streams now has BAC lessons. Generated bank
+  topics carry no year; real dated topics can be published by an admin.
 - Placement test across subjects (5 levels), daily plan + streak, mistake diagnosis stored per
   answer (`tafawoqAttempts.errorType`), weekly test /20, mock BAC with autosave and time
   analysis, topic bank, offline quick revision, teacher quick requests in the fixed format
   (title / explanation / law / example / question, read aloud on request), points & badges (no
   public ranking), parent follow-up (chats only with the student's consent), admin panel and an
   event log (`tafawoqEvents`, never passwords).
+- **Sessions with a human teacher** (`/tafawoq/sessions`, migration
+  `drizzle/0034_add_tafawoq_tutoring.sql`, rules in `server/tafawoq/platform/tutoring.ts`):
+  an admin links a teacher profile to a *teacher* account (Admin → الأساتذة والحصص); the teacher
+  opens slots (Algiers time, up to 30 days ahead, never overlapping); a subscribed student books
+  one in a subject of their stream (≥ 2 h ahead, at most 3 to come); the teacher confirms or
+  declines. On confirmation a free Jitsi Meet room (unguessable link, nothing to install) appears
+  for both, joinable 15 minutes before. Students cancel free up to 12 h before. One slot can never
+  be booked twice (conditional update), and every step sends an in-app notification. Sessions
+  are included in the subscription by default; a per-teacher price can be shown, but no payment
+  is collected for it.
 - Tests: `server/tafawoq/platform/platform.test.ts` and the real-DB
-  `server/tafawoq/platform/bacPlatform.realDb.e2e.test.ts` (in `npm run test:db`).
+  `server/tafawoq/platform/bacPlatform.realDb.e2e.test.ts` and
+  `server/tafawoq/platform/tutoring.realDb.e2e.test.ts` (in `npm run test:db`).
 
 Payment instructions shown to students are set by an admin (Admin → Settings).

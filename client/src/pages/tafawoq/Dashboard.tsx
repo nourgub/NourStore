@@ -17,6 +17,7 @@ import {
   PlayCircle,
   Repeat,
   Users,
+  Video,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -98,6 +99,9 @@ export function StudentDashboard() {
             <MessageCircle size={16} /> {b.contactTeacher}
           </Link>
         )}
+        <Link href="/tafawoq/sessions" className="tfq-btn ghost">
+          <Video size={16} /> {b.sessions.title}
+        </Link>
         <Link href="/tafawoq/subscription" className="tfq-btn ghost">
           <CreditCard size={16} /> {b.manageSubscription}
         </Link>

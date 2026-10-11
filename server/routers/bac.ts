@@ -11,8 +11,9 @@ import {
   THIRD_LANGUAGES,
 } from "@shared/bacPlatform";
 import { protectedProcedure, router } from "../_core/trpc";
-import { adminProcedure, learnerProcedure, parentProcedure, rateLimit } from "../_core/procedures";
+import { adminProcedure, learnerProcedure, parentProcedure, rateLimit, teacherProcedure } from "../_core/procedures";
 import * as platform from "../tafawoq/platform/service";
+import * as tutoring from "../tafawoq/platform/tutoring";
 import * as bacDb from "../db/bacPlatform";
 
 const HOUR = 60 * 60 * 1000;
@@ -57,6 +58,21 @@ export const bacRouter = router({
     .mutation(({ ctx, input }) => platform.requestStreamChange(ctx.user.id, input.toStream, input.reason, input.toLanguage)),
 
   myStreamRequests: learnerProcedure.query(({ ctx }) => platform.myStreamRequests(ctx.user.id)),
+
+  // Sessions with a human teacher ----------------------------------------------------
+  tutors: learnerProcedure.query(({ ctx }) => tutoring.tutorsForStudent(ctx.user.id)),
+
+  bookSession: learnerProcedure
+    .use(rateLimit("bac-book-session", 20, 24 * HOUR))
+    .input(z.object({ slotId: z.number().int().positive(), subject: z.enum(BAC_SUBJECTS), note: z.string().trim().max(500).nullish() }))
+    .mutation(({ ctx, input }) => tutoring.bookSession(ctx.user.id, input)),
+
+  myBookings: learnerProcedure.query(({ ctx }) => tutoring.myBookings(ctx.user.id)),
+
+  cancelBooking: learnerProcedure
+    .use(rateLimit("bac-cancel-session", 20, 24 * HOUR))
+    .input(z.object({ bookingId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => tutoring.cancelMyBooking(ctx.user.id, input.bookingId)),
 
   setShareChats: learnerProcedure
     .input(z.object({ share: z.boolean() }))
@@ -234,8 +250,64 @@ const bankTopicInput = z.object({
 
 const toTopic = (input: z.infer<typeof bankTopicInput>) => ({ ...input, streams: input.streams.join(",") });
 
+const slotsInput = z.object({
+  startsAt: z.array(z.coerce.date()).min(1).max(50),
+  durationMin: z.number().int().min(30).max(120),
+});
+const reviewInput = z.object({
+  bookingId: z.number().int().positive(),
+  action: z.enum(["confirm", "decline", "cancel", "done"]),
+  note: z.string().trim().max(1000).nullish(),
+});
+
+/** The human teacher's own sessions (a "teacher" account linked to a teacher profile). */
+export const bacTutorRouter = router({
+  dashboard: teacherProcedure.query(({ ctx }) => tutoring.tutorDashboard(ctx.user.id)),
+  addSlots: teacherProcedure
+    .use(rateLimit("bac-tutor-slots", 60, HOUR))
+    .input(slotsInput)
+    .mutation(({ ctx, input }) => tutoring.addSlots({ userId: ctx.user.id, admin: false }, input)),
+  cancelSlot: teacherProcedure
+    .input(z.object({ slotId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => tutoring.cancelSlot({ userId: ctx.user.id, admin: false }, input.slotId)),
+  review: teacherProcedure
+    .input(reviewInput)
+    .mutation(({ ctx, input }) => tutoring.reviewBooking({ userId: ctx.user.id, admin: false }, input)),
+});
+
 export const bacAdminRouter = router({
   overview: adminProcedure.query(() => platform.adminOverview()),
+
+  // Sessions with a human teacher ----------------------------------------------------
+  tutors: adminProcedure.query(() => tutoring.adminTutors()),
+  saveTutor: adminProcedure
+    .input(
+      z.object({
+        id: z.number().int().positive().optional(),
+        name: z.string().trim().min(2).max(120),
+        email: z.string().trim().email().max(320).nullish().or(z.literal("")),
+        subjects: z.array(z.enum(BAC_SUBJECTS)).min(1),
+        bio: z.string().trim().max(1000).nullish(),
+        priceDa: z.number().int().min(0).max(100_000),
+        active: z.boolean(),
+      })
+    )
+    .mutation(({ ctx, input }) => tutoring.adminSaveTutor(ctx.user.id, input)),
+  tutorSlots: adminProcedure
+    .input(z.object({ tutorId: z.number().int().positive() }))
+    .query(({ input }) => tutoring.adminTutorSlots(input.tutorId)),
+  addTutorSlots: adminProcedure
+    .input(slotsInput.extend({ tutorId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => tutoring.addSlots({ userId: ctx.user.id, admin: true }, input)),
+  cancelTutorSlot: adminProcedure
+    .input(z.object({ slotId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => tutoring.cancelSlot({ userId: ctx.user.id, admin: true }, input.slotId)),
+  bookings: adminProcedure
+    .input(z.object({ status: z.enum(["requested", "confirmed", "declined", "cancelled", "done"]).optional() }))
+    .query(({ input }) => tutoring.adminBookings(input.status)),
+  reviewBooking: adminProcedure
+    .input(reviewInput)
+    .mutation(({ ctx, input }) => tutoring.reviewBooking({ userId: ctx.user.id, admin: true }, input)),
 
   students: adminProcedure
     .input(z.object({ search: z.string().max(100).optional(), stream: stream.optional() }))

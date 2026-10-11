@@ -1463,6 +1463,60 @@ export const tafawoqSecondSubjectChanges = mysqlTable(
   })
 );
 
+// Sessions with a human teacher (drizzle/0034_add_tafawoq_tutoring.sql).
+export const tafawoqTutors = mysqlTable("tafawoqTutors", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").references(() => users.id).unique("tafawoqTutors_user_unique"),
+  displayName: varchar("displayName", { length: 120 }).notNull(),
+  /** BAC subject keys, comma-separated. */
+  subjects: varchar("subjects", { length: 255 }).notNull(),
+  bio: text("bio"),
+  /** Per session; 0 = included in the subscription. */
+  priceDa: int("priceDa").default(0).notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const tafawoqTutorSlots = mysqlTable(
+  "tafawoqTutorSlots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tutorId: int("tutorId").notNull().references(() => tafawoqTutors.id),
+    startsAt: timestamp("startsAt").notNull(),
+    durationMin: int("durationMin").default(45).notNull(),
+    status: mysqlEnum("status", ["open", "booked", "cancelled"]).default("open").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    tutorIdx: index("tafawoqTutorSlots_tutor_idx").on(table.tutorId, table.startsAt),
+    statusIdx: index("tafawoqTutorSlots_status_idx").on(table.status, table.startsAt),
+  })
+);
+
+export const tafawoqBookings = mysqlTable(
+  "tafawoqBookings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    slotId: int("slotId").notNull().references(() => tafawoqTutorSlots.id),
+    tutorId: int("tutorId").notNull().references(() => tafawoqTutors.id),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    userId: int("userId").notNull().references(() => users.id),
+    subject: varchar("subject", { length: 32 }).notNull(),
+    note: text("note"),
+    status: mysqlEnum("status", ["requested", "confirmed", "declined", "cancelled", "done"]).default("requested").notNull(),
+    meetingUrl: varchar("meetingUrl", { length: 255 }),
+    tutorNote: text("tutorNote"),
+    cancelledBy: int("cancelledBy"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt"),
+  },
+  table => ({
+    userIdx: index("tafawoqBookings_user_idx").on(table.userId, table.status),
+    tutorIdx: index("tafawoqBookings_tutor_idx").on(table.tutorId, table.status),
+    slotIdx: index("tafawoqBookings_slot_idx").on(table.slotId),
+  })
+);
+
 export const tafawoqSubscriptions = mysqlTable(
   "tafawoqSubscriptions",
   {

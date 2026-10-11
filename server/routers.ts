@@ -19,7 +19,7 @@ import { institutionRouter } from "./routers/institution";
 import { adminRouter } from "./routers/admin";
 import { supportRouter } from "./routers/support";
 import { tafawoqRouter } from "./routers/tafawoq";
-import { bacAdminRouter, bacRouter } from "./routers/bac";
+import { bacAdminRouter, bacRouter, bacTutorRouter } from "./routers/bac";
 
 export const appRouter = router({
   diagnostics: diagnosticsRouter,
@@ -44,6 +44,7 @@ export const appRouter = router({
   tafawoq: tafawoqRouter,
   bac: bacRouter,
   bacAdmin: bacAdminRouter,
+  bacTutor: bacTutorRouter,
 });
 
 export type AppRouter = typeof appRouter;

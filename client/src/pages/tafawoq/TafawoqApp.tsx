@@ -49,6 +49,7 @@ import { LiveTutor } from "./LiveTutor";
 import { CallScreen } from "./CallScreen";
 import { ExamHistory, ExamView } from "./ExamView";
 import { ExerciseHelp, TeacherInbox } from "./ExerciseHelp";
+import { SessionsPage, TutorSessions } from "./Sessions";
 import { RoadmapCard } from "./RoadmapCard";
 import { FOREIGN_REQUESTS, darjaSuggestions, foreignSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
 import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
@@ -126,7 +127,7 @@ export default function TafawoqApp() {
           ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
             <ParentView />
           ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
-            <TeacherInbox />
+            <TeacherHome />
           ) : user?.role === "admin" && params?.lessonKey === "admin" ? (
             <AdminPanel />
           ) : user && user.role !== "learner" && user.role !== "admin" ? (
@@ -270,6 +271,24 @@ function hasOfflineRevision() {
   }
 }
 
+/** A teacher's space: exercises sent by students, and live sessions. */
+function TeacherHome() {
+  const b = useB();
+  const [tab, setTab] = useState<"exercises" | "sessions">("exercises");
+  return (
+    <>
+      <nav className="tfq-tabs" role="tablist">
+        {(["exercises", "sessions"] as const).map(key => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key} className={`tfq-tab ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
+            {key === "exercises" ? b.sessions.tabExercises : b.sessions.tabSessions}
+          </button>
+        ))}
+      </nav>
+      {tab === "exercises" ? <TeacherInbox /> : <TutorSessions />}
+    </>
+  );
+}
+
 function LearnerRoutes({ route }: { route: string | null }) {
   const t = useT();
   const b = useB();
@@ -285,6 +304,7 @@ function LearnerRoutes({ route }: { route: string | null }) {
   if (route === "profile") return <ProfileRoute />;
   if (data.step === "second" || route === "second-subject") return <SecondSubjectPicker state={data} />;
   if (route === "stream-request") return <StreamRequestPage />;
+  if (route === "sessions") return <SessionsPage />;
   if (route === "subscription") return <SubscriptionPage />;
   if (data.step === "placement" || route === "placement") return <PlacementRoute />;
   switch (route) {
