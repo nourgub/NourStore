@@ -2,17 +2,24 @@
 //
 // An admin creates teacher profiles (linked to a "teacher" account, so the
 // teacher logs in and manages their own sessions) with the subjects they
-// teach and a price per session (0 = included in the subscription). A
-// teacher opens time slots; a subscribed student books one in one of their
-// own subjects; the teacher (or an admin) confirms — which creates a free
-// Jitsi video room — or declines; after the session it is marked done, with
-// an optional note for the student. Every step notifies the other side.
+// teach. A teacher opens time slots; a subscribed student books one in one of
+// their own subjects; the teacher (or an admin) confirms — which creates a
+// video room (Jitsi, TAFAWOQ_MEETING_BASE_URL) — or declines; after the
+// session it is marked done, with an optional note for the student. Every
+// step notifies the other side. Sessions are included in the subscription:
+// extra paid sessions are NOT sold (no way to collect their payment yet).
 //
 // Rules, all enforced here: an active subscription; a subject of the
 // student's own (stream, second subject, third language); at least
-// MIN_NOTICE_H ahead; at most MAX_UPCOMING sessions to come; a slot is
-// taken by one student only (conditional update); free cancellation until
+// MIN_NOTICE_H ahead; at most `bac.maxUpcomingSessions` sessions to come
+// and `bac.sessionsPerMonth` per monthly cycle of the subscription (admin
+// settings); a slot is taken by one student only; free cancellation until
 // CANCEL_LIMIT_H before; each teacher sees and manages only their sessions.
+//
+// The allowance: a booking uses one session of the cycle in which it was
+// made, as long as it is requested, confirmed or done. It is given back when
+// the teacher declines, or when the booking is cancelled (by the student in
+// time, by the teacher, or by an admin).
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { BAC_SUBJECTS, isPlatformStream, type BacSubject, type PlatformStream } from "@shared/bacPlatform";
@@ -22,10 +29,10 @@ import { logAdminAction } from "../../db/adminAudit";
 import * as tafawoq from "../service";
 import { hasActiveSubscription } from "./access";
 import { allowedSubjects } from "./catalog";
+import { getSettingNumber } from "../../db/platformSettings";
 
 export const MIN_NOTICE_H = 2;
 export const CANCEL_LIMIT_H = 12;
-export const MAX_UPCOMING = 3;
 const HOUR = 60 * 60 * 1000;
 /** How far ahead students see slots, and teachers may open them. */
 const HORIZON_DAYS = 30;
@@ -33,6 +40,55 @@ const HORIZON_DAYS = 30;
 const JOIN_EARLY_MIN = 15;
 
 const SUBJECTS = BAC_SUBJECTS.filter(subject => subject !== "third_language");
+
+/** Trial defaults; the owner sets the commercial values (Admin → Settings). */
+export const DEFAULT_SESSIONS_PER_MONTH = 2;
+export const DEFAULT_MAX_UPCOMING = 3;
+
+export async function sessionRules() {
+  const [perMonth, maxUpcoming] = await Promise.all([
+    getSettingNumber("bac.sessionsPerMonth", DEFAULT_SESSIONS_PER_MONTH),
+    getSettingNumber("bac.maxUpcomingSessions", DEFAULT_MAX_UPCOMING),
+  ]);
+  return { perMonth: Math.floor(perMonth), maxUpcoming: Math.max(1, Math.floor(maxUpcoming)) };
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+}
+
+/** The monthly cycle of a subscription that contains `now`: [from, to). */
+export function cycleWindow(startsAt: Date, endsAt: Date, now: Date) {
+  let from = startsAt;
+  for (let k = 1; ; k += 1) {
+    const next = addMonths(startsAt, k);
+    if (next.getTime() > now.getTime() || next.getTime() >= endsAt.getTime()) {
+      return { from, to: next.getTime() < endsAt.getTime() ? next : endsAt };
+    }
+    from = next;
+  }
+}
+
+/** The student's allowance right now (null without an active subscription). */
+export async function allowanceFor(userId: number, now = new Date()) {
+  const rules = await sessionRules();
+  const subscription = await bac.getCurrentSubscription(userId, now);
+  if (!subscription?.startsAt || !subscription.endsAt) return { rules, cycle: null };
+  const window = cycleWindow(subscription.startsAt, subscription.endsAt, now);
+  const used = await db.consumedBetween(userId, window.from, window.to);
+  return {
+    rules,
+    cycle: { subscriptionId: subscription.id, ...window, allowance: rules.perMonth, used, remaining: Math.max(0, rules.perMonth - used) },
+  };
+}
+
+/** Where confirmed sessions take place: a Jitsi server (meet.jit.si by default). */
+export function meetingBaseUrl(): string {
+  const configured = (process.env.TAFAWOQ_MEETING_BASE_URL || "").trim().replace(/\/+$/, "");
+  return /^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(configured) ? configured : "https://meet.jit.si";
+}
 
 function fail(code: "BAD_REQUEST" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT", message: string): never {
   throw new TRPCError({ code, message });
@@ -82,14 +138,27 @@ export async function tutorsForStudent(userId: number, now = new Date()) {
     new Date(now.getTime() + MIN_NOTICE_H * HOUR)
   );
   const until = now.getTime() + HORIZON_DAYS * 24 * HOUR;
+  const [subscriptionActive, allowance, upcoming] = await Promise.all([
+    hasActiveSubscription(userId),
+    allowanceFor(userId, now),
+    db.upcomingCount(userId, now),
+  ]);
   return {
-    subscriptionActive: await hasActiveSubscription(userId),
-    rules: { minNoticeHours: MIN_NOTICE_H, cancelLimitHours: CANCEL_LIMIT_H, maxUpcoming: MAX_UPCOMING },
+    subscriptionActive,
+    rules: {
+      minNoticeHours: MIN_NOTICE_H,
+      cancelLimitHours: CANCEL_LIMIT_H,
+      maxUpcoming: allowance.rules.maxUpcoming,
+      perMonth: allowance.rules.perMonth,
+    },
+    allowance: allowance.cycle
+      ? { used: allowance.cycle.used, remaining: allowance.cycle.remaining, renewsAt: allowance.cycle.to }
+      : null,
+    upcoming,
     tutors: tutors.map(({ tutor, subjects }) => ({
       id: tutor.id,
       name: tutor.displayName,
       bio: tutor.bio,
-      priceDa: tutor.priceDa,
       subjects,
       slots: slots
         .filter(slot => slot.tutorId === tutor.id && slot.startsAt.getTime() <= until)
@@ -107,11 +176,28 @@ export async function bookSession(userId: number, input: { slotId: number; subje
   const tutor = await db.getTutor(slot.tutorId);
   if (!tutor || !tutor.active || !parseSubjects(tutor.subjects).includes(input.subject)) fail("BAD_REQUEST", "TUTOR_SUBJECT");
   if (slot.startsAt.getTime() < now.getTime() + MIN_NOTICE_H * HOUR) fail("BAD_REQUEST", "SLOT_TOO_SOON");
-  if ((await db.upcomingCount(userId, now)) >= MAX_UPCOMING) fail("BAD_REQUEST", "TOO_MANY_SESSIONS");
-  // Two students clicking at once: only one takes the slot.
-  if (!(await db.takeSlot(slot.id))) fail("CONFLICT", "SLOT_TAKEN");
+  const allowance = await allowanceFor(userId, now);
+  if (!allowance.cycle) fail("FORBIDDEN", "SUBSCRIPTION_REQUIRED");
+  if (allowance.rules.perMonth === 0) fail("FORBIDDEN", "SESSIONS_NOT_INCLUDED");
   const note = input.note?.trim() ? input.note.trim() : null;
-  const id = await db.insertBooking({ slotId: slot.id, tutorId: tutor.id, studentId: student.id, userId, subject: input.subject, note });
+  let id: number;
+  try {
+    id = await db.bookAtomically({
+      slotId: slot.id,
+      tutorId: tutor.id,
+      studentId: student.id,
+      userId,
+      subject: input.subject,
+      note,
+      subscriptionId: allowance.cycle.subscriptionId,
+      now,
+      maxUpcoming: allowance.rules.maxUpcoming,
+      cycle: { from: allowance.cycle.from, to: allowance.cycle.to, allowance: allowance.rules.perMonth },
+    });
+  } catch (error) {
+    if (error instanceof db.BookingRefused) fail(error.reason === "SLOT_TAKEN" ? "CONFLICT" : "BAD_REQUEST", error.reason);
+    throw error;
+  }
   await notify(tutor.userId, "طلب حصة جديد", `${student.displayName} يطلب حصة يوم ${sessionTime(slot.startsAt)}. أكّد الحصة أو اعتذر عنها من صفحة «حصصي».`);
   await bac.logEvent(userId, "session_booked", { bookingId: id, tutorId: tutor.id, subject: input.subject });
   return { id };
@@ -226,7 +312,7 @@ export async function reviewBooking(actor: Actor, input: { bookingId: number; ac
   switch (input.action) {
     case "confirm": {
       // A free video room: unguessable name, nothing to install for the student.
-      const meetingUrl = `https://meet.jit.si/Tafawoq-${booking.id}-${nanoid(14)}`;
+      const meetingUrl = `${meetingBaseUrl()}/Tafawoq-${booking.id}-${nanoid(14)}`;
       if (!(await db.moveBooking(booking.id, ["requested"], "confirmed", { meetingUrl, tutorNote: note }))) fail("CONFLICT", "BOOKING_CLOSED");
       await notify(booking.userId, "تم تأكيد حصتك", `حصتك يوم ${when} مؤكدة. ادخل إليها من صفحة «حصة مع أستاذ» قبل الموعد بقليل.${note ? ` رسالة الأستاذ: ${note}` : ""}`);
       break;
@@ -282,7 +368,7 @@ async function teacherAccount(email: string | null | undefined) {
 
 export async function adminSaveTutor(
   adminId: number,
-  input: { id?: number; name: string; email?: string | null; subjects: BacSubject[]; bio?: string | null; priceDa: number; active: boolean }
+  input: { id?: number; name: string; email?: string | null; subjects: BacSubject[]; bio?: string | null; priceDa?: number; active: boolean }
 ) {
   const subjects = input.subjects.filter(subject => (SUBJECTS as readonly string[]).includes(subject));
   if (!subjects.length) fail("BAD_REQUEST", "TUTOR_SUBJECT");
@@ -296,7 +382,7 @@ export async function adminSaveTutor(
     userId,
     subjects: subjects.join(","),
     bio: input.bio?.trim() || null,
-    priceDa: input.priceDa,
+    priceDa: 0, // extra paid sessions are not sold (no way to collect them)
     active: input.active ? 1 : 0,
   };
   let id = input.id;

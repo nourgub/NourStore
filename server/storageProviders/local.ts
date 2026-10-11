@@ -46,6 +46,11 @@ export async function localPut(
   return { key, url: `/local-storage/${key}` };
 }
 
+/** Removes a stored file; a file already gone is not an error. */
+export async function localDelete(relKey: string): Promise<void> {
+  await fs.rm(path.join(UPLOAD_ROOT, normalizeKey(relKey)), { force: true });
+}
+
 export async function localGet(
   relKey: string
 ): Promise<{ key: string; url: string }> {

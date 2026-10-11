@@ -2,7 +2,7 @@
 // The rules live in server/tafawoq/platform/tutoring.ts; this file only
 // reads and writes, with conditional updates where two requests could race
 // (two students booking the same slot, a booking reviewed twice).
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { tafawoqBookings, tafawoqStudents, tafawoqTutorSlots, tafawoqTutors, users } from "../../drizzle/schema";
 import { getDb } from "./shared";
@@ -116,16 +116,6 @@ export async function getSlot(id: number) {
   return row;
 }
 
-/** open → booked, only if still open: false when another student took it first. */
-export async function takeSlot(id: number) {
-  const db = await requireDb();
-  const [result] = await db
-    .update(tafawoqTutorSlots)
-    .set({ status: "booked" })
-    .where(and(eq(tafawoqTutorSlots.id, id), eq(tafawoqTutorSlots.status, "open")));
-  return result.affectedRows === 1;
-}
-
 export async function setSlotStatus(id: number, status: Slot["status"], from?: Slot["status"]) {
   const db = await requireDb();
   const [result] = await db
@@ -138,12 +128,6 @@ export async function setSlotStatus(id: number, status: Slot["status"], from?: S
 // ---------------------------------------------------------------------------
 // Bookings
 // ---------------------------------------------------------------------------
-
-export async function insertBooking(input: { slotId: number; tutorId: number; studentId: number; userId: number; subject: string; note: string | null }) {
-  const db = await requireDb();
-  const [result] = await db.insert(tafawoqBookings).values(input);
-  return result.insertId;
-}
 
 export async function getBooking(id: number) {
   const db = await requireDb();
@@ -211,4 +195,102 @@ export async function upcomingCount(userId: number, now: Date) {
     .innerJoin(tafawoqTutorSlots, eq(tafawoqTutorSlots.id, tafawoqBookings.slotId))
     .where(and(eq(tafawoqBookings.userId, userId), inArray(tafawoqBookings.status, ["requested", "confirmed"]), gt(tafawoqTutorSlots.startsAt, now)));
   return Number(row?.value ?? 0);
+}
+
+// ---------------------------------------------------------------------------
+// Atomic booking
+// ---------------------------------------------------------------------------
+
+/** Bookings that use up a session of the student's allowance. A declined or
+ *  cancelled booking gives it back. */
+export const CONSUMING_STATUSES: BookingStatus[] = ["requested", "confirmed", "done"];
+
+export class BookingRefused extends Error {
+  constructor(public readonly reason: "SLOT_TAKEN" | "TOO_MANY_SESSIONS" | "MONTHLY_SESSIONS_USED") {
+    super(reason);
+  }
+}
+
+/** Sessions booked by the student in [from, to) that still count. */
+export async function consumedBetween(userId: number, from: Date, to: Date) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ value: sql<number>`count(*)` })
+    .from(tafawoqBookings)
+    .where(
+      and(
+        eq(tafawoqBookings.userId, userId),
+        inArray(tafawoqBookings.status, CONSUMING_STATUSES),
+        gte(tafawoqBookings.createdAt, from),
+        lt(tafawoqBookings.createdAt, to)
+      )
+    );
+  return Number(row?.value ?? 0);
+}
+
+/**
+ * Checks the limits, takes the slot and records the booking in ONE
+ * transaction. The student's row is locked first, so two requests from the
+ * same student (double click, two tabs) are counted one after the other and
+ * can never both pass the limits; the slot update is conditional, so two
+ * students can never take the same slot. Anything failing rolls back the
+ * whole booking — no slot is left "booked" without its booking.
+ */
+export async function bookAtomically(input: {
+  slotId: number;
+  tutorId: number;
+  studentId: number;
+  userId: number;
+  subject: string;
+  note: string | null;
+  subscriptionId: number | null;
+  now: Date;
+  maxUpcoming: number;
+  cycle: { from: Date; to: Date; allowance: number } | null;
+}): Promise<number> {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.select({ id: tafawoqStudents.id }).from(tafawoqStudents).where(eq(tafawoqStudents.id, input.studentId)).for("update");
+    const [upcoming] = await tx
+      .select({ value: sql<number>`count(*)` })
+      .from(tafawoqBookings)
+      .innerJoin(tafawoqTutorSlots, eq(tafawoqTutorSlots.id, tafawoqBookings.slotId))
+      .where(
+        and(
+          eq(tafawoqBookings.userId, input.userId),
+          inArray(tafawoqBookings.status, ["requested", "confirmed"]),
+          gt(tafawoqTutorSlots.startsAt, input.now)
+        )
+      );
+    if (Number(upcoming?.value ?? 0) >= input.maxUpcoming) throw new BookingRefused("TOO_MANY_SESSIONS");
+    if (input.cycle) {
+      const [used] = await tx
+        .select({ value: sql<number>`count(*)` })
+        .from(tafawoqBookings)
+        .where(
+          and(
+            eq(tafawoqBookings.userId, input.userId),
+            inArray(tafawoqBookings.status, CONSUMING_STATUSES),
+            gte(tafawoqBookings.createdAt, input.cycle.from),
+            lt(tafawoqBookings.createdAt, input.cycle.to)
+          )
+        );
+      if (Number(used?.value ?? 0) >= input.cycle.allowance) throw new BookingRefused("MONTHLY_SESSIONS_USED");
+    }
+    const [taken] = await tx
+      .update(tafawoqTutorSlots)
+      .set({ status: "booked" })
+      .where(and(eq(tafawoqTutorSlots.id, input.slotId), eq(tafawoqTutorSlots.status, "open")));
+    if (taken.affectedRows !== 1) throw new BookingRefused("SLOT_TAKEN");
+    const [result] = await tx.insert(tafawoqBookings).values({
+      slotId: input.slotId,
+      tutorId: input.tutorId,
+      studentId: input.studentId,
+      userId: input.userId,
+      subject: input.subject,
+      note: input.note,
+      subscriptionId: input.subscriptionId,
+    });
+    return result.insertId;
+  });
 }

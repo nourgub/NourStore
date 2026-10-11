@@ -1,11 +1,14 @@
 import {
   bigint,
+  char,
+  date,
   double,
   index,
   int,
   mysqlEnum,
   mediumtext,
   mysqlTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -46,6 +49,9 @@ export const users = mysqlTable("users", {
   accountStatus: mysqlEnum("accountStatus", ["active", "pending", "suspended"])
     .default("active")
     .notNull(),
+  // Bumped on every password change or reset: a session signed with an
+  // older version is refused (server/_core/session.ts).
+  sessionVersion: int("sessionVersion").default(0).notNull(),
   country: varchar("country", { length: 2 }),
   currency: varchar("currency", { length: 3 }).default("DZD"),
   language: varchar("language", { length: 5 }).default("ar"),
@@ -1507,11 +1513,14 @@ export const tafawoqBookings = mysqlTable(
     meetingUrl: varchar("meetingUrl", { length: 255 }),
     tutorNote: text("tutorNote"),
     cancelledBy: int("cancelledBy"),
+    // The subscription the booking was counted against (per-cycle allowance).
+    subscriptionId: int("subscriptionId"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt"),
   },
   table => ({
     userIdx: index("tafawoqBookings_user_idx").on(table.userId, table.status),
+    subscriptionIdx: index("tafawoqBookings_subscription_idx").on(table.subscriptionId, table.status),
     tutorIdx: index("tafawoqBookings_tutor_idx").on(table.tutorId, table.status),
     slotIdx: index("tafawoqBookings_slot_idx").on(table.slotId),
   })
@@ -1538,6 +1547,9 @@ export const tafawoqSubscriptions = mysqlTable(
     bonusDays: int("bonusDays").default(0).notNull(),
     reviewedBy: int("reviewedBy").references(() => users.id),
     reviewNote: text("reviewNote"),
+    // What the admin actually received when confirming a manual payment.
+    paidAmountDa: int("paidAmountDa"),
+    paidReference: varchar("paidReference", { length: 120 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     reviewedAt: timestamp("reviewedAt"),
   },
@@ -1637,3 +1649,64 @@ export const tafawoqEvents = mysqlTable(
     userIdx: index("tafawoqEvents_user_idx").on(table.userId, table.createdAt),
   })
 );
+
+// ---------------------------------------------------------------------------
+// Launch readiness (drizzle/0035_launch_readiness.sql)
+// ---------------------------------------------------------------------------
+
+/** One-time password reset codes; only a SHA-256 of the code is stored. */
+export const passwordResetTokens = mysqlTable(
+  "passwordResetTokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    tokenHash: char("tokenHash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    hashUnique: uniqueIndex("passwordResetTokens_hash_unique").on(table.tokenHash),
+    userIdx: index("passwordResetTokens_user_idx").on(table.userId, table.createdAt),
+  })
+);
+
+/** A user's request to export their data or delete their account. */
+export const accountRequests = mysqlTable(
+  "accountRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    kind: mysqlEnum("kind", ["export", "delete"]).notNull(),
+    status: mysqlEnum("status", ["open", "done", "rejected"]).default("open").notNull(),
+    note: text("note"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    resolvedAt: timestamp("resolvedAt"),
+    resolvedBy: int("resolvedBy"),
+  },
+  table => ({
+    statusIdx: index("accountRequests_status_idx").on(table.status, table.createdAt),
+    userIdx: index("accountRequests_user_idx").on(table.userId),
+  })
+);
+
+/** Daily counters of what costs money or capacity — numbers only. */
+export const tafawoqUsage = mysqlTable(
+  "tafawoqUsage",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    metric: varchar("metric", { length: 48 }).notNull(),
+    amount: bigint("amount", { mode: "number" }).default(0).notNull(),
+  },
+  table => ({ pk: primaryKey({ columns: [table.day, table.metric] }) })
+);
+
+/** Pedagogical review of each lesson by a human teacher. */
+export const tafawoqContentReviews = mysqlTable("tafawoqContentReviews", {
+  lessonKey: varchar("lessonKey", { length: 80 }).primaryKey(),
+  status: mysqlEnum("status", ["unreviewed", "in_review", "approved", "needs_changes"]).default("unreviewed").notNull(),
+  reviewerName: varchar("reviewerName", { length: 120 }),
+  note: text("note"),
+  updatedBy: int("updatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

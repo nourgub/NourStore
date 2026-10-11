@@ -270,8 +270,11 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
 export function withoutName(sentence: string, name: string): string {
   const spoken = toSpokenArabic(name).trim();
   if (!spoken) return sentence;
-  return sentence
-    .replace(new RegExp(`\\s*(?:يا\\s+)?${escapeRegExp(spoken)}`, "g"), "")
+  // The full name, then the first name alone (sentences often use just it).
+  const forms = Array.from(new Set([spoken, spoken.split(/\s+/)[0]])).filter(form => form.length > 1);
+  let result = sentence;
+  for (const form of forms) result = result.replace(new RegExp(`\\s*(?:يا\\s+)?${escapeRegExp(form)}`, "g"), "");
+  return result
     .replace(/\s+(?=[.،,:!؟?])/g, "")
     .replace(/([،,])(?=[.!؟?:،,])/g, "")
     .replace(/^[،,\s]+/, "")

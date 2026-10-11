@@ -1,7 +1,4 @@
-import {
-  desc,
-  eq,
-} from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import {
   InsertUser,
   User,
@@ -265,11 +262,33 @@ export async function adminResetPassword(
     .limit(1);
   if (rows[0]?.loginMethod !== "email")
     return { ok: false, reason: "not_email_account" };
-  await db
-    .update(users)
-    .set({ passwordHash: newPasswordHash })
-    .where(eq(users.id, userId));
+  await setPasswordHash(userId, newPasswordHash);
   return { ok: true };
+}
+
+/**
+ * Sets a new password hash and bumps the session version, which signs out
+ * every existing session of the account (server/_core/session.ts).
+ */
+export async function setPasswordHash(userId: number, newPasswordHash: string) {
+  const db = await getDb();
+  if (!db) return false;
+  const [result] = await db
+    .update(users)
+    .set({ passwordHash: newPasswordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
+    .where(eq(users.id, userId));
+  return result.affectedRows === 1;
+}
+
+/** Signs out every session of the account. */
+export async function revokeSessions(userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const [result] = await db
+    .update(users)
+    .set({ sessionVersion: sql`${users.sessionVersion} + 1` })
+    .where(eq(users.id, userId));
+  return result.affectedRows === 1;
 }
 
 export async function chooseOwnRole(

@@ -12,7 +12,7 @@ import { BAC_SUBJECTS, type BacSubject } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import type { AppRouter } from "../../../../server/routers";
 import { useLang } from "./i18n";
-import { bacError, useB } from "./bacI18n";
+import { bacError, formatDate, useB } from "./bacI18n";
 
 type Outputs = inferRouterOutputs<AppRouter>;
 type Booking = Outputs["bac"]["myBookings"][number];
@@ -102,9 +102,17 @@ export function SessionsPage() {
       </h1>
       <p className="tfq-muted">{s.intro}</p>
       {offer.data && (
-        <p className="tfq-muted" style={{ fontSize: 13 }}>
-          {s.rules(offer.data.rules.minNoticeHours, offer.data.rules.cancelLimitHours, offer.data.rules.maxUpcoming)}
-        </p>
+        <div className="tfq-card" style={{ fontSize: 14 }}>
+          {offer.data.allowance && (
+            <p style={{ margin: "0 0 6px" }}>
+              <strong>{s.allowance(offer.data.allowance.remaining, offer.data.rules.perMonth)}</strong>{" "}
+              <span className="tfq-muted">{s.renews(formatDate(offer.data.allowance.renewsAt, lang))}</span>
+            </p>
+          )}
+          <p className="tfq-muted" style={{ margin: 0 }}>
+            {s.rules(offer.data.rules.minNoticeHours, offer.data.rules.cancelLimitHours, offer.data.rules.maxUpcoming)} {s.refundRule}
+          </p>
+        </div>
       )}
       {offer.error && <div className="tfq-card">{bacError(b, offer.error)}</div>}
       {offer.data && !offer.data.subscriptionActive && (
@@ -156,7 +164,7 @@ export function SessionsPage() {
                 {b.subjects[entry]}
               </span>
             ))}
-            <span className="tfq-chip good">{tutor.priceDa ? s.price(tutor.priceDa) : s.free}</span>
+            <span className="tfq-chip good">{s.free}</span>
           </div>
           {tutor.bio && (
             <p className="tfq-muted" dir="auto">
@@ -408,6 +416,9 @@ export function TutorSessions() {
   return (
     <section>
       <h2>{s.teacherTitle}</h2>
+      <p className="tfq-muted" style={{ fontSize: 13 }}>
+        {s.jitsiHint}
+      </p>
       <div className="tfq-card">
         <h3 style={{ marginTop: 0 }}>{s.requests}</h3>
         {!data.bookings.length ? (
@@ -446,7 +457,6 @@ function TutorForm({ tutor, onDone }: { tutor: TutorRow | null; onDone: () => vo
   const [email, setEmail] = useState(tutor?.email ?? "");
   const [subjects, setSubjects] = useState<BacSubject[]>(tutor?.subjects ?? []);
   const [bio, setBio] = useState(tutor?.bio ?? "");
-  const [price, setPrice] = useState(tutor?.priceDa ?? 0);
   const [active, setActive] = useState(tutor?.active ?? true);
   const save = trpc.bacAdmin.saveTutor.useMutation({
     onSuccess: async () => {
@@ -461,7 +471,7 @@ function TutorForm({ tutor, onDone }: { tutor: TutorRow | null; onDone: () => vo
       className="tfq-form tfq-card"
       onSubmit={event => {
         event.preventDefault();
-        save.mutate({ id: tutor?.id, name, email: email.trim() || null, subjects, bio: bio.trim() || null, priceDa: price, active });
+        save.mutate({ id: tutor?.id, name, email: email.trim() || null, subjects, bio: bio.trim() || null, active });
       }}
     >
       <label className="tfq-field">
@@ -491,10 +501,9 @@ function TutorForm({ tutor, onDone }: { tutor: TutorRow | null; onDone: () => vo
         {s.tutorBio}
         <textarea className="tfq-textarea" dir="auto" maxLength={1000} value={bio} onChange={event => setBio(event.target.value)} />
       </label>
-      <label className="tfq-field">
-        {s.tutorPrice}
-        <input className="tfq-input" type="number" min={0} max={100000} value={price} onChange={event => setPrice(Number(event.target.value))} />
-      </label>
+      <p className="tfq-muted" style={{ fontSize: 13, margin: 0 }}>
+        {s.noPaidSessions}
+      </p>
       <label className="tfq-row" style={{ gap: 6 }}>
         <input type="checkbox" checked={active} onChange={event => setActive(event.target.checked)} /> {s.active}
       </label>
@@ -559,7 +568,7 @@ export function AdminTutors() {
                 {tutor.name} {!tutor.active && <span className="tfq-chip warn">✗ {s.active}</span>}
               </strong>
               <span>
-                {tutor.subjects.map(subject => b.subjects[subject]).join("، ")} · {tutor.priceDa ? s.price(tutor.priceDa) : s.free}
+                {tutor.subjects.map(subject => b.subjects[subject]).join("، ")}
               </span>
               <small dir="ltr">{tutor.email ?? "—"}</small>
               <div className="tfq-row" style={{ gap: 8 }}>

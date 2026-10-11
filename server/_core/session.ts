@@ -22,6 +22,8 @@ const isNonEmptyString = (value: unknown): value is string =>
 export type SessionPayload = {
   openId: string;
   name: string;
+  /** The account's session version when signed (users.sessionVersion). */
+  sessionVersion?: number;
 };
 
 function getSessionSecret() {
@@ -32,7 +34,10 @@ export async function createSessionToken(
   openId: string,
   options: { expiresInMs?: number; name?: string } = {}
 ): Promise<string> {
-  return signSession({ openId, name: options.name || "" }, options);
+  // Carries the account's current session version: changing or resetting the
+  // password bumps it, which ends every session signed before.
+  const user = await db.getUserByOpenId(openId);
+  return signSession({ openId, name: options.name || "", sessionVersion: user?.sessionVersion ?? 0 }, options);
 }
 
 export async function signSession(
@@ -42,7 +47,7 @@ export async function signSession(
   const issuedAt = Date.now();
   const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
   const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
-  return new SignJWT({ openId: payload.openId, name: payload.name })
+  return new SignJWT({ openId: payload.openId, name: payload.name, sv: payload.sessionVersion ?? 0 })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setExpirationTime(expirationSeconds)
     .sign(getSessionSecret());
@@ -50,20 +55,23 @@ export async function signSession(
 
 export async function verifySession(
   cookieValue: string | undefined | null
-): Promise<{ openId: string; name: string } | null> {
+): Promise<{ openId: string; name: string; sessionVersion: number } | null> {
   if (!cookieValue) return null;
   try {
     const { payload } = await jwtVerify(cookieValue, getSessionSecret(), {
       algorithms: ["HS256"],
     });
-    const { openId, name } = payload as Record<string, unknown>;
+    const { openId, name, sv } = payload as Record<string, unknown>;
     if (!isNonEmptyString(openId)) return null;
-    return { openId, name: isNonEmptyString(name) ? name : "" };
+    // Sessions signed before versions existed count as version 0.
+    return { openId, name: isNonEmptyString(name) ? name : "", sessionVersion: typeof sv === "number" ? sv : 0 };
   } catch (error) {
     console.warn("[Auth] Session verification failed:", error);
     return null;
   }
 }
+
+const LAST_SEEN_EVERY_MS = 15 * 60 * 1000;
 
 function parseCookies(cookieHeader: string | undefined): Map<string, string> {
   if (!cookieHeader) return new Map();
@@ -95,7 +103,12 @@ export async function authenticateRequest(req: Request): Promise<User> {
 
   const user = await db.getUserByOpenId(session.openId);
   if (!user) throw ForbiddenError("User not found");
+  // Signed before the last password change or reset: no longer valid.
+  if (session.sessionVersion !== (user.sessionVersion ?? 0)) throw ForbiddenError("Session revoked");
 
-  await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+  // "Last seen" at most every 15 minutes — not one database write per request.
+  if (!user.lastSignedIn || Date.now() - new Date(user.lastSignedIn).getTime() > LAST_SEEN_EVERY_MS) {
+    await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+  }
   return user;
 }

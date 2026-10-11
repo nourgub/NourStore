@@ -31,7 +31,7 @@ import {
 import type { PublicQuestion } from "@shared/tafawoq";
 import * as bac from "../../db/bacPlatform";
 import * as store from "../../db/tafawoq";
-import { getPlatformSetting, setPlatformSetting } from "../../db/platformSettings";
+import { getPlatformSetting, getSettingNumber, setPlatformSetting } from "../../db/platformSettings";
 import { logAdminAction } from "../../db/adminAudit";
 import { createParentInvite, getParentLinks } from "../../db/parent";
 import { getLesson, lessonForStream, type BankQuestion, type Lesson } from "../curriculum";
@@ -97,9 +97,8 @@ async function settingFlag(key: string, fallback: boolean) {
   return value === null ? fallback : value === "1";
 }
 
-async function settingNumber(key: string, fallback: number) {
-  const value = Number(await getPlatformSetting(key));
-  return Number.isFinite(value) && value >= 0 ? value : fallback;
+function settingNumber(key: string, fallback: number) {
+  return getSettingNumber(key, fallback);
 }
 
 function addMonths(date: Date, months: number) {
@@ -395,7 +394,7 @@ export async function requestSubscription(
     referralCodeId = referral.id;
   }
 
-  const id = await bac.createSubscription({
+  const id = await bac.createSubscriptionIfNoPending({
     userId,
     plan: input.plan,
     months,
@@ -406,6 +405,7 @@ export async function requestSubscription(
     paymentMethod: input.paymentMethod,
     paymentReference: input.paymentReference?.trim() || null,
   });
+  if (id === null) throw new TRPCError({ code: "CONFLICT", message: "PENDING_EXISTS" });
   await bac.logEvent(userId, "subscription_requested", { subscriptionId: id, plan: input.plan, amountDa, coupon: coupon?.code ?? null });
   return { id, amountDa, status: "pending_payment" as const };
 }
@@ -1545,10 +1545,23 @@ export async function adminResolveStreamRequest(adminId: number, requestId: numb
   return { ok: true };
 }
 
-export async function adminConfirmSubscription(adminId: number, subscriptionId: number, note: string | null) {
+/**
+ * Confirms a manual payment. Safe to repeat: activation only happens from
+ * "pending_payment" (a second click, or two admins at once, gets CONFLICT and
+ * changes nothing), and the bonus days, coupon and referral reward are each
+ * claimed once by a conditional update.
+ */
+export async function adminConfirmSubscription(
+  adminId: number,
+  subscriptionId: number,
+  note: string | null,
+  paid: { amountDa: number; reference: string | null }
+) {
   const row = await bac.getSubscription(subscriptionId);
   if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
   if (row.status !== "pending_payment") throw new TRPCError({ code: "CONFLICT", message: "NOT_PENDING" });
+  // A received amount different from what was asked must be explained.
+  if (paid.amountDa !== row.amountDa && !note?.trim()) throw new TRPCError({ code: "BAD_REQUEST", message: "AMOUNT_MISMATCH_NOTE" });
   const student = await store.getTafawoqStudentByUser(row.userId);
   const latestEnd = await bac.getLatestActiveEnd(row.userId);
   // Whole seconds: MySQL TIMESTAMP rounds milliseconds to the nearest
@@ -1558,7 +1571,7 @@ export async function adminConfirmSubscription(adminId: number, subscriptionId: 
   const startsAt = latestEnd && latestEnd.getTime() > now.getTime() ? latestEnd : now;
   const bonus = student ? await bac.takeBonusCredit(student.id) : 0;
   const endsAt = new Date(addMonths(startsAt, row.months).getTime() + bonus * DAY_MS);
-  if (!(await bac.activateSubscription({ id: row.id, startsAt, endsAt, bonusDays: bonus, adminId, note }))) {
+  if (!(await bac.activateSubscription({ id: row.id, startsAt, endsAt, bonusDays: bonus, adminId, note, paidAmountDa: paid.amountDa, paidReference: paid.reference }))) {
     if (student && bonus) await bac.addBonusCredit(student.id, bonus);
     throw new TRPCError({ code: "CONFLICT", message: "NOT_PENDING" });
   }
@@ -1579,7 +1592,20 @@ export async function adminConfirmSubscription(adminId: number, subscriptionId: 
   await bac.insertNotifications([
     { userId: row.userId, type: "bac_subscription_active", title: "تم تفعيل اشتراكك", body: `اشتراكك صالح حتى ${dayKey(endsAt)}.` },
   ]);
-  await logAdminAction({ actorId: adminId, action: "bac.subscription_confirmed", targetType: "tafawoqSubscription", targetId: row.id, details: { userId: row.userId, amountDa: row.amountDa } });
+  await logAdminAction({
+    actorId: adminId,
+    action: "bac.subscription_confirmed",
+    targetType: "tafawoqSubscription",
+    targetId: row.id,
+    details: {
+      userId: row.userId,
+      expectedDa: row.amountDa,
+      receivedDa: paid.amountDa,
+      method: row.paymentMethod,
+      studentReference: row.paymentReference,
+      receivedReference: paid.reference,
+    },
+  });
   await bac.logEvent(adminId, "subscription_activated", { subscriptionId: row.id, userId: row.userId });
   return { startsAt, endsAt };
 }
@@ -1690,16 +1716,27 @@ export async function adminSettings() {
     secondSubjectChange: await settingFlag("bac.secondSubjectChange", true),
     referralBonusDays: await settingNumber("bac.referralBonusDays", 7),
     paymentInstructions: (await getPlatformSetting("bac.paymentInstructions")) ?? "",
+    // Trial values until the owner decides the commercial ones.
+    sessionsPerMonth: await settingNumber("bac.sessionsPerMonth", 2),
+    maxUpcomingSessions: await settingNumber("bac.maxUpcomingSessions", 3),
   };
 }
 
 export async function adminSetSettings(
   adminId: number,
-  input: { secondSubjectChange?: boolean; referralBonusDays?: number; paymentInstructions?: string }
+  input: {
+    secondSubjectChange?: boolean;
+    referralBonusDays?: number;
+    paymentInstructions?: string;
+    sessionsPerMonth?: number;
+    maxUpcomingSessions?: number;
+  }
 ) {
   if (input.secondSubjectChange !== undefined) await setPlatformSetting("bac.secondSubjectChange", input.secondSubjectChange ? "1" : "0");
   if (input.referralBonusDays !== undefined) await setPlatformSetting("bac.referralBonusDays", String(input.referralBonusDays));
   if (input.paymentInstructions !== undefined) await setPlatformSetting("bac.paymentInstructions", input.paymentInstructions);
+  if (input.sessionsPerMonth !== undefined) await setPlatformSetting("bac.sessionsPerMonth", String(input.sessionsPerMonth));
+  if (input.maxUpcomingSessions !== undefined) await setPlatformSetting("bac.maxUpcomingSessions", String(input.maxUpcomingSessions));
   await logAdminAction({ actorId: adminId, action: "bac.settings", details: input as Record<string, unknown> });
   return adminSettings();
 }

@@ -64,7 +64,7 @@ async function enroll(user: User, stream: "sciences" | "lettres" | "langues" = "
   const caller = appRouter.createCaller(ctxFor(user));
   await caller.bac.chooseStream({ stream });
   const request = await caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp" });
-  await appRouter.createCaller(ctxFor(adminUser)).bacAdmin.confirmSubscription({ id: request.id });
+  await appRouter.createCaller(ctxFor(adminUser)).bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa });
 }
 
 async function fixtureUser(label: string): Promise<User> {

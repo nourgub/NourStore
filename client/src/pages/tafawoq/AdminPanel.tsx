@@ -335,6 +335,11 @@ function Subscriptions() {
           </button>
         ))}
       </div>
+      {status === "active" && list.data?.length ? (
+        <button type="button" className="tfq-btn ghost small" onClick={() => downloadPaymentsCsv(list.data!)}>
+          {b.exportPayments}
+        </button>
+      ) : null}
       <Loading query={list}>
         {rows =>
           rows.length ? (
@@ -369,14 +374,17 @@ function Subscriptions() {
                       </td>
                       <td>
                         {row.status === "pending_payment" && (
-                          <div className="tfq-row">
-                            <button type="button" className="tfq-btn small" disabled={confirm.isPending} onClick={() => confirm.mutate({ id: row.id })}>
-                              {b.confirmPayment}
-                            </button>
-                            <button type="button" className="tfq-btn ghost small" disabled={close.isPending} onClick={() => close.mutate({ id: row.id, status: "rejected" })}>
-                              {b.reject}
-                            </button>
-                          </div>
+                          <ConfirmPaymentForm
+                            expectedDa={row.amountDa}
+                            busy={confirm.isPending || close.isPending}
+                            onConfirm={paid => confirm.mutate({ id: row.id, ...paid })}
+                            onReject={() => close.mutate({ id: row.id, status: "rejected" })}
+                          />
+                        )}
+                        {row.paidAmountDa !== null && (
+                          <small className={row.paidAmountDa === row.amountDa ? "tfq-muted" : "tfq-error"} dir="auto">
+                            {b.received(b.da(row.paidAmountDa), row.paidReference ?? "—")}
+                          </small>
                         )}
                         {row.status === "active" && (
                           <button type="button" className="tfq-btn ghost small" disabled={close.isPending} onClick={() => close.mutate({ id: row.id, status: "canceled" })}>
@@ -396,6 +404,102 @@ function Subscriptions() {
       </Loading>
     </>
   );
+}
+
+/** Confirming a manual payment records what actually arrived. */
+function ConfirmPaymentForm({
+  expectedDa,
+  busy,
+  onConfirm,
+  onReject,
+}: {
+  expectedDa: number;
+  busy: boolean;
+  onConfirm: (paid: { paidAmountDa: number; paidReference: string | null; note: string | null }) => void;
+  onReject: () => void;
+}) {
+  const b = useB();
+  const [amount, setAmount] = useState(expectedDa);
+  const [reference, setReference] = useState("");
+  const [note, setNote] = useState("");
+  const mismatch = amount !== expectedDa;
+  return (
+    <form
+      className="tfq-form"
+      style={{ gap: 6 }}
+      onSubmit={event => {
+        event.preventDefault();
+        onConfirm({ paidAmountDa: amount, paidReference: reference.trim() || null, note: note.trim() || null });
+      }}
+    >
+      <label className="tfq-field">
+        {b.receivedAmount}
+        <input className="tfq-input" type="number" min={0} max={1_000_000} required value={amount} onChange={event => setAmount(Number(event.target.value))} />
+      </label>
+      <label className="tfq-field">
+        {b.receivedReference}
+        <input className="tfq-input" dir="ltr" maxLength={120} value={reference} onChange={event => setReference(event.target.value)} />
+      </label>
+      {mismatch && (
+        <label className="tfq-field">
+          {b.mismatchNote}
+          <input className="tfq-input" dir="auto" maxLength={1000} required value={note} onChange={event => setNote(event.target.value)} />
+        </label>
+      )}
+      <div className="tfq-row">
+        <button type="submit" className="tfq-btn small" disabled={busy}>
+          {b.confirmPayment}
+        </button>
+        <button type="button" className="tfq-btn ghost small" disabled={busy} onClick={onReject}>
+          {b.reject}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+type SubscriptionRow = {
+  id: number;
+  userName: string | null;
+  email: string | null;
+  plan: string;
+  amountDa: number;
+  paidAmountDa: number | null;
+  paymentMethod: string;
+  paymentReference: string | null;
+  paidReference: string | null;
+  reviewedAt: Date | string | null;
+  startsAt: Date | string | null;
+  endsAt: Date | string | null;
+};
+
+/** Confirmed payments as CSV, for matching against the CCP/bank statement. */
+function downloadPaymentsCsv(rows: SubscriptionRow[]) {
+  const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const day = (value: Date | string | null) => (value ? new Date(value).toISOString().slice(0, 10) : "");
+  const lines = [
+    ["id", "confirmed_on", "name", "email", "plan", "expected_da", "received_da", "method", "student_reference", "received_reference", "starts", "ends"],
+    ...rows.map(row => [
+      row.id,
+      day(row.reviewedAt),
+      row.userName,
+      row.email,
+      row.plan,
+      row.amountDa,
+      row.paidAmountDa ?? "",
+      row.paymentMethod,
+      row.paymentReference,
+      row.paidReference,
+      day(row.startsAt),
+      day(row.endsAt),
+    ]),
+  ];
+  const blob = new Blob(["\uFEFF" + lines.map(line => line.map(cell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `tafawoq-payments-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 function ContentSwitches() {
@@ -873,7 +977,13 @@ function Settings() {
   const b = useB();
   const settings = trpc.bacAdmin.settings.useQuery();
   const save = trpc.bacAdmin.setSettings.useMutation(useAdminMutationOptions());
-  const [draft, setDraft] = useState<{ secondSubjectChange: boolean; referralBonusDays: number; paymentInstructions: string } | null>(null);
+  const [draft, setDraft] = useState<{
+    secondSubjectChange: boolean;
+    referralBonusDays: number;
+    paymentInstructions: string;
+    sessionsPerMonth: number;
+    maxUpcomingSessions: number;
+  } | null>(null);
   return (
     <Loading query={settings}>
       {data => {
@@ -894,6 +1004,18 @@ function Settings() {
               {b.referralDays}
               <input className="tfq-input" type="number" min={0} max={60} value={value.referralBonusDays} onChange={event => setDraft({ ...value, referralBonusDays: Number(event.target.value) })} />
             </label>
+            <fieldset className="tfq-field" style={{ border: 0, padding: 0 }}>
+              <legend>{b.sessionSettings}</legend>
+              <label className="tfq-field">
+                {b.sessionsPerMonthLabel}
+                <input className="tfq-input" type="number" min={0} max={30} value={value.sessionsPerMonth} onChange={event => setDraft({ ...value, sessionsPerMonth: Number(event.target.value) })} />
+              </label>
+              <label className="tfq-field">
+                {b.maxUpcomingLabel}
+                <input className="tfq-input" type="number" min={1} max={10} value={value.maxUpcomingSessions} onChange={event => setDraft({ ...value, maxUpcomingSessions: Number(event.target.value) })} />
+              </label>
+              <small className="tfq-muted">{b.sessionSettingsNote}</small>
+            </fieldset>
             <label className="tfq-field">
               {b.paymentInstructionsLabel}
               <textarea className="tfq-textarea" dir="auto" maxLength={2000} value={value.paymentInstructions} onChange={event => setDraft({ ...value, paymentInstructions: event.target.value })} />

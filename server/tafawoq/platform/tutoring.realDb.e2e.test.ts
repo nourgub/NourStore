@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { appRouter } from "../../routers";
 import type { TrpcContext } from "../../_core/context";
 import { getDb } from "../../db/shared";
 import { createEmailUser } from "../../db/usersAuth";
 import { emailOpenId, hashPassword } from "../../_core/emailAuth";
-import { notifications, tafawoqTutorSlots, users, type User } from "../../../drizzle/schema";
+import { notifications, tafawoqBookings, tafawoqSubscriptions, tafawoqTutorSlots, users, type User } from "../../../drizzle/schema";
 
 /**
  * REAL DATABASE run of sessions with a human teacher: an admin creates a
@@ -44,7 +44,7 @@ async function subscribedStudent(label: string, admin: User) {
   await caller.tafawoq.register({ displayName: label, age: 17, schoolLevel: "bac" });
   await caller.bac.chooseStream({ stream: "sciences" });
   const request = await caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp" });
-  await appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id });
+  await appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa });
   return { user, caller };
 }
 
@@ -155,12 +155,35 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — session
     expect(row.status).toBe("open");
   });
 
-  it("limits a student to three sessions to come, and refuses one without a subscription", async () => {
+  it("caps sessions to come and the month's allowance separately, and gives a session back when declined or cancelled", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    await adminCaller.bacAdmin.addTutorSlots({ tutorId, startsAt: [at(144), at(168), at(192)], durationMin: 45 });
+    // Sessions to come: at most 3 at once (the monthly allowance set high).
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 10, maxUpcomingSessions: 3 });
     const sami = await subscribedStudent("sami", admin);
     const slots = (await sami.caller.bac.tutors()).tutors.find(entry => entry.id === tutorId)!.slots;
-    expect(slots.length).toBeGreaterThanOrEqual(4);
-    for (const slot of slots.slice(0, 3)) await sami.caller.bac.bookSession({ slotId: slot.id, subject: "physics" });
+    expect(slots.length).toBeGreaterThanOrEqual(5);
+    const booked = [];
+    for (const slot of slots.slice(0, 3)) booked.push(await sami.caller.bac.bookSession({ slotId: slot.id, subject: "physics" }));
     await expect(sami.caller.bac.bookSession({ slotId: slots[3].id, subject: "physics" })).rejects.toMatchObject({ message: "TOO_MANY_SESSIONS" });
+
+    // The month's allowance: 3 used of 3, whatever the cap on sessions to come.
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 3, maxUpcomingSessions: 10 });
+    expect((await sami.caller.bac.tutors()).allowance).toMatchObject({ used: 3, remaining: 0 });
+    await expect(sami.caller.bac.bookSession({ slotId: slots[3].id, subject: "physics" })).rejects.toMatchObject({ message: "MONTHLY_SESSIONS_USED" });
+    // Declined by the teacher: the session comes back, and the slot reopens.
+    await appRouter.createCaller(ctxFor(teacherUser)).bacTutor.review({ bookingId: booked[0].id, action: "decline" });
+    expect((await sami.caller.bac.tutors()).allowance).toMatchObject({ used: 2, remaining: 1 });
+    const fourth = await sami.caller.bac.bookSession({ slotId: slots[3].id, subject: "physics" });
+    // Cancelled in time by the student: given back too.
+    await sami.caller.bac.cancelBooking({ bookingId: fourth.id });
+    expect((await sami.caller.bac.tutors()).allowance).toMatchObject({ used: 2, remaining: 1 });
+    // Allowance 0: sessions are not included at all.
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 0 });
+    await expect(sami.caller.bac.bookSession({ slotId: slots[4].id, subject: "physics" })).rejects.toMatchObject({ message: "SESSIONS_NOT_INCLUDED" });
+    // Back to the trial values; release Sami's sessions for the next tests.
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 2, maxUpcomingSessions: 3 });
+    for (const { id } of booked.slice(1)) await sami.caller.bac.cancelBooking({ bookingId: id });
 
     const nour = await fixtureUser("nour");
     const caller = appRouter.createCaller(ctxFor(nour));
@@ -168,7 +191,77 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — session
     await caller.bac.chooseStream({ stream: "sciences" });
     const offer = await caller.bac.tutors();
     expect(offer.subscriptionActive).toBe(false);
+    expect(offer.allowance).toBeNull();
     await expect(caller.bac.bookSession({ slotId: slots[3].id, subject: "physics" })).rejects.toMatchObject({ message: "SUBSCRIPTION_REQUIRED" });
+  });
+
+  it("books atomically: two students at the same instant get one slot, a double click never passes the limits, no slot is left without its booking", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    await adminCaller.bacAdmin.addTutorSlots({ tutorId, startsAt: [at(216), at(240), at(264)], durationMin: 45 });
+    const [ali, sara, dina] = await Promise.all([subscribedStudent("ali", admin), subscribedStudent("sara", admin), subscribedStudent("dina", admin)]);
+    const slotsFor = async () => (await ali.caller.bac.tutors()).tutors.find(entry => entry.id === tutorId)!.slots;
+    const target = (await slotsFor()).find(slot => slot.startsAt.getTime() === at(216).getTime())!;
+    const race = await Promise.allSettled([
+      ali.caller.bac.bookSession({ slotId: target.id, subject: "physics" }),
+      sara.caller.bac.bookSession({ slotId: target.id, subject: "physics" }),
+    ]);
+    expect(race.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(race.find(result => result.status === "rejected")).toMatchObject({ reason: { message: "SLOT_TAKEN" } });
+    const db = await getDb();
+    const onSlot = await db!.select().from(tafawoqBookings).where(eq(tafawoqBookings.slotId, target.id));
+    expect(onSlot).toHaveLength(1);
+
+    // Dina's double click on two slots with one session left this month (a
+    // student who took no part in the race above).
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 1, maxUpcomingSessions: 10 });
+    const others = (await slotsFor()).filter(slot => [at(240), at(264)].some(time => time.getTime() === slot.startsAt.getTime()));
+    const clicks = await Promise.allSettled(others.map(slot => dina.caller.bac.bookSession({ slotId: slot.id, subject: "math" })));
+    await adminCaller.bacAdmin.setSettings({ sessionsPerMonth: 2, maxUpcomingSessions: 3 });
+    expect(clicks.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(clicks.find(result => result.status === "rejected")).toMatchObject({ reason: { message: "MONTHLY_SESSIONS_USED" } });
+    // The refused click left its slot open: no "booked" slot without a live booking.
+    const booked = await db!.select().from(tafawoqTutorSlots).where(and(eq(tafawoqTutorSlots.tutorId, tutorId), eq(tafawoqTutorSlots.status, "booked")));
+    for (const slot of booked) {
+      const live = await db!
+        .select()
+        .from(tafawoqBookings)
+        .where(and(eq(tafawoqBookings.slotId, slot.id), inArray(tafawoqBookings.status, ["requested", "confirmed", "done"])));
+      expect(live, `slot ${slot.id}`).toHaveLength(1);
+    }
+  });
+
+  it("confirms a manual payment once, records what arrived, and never keeps two pending requests", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    const user = await fixtureUser("payer");
+    const caller = appRouter.createCaller(ctxFor(user));
+    await caller.tafawoq.register({ displayName: "payer", age: 17, schoolLevel: "bac" });
+    await caller.bac.chooseStream({ stream: "sciences" });
+    // Double click on "request": one pending request only.
+    const requests = await Promise.allSettled([
+      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: "CCP-123" }),
+      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: "CCP-123" }),
+    ]);
+    expect(requests.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(requests.find(result => result.status === "rejected")).toMatchObject({ reason: { message: "PENDING_EXISTS" } });
+    const request = (requests.find(result => result.status === "fulfilled") as PromiseFulfilledResult<{ id: number; amountDa: number }>).value;
+    // A different amount needs a written reason.
+    await expect(adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa - 500 })).rejects.toMatchObject({
+      message: "AMOUNT_MISMATCH_NOTE",
+    });
+    // Two admins (or a double click) confirming at once: activated once.
+    const confirmations = await Promise.allSettled([
+      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: "RX-1" }),
+      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: "RX-1" }),
+    ]);
+    expect(confirmations.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(confirmations.find(result => result.status === "rejected")).toMatchObject({ reason: { code: "CONFLICT" } });
+    const db = await getDb();
+    const rows = await db!.select().from(tafawoqSubscriptions).where(eq(tafawoqSubscriptions.userId, user.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: "active", paidAmountDa: request.amountDa, paidReference: "RX-1", paymentReference: "CCP-123" });
+    const log = await adminCaller.admin.auditLog({ limit: 100, action: "bac.subscription_confirmed" });
+    const entry = log.find(row => row.targetId === String(request.id));
+    expect(JSON.parse(entry!.detailsJson!)).toMatchObject({ expectedDa: request.amountDa, receivedDa: request.amountDa, receivedReference: "RX-1" });
   });
 
   it("refuses a cancellation less than 12 hours before, and lets an admin see and answer every booking", async () => {

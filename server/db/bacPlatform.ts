@@ -363,6 +363,26 @@ export async function createSubscription(input: {
   return result[0].id;
 }
 
+/**
+ * Creates a subscription request unless one is already pending — in one
+ * transaction that first locks the student's row, so a double click or two
+ * tabs can never leave two pending requests. Null when one is pending.
+ */
+export async function createSubscriptionIfNoPending(input: Parameters<typeof createSubscription>[0]) {
+  const db = await requireDb();
+  return db.transaction(async tx => {
+    await tx.select({ id: tafawoqStudents.id }).from(tafawoqStudents).where(eq(tafawoqStudents.userId, input.userId)).for("update");
+    const pending = await tx
+      .select({ id: tafawoqSubscriptions.id })
+      .from(tafawoqSubscriptions)
+      .where(and(eq(tafawoqSubscriptions.userId, input.userId), eq(tafawoqSubscriptions.status, "pending_payment")))
+      .limit(1);
+    if (pending.length) return null;
+    const result = await tx.insert(tafawoqSubscriptions).values(input).$returningId();
+    return result[0].id;
+  });
+}
+
 export async function getSubscription(id: number) {
   const db = await requireDb();
   const rows = await db.select().from(tafawoqSubscriptions).where(eq(tafawoqSubscriptions.id, id)).limit(1);
@@ -429,12 +449,16 @@ export async function activateSubscription(input: {
   bonusDays: number;
   adminId: number;
   note: string | null;
+  paidAmountDa: number;
+  paidReference: string | null;
 }) {
   const db = await requireDb();
   const [result] = await db
     .update(tafawoqSubscriptions)
     .set({
       status: "active",
+      paidAmountDa: input.paidAmountDa,
+      paidReference: input.paidReference,
       startsAt: input.startsAt,
       endsAt: input.endsAt,
       bonusDays: input.bonusDays,
@@ -502,6 +526,9 @@ export async function listSubscriptions(status?: "pending_payment" | "active" | 
       amountDa: tafawoqSubscriptions.amountDa,
       paymentMethod: tafawoqSubscriptions.paymentMethod,
       paymentReference: tafawoqSubscriptions.paymentReference,
+      paidAmountDa: tafawoqSubscriptions.paidAmountDa,
+      paidReference: tafawoqSubscriptions.paidReference,
+      reviewedAt: tafawoqSubscriptions.reviewedAt,
       status: tafawoqSubscriptions.status,
       startsAt: tafawoqSubscriptions.startsAt,
       endsAt: tafawoqSubscriptions.endsAt,

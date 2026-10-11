@@ -144,11 +144,11 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     // Still pending: nothing unlocked.
     await expect(caller.tafawoq.generatePractice({ lessonKey: "math-limits" })).rejects.toMatchObject({ message: "SUBSCRIPTION_REQUIRED" });
     // A student cannot confirm their own payment.
-    await expect(caller.bacAdmin.confirmSubscription({ id: request.id })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
-    const confirmed = await appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id });
+    const confirmed = await appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa });
     expect(confirmed.endsAt.getTime()).toBeGreaterThan(Date.now() + 27 * 86_400_000);
-    await expect(appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id })).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa })).rejects.toMatchObject({ code: "CONFLICT" });
     const summary = (await caller.bac.subscription()).summary;
     expect(summary.active).toBe(true);
     expect(summary.daysLeft).toBeGreaterThanOrEqual(28);

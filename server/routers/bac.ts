@@ -288,7 +288,8 @@ export const bacAdminRouter = router({
         email: z.string().trim().email().max(320).nullish().or(z.literal("")),
         subjects: z.array(z.enum(BAC_SUBJECTS)).min(1),
         bio: z.string().trim().max(1000).nullish(),
-        priceDa: z.number().int().min(0).max(100_000),
+        // Paid extra sessions are not sold: any price sent is ignored.
+        priceDa: z.number().int().min(0).max(100_000).optional(),
         active: z.boolean(),
       })
     )
@@ -336,8 +337,21 @@ export const bacAdminRouter = router({
     .query(({ input }) => bacDb.listSubscriptions(input.status)),
 
   confirmSubscription: adminProcedure
-    .input(z.object({ id, note: z.string().trim().max(1000).nullish() }))
-    .mutation(({ ctx, input }) => platform.adminConfirmSubscription(ctx.user.id, input.id, input.note ?? null)),
+    .input(
+      z.object({
+        id,
+        // What actually arrived (manual payment): recorded for reconciliation.
+        paidAmountDa: z.number().int().min(0).max(1_000_000),
+        paidReference: z.string().trim().max(120).nullish(),
+        note: z.string().trim().max(1000).nullish(),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      platform.adminConfirmSubscription(ctx.user.id, input.id, input.note ?? null, {
+        amountDa: input.paidAmountDa,
+        reference: input.paidReference?.trim() || null,
+      })
+    ),
 
   closeSubscription: adminProcedure
     .input(z.object({ id, status: z.enum(["rejected", "canceled"]), note: z.string().trim().max(1000).nullish() }))
@@ -397,6 +411,8 @@ export const bacAdminRouter = router({
         secondSubjectChange: z.boolean().optional(),
         referralBonusDays: z.number().int().min(0).max(60).optional(),
         paymentInstructions: z.string().max(2000).optional(),
+        sessionsPerMonth: z.number().int().min(0).max(30).optional(),
+        maxUpcomingSessions: z.number().int().min(1).max(10).optional(),
       })
     )
     .mutation(({ ctx, input }) => platform.adminSetSettings(ctx.user.id, input)),

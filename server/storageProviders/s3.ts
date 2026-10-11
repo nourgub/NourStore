@@ -15,6 +15,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
@@ -70,6 +71,10 @@ export async function s3Put(
     ? `${ENV.s3PublicBaseUrl.replace(/\/+$/, "")}/${key}`
     : await s3GetSignedUrl(key);
   return { key, url };
+}
+
+export async function s3Delete(relKey: string): Promise<void> {
+  await getClient().send(new DeleteObjectCommand({ Bucket: ENV.s3Bucket, Key: normalizeKey(relKey) }));
 }
 
 export async function s3Get(

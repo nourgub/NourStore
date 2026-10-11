@@ -585,8 +585,13 @@ export async function speak(text: string, gender: VoiceGender = "male", name?: s
   const clean = text.replace(/\s+/g, " ").trim().slice(0, MAX_TTS_CHARS);
   if (!clean) return null;
   const nameless = name ? withoutName(clean, name) : clean;
-  const sentences = nameless !== clean && HAS_WORD.test(nameless) ? [clean, nameless] : [clean];
+  const named = nameless !== clean && HAS_WORD.test(nameless) ? [clean, nameless] : [clean];
   for (const engine of engines(gender, lang)) {
+    // The student's name never goes to an external service (Azure, Google):
+    // they get the sentence without it. Piper runs on this server.
+    const external = engine.provider === "azure" || engine.provider === "google";
+    if (external && nameless !== clean && !HAS_WORD.test(nameless)) continue;
+    const sentences = external ? [nameless] : named;
     const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender });
     try {
       for (const sentence of sentences) {
