@@ -84,6 +84,18 @@ def run_tool(name, payload):
     return {"error": "Unknown tool"}, None
 
 
+def empty_usage():
+    return {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+
+
+def add_usage(total, response):
+    """Accumulate token usage from one API response (used to measure running cost)."""
+    total["requests"] += 1
+    reported = getattr(response, "usage", None)
+    for key in ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"):
+        total[key] += int(getattr(reported, key, 0) or 0)
+
+
 def make_client():
     import anthropic
     return anthropic.Anthropic()
@@ -97,10 +109,10 @@ def run_agent(messages, client=None):
     """
     if client is None:
         if not os.getenv("ANTHROPIC_API_KEY"):
-            return {"reply": MESSAGES["disabled"], "proposal": None, "tool_calls": []}
+            return {"reply": MESSAGES["disabled"], "proposal": None, "tool_calls": [], "usage": empty_usage()}
         client = make_client()
     messages = list(messages)
-    proposal, trace = None, []
+    proposal, trace, usage = None, [], empty_usage()
     for _ in range(int(os.getenv("MAX_AGENT_STEPS", "6"))):
         try:
             response = client.messages.create(
@@ -112,7 +124,8 @@ def run_agent(messages, client=None):
                 messages=messages,
             )
         except Exception:
-            return {"reply": MESSAGES["error"], "proposal": proposal, "tool_calls": trace}
+            return {"reply": MESSAGES["error"], "proposal": proposal, "tool_calls": trace, "usage": usage}
+        add_usage(usage, response)
 
         if response.stop_reason == "tool_use":
             # Keep the assistant turn unchanged (thinking blocks included) and answer every tool call.
@@ -135,8 +148,8 @@ def run_agent(messages, client=None):
 
         text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text").strip()
         if response.stop_reason == "refusal":
-            return {"reply": MESSAGES["refusal"], "proposal": None, "tool_calls": trace}
+            return {"reply": MESSAGES["refusal"], "proposal": None, "tool_calls": trace, "usage": usage}
         if response.stop_reason == "max_tokens" or not text:
-            return {"reply": MESSAGES["too_long"], "proposal": proposal, "tool_calls": trace}
-        return {"reply": text, "proposal": proposal, "tool_calls": trace}
-    return {"reply": MESSAGES["steps"], "proposal": proposal, "tool_calls": trace}
+            return {"reply": MESSAGES["too_long"], "proposal": proposal, "tool_calls": trace, "usage": usage}
+        return {"reply": text, "proposal": proposal, "tool_calls": trace, "usage": usage}
+    return {"reply": MESSAGES["steps"], "proposal": proposal, "tool_calls": trace, "usage": usage}

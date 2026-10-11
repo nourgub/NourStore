@@ -29,11 +29,11 @@ cp .env.example .env      # ضع ANTHROPIC_API_KEY و ADMIN_TOKEN طويلًا �
 python app.py             # http://127.0.0.1:5000  و  /admin
 ```
 
-للإنتاج: `gunicorn --workers 2 --bind 0.0.0.0:5000 app:app` خلف Nginx مع HTTPS.
+للنشر: ملف `Dockerfile` جاهز، وخطوات نشر نسخة تجريبية آمنة (حدّ للإنفاق وحدّ يومي) في [DEPLOY.md](DEPLOY.md).
 
 ## الاختبارات والتقييم
 
-- **33 اختبارًا** دون إنترنت ودون مفتاح API: `pytest -q`.
+- **35 اختبارًا** دون إنترنت ودون مفتاح API: `pytest -q`.
 - **تقييم سلوكي من 24 محادثة** بالعربية والدارجة والفرنسية والإنجليزية: `python -m evals.run_eval` (يحتاج مفتاح API، وتكلفته بضعة سنتات).
 
 ## التخصيص لكل متجر

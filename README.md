@@ -33,7 +33,7 @@ Server re-checks stock atomically → order saved → admin dashboard
 - **No overselling.** Confirmation reserves stock in one database transaction, and a stock update only succeeds while enough units remain. Tested with six simultaneous buyers for the last laptop: exactly one order succeeds, the others get a clear "no longer available" message.
 - **Admin dashboard locked by default.** It stays disabled until a strong `ADMIN_TOKEN` (16+ characters) is set. The token is sent in a header only and compared in constant time.
 - **Untrusted input handled as such.** Browser chat history is reduced to plain text turns; customer-supplied text is rendered with `textContent` everywhere, so a name like `<img onerror=…>` is shown as text, not run.
-- **Abuse limits.** Per-client rate limits on chat and confirmation protect the store's API budget.
+- **Abuse limits.** Per-client rate limits on chat and confirmation, plus an optional daily cap on assistant replies for public demos, keep the API bill bounded.
 
 ## Run it
 
@@ -44,15 +44,15 @@ cp .env.example .env      # set ANTHROPIC_API_KEY and a long random ADMIN_TOKEN
 python app.py             # http://127.0.0.1:5000  and  /admin
 ```
 
-Production: `gunicorn --workers 2 --bind 0.0.0.0:5000 app:app` behind Nginx with HTTPS.
+Production: `docker build -t sales-assistant . && docker run -p 5000:5000 --env-file .env sales-assistant`, behind HTTPS. To publish a public demo safely (spend limit, daily cap), follow [DEPLOY.md](DEPLOY.md).
 
 Without an API key the shop, confirmation flow and dashboard still work; the assistant replies that it is not enabled.
 
 ## Tests and evaluation
 
-**33 offline tests** (`pytest -q`, no API key needed; Claude is replaced by a scripted fake): the tool loop, truncated and refused replies, the step limit, proposal → confirmation → stock, double confirmation, expiry, concurrent buyers, delivery fees, phone validation, admin access rules, HTML escaping in both pages, forged browser history, and rate limiting.
+**35 offline tests** (`pytest -q`, no API key needed; Claude is replaced by a scripted fake): the tool loop, truncated and refused replies, the step limit, proposal → confirmation → stock, double confirmation, expiry, concurrent buyers, delivery fees, phone validation, admin access rules, HTML escaping in both pages, forged browser history, and rate limiting.
 
-**24-case behaviour evaluation** (`python -m evals.run_eval`, needs an API key, a few US cents per run) across Arabic, Darija, French and English: correct prices, out-of-stock answers, unknown products, asking for missing name/phone/wilaya before preparing an order, refusing impossible quantities, prompt-injection attempts on prices and discounts, order tracking that requires the phone number, and off-topic requests. Every case also fails if an order appears in the database without a confirmation click. Use `--repeat 3` to measure run-to-run variance; results are saved under `evals/results/`.
+**24-case behaviour evaluation** (`python -m evals.run_eval`, needs an API key, a few US cents per run) across Arabic, Darija, French and English: correct prices, out-of-stock answers, unknown products, asking for missing name/phone/wilaya before preparing an order, refusing impossible quantities, prompt-injection attempts on prices and discounts, order tracking that requires the phone number, and off-topic requests. Every case also fails if an order appears in the database without a confirmation click. Use `--repeat 3` to measure run-to-run variance. The run also reports the **measured API cost per conversation** from token usage; results are saved under `evals/results/`.
 
 ## Customising for a store
 

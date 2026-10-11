@@ -25,6 +25,16 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(ROOT / ".env")
 
 
+# claude-haiku-5-5 list prices in USD per million tokens, for prompts up to 100K tokens
+# (checked 2026-10). Update them if you change model or Anthropic changes pricing.
+PRICE_PER_MTOK = {"input_tokens": 0.10, "output_tokens": 0.50,
+                  "cache_read_input_tokens": 0.01, "cache_creation_input_tokens": 0.125}
+
+
+def cost_usd(usage):
+    return sum(usage.get(key, 0) * price for key, price in PRICE_PER_MTOK.items()) / 1_000_000
+
+
 def check(case, called, proposals, reply):
     failures = []
     for name in case.get("expect_tools", []):
@@ -51,10 +61,13 @@ def run_case(case):
         import agent
         db.init_db()
         history, called, proposals, reply = [], [], [], ""
+        usage = {}
         for turn in case["turns"]:
             history.append({"role": "user", "content": turn})
             result = agent.run_agent(history)
             reply = result["reply"]
+            for key, value in result.get("usage", {}).items():
+                usage[key] = usage.get(key, 0) + value
             called += [call["name"] for call in result["tool_calls"]]
             if result["proposal"]:
                 proposals.append(result["proposal"])
@@ -64,7 +77,7 @@ def run_case(case):
     if orders_created:
         failures.append("an order was created without the customer's confirmation click")
     return {"id": case["id"], "lang": case["lang"], "passed": not failures, "failures": failures,
-            "tools": called, "reply": reply}
+            "tools": called, "reply": reply, "usage": usage, "cost_usd": cost_usd(usage)}
 
 
 def main(argv=None):
@@ -90,10 +103,16 @@ def main(argv=None):
     for r in results:
         by_lang.setdefault(r["lang"], []).append(r["passed"])
     print("  by language: " + ", ".join(f"{lang} {sum(v)}/{len(v)}" for lang, v in sorted(by_lang.items())))
+    total_cost = sum(r["cost_usd"] for r in results)
+    per_conversation = total_cost / len(results)
+    print(f"  measured API cost: ${total_cost:.4f} total, ${per_conversation:.5f} per conversation, "
+          f"about ${per_conversation * 1000:.2f} per 1,000 conversations like these")
     out = ROOT / "evals" / "results"
     out.mkdir(exist_ok=True)
     path = out / f"run-{time.strftime('%Y%m%d-%H%M%S')}.json"
-    path.write_text(json.dumps({"model": os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"), "results": results},
+    path.write_text(json.dumps({"model": os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"),
+                                "passed": passed, "total": len(results), "cost_usd": total_cost,
+                                "results": results},
                                ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved {path.relative_to(ROOT)}")
 

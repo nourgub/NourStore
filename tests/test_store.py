@@ -259,3 +259,23 @@ def test_eval_cases_are_well_formed():
             "reply_contains_any": ["62000"], "reply_not_contains": ["1000 DA"]}
     assert check(case, ["search_products"], [], "Prix: 62000 DA") == []
     assert len(check(case, ["propose_order"], [{}], "1000 DA")) == 5
+
+
+def test_daily_cap_bounds_a_public_demo(store, monkeypatch):
+    monkeypatch.setenv("DAILY_CHAT_LIMIT", "2")
+    app_module = importlib.reload(store.app)
+    client = app_module.app.test_client()
+    responses = [client.post("/api/chat", json={"message": "salam"}) for _ in range(3)]
+    assert [r.status_code for r in responses] == [200, 200, 429]
+    assert "limit" in responses[2].get_json()["reply"]
+
+
+def test_agent_reports_token_usage(store):
+    usage = SimpleNamespace(input_tokens=1200, output_tokens=80, cache_read_input_tokens=0, cache_creation_input_tokens=0)
+    first = reply("tool_use", tool_use("search_products", {}))
+    first.usage = usage
+    second = reply("end_turn", text("ok"))
+    second.usage = usage
+    result = store.agent.run_agent([{"role": "user", "content": "x"}], client=FakeClient(first, second))
+    assert result["usage"]["requests"] == 2
+    assert result["usage"]["input_tokens"] == 2400 and result["usage"]["output_tokens"] == 160

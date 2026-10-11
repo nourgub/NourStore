@@ -20,7 +20,7 @@ MAX_MESSAGE_CHARS = 2000
 MAX_HISTORY_MESSAGES = 10
 
 app = Flask(__name__)
-app.config["JSON_AS_ASCII"] = False
+app.json.ensure_ascii = False  # return Arabic as readable UTF-8
 
 
 class RateLimiter:
@@ -48,6 +48,34 @@ class RateLimiter:
 
 
 chat_limiter = RateLimiter(int(os.getenv("CHAT_LIMIT_PER_10_MIN", "30")), 600)
+
+
+class DailyCap:
+    """Caps assistant replies per UTC day across all visitors (0 = no cap).
+
+    Meant for a public demo: whatever happens, the API bill stays bounded.
+    Also set a monthly spend limit in the Anthropic Console.
+    """
+
+    def __init__(self, limit):
+        self.limit, self.day, self.count = limit, None, 0
+        self.lock = threading.Lock()
+
+    def allow(self):
+        if self.limit <= 0:
+            return True
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        with self.lock:
+            if today != self.day:
+                self.day, self.count = today, 0
+            if self.count >= self.limit:
+                return False
+            self.count += 1
+            return True
+
+
+daily_cap = DailyCap(int(os.getenv("DAILY_CHAT_LIMIT", "0")))
+DAILY_CAP_MESSAGE = "وصل العرض التجريبي إلى حدّه اليومي. عُد غدًا. · The demo has reached today's limit, please come back tomorrow."
 confirm_limiter = RateLimiter(10, 600)
 
 
@@ -132,6 +160,8 @@ def chat():
     message = str(payload.get("message", "")).strip()
     if not message or len(message) > MAX_MESSAGE_CHARS:
         return jsonify({"error": f"Message is required and must be under {MAX_MESSAGE_CHARS} characters."}), 400
+    if not daily_cap.allow():
+        return jsonify({"reply": DAILY_CAP_MESSAGE, "proposal": None}), 429
     messages = clean_history(payload.get("history", []))
     messages.append({"role": "user", "content": message})
     result = run_agent(messages)
