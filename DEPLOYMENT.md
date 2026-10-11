@@ -74,6 +74,10 @@ Without this step no account can open the admin panel.
 | `DATABASE_URL` | everything (MySQL 8+ / MariaDB 10.6+) |
 | `JWT_SECRET` | signing session cookies — at least 16 random characters |
 | `OWNER_OPEN_ID` | the first admin (above) |
+| `APP_BASE_URL` | **required in production**: the public address used in password-reset links |
+| `SMTP_URL`, `MAIL_FROM` | sending password-reset links (any SMTP provider); without them admins reset passwords by hand |
+| `TAFAWOQ_MEETING_BASE_URL` | video room host for live sessions (default `https://meet.jit.si`) |
+| `TAFAWOQ_AI_DAILY_CALLS` | daily ceiling on AI calls (default 500), only with `ANTHROPIC_API_KEY` |
 | `AUTH_PROVIDER`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | optional Google sign-in; email/password always works |
 | `STORAGE_PROVIDER=s3` + `S3_*` | files on S3/R2/B2 instead of local disk |
 | `REDIS_URL` | rate limits shared across several app instances |

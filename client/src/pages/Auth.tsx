@@ -78,6 +78,15 @@ const KNOWN_AUTH_ERRORS: Array<{ match: RegExp; text: Record<Lang, string> }> = 
   },
 ];
 
+KNOWN_AUTH_ERRORS.push({
+  match: /RESET_INVALID/,
+  text: {
+    ar: "رابط إعادة التعيين غير صالح أو منتهي أو مستعمل. اطلب رابطًا جديدًا.",
+    fr: "Lien de réinitialisation invalide, expiré ou déjà utilisé. Demandez-en un nouveau.",
+    en: "This reset link is invalid, expired or already used. Ask for a new one.",
+  },
+});
+
 const GENERIC_AUTH_ERROR: Record<Lang, string> = {
   ar: "حدث خطأ غير متوقع. حاول مرة أخرى.",
   fr: "Une erreur inattendue s'est produite. Réessayez.",
@@ -109,6 +118,18 @@ const copy = {
     passwordHint: "8 أحرف على الأقل، تحتوي حروفًا وأرقامًا",
     submitLogin: "دخول بالبريد الإلكتروني",
     submitRegister: "إنشاء حساب بالبريد الإلكتروني",
+    forgot: "نسيت كلمة المرور؟",
+    forgotTitle: "استعادة كلمة المرور",
+    forgotHint: "اكتب بريدك الإلكتروني وسنرسل إليه رابطًا لاختيار كلمة مرور جديدة، صالحًا 30 دقيقة ولمرة واحدة.",
+    sendLink: "أرسل الرابط",
+    forgotSent: "إذا كان هذا البريد مسجّلًا لدينا بحساب بريد وكلمة مرور، ستصلك رسالة خلال دقائق. تحقّق من مجلد الرسائل غير المرغوبة أيضًا. إن لم تصلك، تواصل مع الإدارة.",
+    resetTitle: "اختر كلمة مرور جديدة",
+    resetHint: "بعد الحفظ تُغلق كل الجلسات المفتوحة على الأجهزة الأخرى.",
+    newPassword: "كلمة المرور الجديدة",
+    saveNew: "حفظ كلمة المرور",
+    resetDone: "تم تغيير كلمة المرور. سجّل الدخول بها الآن.",
+    noToken: "الرابط ناقص. افتح الرابط كاملًا من الرسالة أو اطلب رابطًا جديدًا.",
+    backLogin: "العودة لتسجيل الدخول",
   },
   fr: {
     loginTitle: "Bienvenue sur Tafawoq",
@@ -130,6 +151,18 @@ const copy = {
     passwordHint: "8 caractères minimum, lettres et chiffres",
     submitLogin: "Connexion par e-mail",
     submitRegister: "Créer un compte par e-mail",
+    forgot: "Mot de passe oublié ?",
+    forgotTitle: "Récupérer le mot de passe",
+    forgotHint: "Saisissez votre e-mail : nous y enverrons un lien pour choisir un nouveau mot de passe, valable 30 minutes et une seule fois.",
+    sendLink: "Envoyer le lien",
+    forgotSent: "Si cet e-mail correspond à un compte e-mail + mot de passe, un message arrivera dans quelques minutes. Vérifiez aussi les indésirables. Sinon, contactez l’administration.",
+    resetTitle: "Choisir un nouveau mot de passe",
+    resetHint: "Après l’enregistrement, toutes les sessions ouvertes sur d’autres appareils sont fermées.",
+    newPassword: "Nouveau mot de passe",
+    saveNew: "Enregistrer",
+    resetDone: "Mot de passe changé. Connectez-vous avec le nouveau.",
+    noToken: "Lien incomplet. Ouvrez le lien complet du message ou demandez-en un nouveau.",
+    backLogin: "Retour à la connexion",
   },
   en: {
     loginTitle: "Welcome to Tafawoq",
@@ -151,13 +184,25 @@ const copy = {
     passwordHint: "At least 8 characters, letters and numbers",
     submitLogin: "Log in with email",
     submitRegister: "Create account with email",
+    forgot: "Forgot your password?",
+    forgotTitle: "Recover your password",
+    forgotHint: "Enter your email and we will send a link to choose a new password, valid for 30 minutes and once only.",
+    sendLink: "Send the link",
+    forgotSent: "If this email belongs to an email + password account, a message will arrive within minutes. Check your spam folder too. If not, contact the administration.",
+    resetTitle: "Choose a new password",
+    resetHint: "Once saved, every session open on other devices is signed out.",
+    newPassword: "New password",
+    saveNew: "Save password",
+    resetDone: "Password changed. Log in with it now.",
+    noToken: "The link is incomplete. Open the full link from the email or ask for a new one.",
+    backLogin: "Back to log in",
   },
 } as const;
 
 export default function AuthPage({
   mode = "login",
 }: {
-  mode?: "login" | "register";
+  mode?: "login" | "register" | "forgot" | "reset";
 }) {
   const { isAuthenticated, loading, error, refresh } = useAuth();
   const [lang, setLang] = useState<Lang>(
@@ -175,9 +220,10 @@ export default function AuthPage({
         : null;
     return value && /^\/(?!\/)/.test(value) && !value.includes("\\") ? value : "/tafawoq";
   })();
+  const recovery = mode === "forgot" || mode === "reset";
   useEffect(() => {
-    if (!loading && isAuthenticated) window.location.href = next;
-  }, [isAuthenticated, loading, next]);
+    if (!loading && isAuthenticated && !recovery) window.location.href = next;
+  }, [isAuthenticated, loading, next, recovery]);
   const register = mode === "register";
   const queryError =
     typeof window !== "undefined"
@@ -204,6 +250,17 @@ export default function AuthPage({
       refresh();
       window.location.href = next;
     },
+    onError: err => setFormError(err.message),
+  });
+  const resetToken =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") : null;
+  const [recoveryDone, setRecoveryDone] = useState(false);
+  const forgotMutation = trpc.auth.requestPasswordReset.useMutation({
+    onSuccess: () => setRecoveryDone(true),
+    onError: err => setFormError(err.message),
+  });
+  const resetMutation = trpc.auth.resetPassword.useMutation({
+    onSuccess: () => setRecoveryDone(true),
     onError: err => setFormError(err.message),
   });
   const submitting = registerMutation.isPending || loginMutation.isPending;
@@ -255,10 +312,59 @@ export default function AuthPage({
         <section className="auth-card">
           <div className="auth-mark">T</div>
           <div className="section-kicker">
-            TAFAWOQ / {register ? "REGISTER" : "LOGIN"}
+            TAFAWOQ / {mode.toUpperCase()}
           </div>
-          <h1>{register ? t.registerTitle : t.loginTitle}</h1>
-          <p>{register ? t.registerHint : t.loginHint}</p>
+          <h1>{mode === "forgot" ? t.forgotTitle : mode === "reset" ? t.resetTitle : register ? t.registerTitle : t.loginTitle}</h1>
+          <p>{mode === "forgot" ? t.forgotHint : mode === "reset" ? t.resetHint : register ? t.registerHint : t.loginHint}</p>
+          {recovery ? (
+            <form
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              onSubmit={event => {
+                event.preventDefault();
+                setFormError(null);
+                if (mode === "forgot") forgotMutation.mutate({ email: email.trim() });
+                else if (resetToken) resetMutation.mutate({ token: resetToken, newPassword: password });
+              }}
+            >
+              {recoveryDone ? (
+                <div className="auth-error" role="status" style={{ borderColor: "rgba(120,200,150,.4)" }}>
+                  {mode === "forgot" ? t.forgotSent : t.resetDone}
+                </div>
+              ) : mode === "reset" && !resetToken ? (
+                <div className="auth-error" role="alert">{t.noToken}</div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <label htmlFor={mode === "forgot" ? "auth-email" : "auth-password"} className="quiet-label">
+                      {mode === "forgot" ? t.email : t.newPassword}
+                    </label>
+                    {mode === "forgot" ? (
+                      <Input id="auth-email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                    ) : (
+                      <Input id="auth-password" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} required />
+                    )}
+                  </div>
+                  {mode === "reset" && <small style={{ opacity: 0.55, fontSize: 11 }}>{t.passwordHint}</small>}
+                  {formError && (
+                    <small style={{ color: "#e08a8a" }} role="alert">
+                      {localizeAuthError(formError, lang)}
+                    </small>
+                  )}
+                  <Button
+                    type="submit"
+                    className="quiet-button"
+                    disabled={forgotMutation.isPending || resetMutation.isPending || (mode === "forgot" ? !email : !password)}
+                  >
+                    {mode === "forgot" ? t.sendLink : t.saveNew}
+                  </Button>
+                </>
+              )}
+              <Link href="/login" className="catalog-home-link">
+                {t.backLogin}
+              </Link>
+            </form>
+          ) : (
+          <>
           {authError && (
             <div className="auth-error" role="alert">
               {lang === "ar"
@@ -362,6 +468,11 @@ export default function AuthPage({
             >
               {register ? t.submitRegister : t.submitLogin}
             </Button>
+            {!register && (
+              <Link href="/forgot-password" className="catalog-home-link" style={{ marginTop: 4 }}>
+                {t.forgot}
+              </Link>
+            )}
           </div>
 
           <div className="auth-switch">
@@ -374,6 +485,8 @@ export default function AuthPage({
             <ShieldCheck size={16} />
             <span>{t.privacy}</span>
           </div>
+          </>
+          )}
           <Link href="/tafawoq" className="catalog-home-link">
             {t.home}
           </Link>

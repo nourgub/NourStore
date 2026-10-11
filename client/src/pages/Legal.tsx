@@ -58,15 +58,15 @@ const privacyContent = {
       },
       {
         h: "مشاركة البيانات",
-        p: "لا نبيع بياناتك. نشارك فقط ما يلزم لتشغيل الخدمة: مزود الاستضافة؛ وعند تفعيلها، مزودو الذكاء الاصطناعي وتحويل النص إلى صوت (يصلهم نص السؤال أو الرد فقط، دون اسمك أو بريدك)؛ والأستاذ الذي تحجز معه حصة (اسمك الأول، المادة وملاحظتك). الحصص المباشرة تجري على Jitsi Meet (خدمة خارجية) برابط سري، ولا تسجّلها المنصة. الأساتذة الذين يجيبون عن تمارينك يرون اسمك الأول وصورة التمرين فقط.",
+        p: "لا نبيع بياناتك. نشارك فقط ما يلزم لتشغيل الخدمة: مزود الاستضافة؛ وعند تفعيلها، مزود الذكاء الاصطناعي (يصله محتوى الدرس ورسائلك وإجاباتك ومستواك الدراسي ودرجة إتقانك ونوع أخطائك، دون اسمك أو بريدك أو عمرك أو أهدافك؛ ولا تُرسل إليه صور التمارين) ومزود تحويل النص إلى صوت (يصله نص الرد دون اسمك)؛ ومزود البريد الإلكتروني الذي يرسل رابط استعادة كلمة المرور (يصله بريدك ونص الرسالة)؛ والأستاذ الذي تحجز معه حصة (اسمك الأول، المادة وملاحظتك). الحصص المباشرة تجري على Jitsi Meet (خدمة خارجية) برابط سري، ولا تسجّلها المنصة. الأساتذة الذين يجيبون عن تمارينك يرون اسمك الأول وصورة التمرين فقط.",
       },
       {
         h: "مدة الاحتفاظ",
-        p: "نحتفظ ببياناتك ما دام حسابك نشطاً. يمكنك طلب حذف حسابك وبياناتك في أي وقت، إلا ما يفرض القانون الاحتفاظ به (مثل سجلات الدفع).",
+        p: "نحتفظ ببياناتك ما دام حسابك نشطاً. من صفحة «حسابي» يمكنك تنزيل نسخة من بياناتك فوراً، وطلب حذف حسابك. تؤكد الإدارة الطلب ثم يُمحى اسمك وبريدك وكلمة مرورك ومحادثاتك وتمارينك وصورك وإجاباتك المكتوبة وروابط الولي، ويتوقف الدخول. تبقى دون اسم: سجلات الدفع والاشتراك (محاسبة) ونتائج الإجابات صح/خطأ (إحصاء). مدة الاحتفاظ بهذه السجلات وبالنسخ الاحتياطية تحددها إدارة المنصة وفق ما يفرضه القانون.",
       },
       {
         h: "حقوقك",
-        p: "وفق القانون 18-07 المتعلق بحماية الأشخاص الطبيعيين في مجال معالجة المعطيات ذات الطابع الشخصي، يحق لك الوصول إلى بياناتك وتصحيحها وطلب حذفها والاعتراض على معالجتها، بالتواصل مع إدارة المنصة.",
+        p: "وفق القانون 18-07 المتعلق بحماية الأشخاص الطبيعيين في مجال معالجة المعطيات ذات الطابع الشخصي، يحق لك الوصول إلى بياناتك وتصحيحها وطلب حذفها والاعتراض على معالجتها، من صفحة «حسابي» أو بالتواصل مع إدارة المنصة. لتصحيح بيانات لا يمكنك تعديلها بنفسك، تواصل مع الإدارة.",
       },
     ],
   },
@@ -95,15 +95,15 @@ const privacyContent = {
       },
       {
         h: "Partage des données",
-        p: "Nous ne vendons pas vos données. Nous ne partageons que le nécessaire : l’hébergeur ; lorsqu’ils sont activés, les fournisseurs d’IA et de synthèse vocale (ils reçoivent uniquement le texte de la question ou de la réponse, sans votre nom ni e-mail) ; l’enseignant avec qui vous réservez une séance (prénom, matière, votre note). Les séances en direct se déroulent sur Jitsi Meet (service externe) via un lien secret, et la Plateforme ne les enregistre pas. Les enseignants qui répondent à vos exercices ne voient que votre prénom et la photo.",
+        p: "Nous ne vendons pas vos données. Nous ne partageons que le nécessaire : l’hébergeur ; lorsqu’ils sont activés, le fournisseur d’IA (il reçoit le contenu de la leçon, vos messages et réponses, votre niveau scolaire, votre maîtrise et vos types d’erreurs, sans votre nom, e-mail, âge ni objectifs ; les photos d’exercices ne lui sont jamais envoyées) et le fournisseur de synthèse vocale (le texte de la réponse, sans votre nom) ; le fournisseur d’e-mail qui envoie le lien de réinitialisation du mot de passe (votre adresse et le message) ; l’enseignant avec qui vous réservez une séance (prénom, matière, votre note). Les séances en direct se déroulent sur Jitsi Meet (service externe) via un lien secret, et la Plateforme ne les enregistre pas. Les enseignants qui répondent à vos exercices ne voient que votre prénom et la photo.",
       },
       {
         h: "Durée de conservation",
-        p: "Vos données sont conservées tant que votre compte est actif. Vous pouvez demander la suppression de votre compte à tout moment, sauf ce que la loi impose de garder (comme les traces de paiement).",
+        p: "Vos données sont conservées tant que votre compte est actif. Depuis « Mon compte », vous pouvez télécharger immédiatement une copie de vos données et demander la suppression du compte. Après confirmation par l’administration, nom, e-mail, mot de passe, conversations, exercices, photos, réponses rédigées et liens parent sont effacés et la connexion est bloquée. Restent sans nom : paiements et abonnements (comptabilité) et le juste/faux des réponses (statistiques). La durée de conservation de ces traces et des sauvegardes est fixée par l’administration selon les obligations légales.",
       },
       {
         h: "Vos droits",
-        p: "Conformément à la loi 18-07 relative à la protection des personnes physiques dans le traitement des données à caractère personnel, vous pouvez accéder à vos données, les rectifier, demander leur suppression et vous opposer à leur traitement en contactant l’administration de la Plateforme.",
+        p: "Conformément à la loi 18-07 relative à la protection des personnes physiques dans le traitement des données à caractère personnel, vous pouvez accéder à vos données, les rectifier, demander leur suppression et vous opposer à leur traitement depuis « Mon compte » ou en contactant l’administration de la Plateforme.",
       },
     ],
   },
@@ -132,15 +132,15 @@ const privacyContent = {
       },
       {
         h: "Data sharing",
-        p: "We do not sell your data. We share only what the service needs: our hosting provider; when enabled, AI and text-to-speech providers (they receive only the text of a question or reply, never your name or email); the teacher you book a session with (first name, subject, your note). Live sessions take place on Jitsi Meet (an external service) through a secret link, and the Platform does not record them. Teachers who answer your exercises see only your first name and the photo.",
+        p: "We do not sell your data. We share only what the service needs: our hosting provider; when enabled, the AI provider (it receives the lesson content, your messages and answers, your school level, mastery and mistake types — never your name, email, age or goals; exercise photos are never sent to it) and the text-to-speech provider (the reply text, without your name); the email provider that sends password reset links (your address and the message); the teacher you book a session with (first name, subject, your note). Live sessions take place on Jitsi Meet (an external service) through a secret link, and the Platform does not record them. Teachers who answer your exercises see only your first name and the photo.",
       },
       {
         h: "Retention",
-        p: "We keep your data while your account is active. You can ask for your account and data to be deleted at any time, except what the law requires us to keep (such as payment records).",
+        p: "We keep your data while your account is active. From “My account” you can download a copy of your data at once and request deletion of your account. Once the administration confirms, your name, email, password, chats, exercises, photos, written answers and parent links are erased and sign-in is blocked. Kept without a name: payment and subscription records (accounting) and right/wrong answer results (statistics). How long those records and backups are kept is set by the administration according to legal obligations.",
       },
       {
         h: "Your rights",
-        p: "Under Law 18-07 on the protection of individuals in the processing of personal data, you may access, correct, request deletion of, and object to the processing of your data by contacting the Platform's administration.",
+        p: "Under Law 18-07 on the protection of individuals in the processing of personal data, you may access, correct, request deletion of, and object to the processing of your data from “My account” or by contacting the Platform's administration.",
       },
     ],
   },

@@ -157,6 +157,21 @@ export function checkEnv(): EnvCheckResult {
     );
   }
 
+  if (ENV.isProduction && !/^https?:\/\//i.test(process.env.APP_BASE_URL || "")) {
+    warnings.push(
+      "APP_BASE_URL is not set. Password reset emails are not sent (their " +
+        "link needs the site's public address); admins can still reset a " +
+        "password from the admin panel."
+    );
+  }
+
+  if (ENV.isProduction && !process.env.SMTP_URL) {
+    warnings.push(
+      "SMTP_URL is not set. Self-service password reset sends no email; " +
+        "students must ask an admin to reset their password."
+    );
+  }
+
   return { fatal, warnings };
 }
 

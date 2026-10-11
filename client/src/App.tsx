@@ -44,6 +44,8 @@ function Router() {
           path="/register"
           component={() => <AuthPage mode="register" />}
         />
+        <Route path="/forgot-password" component={() => <AuthPage mode="forgot" />} />
+        <Route path="/reset-password" component={() => <AuthPage mode="reset" />} />
         <Route path="/tafawoq/:lessonKey" component={TafawoqApp} />
         <Route path="/tafawoq" component={TafawoqApp} />
         <Route path="/legal/:doc" component={Legal} />

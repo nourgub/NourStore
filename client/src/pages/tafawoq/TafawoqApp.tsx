@@ -22,6 +22,7 @@ import {
   Sparkles,
   Target,
   Trophy,
+  UserCog,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -75,6 +76,7 @@ const CallScreen = lazy(() => import("./CallScreen").then(m => ({ default: m.Cal
 const ExamView = lazy(() => import("./ExamView").then(m => ({ default: m.ExamView })));
 const ExamHistory = lazy(() => import("./ExamView").then(m => ({ default: m.ExamHistory })));
 const WeeklyTestPage = lazy(() => import("./WeeklyTest").then(m => ({ default: m.WeeklyTestPage })));
+const AccountPage = lazy(() => import("./AccountPage").then(m => ({ default: m.AccountPage })));
 const TopicBankPage = lazy(() => import("./TopicBank").then(m => ({ default: m.TopicBankPage })));
 
 function PageLoading() {
@@ -128,6 +130,11 @@ export default function TafawoqApp() {
               </Link>
             )}
             {isAuthenticated && (
+              <Link href="/tafawoq/account" className="tfq-btn ghost small" aria-label={t.myAccount}>
+                <UserCog size={14} /> <span className="tfq-btn-label">{t.myAccount}</span>
+              </Link>
+            )}
+            {isAuthenticated && (
               <button type="button" className="tfq-btn ghost small" onClick={() => logout()}>
                 <LogOut size={14} /> <span className="tfq-btn-label">{t.logout}</span>
               </button>
@@ -141,6 +148,8 @@ export default function TafawoqApp() {
             ) : !isAuthenticated ? (
               // Quick revision opens from the copy saved on the device, even offline.
               params?.lessonKey === "revision" && hasOfflineRevision() ? <RevisionPage /> : <Landing />
+            ) : params?.lessonKey === "account" ? (
+              <AccountPage />
             ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
               <ParentView />
             ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (

@@ -57,6 +57,7 @@ export function AdminAccounts() {
 
   return (
     <>
+      <AccountRequests />
       <p className="tfq-muted">{a.intro}</p>
       <div className="tfq-card tfq-filters">
         <label className="tfq-field">
@@ -266,5 +267,79 @@ export function AdminLogs() {
         )}
       </section>
     </>
+  );
+}
+
+/** Open account-deletion requests: carry out (anonymise) or refuse with a reason. */
+function AccountRequests() {
+  const b = useB();
+  const a = b.accounts;
+  const lang = useLang();
+  const utils = trpc.useUtils();
+  const list = trpc.accountAdmin.requests.useQuery({ status: "open" });
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [note, setNote] = useState("");
+  const resolve = trpc.accountAdmin.resolve.useMutation({
+    onSuccess: async result => {
+      toast.success("photosDeleted" in result ? a.reqDone(result.photosDeleted ?? 0, result.photosLeft ?? 0) : b.successToast);
+      setRejecting(null);
+      setNote("");
+      await utils.accountAdmin.invalidate();
+      await utils.admin.invalidate();
+    },
+    onError: error => toast.error(bacError(b, error) === b.errors.generic ? error.message : bacError(b, error)),
+  });
+  const rows = list.data ?? [];
+  return (
+    <div className="tfq-card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0 }}>{a.reqTitle}</h3>
+      <p className="tfq-muted">{a.reqIntro}</p>
+      {!rows.length ? (
+        <p className="tfq-muted">{list.isLoading ? "…" : a.reqNone}</p>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 10 }}>
+          {rows.map(row => (
+            <li key={row.id} className="tfq-step">
+              <strong dir="auto">{row.name || "—"}</strong>{" "}
+              <small className="tfq-muted" dir="ltr">
+                {row.email}
+              </small>
+              <div className="tfq-muted" style={{ fontSize: 13 }}>
+                {dateTime(row.createdAt, lang)}
+                {row.note ? <> — <span dir="auto">{row.note}</span></> : null}
+              </div>
+              {rejecting === row.id ? (
+                <div className="tfq-row" style={{ marginTop: 8 }}>
+                  <input className="tfq-input" aria-label={a.reqRejectNote} placeholder={a.reqRejectNote} value={note} onChange={event => setNote(event.target.value)} />
+                  <button type="button" className="tfq-btn small" disabled={!note.trim() || resolve.isPending} onClick={() => resolve.mutate({ id: row.id, action: "reject", note: note.trim() })}>
+                    {a.save}
+                  </button>
+                  <button type="button" className="tfq-btn ghost small" onClick={() => setRejecting(null)}>
+                    {a.cancel}
+                  </button>
+                </div>
+              ) : (
+                <div className="tfq-row" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="tfq-btn small"
+                    style={{ background: "#b4443c", borderColor: "#b4443c", color: "#fff" }}
+                    disabled={resolve.isPending}
+                    onClick={() => {
+                      if (window.confirm(a.reqConfirm(row.name || row.email || String(row.userId)))) resolve.mutate({ id: row.id, action: "anonymize" });
+                    }}
+                  >
+                    {a.reqAnonymize}
+                  </button>
+                  <button type="button" className="tfq-btn ghost small" onClick={() => setRejecting(row.id)}>
+                    {a.reqReject}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
