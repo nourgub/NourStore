@@ -1,0 +1,5 @@
+[
+  {"query":"refund after purchase","expected_source":"data/documents/refund_policy.md"},
+  {"query":"cancel subscription","expected_source":"data/documents/cancellation_policy.md"},
+  {"query":"shipping delay","expected_source":"data/documents/shipping_policy.md"}
+]

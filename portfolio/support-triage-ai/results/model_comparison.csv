@@ -1,0 +1,3 @@
+model,accuracy,weighted_f1
+TF-IDF + Logistic Regression,0.8577922077922078,0.8568045932619895
+Most frequent baseline,0.012987012987012988,0.00033300033300033295

@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Enterprise AI Automation Platform</title><style>body{font:15px system-ui;margin:0;background:#f5f7fb;color:#172033}header{background:#12213a;color:#fff;padding:24px 5%}main{max-width:1200px;margin:24px auto;padding:0 20px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:#fff;padding:18px;border-radius:10px;min-width:150px;box-shadow:0 2px 8px #dfe4ef}.num{font-size:28px;font-weight:700}table{width:100%;background:#fff;border-collapse:collapse;margin-top:20px}td,th{padding:12px;border-bottom:1px solid #e7ebf2;text-align:left}button{padding:7px 12px;border:0;border-radius:5px;background:#1b64d8;color:#fff;cursor:pointer}.review{background:#fff;padding:16px;margin-top:20px;border-left:4px solid #e29b18;border-radius:6px}small{color:#667}</style></head><body><header><h1>Enterprise AI Automation Platform</h1><div>Customer operations · AI orchestration · human control</div></header><main><div class="cards" id="cards"></div><h2>Human review queue</h2><div id="queue"></div><h2>Recent workflows</h2><table><thead><tr><th>ID</th><th>Request</th><th>Intent</th><th>Confidence</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></main><script>
+// Customer text is untrusted: everything is rendered with textContent, never parsed as HTML.
+function el(tag, text, cls) {
+  const node = document.createElement(tag);
+  if (text !== undefined && text !== null) node.textContent = String(text);
+  if (cls) node.className = cls;
+  return node;
+}
+function fmt(confidence) { return typeof confidence === 'number' ? confidence.toFixed(2) : '-'; }
+
+async function load() {
+  const workflows = await (await fetch('/requests')).json();
+  const counts = {};
+  workflows.forEach(w => { counts[w.status] = (counts[w.status] || 0) + 1; });
+
+  const cards = document.getElementById('cards');
+  cards.replaceChildren(...['COMPLETED', 'AUTO_APPROVED', 'REQUIRES_HUMAN_REVIEW', 'FAILED'].map(status => {
+    const card = el('div', null, 'card');
+    card.append(el('small', status), el('div', counts[status] || 0, 'num'));
+    return card;
+  }));
+
+  const rows = document.getElementById('rows');
+  rows.replaceChildren(...workflows.slice(0, 20).map(w => {
+    const tr = el('tr');
+    [w.id.slice(0, 8), w.original_request, w.intent || '-', fmt(w.confidence), w.status].forEach(v => tr.append(el('td', v)));
+    return tr;
+  }));
+
+  const queue = document.getElementById('queue');
+  const pending = workflows.filter(w => w.status === 'REQUIRES_HUMAN_REVIEW');
+  if (!pending.length) { queue.replaceChildren(el('p', 'No pending cases.')); return; }
+  queue.replaceChildren(...pending.map(w => {
+    const box = el('div', null, 'review');
+    const details = el('p');
+    details.append('Intent: ' + (w.intent || '-') + ' · Confidence: ' + fmt(w.confidence), el('br'), 'Reason: ' + (w.reason || '-'));
+    const approve = el('button', 'Approve simulated action');
+    approve.addEventListener('click', () => act(w.id, 'approve'));
+    const reject = el('button', 'Reject');
+    reject.addEventListener('click', () => act(w.id, 'reject'));
+    box.append(el('b', w.original_request), details, approve, ' ', reject);
+    return box;
+  }));
+}
+
+async function act(id, action) {
+  await fetch('/workflows/' + encodeURIComponent(id) + '/' + action, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reviewer: 'dashboard-user', note: 'Reviewed in demo dashboard'}),
+  });
+  load();
+}
+load();
+</script></body></html>
