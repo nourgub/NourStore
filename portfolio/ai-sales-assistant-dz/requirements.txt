@@ -1,0 +1,7 @@
+# Exact versions for reproducible installs and Docker builds. Upgrade deliberately, then run the tests.
+Flask==3.1.3
+Werkzeug==3.1.9
+anthropic==0.125.0
+python-dotenv==1.2.4
+gunicorn==23.0.0
+redis==5.3.1
