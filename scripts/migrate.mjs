@@ -67,9 +67,15 @@ async function getAppliedMigrations(connection) {
 }
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
+  // TAFAWOQ_DATABASE_URL wins: DATABASE_URL may belong to another service
+  // on the same host (e.g. Replit's managed PostgreSQL).
+  const databaseUrl = (process.env.TAFAWOQ_DATABASE_URL || process.env.DATABASE_URL || "").trim();
   if (!databaseUrl) {
-    console.error("ERROR: set DATABASE_URL before running this script.");
+    console.error("ERROR: set TAFAWOQ_DATABASE_URL (or DATABASE_URL) to a mysql:// address before running this script.");
+    process.exit(1);
+  }
+  if (!/^(mysql|mariadb):\/\//i.test(databaseUrl)) {
+    console.error(`ERROR: migrations target MySQL, but the connection string uses "${databaseUrl.split(":")[0]}:". Refusing to run. Set TAFAWOQ_DATABASE_URL to a mysql:// address.`);
     process.exit(1);
   }
 

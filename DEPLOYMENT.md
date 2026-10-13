@@ -72,6 +72,7 @@ Without this step no account can open the admin panel.
 | Variable | Needed for |
 |---|---|
 | `DATABASE_URL` | everything (MySQL 8+ / MariaDB 10.6+) |
+| `TAFAWOQ_DATABASE_URL` | the same, and wins over `DATABASE_URL`: use it where `DATABASE_URL` belongs to another service (e.g. Replit's managed PostgreSQL). A non-`mysql://` address stops the server at start-up and is refused by `npm run migrate` |
 | `JWT_SECRET` | signing session cookies — at least 16 random characters |
 | `OWNER_OPEN_ID` | the first admin (above) |
 | `APP_BASE_URL` | **required in production**: the public address used in password-reset links |

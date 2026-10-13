@@ -111,7 +111,9 @@ start_mysqld_from() {
     if ! node scripts/create-database.mjs "$MYSQL_PORT" "$db_name"; then
       "$mysql_bin" --socket="$MYSQL_SOCKET" -u root -e "CREATE DATABASE IF NOT EXISTS \`$db_name\`;" || true
     fi
-    export DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/$db_name"
+    # The app's own variable: never touches DATABASE_URL, which Replit may
+    # manage for another service (its PostgreSQL).
+    export TAFAWOQ_DATABASE_URL="mysql://root@127.0.0.1:$MYSQL_PORT/$db_name"
     echo "[replit-start] Applying database migrations..."
     if ! node scripts/migrate.mjs; then
       echo "[replit-start] WARNING: migrations failed — continuing without a guaranteed schema. See output above."
@@ -185,14 +187,14 @@ fi
 
 if [ "$DB_READY" -ne 1 ]; then
   echo "[replit-start] Starting the app WITHOUT a database (degraded mode) — the homepage and static UI still work."
-  echo "[replit-start] To fix: rebuild this Repl so replit.nix takes effect, or set DATABASE_URL to an external MySQL host in Secrets."
+  echo "[replit-start] To fix: rebuild this Repl so replit.nix takes effect, or set TAFAWOQ_DATABASE_URL to an external MySQL host in Secrets."
 fi
 
 # A real Secret set in Replit's Secrets panel always wins over the local
 # database this script may have just started — e.g. if you'd rather point
 # DATABASE_URL at a real external MySQL instead.
 if [ -n "${REPLIT_DB_URL_OVERRIDE:-}" ]; then
-  export DATABASE_URL="$REPLIT_DB_URL_OVERRIDE"
+  export TAFAWOQ_DATABASE_URL="$REPLIT_DB_URL_OVERRIDE"
 fi
 
 # --- The teacher's natural voice (Piper, free) ------------------------------

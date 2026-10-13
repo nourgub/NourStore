@@ -1,5 +1,13 @@
 # Running Tafawoq on Replit — fully self-contained
 
+> **Database variable.** `scripts/replit-start.sh` gives the app its local
+> MySQL through `TAFAWOQ_DATABASE_URL`, never through `DATABASE_URL`: in a
+> Repl where Replit manages a PostgreSQL `DATABASE_URL` for something else,
+> that one is left untouched. The app and `npm run migrate` read
+> `TAFAWOQ_DATABASE_URL` first and refuse any address that is not
+> `mysql://`. The MySQL server listens on 127.0.0.1 only and keeps its data
+> in `.replit-data/mysql`.
+
 Everything runs inside the Repl itself: the app **and** a real MySQL
 server. No external database account, no `corepack`, no separate
 sign-ups. Import the repo, click **Run**.

@@ -8,6 +8,7 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
   const keys = [
     "JWT_SECRET",
     "DATABASE_URL",
+    "TAFAWOQ_DATABASE_URL",
     "NODE_ENV",
     "AUTH_PROVIDER",
     "GOOGLE_CLIENT_ID",
@@ -34,6 +35,19 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
 }
 
 describe("server startup env validation (checkEnv)", () => {
+  it("refuses a PostgreSQL address (e.g. Replit's managed DATABASE_URL) unless TAFAWOQ_DATABASE_URL gives a MySQL one", async () => {
+    const postgres = "postgresql://user:pass@db.example.com:5432/app";
+    const refused = await loadCheckEnvWith({ JWT_SECRET: "a".repeat(32), DATABASE_URL: postgres, NODE_ENV: "development" });
+    expect(refused().fatal.some(m => m.includes("TAFAWOQ_DATABASE_URL"))).toBe(true);
+    const separated = await loadCheckEnvWith({
+      JWT_SECRET: "a".repeat(32),
+      DATABASE_URL: postgres,
+      TAFAWOQ_DATABASE_URL: "mysql://root@127.0.0.1:3306/tafawoq",
+      NODE_ENV: "development",
+    });
+    expect(separated().fatal).toEqual([]);
+  });
+
   it("reports no fatal findings for a minimally sane development config", async () => {
     const checkEnv = await loadCheckEnvWith({
       JWT_SECRET: "a".repeat(32),

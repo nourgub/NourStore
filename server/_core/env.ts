@@ -1,6 +1,7 @@
 export const ENV = {
   cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
+  // TAFAWOQ_DATABASE_URL first: see appDatabaseUrl() in server/db/shared.ts.
+  databaseUrl: process.env.TAFAWOQ_DATABASE_URL || process.env.DATABASE_URL || "",
   // Bootstrap mechanism for the very first admin account: whichever user's
   // openId matches this exactly gets granted "admin" on their next sign-in
   // (see server/db/usersAuth.ts). Deliberately provider-agnostic — works
@@ -97,6 +98,14 @@ export function checkEnv(): EnvCheckResult {
     fatal.push(
       "DATABASE_URL still uses the example placeholder password. Set a real " +
         "MYSQL_PASSWORD (and MYSQL_ROOT_PASSWORD) before starting in production."
+    );
+  }
+
+  if (ENV.databaseUrl && !/^(mysql|mariadb):\/\//i.test(ENV.databaseUrl)) {
+    fatal.push(
+      `The database address uses "${ENV.databaseUrl.split(":")[0]}:" but this app needs MySQL. ` +
+        "On a host where DATABASE_URL belongs to another service (e.g. Replit's PostgreSQL), " +
+        "set TAFAWOQ_DATABASE_URL to the app's mysql:// address instead."
     );
   }
 
