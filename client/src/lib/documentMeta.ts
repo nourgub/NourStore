@@ -1,11 +1,8 @@
-// Real per-page <title>/description/Open Graph updates — the static tags
-// in index.html are the correct fallback for the landing page and for
-// crawlers that don't execute JS, but a course page ("رياضيات BEM —
-// المعادلات من الدرجة الأولى | Nourix Academy") showing the generic site
-// title in a shared WhatsApp link or a browser tab is a real, missed SEO
-// and shareability opportunity. This never touches anything the server
-// hasn't already decided is public (a course's own title/description) —
-// no protected content is ever put here.
+// Per-page <title>/description/Open Graph updates — the static tags in
+// index.html are the fallback for the first page and for crawlers that don't
+// execute JS; a page with its own title (a lesson, for example) sets it here
+// so a shared WhatsApp link or a browser tab names the page. Only public
+// text ever goes here, never protected content.
 
 function setMetaTag(selector: string, attr: "content", value: string) {
   const el = document.head.querySelector(selector);
@@ -37,13 +34,13 @@ export function setDocumentMeta(input: {
 
 /**
  * Resets to the site-wide defaults already in index.html — call this from
- * a page's cleanup (useEffect return) so navigating away from a course
- * page doesn't leave its title/description active on, say, the dashboard.
+ * a page's cleanup (useEffect return) so navigating away from a page with
+ * its own title doesn't leave that title active on the next page.
  */
 export function resetDocumentMeta() {
   setDocumentMeta({
-    title: "Nourix Academy – نوريكس أكاديمي",
+    title: "تفوّق Tafawoq — أستاذك الذكي للبكالوريا",
     description:
-      "Nourix Academy — منصة تعليم إلكتروني للسوق الجزائرية، تدعم العربية والفرنسية والإنجليزية، وتركز على الرياضيات والإعلام الآلي — من التأسيس إلى التحضير لشهادتي BEM وBAC.",
+      "تفوّق (Tafawoq) — منصة التحضير لشهادة البكالوريا في الجزائر: دروس وتمارين واختبارات وبكالوريا تجريبية، أستاذ ذكي يشرح بالصوت، وحصص مع أساتذة. للعلوم التجريبية والآداب والفلسفة واللغات الأجنبية.",
   });
 }

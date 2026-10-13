@@ -1,9 +1,9 @@
 run = "npm install && bash scripts/replit-start.sh"
-modules = ["nodejs-20"]
+modules = ["nodejs-22"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["mariadb", "nodejs_20", "libaio"]
+packages = ["mariadb", "nodejs_22", "libaio"]
 
 [env]
 NODE_ENV = "development"

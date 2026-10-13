@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ForwardArrow, BackArrow } from "@/components/DirectionalArrow";
+import { BackArrow } from "@/components/DirectionalArrow";
 import { Globe2, ShieldAlert } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { setStoredLanguage } from "@/lib/language";
+import { getStoredLanguage, setStoredLanguage } from "@/lib/language";
 
 type Lang = "ar" | "fr" | "en";
 type Doc = "privacy" | "terms";
@@ -14,21 +14,21 @@ const nav = {
     privacy: "سياسة الخصوصية",
     terms: "شروط الاستخدام",
     draftNotice:
-      "هذا نص مسودة يغطي النقاط الأساسية المطلوبة، وليس وثيقة معتمدة قانونيًا. يجب مراجعته من محامٍ مختص في القانون الجزائري (القانون 18-07 لحماية المعطيات ذات الطابع الشخصي) قبل النشر الرسمي.",
+      "مسودة للتجربة: هذا النص يغطي النقاط الأساسية لكنه ليس وثيقة معتمدة قانونيًا. يجب أن يراجعه محامٍ مختص في القانون الجزائري (القانون 18-07 لحماية المعطيات ذات الطابع الشخصي) قبل الإطلاق التجاري وقبل تحصيل أي اشتراك.",
   },
   fr: {
     back: "Accueil",
     privacy: "Politique de confidentialité",
     terms: "Conditions d’utilisation",
     draftNotice:
-      "Ceci est un texte de brouillon couvrant les points essentiels — ce n’est pas un document juridiquement validé. Il doit être révisé par un avocat spécialisé en droit algérien (loi 18-07 sur la protection des données à caractère personnel) avant publication officielle.",
+      "Brouillon pour la phase d’essai : ce texte couvre les points essentiels mais n’est pas un document juridiquement validé. Il doit être révisé par un avocat spécialisé en droit algérien (loi 18-07 sur la protection des données à caractère personnel) avant le lancement commercial et avant tout encaissement d’abonnement.",
   },
   en: {
     back: "Home",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     draftNotice:
-      "This is a draft covering the essential points — it is not a legally certified document. It should be reviewed by a lawyer specialized in Algerian law (Law 18-07 on personal data protection) before official publication.",
+      "Draft for the trial phase: this text covers the essential points but is not a legally certified document. It must be reviewed by a lawyer specialised in Algerian law (Law 18-07 on personal data protection) before the commercial launch and before any subscription is charged.",
   },
 } as const;
 
@@ -38,35 +38,35 @@ const privacyContent = {
     sections: [
       {
         h: "من نحن ولماذا نجمع بياناتك",
-        p: 'منصة Nourix Academy ("المنصة") تجمع بياناتك الشخصية بهدف تقديم خدمات التعلم عن بعد، تتبع تقدمك، إصدار الشهادات، وإدارة الاشتراكات والدفع.',
+        p: 'منصة Tafawoq ("المنصة") تساعد تلاميذ البكالوريا في الجزائر على التحضير: دروس وتمارين واختبارات وأستاذ ذكي وحصص مع أساتذة. نجمع بياناتك فقط لتقديم هذه الخدمة ومتابعة تقدمك وإدارة اشتراكك.',
       },
       {
         h: "البيانات التي نجمعها",
-        p: "الاسم، البريد الإلكتروني، رقم الهاتف (إن قُدِّم)، بيانات الالتحاق والتقدم الدراسي، نتائج الاختبارات، وبيانات الفوترة (دون تخزين تفاصيل بطاقة الدفع الكاملة — تُعالج عبر مزود الدفع مباشرة).",
+        p: "الحساب: الاسم، البريد الإلكتروني، كلمة المرور (مشفّرة، لا نراها أبداً)، العمر، المستوى، الشعبة والمادة الثانية. التعلّم: إجاباتك ونتائج اختباراتك ونوع أخطائك وخطة مراجعتك ونقاطك، ومحادثاتك مع الأستاذ الذكي، وصور التمارين التي ترسلها، وملاحظات حجز الحصص. الاشتراك: طلبات الاشتراك وطريقة الدفع التي تختارها (لا نجمع أي بيانات بطاقة بنكية). الأمان: سجل أحداث (تسجيل الدخول، تغيير الشعبة…) دون كلمات المرور.",
+      },
+      {
+        h: "الصوت والميكروفون",
+        p: "عند التحدث مع الأستاذ، يحوّل متصفحك صوتك إلى نص (قد يعالجه مزود المتصفح، مثل Google في Chrome)، ولا تصل إلى المنصة إلا الكلمات المكتوبة، ولا نسجّل صوتك. صوت الأستاذ يُولَّد من النص على خوادمنا.",
       },
       {
         h: "أساس المعالجة",
-        p: "نعالج بياناتك بناءً على موافقتك عند التسجيل، ولتنفيذ العقد التعليمي بيننا، ولأغراض قانونية (كالفوترة الضريبية) عند الاقتضاء.",
+        p: "نعالج بياناتك بناءً على موافقتك عند التسجيل، ولتنفيذ الخدمة التعليمية التي اشتركت فيها، ولأغراض قانونية عند الاقتضاء.",
       },
       {
-        h: "حقوقك",
-        p: "وفق القانون 18-07 المتعلق بحماية الأشخاص الطبيعيين في مجال معالجة المعطيات ذات الطابع الشخصي، يحق لك الوصول إلى بياناتك، تصحيحها، طلب حذفها، والاعتراض على معالجتها، عبر التواصل معنا على العنوان المذكور أدناه.",
+        h: "التلاميذ القاصرون وأولياء الأمور",
+        p: "إذا كان عمرك أقل من 18 سنة، فاستعمالك للمنصة يكون بموافقة وليّك. يمكن لوليّك ربط حسابه بحسابك برمز تعطيه إياه، فيرى مستواك وتقدمك واشتراكك. محادثاتك مع الأستاذ تبقى خاصة ولا تظهر لوليّك إلا إذا فعّلت مشاركتها، ويمكنك إيقافها متى شئت.",
       },
       {
         h: "مشاركة البيانات",
-        p: "لا نبيع بياناتك لأي طرف ثالث. قد تُشارك بيانات محدودة مع مزود الدفع (لإتمام العملية) ومزود الاستضافة التقنية، بالقدر اللازم فقط لتشغيل الخدمة.",
+        p: "لا نبيع بياناتك. نشارك فقط ما يلزم لتشغيل الخدمة: مزود الاستضافة؛ وعند تفعيلها، مزود الذكاء الاصطناعي (يصله محتوى الدرس ورسائلك وإجاباتك ومستواك الدراسي ودرجة إتقانك ونوع أخطائك، دون اسمك أو بريدك أو عمرك أو أهدافك؛ ولا تُرسل إليه صور التمارين) ومزود تحويل النص إلى صوت (يصله نص الرد دون اسمك)؛ ومزود البريد الإلكتروني الذي يرسل رابط استعادة كلمة المرور (يصله بريدك ونص الرسالة)؛ والأستاذ الذي تحجز معه حصة (اسمك الأول، المادة وملاحظتك). الحصص المباشرة تجري على Jitsi Meet (خدمة خارجية) برابط سري، ولا تسجّلها المنصة. الأساتذة الذين يجيبون عن تمارينك يرون اسمك الأول وصورة التمرين فقط.",
       },
       {
-        h: "بيانات الأطفال وأولياء الأمور",
-        p: "بالنسبة للمتعلمين القاصرين، تتطلب المنصة موافقة/إشراف ولي الأمر عبر ميزة ربط الحساب. لا نجمع بيانات تفوق ما هو ضروري لتقديم الخدمة التعليمية.",
+        h: "مدة الاحتفاظ",
+        p: "نحتفظ ببياناتك ما دام حسابك نشطاً. من صفحة «حسابي» يمكنك تنزيل نسخة من بياناتك فوراً، وطلب حذف حسابك. تؤكد الإدارة الطلب ثم يُمحى اسمك وبريدك وكلمة مرورك ومحادثاتك وتمارينك وصورك وإجاباتك المكتوبة وروابط الولي، ويتوقف الدخول. تبقى دون اسم: سجلات الدفع والاشتراك (محاسبة) ونتائج الإجابات صح/خطأ (إحصاء). مدة الاحتفاظ بهذه السجلات وبالنسخ الاحتياطية تحددها إدارة المنصة وفق ما يفرضه القانون.",
       },
       {
-        h: "مدة الاحتفاظ بالبيانات",
-        p: "نحتفظ ببياناتك طوال مدة نشاط حسابك، ولمدة إضافية بعد الإلغاء إن اقتضت القوانين المحاسبية/الضريبية ذلك.",
-      },
-      {
-        h: "الاتصال بنا",
-        p: "لأي استفسار متعلق بالخصوصية أو لممارسة حقوقك، راسلنا عبر البريد الإلكتروني الموضح في تذييل الموقع.",
+        h: "حقوقك",
+        p: "وفق القانون 18-07 المتعلق بحماية الأشخاص الطبيعيين في مجال معالجة المعطيات ذات الطابع الشخصي، يحق لك الوصول إلى بياناتك وتصحيحها وطلب حذفها والاعتراض على معالجتها، من صفحة «حسابي» أو بالتواصل مع إدارة المنصة. لتصحيح بيانات لا يمكنك تعديلها بنفسك، تواصل مع الإدارة.",
       },
     ],
   },
@@ -74,36 +74,36 @@ const privacyContent = {
     title: "Politique de confidentialité",
     sections: [
       {
-        h: "Qui nous sommes et pourquoi nous collectons vos données",
-        p: "Nourix Academy (« la Plateforme ») collecte vos données personnelles afin de fournir des services d’apprentissage à distance, suivre votre progression, délivrer des certificats, et gérer les abonnements et paiements.",
+        h: "Qui sommes-nous et pourquoi collectons-nous vos données",
+        p: "Tafawoq (« la Plateforme ») aide les élèves algériens à préparer le BAC : leçons, exercices, tests, professeur IA et séances avec des enseignants. Nous collectons vos données uniquement pour fournir ce service, suivre votre progression et gérer votre abonnement.",
       },
       {
         h: "Données collectées",
-        p: "Nom, e-mail, numéro de téléphone (si fourni), données d’inscription et de progression, résultats aux évaluations, et données de facturation (les informations complètes de carte ne sont jamais stockées — elles sont traitées directement par le prestataire de paiement).",
+        p: "Compte : nom, e-mail, mot de passe (chiffré, jamais visible), âge, niveau, filière et deuxième matière. Apprentissage : réponses, résultats, types d’erreurs, plan de révision, points, conversations avec le professeur IA, photos d’exercices envoyées, notes de réservation. Abonnement : demandes et moyen de paiement choisi (aucune donnée de carte bancaire). Sécurité : journal d’événements (connexions, changement de filière…), sans mots de passe.",
       },
       {
-        h: "Base légale du traitement",
-        p: "Nous traitons vos données sur la base de votre consentement lors de l’inscription, de l’exécution du contrat pédagogique, et pour des obligations légales (facturation fiscale) le cas échéant.",
+        h: "Voix et microphone",
+        p: "Quand vous parlez au professeur, votre navigateur transforme votre voix en texte (ce traitement peut être fait par l’éditeur du navigateur, par exemple Google pour Chrome) ; seuls les mots écrits parviennent à la Plateforme, qui n’enregistre pas votre voix. La voix du professeur est générée à partir du texte sur nos serveurs.",
       },
       {
-        h: "Vos droits",
-        p: "Conformément à la loi 18-07 relative à la protection des personnes physiques dans le traitement des données à caractère personnel, vous disposez d’un droit d’accès, de rectification, de suppression et d’opposition, en nous contactant à l’adresse indiquée ci-dessous.",
+        h: "Base du traitement",
+        p: "Nous traitons vos données sur la base de votre consentement à l’inscription, pour exécuter le service éducatif souscrit, et pour des obligations légales le cas échéant.",
+      },
+      {
+        h: "Élèves mineurs et parents",
+        p: "Si vous avez moins de 18 ans, l’utilisation de la Plateforme se fait avec l’accord de votre parent ou tuteur. Il peut lier son compte au vôtre grâce à un code que vous lui donnez, et voit alors votre niveau, votre progression et votre abonnement. Vos conversations avec le professeur restent privées, sauf si vous activez leur partage, désactivable à tout moment.",
       },
       {
         h: "Partage des données",
-        p: "Nous ne vendons pas vos données. Des données limitées peuvent être partagées avec le prestataire de paiement (pour finaliser la transaction) et l’hébergeur technique, dans la stricte mesure nécessaire au fonctionnement du service.",
-      },
-      {
-        h: "Données des enfants et des parents",
-        p: "Pour les apprenants mineurs, la plateforme requiert le consentement/suivi d’un parent via la fonctionnalité de liaison de compte. Nous ne collectons pas plus de données que nécessaire à la prestation pédagogique.",
+        p: "Nous ne vendons pas vos données. Nous ne partageons que le nécessaire : l’hébergeur ; lorsqu’ils sont activés, le fournisseur d’IA (il reçoit le contenu de la leçon, vos messages et réponses, votre niveau scolaire, votre maîtrise et vos types d’erreurs, sans votre nom, e-mail, âge ni objectifs ; les photos d’exercices ne lui sont jamais envoyées) et le fournisseur de synthèse vocale (le texte de la réponse, sans votre nom) ; le fournisseur d’e-mail qui envoie le lien de réinitialisation du mot de passe (votre adresse et le message) ; l’enseignant avec qui vous réservez une séance (prénom, matière, votre note). Les séances en direct se déroulent sur Jitsi Meet (service externe) via un lien secret, et la Plateforme ne les enregistre pas. Les enseignants qui répondent à vos exercices ne voient que votre prénom et la photo.",
       },
       {
         h: "Durée de conservation",
-        p: "Nous conservons vos données pendant la durée d’activité de votre compte, et au-delà si des obligations comptables/fiscales l’exigent.",
+        p: "Vos données sont conservées tant que votre compte est actif. Depuis « Mon compte », vous pouvez télécharger immédiatement une copie de vos données et demander la suppression du compte. Après confirmation par l’administration, nom, e-mail, mot de passe, conversations, exercices, photos, réponses rédigées et liens parent sont effacés et la connexion est bloquée. Restent sans nom : paiements et abonnements (comptabilité) et le juste/faux des réponses (statistiques). La durée de conservation de ces traces et des sauvegardes est fixée par l’administration selon les obligations légales.",
       },
       {
-        h: "Nous contacter",
-        p: "Pour toute question relative à la confidentialité ou pour exercer vos droits, contactez-nous à l’adresse e-mail indiquée en pied de page.",
+        h: "Vos droits",
+        p: "Conformément à la loi 18-07 relative à la protection des personnes physiques dans le traitement des données à caractère personnel, vous pouvez accéder à vos données, les rectifier, demander leur suppression et vous opposer à leur traitement depuis « Mon compte » ou en contactant l’administration de la Plateforme.",
       },
     ],
   },
@@ -112,35 +112,35 @@ const privacyContent = {
     sections: [
       {
         h: "Who we are and why we collect your data",
-        p: 'Nourix Academy ("the Platform") collects your personal data to provide remote learning services, track your progress, issue certificates, and manage subscriptions and payments.',
+        p: 'Tafawoq ("the Platform") helps Algerian students prepare for the BAC: lessons, exercises, tests, an AI teacher and sessions with teachers. We collect your data only to provide this service, follow your progress and manage your subscription.',
       },
       {
         h: "Data we collect",
-        p: "Name, email, phone number (if provided), enrollment and progress data, assessment results, and billing data (full card details are never stored — they are processed directly by the payment provider).",
+        p: "Account: name, email, password (encrypted, never visible to us), age, level, stream and second subject. Learning: your answers, results, types of mistakes, revision plan, points, conversations with the AI teacher, exercise photos you send, and booking notes. Subscription: requests and the payment method you choose (no bank card data). Security: an event log (sign-ins, stream changes…), never passwords.",
       },
       {
-        h: "Legal basis for processing",
-        p: "We process your data based on your consent at sign-up, to perform our educational contract with you, and for legal obligations (e.g. tax invoicing) where applicable.",
+        h: "Voice and microphone",
+        p: "When you speak to the teacher, your browser turns your voice into text (this may be done by the browser vendor, e.g. Google for Chrome); only the written words reach the Platform, which never records your voice. The teacher's voice is generated from text on our servers.",
       },
       {
-        h: "Your rights",
-        p: "Under Law 18-07 on the protection of individuals in the processing of personal data, you have the right to access, correct, request deletion of, and object to the processing of your data, by contacting us at the address below.",
+        h: "Legal basis",
+        p: "We process your data based on your consent at registration, to deliver the educational service you subscribed to, and for legal obligations where applicable.",
+      },
+      {
+        h: "Minors and parents",
+        p: "If you are under 18, you use the Platform with your parent's or guardian's agreement. They can link their account to yours with a code you give them, and then see your level, progress and subscription. Your conversations with the teacher stay private unless you turn on sharing, which you can turn off at any time.",
       },
       {
         h: "Data sharing",
-        p: "We do not sell your data. Limited data may be shared with the payment provider (to complete a transaction) and the technical hosting provider, only to the extent necessary to operate the service.",
+        p: "We do not sell your data. We share only what the service needs: our hosting provider; when enabled, the AI provider (it receives the lesson content, your messages and answers, your school level, mastery and mistake types — never your name, email, age or goals; exercise photos are never sent to it) and the text-to-speech provider (the reply text, without your name); the email provider that sends password reset links (your address and the message); the teacher you book a session with (first name, subject, your note). Live sessions take place on Jitsi Meet (an external service) through a secret link, and the Platform does not record them. Teachers who answer your exercises see only your first name and the photo.",
       },
       {
-        h: "Children's and parents' data",
-        p: "For minor learners, the platform requires parental consent/oversight via the account-linking feature. We do not collect more data than necessary to deliver the educational service.",
+        h: "Retention",
+        p: "We keep your data while your account is active. From “My account” you can download a copy of your data at once and request deletion of your account. Once the administration confirms, your name, email, password, chats, exercises, photos, written answers and parent links are erased and sign-in is blocked. Kept without a name: payment and subscription records (accounting) and right/wrong answer results (statistics). How long those records and backups are kept is set by the administration according to legal obligations.",
       },
       {
-        h: "Data retention",
-        p: "We retain your data for as long as your account is active, and for an additional period after cancellation where accounting/tax rules require it.",
-      },
-      {
-        h: "Contact us",
-        p: "For any privacy question or to exercise your rights, contact us at the email address shown in the site footer.",
+        h: "Your rights",
+        p: "Under Law 18-07 on the protection of individuals in the processing of personal data, you may access, correct, request deletion of, and object to the processing of your data from “My account” or by contacting the Platform's administration.",
       },
     ],
   },
@@ -156,31 +156,31 @@ const termsContent = {
       },
       {
         h: "الحسابات والأدوار",
-        p: "يوفر النظام أدوارًا متعددة (متعلم، ولي أمر، أستاذ، مؤسسة، مسؤول). كل مستخدم مسؤول عن سرية بيانات دخوله وعن دقة المعلومات المقدمة.",
+        p: "الحسابات: تلميذ، وليّ أمر، أستاذ، مسؤول. يختار المستخدم بنفسه دور التلميذ أو الولي فقط؛ حسابات الأساتذة تفعّلها الإدارة. كل مستخدم مسؤول عن سرية كلمة مروره وعن دقة معلوماته. الشعبة تُختار مرة واحدة ولا تتغير إلا بطلب توافق عليه الإدارة.",
       },
       {
-        h: "الاشتراكات والدفع",
-        p: "تُعرض الأسعار بالدينار الجزائري (DZD) وفق التنظيم المعمول به. الدفع الإلكتروني يتم عبر مزود دفع خارجي؛ لا نُخزّن بيانات بطاقتك البنكية الكاملة. الوصول اليدوي من الإدارة لا يُعتبر عملية دفع.",
+        h: "الاشتراك والدفع",
+        p: "يُعرض السعر بالدينار الجزائري في صفحة الاشتراك. يُدفع عبر الوسيلة المختارة (CCP أو بريدي موب…) ثم تفعّل الإدارة الاشتراك بعد تأكيد الدفع؛ لا يُعتبر أي شيء مدفوعاً قبل ذلك. لا يتجدد الاشتراك تلقائياً. اختبار تحديد المستوى متاح بلا اشتراك.",
       },
       {
-        h: "الإلغاء والاسترجاع",
-        p: "يمكن إلغاء الاشتراك في أي وقت من لوحة التحكم؛ سياسة الاسترجاع (كليًا أو جزئيًا) تُحدَّد حسب المدة المستهلكة من الخدمة ووفق ما يقتضيه القانون التجاري الجزائري.",
+        h: "الاسترجاع",
+        p: "تُدرس طلبات الاسترجاع حسب المدة المستهلكة من الاشتراك ووفق ما يقتضيه القانون الجزائري، بالتواصل مع الإدارة.",
       },
       {
-        h: "المحتوى والملكية الفكرية",
-        p: "كل محتوى الدورات (نصوص، فيديوهات، تمارين) محمي بحقوق الملكية الفكرية. يُمنع نسخه أو إعادة توزيعه دون إذن كتابي.",
+        h: "الأستاذ الذكي والمحتوى",
+        p: "الأستاذ الذكي والتمارين المولّدة وسيلة مساعدة وقد تخطئ أحياناً؛ لا تعوّض الأستاذ ولا المتابعة المدرسية. مواضيع البكالوريا التجريبية مولّدة على نمط الامتحان وليست مواضيع رسمية ما لم يُذكر ذلك. كل المحتوى محمي بحقوق الملكية الفكرية ويُمنع نسخه أو إعادة توزيعه دون إذن.",
+      },
+      {
+        h: "الحصص مع الأساتذة",
+        p: "تُحجز الحصص للمشتركين حسب القواعد المعروضة في صفحة الحصص (الإلغاء المجاني قبل 12 ساعة على الأقل). يلتزم الجميع بالاحترام خلال الحصة؛ ويحق للإدارة إيقاف أي حساب يسيء.",
       },
       {
         h: "سلوك المستخدم",
-        p: "يُمنع استخدام المنصة للغش في الاختبارات، مشاركة الحسابات، أو أي نشاط يضر بالمنصة أو بمستخدمين آخرين. الإدارة تحتفظ بحق تعليق أي حساب يخالف هذه الشروط.",
-      },
-      {
-        h: "الشهادات",
-        p: "الشهادات الصادرة عن المنصة تُثبت إكمال المحتوى التعليمي داخل Nourix Academy فقط، وليست معادلة رسميًا ما لم يُذكر ذلك صراحة.",
+        p: "يُمنع مشاركة الحسابات، أو محاولة الوصول إلى بيانات غيرك، أو إرسال محتوى مسيء، أو أي نشاط يضر بالمنصة أو بمستخدميها. يحق للإدارة تعليق أي حساب يخالف هذه الشروط.",
       },
       {
         h: "حدود المسؤولية",
-        p: 'تُقدَّم الخدمة "كما هي". لا نضمن نتائج أكاديمية محددة (كالنجاح في امتحان رسمي)، والمنصة أداة مساعدة على التعلم وليست بديلاً عن المتابعة المدرسية الرسمية.',
+        p: 'تُقدَّم الخدمة "كما هي". لا نضمن نتيجة معيّنة في البكالوريا؛ المنصة أداة مساعدة على التحضير.',
       },
       {
         h: "التعديلات على الشروط",
@@ -193,39 +193,39 @@ const termsContent = {
     sections: [
       {
         h: "Acceptation des conditions",
-        p: "En utilisant la plateforme, vous acceptez ces conditions. Si vous n’êtes pas d’accord, veuillez ne pas utiliser la plateforme.",
+        p: "En utilisant la Plateforme, vous acceptez ces conditions. Si vous n’êtes pas d’accord, merci de ne pas l’utiliser.",
       },
       {
         h: "Comptes et rôles",
-        p: "Le système propose plusieurs rôles (apprenant, parent, enseignant, institution, administrateur). Chaque utilisateur est responsable de la confidentialité de ses identifiants et de l’exactitude des informations fournies.",
+        p: "Comptes : élève, parent, enseignant, administrateur. Chacun choisit lui-même uniquement le rôle élève ou parent ; les comptes enseignants sont activés par l’administration. Chaque utilisateur est responsable de la confidentialité de son mot de passe et de l’exactitude de ses informations. La filière est choisie une seule fois et ne change que sur demande acceptée par l’administration.",
       },
       {
-        h: "Abonnements et paiement",
-        p: "Les prix sont affichés en dinars algériens (DZD) conformément à la réglementation en vigueur. Le paiement en ligne s’effectue via un prestataire externe ; nous ne stockons jamais les informations complètes de votre carte. Un accès accordé manuellement par l’administration ne constitue pas un paiement.",
+        h: "Abonnement et paiement",
+        p: "Le prix est affiché en dinars algériens sur la page d’abonnement. Le paiement se fait par le moyen choisi (CCP, BaridiMob…), puis l’administration active l’abonnement après confirmation ; rien n’est considéré comme payé avant. L’abonnement ne se renouvelle pas automatiquement. Le test de positionnement est accessible sans abonnement.",
       },
       {
-        h: "Annulation et remboursement",
-        p: "L’abonnement peut être annulé à tout moment depuis le tableau de bord ; la politique de remboursement (total ou partiel) dépend de la durée de service déjà consommée et du droit commercial algérien applicable.",
+        h: "Remboursement",
+        p: "Les demandes de remboursement sont étudiées selon la durée consommée et conformément au droit algérien, en contactant l’administration.",
       },
       {
-        h: "Contenu et propriété intellectuelle",
-        p: "Tout le contenu des cours (textes, vidéos, exercices) est protégé par le droit de propriété intellectuelle. Sa copie ou redistribution sans autorisation écrite est interdite.",
+        h: "Professeur IA et contenu",
+        p: "Le professeur IA et les exercices générés sont une aide et peuvent parfois se tromper ; ils ne remplacent ni un enseignant ni le suivi scolaire. Les sujets de BAC blanc sont générés sur le modèle de l’examen et ne sont pas des sujets officiels, sauf mention contraire. Tout le contenu est protégé et ne peut être copié ni redistribué sans autorisation.",
       },
       {
-        h: "Comportement de l’utilisateur",
-        p: "Il est interdit d’utiliser la plateforme pour tricher aux évaluations, partager des comptes, ou toute activité nuisant à la plateforme ou à d’autres utilisateurs. L’administration se réserve le droit de suspendre tout compte enfreignant ces conditions.",
+        h: "Séances avec des enseignants",
+        p: "Les séances sont réservées aux abonnés selon les règles affichées sur la page des séances (annulation gratuite jusqu’à 12 h avant). Chacun s’engage au respect pendant la séance ; l’administration peut suspendre tout compte qui en abuse.",
       },
       {
-        h: "Certificats",
-        p: "Les certificats délivrés attestent uniquement l’achèvement du contenu pédagogique sur Nourix Academy et ne constituent pas une équivalence officielle sauf mention explicite contraire.",
+        h: "Comportement",
+        p: "Sont interdits : le partage de compte, toute tentative d’accéder aux données d’autrui, l’envoi de contenu offensant et toute activité nuisible à la Plateforme ou à ses utilisateurs. L’administration peut suspendre tout compte qui enfreint ces conditions.",
       },
       {
         h: "Limitation de responsabilité",
-        p: "Le service est fourni « tel quel ». Nous ne garantissons pas de résultat académique spécifique (comme la réussite à un examen officiel) ; la plateforme est un outil d’accompagnement et non un substitut au suivi scolaire officiel.",
+        p: "Le service est fourni « tel quel ». Nous ne garantissons aucun résultat au BAC ; la Plateforme est une aide à la préparation.",
       },
       {
-        h: "Modifications des conditions",
-        p: "Ces conditions peuvent être mises à jour ponctuellement ; la poursuite de l’utilisation après mise à jour vaut acceptation de la nouvelle version.",
+        h: "Modifications",
+        p: "Ces conditions peuvent être mises à jour ; continuer à utiliser la Plateforme après une mise à jour vaut acceptation de la nouvelle version.",
       },
     ],
   },
@@ -238,31 +238,31 @@ const termsContent = {
       },
       {
         h: "Accounts and roles",
-        p: "The system offers multiple roles (learner, parent, teacher, institution, admin). Each user is responsible for the confidentiality of their credentials and the accuracy of the information they provide.",
+        p: "Accounts: student, parent, teacher, admin. Users choose only the student or parent role themselves; teacher accounts are activated by the administration. Every user is responsible for keeping their password secret and their information accurate. The stream is chosen once and changes only through a request the administration approves.",
       },
       {
-        h: "Subscriptions and payment",
-        p: "Prices are shown in Algerian dinars (DZD) per applicable regulation. Online payment is processed via an external provider; we never store your full card details. Access granted manually by the administration does not constitute a payment.",
+        h: "Subscription and payment",
+        p: "The price is shown in Algerian dinars on the subscription page. You pay with the chosen method (CCP, BaridiMob…), then the administration activates the subscription once the payment is confirmed; nothing counts as paid before that. Subscriptions never renew automatically. The placement test is available without a subscription.",
       },
       {
-        h: "Cancellation and refunds",
-        p: "A subscription can be canceled at any time from the dashboard; the refund policy (full or partial) depends on the service duration already consumed and applicable Algerian commercial law.",
+        h: "Refunds",
+        p: "Refund requests are assessed according to the time used and Algerian law, by contacting the administration.",
       },
       {
-        h: "Content and intellectual property",
-        p: "All course content (text, video, exercises) is protected by intellectual property rights. Copying or redistributing it without written permission is prohibited.",
+        h: "AI teacher and content",
+        p: "The AI teacher and generated exercises are a study aid and can sometimes be wrong; they replace neither a teacher nor school follow-up. Mock BAC papers are generated in the exam's style and are not official papers unless stated. All content is protected and may not be copied or redistributed without permission.",
+      },
+      {
+        h: "Sessions with teachers",
+        p: "Sessions are for subscribers, under the rules shown on the sessions page (free cancellation up to 12 hours before). Everyone must be respectful during a session; the administration may suspend any account that abuses it.",
       },
       {
         h: "User conduct",
-        p: "Using the platform to cheat on assessments, share accounts, or engage in any activity harmful to the platform or other users is prohibited. The administration reserves the right to suspend any account violating these terms.",
-      },
-      {
-        h: "Certificates",
-        p: "Certificates issued attest only to completion of educational content within Nourix Academy and are not an official equivalence unless explicitly stated.",
+        p: "Sharing accounts, trying to access other people's data, sending offensive content, or any activity harmful to the platform or its users is prohibited. The administration may suspend any account that breaks these terms.",
       },
       {
         h: "Limitation of liability",
-        p: 'The service is provided "as is". We do not guarantee any specific academic outcome (such as passing an official exam); the platform is a learning aid, not a substitute for official school attendance.',
+        p: 'The service is provided "as is". We do not guarantee any particular BAC result; the platform is a preparation aid.',
       },
       {
         h: "Changes to these terms",
@@ -276,7 +276,7 @@ export default function Legal() {
   const [, params] = useRoute("/legal/:doc");
   const initialDoc: Doc = params?.doc === "terms" ? "terms" : "privacy";
   const [lang, setLang] = useState<Lang>(
-    () => (localStorage.getItem("nourix-language") as Lang) || "ar"
+    () => getStoredLanguage() ?? "ar"
   );
   const [doc, setDoc] = useState<Doc>(initialDoc);
   const t = nav[lang];
@@ -290,20 +290,20 @@ export default function Legal() {
   return (
     <div
       dir={dir}
-      className="nourix-app min-h-screen bg-[#050505] text-[#f7f4ec]"
+      className="app-shell min-h-screen bg-[#050505] text-[#f7f4ec]"
     >
       <header className="site-header">
         <div className="container flex h-[76px] items-center justify-between gap-6">
-          <Link href="/" className="brand-lockup">
+          <Link href="/tafawoq" className="brand-lockup">
             <span className="brand-mark-text" aria-hidden="true">
-              N
+              T
             </span>
             <span className="brand-wordmark">
-              Nourix <b>Academy</b>
+              Tafawoq <b>AI Teacher</b>
             </span>
           </Link>
           <div className="catalog-header-actions">
-            <Link href="/" className="catalog-home-link">
+            <Link href="/tafawoq" className="catalog-home-link">
               <BackArrow dir={dir} size={14} />
               {t.back}
             </Link>
@@ -327,7 +327,7 @@ export default function Legal() {
         <div className="container" style={{ maxWidth: 780 }}>
           <div className="catalog-hero">
             <div>
-              <div className="section-kicker">NOURIX / LEGAL</div>
+              <div className="section-kicker">TAFAWOQ / LEGAL</div>
               <h1>{content.title}</h1>
             </div>
           </div>

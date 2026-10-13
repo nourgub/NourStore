@@ -1,7 +1,7 @@
 import { publicProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { checkRateLimit } from "../rateLimit";
-import { logError } from "../db";
+import { logError } from "../db/errorLog";
 
 export const diagnosticsRouter = router({
   // A real, honest way for the frontend to report an unhandled error

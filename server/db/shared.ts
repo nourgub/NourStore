@@ -59,10 +59,29 @@ function buildConnectionConfig(databaseUrl: string) {
   return config;
 }
 
+/**
+ * The app's own MySQL connection string. TAFAWOQ_DATABASE_URL wins over
+ * DATABASE_URL, so a host that already uses DATABASE_URL for something else
+ * (Replit's managed PostgreSQL, for instance) never hands that to this app.
+ * A non-MySQL address is refused outright instead of failing obscurely.
+ */
+export function appDatabaseUrl(): string {
+  const url = (process.env.TAFAWOQ_DATABASE_URL || process.env.DATABASE_URL || "").trim();
+  if (url && !/^(mysql|mariadb):\/\//i.test(url)) {
+    const scheme = url.split(":")[0];
+    throw new Error(
+      `[Database] This app needs MySQL, but its connection string uses "${scheme}:". ` +
+        "Set TAFAWOQ_DATABASE_URL to a mysql:// address (DATABASE_URL may belong to another service, e.g. PostgreSQL)."
+    );
+  }
+  return url;
+}
+
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const url = appDatabaseUrl();
+  if (!_db && url) {
     try {
-      const connection = buildConnectionConfig(process.env.DATABASE_URL);
+      const connection = buildConnectionConfig(url);
       _db = typeof connection === "string" ? drizzle(connection) : drizzle({ connection });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);

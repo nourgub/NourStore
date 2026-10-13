@@ -1,5 +1,26 @@
 export type Lang = "ar" | "fr" | "en";
 
+export const LANGUAGE_KEY = "tafawoq-language";
+/** The key used before the platform was renamed; read once, so nobody loses their choice. */
+const LEGACY_LANGUAGE_KEY = "nourix-language";
+
+/** The visitor's saved language, or null when none (or storage is blocked). */
+export function getStoredLanguage(): Lang | null {
+  try {
+    let value = localStorage.getItem(LANGUAGE_KEY);
+    if (value === null) {
+      value = localStorage.getItem(LEGACY_LANGUAGE_KEY);
+      if (value === "ar" || value === "fr" || value === "en") {
+        localStorage.setItem(LANGUAGE_KEY, value);
+        localStorage.removeItem(LEGACY_LANGUAGE_KEY);
+      }
+    }
+    return value === "ar" || value === "fr" || value === "en" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Persists the chosen language AND keeps the real <html> element's dir/lang
  * attributes in sync with it. client/index.html hardcodes dir="rtl" (a
@@ -13,7 +34,11 @@ export type Lang = "ar" | "fr" | "en";
  * localStorage directly.
  */
 export function setStoredLanguage(lang: Lang): void {
-  localStorage.setItem("nourix-language", lang);
+  try {
+    localStorage.setItem(LANGUAGE_KEY, lang);
+  } catch {
+    // Storage blocked (private mode): the choice holds for this page only.
+  }
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   document.documentElement.lang = lang;
 }

@@ -5,8 +5,9 @@
 // that want object storage instead of local disk.
 
 import { ENV } from "./_core/env";
-import { s3Put, s3Get, s3GetSignedUrl } from "./storageProviders/s3";
+import { s3Delete, s3Put, s3Get, s3GetSignedUrl } from "./storageProviders/s3";
 import {
+  localDelete,
   localPut,
   localGet,
   localGetSignedUrl,
@@ -19,6 +20,11 @@ export async function storagePut(
 ): Promise<{ key: string; url: string }> {
   if (ENV.storageProvider === "s3") return s3Put(relKey, data, contentType);
   return localPut(relKey, data, contentType);
+}
+
+export async function storageDelete(relKey: string): Promise<void> {
+  if (ENV.storageProvider === "s3") return s3Delete(relKey);
+  return localDelete(relKey);
 }
 
 export async function storageGet(

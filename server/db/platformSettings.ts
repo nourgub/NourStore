@@ -24,6 +24,14 @@ export async function getPlatformSetting(key: string) {
   return rows[0]?.value ?? null;
 }
 
+/** A non-negative number setting; the fallback when unset, empty or invalid. */
+export async function getSettingNumber(key: string, fallback: number) {
+  const raw = await getPlatformSetting(key);
+  if (raw === null || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
 export async function setPlatformSetting(key: string, value: string) {
     const db = await getDb();
   if (!db) return false;

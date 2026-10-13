@@ -3,7 +3,7 @@
 # setup — the matching half of scripts/backup-database.sh.
 #
 # Usage:
-#   ./scripts/restore-database.sh path/to/nourix-backup-TIMESTAMP.sql.gz
+#   ./scripts/restore-database.sh path/to/tafawoq-backup-TIMESTAMP.sql.gz
 #
 # DESTRUCTIVE: this replaces the current database's contents with the
 # backup's contents. Requires typing the database name to confirm, exactly
@@ -30,8 +30,10 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
   set +a
 fi
 
-MYSQL_DATABASE="${MYSQL_DATABASE:-nourix_academy}"
-MYSQL_USER="${MYSQL_USER:-nourix}"
+# Named explicitly in .env (never guessed: a wrong guess here would dump
+# or overwrite the wrong database).
+MYSQL_DATABASE="${MYSQL_DATABASE:?ERROR: MYSQL_DATABASE is not set. Fill in .env first (see .env.example).}"
+MYSQL_USER="${MYSQL_USER:?ERROR: MYSQL_USER is not set. Fill in .env first (see .env.example).}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:?ERROR: MYSQL_PASSWORD is not set. Fill in .env first (see .env.example).}"
 
 echo "This will REPLACE all data in database '$MYSQL_DATABASE' with the contents of:"

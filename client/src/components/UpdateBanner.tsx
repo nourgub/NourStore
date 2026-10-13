@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 /**
- * Listens for the "nourix:sw-update-available" event dispatched from
+ * Listens for the "tafawoq:sw-update-available" event dispatched from
  * main.tsx once a new service worker is genuinely waiting to activate.
  * Without this, someone with the PWA installed on their home screen would
  * be silently stuck on an old build forever, with no way to know a new
@@ -13,9 +13,9 @@ export default function UpdateBanner() {
 
   useEffect(() => {
     const handler = () => setVisible(true);
-    window.addEventListener("nourix:sw-update-available", handler);
+    window.addEventListener("tafawoq:sw-update-available", handler);
     return () =>
-      window.removeEventListener("nourix:sw-update-available", handler);
+      window.removeEventListener("tafawoq:sw-update-available", handler);
   }, []);
 
   if (!visible) return null;
@@ -53,7 +53,7 @@ export default function UpdateBanner() {
           disabled={applying}
           onClick={() => {
             setApplying(true);
-            window.__nourixApplyUpdate?.();
+            window.__tafawoqApplyUpdate?.();
           }}
           style={{
             background: "linear-gradient(145deg, #f1ce63, #8d6116)",

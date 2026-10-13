@@ -8,6 +8,7 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
   const keys = [
     "JWT_SECRET",
     "DATABASE_URL",
+    "TAFAWOQ_DATABASE_URL",
     "NODE_ENV",
     "AUTH_PROVIDER",
     "GOOGLE_CLIENT_ID",
@@ -16,7 +17,6 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
     "S3_BUCKET",
     "S3_ACCESS_KEY_ID",
     "S3_SECRET_ACCESS_KEY",
-    "CRON_SECRET",
     "OWNER_OPEN_ID",
   ];
   const previous: Record<string, string | undefined> = {};
@@ -35,6 +35,19 @@ async function loadCheckEnvWith(vars: Record<string, string | undefined>) {
 }
 
 describe("server startup env validation (checkEnv)", () => {
+  it("refuses a PostgreSQL address (e.g. Replit's managed DATABASE_URL) unless TAFAWOQ_DATABASE_URL gives a MySQL one", async () => {
+    const postgres = "postgresql://user:pass@db.example.com:5432/app";
+    const refused = await loadCheckEnvWith({ JWT_SECRET: "a".repeat(32), DATABASE_URL: postgres, NODE_ENV: "development" });
+    expect(refused().fatal.some(m => m.includes("TAFAWOQ_DATABASE_URL"))).toBe(true);
+    const separated = await loadCheckEnvWith({
+      JWT_SECRET: "a".repeat(32),
+      DATABASE_URL: postgres,
+      TAFAWOQ_DATABASE_URL: "mysql://root@127.0.0.1:3306/tafawoq",
+      NODE_ENV: "development",
+    });
+    expect(separated().fatal).toEqual([]);
+  });
+
   it("reports no fatal findings for a minimally sane development config", async () => {
     const checkEnv = await loadCheckEnvWith({
       JWT_SECRET: "a".repeat(32),
@@ -121,7 +134,7 @@ describe("server startup env validation (checkEnv)", () => {
     expect(warnings.some(m => m.toLowerCase().includes("s3"))).toBe(false);
   });
 
-  it("warns in production when CRON_SECRET or OWNER_OPEN_ID is unset, without failing startup", async () => {
+  it("warns in production when OWNER_OPEN_ID is unset, without failing startup", async () => {
     const checkEnv = await loadCheckEnvWith({
       JWT_SECRET: "a".repeat(32),
       DATABASE_URL: "mysql://user:pass@localhost:3306/db",
@@ -129,7 +142,23 @@ describe("server startup env validation (checkEnv)", () => {
     });
     const { fatal, warnings } = checkEnv();
     expect(fatal).toEqual([]);
-    expect(warnings.some(m => m.includes("CRON_SECRET"))).toBe(true);
     expect(warnings.some(m => m.includes("OWNER_OPEN_ID"))).toBe(true);
+  });
+
+  it("refuses the example placeholders for JWT_SECRET and the database password in production only", async () => {
+    const production = await loadCheckEnvWith({
+      JWT_SECRET: "change_me_generate_with_openssl_rand_hex_32",
+      DATABASE_URL: "mysql://tafawoq:changeme_use_a_real_password@mysql:3306/db",
+      NODE_ENV: "production",
+    });
+    const { fatal } = production();
+    expect(fatal.some(m => m.includes("JWT_SECRET is still the example placeholder"))).toBe(true);
+    expect(fatal.some(m => m.includes("DATABASE_URL still uses the example placeholder"))).toBe(true);
+
+    const local = await loadCheckEnvWith({
+      JWT_SECRET: "change_me_generate_with_openssl_rand_hex_32",
+      DATABASE_URL: "mysql://tafawoq:changeme_use_a_real_password@localhost:3306/db",
+    });
+    expect(local().fatal).toEqual([]);
   });
 });

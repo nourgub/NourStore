@@ -1,15 +1,5 @@
-import {
-  desc,
-  eq,
-  inArray,
-} from "drizzle-orm";
-import {
-  userSubscriptions,
-  users,
-  invoices,
-  adminAuditLog,
-} from "../../drizzle/schema";
-import { ENV } from "../_core/env";
+import { desc, eq } from "drizzle-orm";
+import { users, adminAuditLog } from "../../drizzle/schema";
 
 // ---------------------------------------------------------------------------
 // Admin audit log: a real, append-only record of sensitive admin actions.
@@ -61,86 +51,4 @@ export async function getAdminAuditLog(input: { limit?: number; action?: string 
     .orderBy(desc(adminAuditLog.createdAt))
     .limit(Math.min(input.limit ?? 100, 500));
   return rows;
-}
-
-export async function getRevenueAnalytics() {
-  const db = await getDb();
-  if (!db)
-    return {
-      totalsByCurrency: [],
-      monthly: [],
-      activeSubscriptions: 0,
-      canceledOrExpiredSubscriptions: 0,
-      pendingInvoiceCount: 0,
-      pendingInvoiceValueByCurrency: [],
-    };
-
-  const paidInvoices = await db
-    .select({
-      amountCents: invoices.amountCents,
-      currency: invoices.currency,
-      paidAt: invoices.paidAt,
-    })
-    .from(invoices)
-    .where(eq(invoices.status, "paid"));
-  const totalsMap = new Map<string, number>();
-  const monthlyMap = new Map<string, number>(); // "YYYY-MM|CUR" -> cents
-  for (const row of paidInvoices) {
-    totalsMap.set(
-      row.currency,
-      (totalsMap.get(row.currency) ?? 0) + row.amountCents
-    );
-    if (row.paidAt) {
-      const monthKey = `${row.paidAt.getFullYear()}-${String(row.paidAt.getMonth() + 1).padStart(2, "0")}|${row.currency}`;
-      monthlyMap.set(
-        monthKey,
-        (monthlyMap.get(monthKey) ?? 0) + row.amountCents
-      );
-    }
-  }
-  const totalsByCurrency = Array.from(totalsMap.entries()).map(
-    ([currency, amountCents]) => ({ currency, amountCents })
-  );
-  const monthly = Array.from(monthlyMap.entries())
-    .map(([key, amountCents]) => {
-      const [month, currency] = key.split("|");
-      return { month, currency, amountCents };
-    })
-    .sort((a, b) => a.month.localeCompare(b.month));
-
-  const pendingInvoices = await db
-    .select({ amountCents: invoices.amountCents, currency: invoices.currency })
-    .from(invoices)
-    .where(eq(invoices.status, "pending"));
-  const pendingMap = new Map<string, number>();
-  for (const row of pendingInvoices)
-    pendingMap.set(
-      row.currency,
-      (pendingMap.get(row.currency) ?? 0) + row.amountCents
-    );
-  const pendingInvoiceValueByCurrency = Array.from(pendingMap.entries()).map(
-    ([currency, amountCents]) => ({ currency, amountCents })
-  );
-
-  const activeSubscriptions = (
-    await db
-      .select({ id: userSubscriptions.id })
-      .from(userSubscriptions)
-      .where(eq(userSubscriptions.status, "active"))
-  ).length;
-  const canceledOrExpiredSubscriptions = (
-    await db
-      .select({ id: userSubscriptions.id })
-      .from(userSubscriptions)
-      .where(inArray(userSubscriptions.status, ["canceled", "expired"]))
-  ).length;
-
-  return {
-    totalsByCurrency,
-    monthly,
-    activeSubscriptions,
-    canceledOrExpiredSubscriptions,
-    pendingInvoiceCount: pendingInvoices.length,
-    pendingInvoiceValueByCurrency,
-  };
 }
