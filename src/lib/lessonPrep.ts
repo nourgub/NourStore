@@ -4,6 +4,7 @@ import { findLessonPrep, GENERATED_DIR, insertLessonPrep, listLessonPreps } from
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "./extractText";
 import { runLessonPrepPipeline } from "./agents/lessonPrepPipeline";
 import { buildLessonPrepDocx } from "./docx/buildLessonPrepDocx";
+import { getActiveLessonPrepTemplate } from "./lessonPrepTemplate";
 import type { LessonPrepMode, LessonPrepRequest, SubjectId } from "./types";
 import type { LessonSourceImage, LessonSourceText } from "./agents/lessonPrepAgent";
 
@@ -77,10 +78,11 @@ export async function createLessonPrep(input: CreateLessonPrepInput): Promise<Le
 
   const requestId = `lp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const createdAt = new Date().toISOString();
+  const activeTemplate = getActiveLessonPrepTemplate(input.teacherId, input.subjectId);
 
   let request: LessonPrepRequest;
   try {
-    const { steps, sections } = await runLessonPrepPipeline({
+    const { steps, sections, headerValues, noteValues, tableColumns, tableRows } = await runLessonPrepPipeline({
       mode: input.mode,
       subjectId: input.subjectId,
       lessonTitle: input.lessonTitle,
@@ -88,6 +90,7 @@ export async function createLessonPrep(input: CreateLessonPrepInput): Promise<Le
       styleNotes: input.styleNotes,
       textSources,
       imageSources,
+      template: activeTemplate?.schema,
     });
 
     const outDir = path.join(GENERATED_DIR, input.teacherId, requestId);
@@ -102,14 +105,19 @@ export async function createLessonPrep(input: CreateLessonPrepInput): Promise<Le
       gradeLevel: input.gradeLevel,
       sourceFileNames,
       steps,
+      templateId: activeTemplate?.id ?? null,
       sections,
+      headerValues,
+      noteValues,
+      tableColumns,
+      tableRows,
       status: "done",
       failureReason: null,
       fileDocx: null,
       createdAt,
     };
 
-    const docxBuffer = await buildLessonPrepDocx(request);
+    const docxBuffer = await buildLessonPrepDocx(request, activeTemplate?.schema.institutionLabel);
     const docxPath = path.join(outDir, "lesson-prep.docx");
     fs.writeFileSync(docxPath, docxBuffer);
     request.fileDocx = docxPath;
@@ -123,7 +131,12 @@ export async function createLessonPrep(input: CreateLessonPrepInput): Promise<Le
       gradeLevel: input.gradeLevel,
       sourceFileNames,
       steps: [],
+      templateId: activeTemplate?.id ?? null,
       sections: [],
+      headerValues: [],
+      noteValues: [],
+      tableColumns: [],
+      tableRows: [],
       status: "failed",
       failureReason: err instanceof Error ? err.message : "خطأ غير معروف",
       fileDocx: null,

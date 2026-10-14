@@ -71,15 +71,55 @@ export default async function LessonPrepDetailPage({
               </a>
             </section>
 
-            <section className="space-y-4">
-              <h2 className="font-bold text-brand-800">معاينة التحضير</h2>
-              {lessonPrep.sections.map((s, i) => (
-                <div key={i} className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
-                  <h3 className="mb-2 font-bold text-brand-800">{s.heading}</h3>
-                  <p className="whitespace-pre-wrap text-sm text-brand-700">{s.body}</p>
+            {lessonPrep.tableColumns.length > 0 ? (
+              <section className="space-y-4">
+                <h2 className="font-bold text-brand-800">معاينة التحضير (بشكل نموذجك الخاص)</h2>
+                {(lessonPrep.headerValues.length > 0 || lessonPrep.noteValues.length > 0) && (
+                  <div className="space-y-2 rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
+                    {[...lessonPrep.headerValues, ...lessonPrep.noteValues].map((f, i) => (
+                      <p key={i} className="text-sm text-brand-700">
+                        <span className="font-semibold text-brand-800">{f.label}: </span>
+                        {f.value || "—"}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <div className="overflow-x-auto rounded-2xl border border-brand-100 bg-white shadow-sm">
+                  <table className="w-full text-right text-sm">
+                    <thead>
+                      <tr className="border-b border-brand-200 bg-brand-50">
+                        {lessonPrep.tableColumns.map((col, i) => (
+                          <th key={i} className="px-4 py-2 font-bold text-brand-800">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lessonPrep.tableRows.map((row, i) => (
+                        <tr key={i} className="border-b border-brand-100 last:border-0">
+                          {row.cells.map((cell, j) => (
+                            <td key={j} className="whitespace-pre-wrap px-4 py-3 align-top text-brand-700">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </section>
+              </section>
+            ) : (
+              <section className="space-y-4">
+                <h2 className="font-bold text-brand-800">معاينة التحضير</h2>
+                {lessonPrep.sections.map((s, i) => (
+                  <div key={i} className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
+                    <h3 className="mb-2 font-bold text-brand-800">{s.heading}</h3>
+                    <p className="whitespace-pre-wrap text-sm text-brand-700">{s.body}</p>
+                  </div>
+                ))}
+              </section>
+            )}
           </>
         )}
       </main>

@@ -1,4 +1,4 @@
-import { AlignmentType, HeadingLevel, Paragraph, TextRun } from "docx";
+import { AlignmentType, HeadingLevel, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
 import { lineToRuns } from "./mathText";
 
 export const RTL_PARAGRAPH = { bidirectional: true, alignment: AlignmentType.RIGHT } as const;
@@ -37,5 +37,42 @@ export function metaParagraph(text: string): Paragraph {
     ...RTL_PARAGRAPH,
     spacing: { after: 200 },
     children: [new TextRun({ text, rightToLeft: true, italics: true, color: "555555" })],
+  });
+}
+
+// A single "label: value" line, math-aware via bodyParagraph's lineToRuns.
+export function labelValueParagraph(label: string, value: string): Paragraph {
+  return bodyParagraph(`${label}: ${value || "—"}`, { bold: false });
+}
+
+// Wraps paragraphs in a bordered single-cell table — the simplest way to get
+// a visible box (like the info/notes boxes on an official lesson-prep form)
+// since docx has no standalone "bordered div" primitive outside a table.
+export function boxedSection(children: Paragraph[]): Table {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            children,
+            margins: { top: 150, bottom: 150, left: 150, right: 150 },
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+export function tableCell(text: string, opts: { header?: boolean; widthPct: number }): TableCell {
+  return new TableCell({
+    width: { size: opts.widthPct, type: WidthType.PERCENTAGE },
+    children: [
+      new Paragraph({
+        ...RTL_PARAGRAPH,
+        children: lineToRuns(text, { rightToLeft: true, bold: opts.header }),
+      }),
+    ],
   });
 }

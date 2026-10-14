@@ -3,8 +3,10 @@ import { redirect, notFound } from "next/navigation";
 import { ArrowRight, History, XCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { listLessonPrepsForTeacher } from "@/lib/lessonPrep";
+import { getActiveLessonPrepTemplate } from "@/lib/lessonPrepTemplate";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LessonPrepForm } from "@/components/LessonPrepForm";
+import { UploadLessonPrepTemplateForm } from "@/components/UploadLessonPrepTemplateForm";
 import { SUBJECTS } from "@/lib/agents/subjects";
 import type { SubjectId } from "@/lib/types";
 
@@ -17,6 +19,7 @@ export default async function LessonPrepListPage({ params }: { params: Promise<{
   if (teacher.subscriptionStatus !== "active") redirect("/billing");
 
   const lessonPreps = listLessonPrepsForTeacher(teacher.id, subjectId as SubjectId);
+  const template = getActiveLessonPrepTemplate(teacher.id, subjectId as SubjectId);
 
   return (
     <>
@@ -29,6 +32,10 @@ export default async function LessonPrepListPage({ params }: { params: Promise<{
           <ArrowRight size={14} /> العودة إلى المادة
         </Link>
         <h1 className="mb-6 text-2xl font-bold text-brand-900">تحضير الدرس — {SUBJECTS[subjectId as SubjectId].displayName}</h1>
+
+        <section className="mb-6">
+          <UploadLessonPrepTemplateForm subjectId={subjectId as SubjectId} template={template} />
+        </section>
 
         <section className="mb-10">
           <LessonPrepForm subjectId={subjectId as SubjectId} />

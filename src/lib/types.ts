@@ -130,6 +130,31 @@ export interface LessonPrepSection {
   body: string;
 }
 
+export interface LessonPrepTemplateSchema {
+  institutionLabel: string;
+  headerFields: string[];
+  noteFields: string[];
+  tableColumns: string[];
+}
+
+export interface LessonPrepTemplate {
+  id: string;
+  teacherId: string;
+  subjectId: SubjectId;
+  fileName: string;
+  schema: LessonPrepTemplateSchema;
+  createdAt: string;
+}
+
+export interface LessonPrepFieldValue {
+  label: string;
+  value: string;
+}
+
+export interface LessonPrepTableRow {
+  cells: string[];
+}
+
 export interface LessonPrepRequest {
   id: string;
   teacherId: string;
@@ -139,7 +164,15 @@ export interface LessonPrepRequest {
   gradeLevel: string;
   sourceFileNames: string[];
   steps: AgentStep[];
+  // When templateId is set, headerValues/noteValues/tableColumns/tableRows
+  // carry the content (rendered to match the teacher's uploaded template);
+  // otherwise `sections` carries the generic heading/body content.
+  templateId: string | null;
   sections: LessonPrepSection[];
+  headerValues: LessonPrepFieldValue[];
+  noteValues: LessonPrepFieldValue[];
+  tableColumns: string[];
+  tableRows: LessonPrepTableRow[];
   status: LessonPrepStatus;
   failureReason: string | null;
   fileDocx: string | null;

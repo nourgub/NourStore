@@ -6,9 +6,13 @@ import type {
   ExtractionStatus,
   GenerationRequest,
   GradingSession,
+  LessonPrepFieldValue,
   LessonPrepRequest,
   LessonPrepSection,
   LessonPrepStatus,
+  LessonPrepTableRow,
+  LessonPrepTemplate,
+  LessonPrepTemplateSchema,
   PaperStatus,
   PaymentRequest,
   PaymentRequestStatus,
@@ -158,13 +162,28 @@ withBusyRetry(() =>
     grade_level TEXT NOT NULL,
     source_file_names_json TEXT NOT NULL DEFAULT '[]',
     steps_json TEXT NOT NULL DEFAULT '[]',
+    template_id TEXT,
     sections_json TEXT NOT NULL DEFAULT '[]',
+    header_values_json TEXT NOT NULL DEFAULT '[]',
+    note_values_json TEXT NOT NULL DEFAULT '[]',
+    table_columns_json TEXT NOT NULL DEFAULT '[]',
+    table_rows_json TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL,
     failure_reason TEXT,
     file_docx TEXT,
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_lesson_preps_teacher_subject ON lesson_preps(teacher_id, subject_id);
+
+  CREATE TABLE IF NOT EXISTS lesson_prep_templates (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    schema_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_lesson_prep_templates_teacher_subject ON lesson_prep_templates(teacher_id, subject_id);
 `),
 );
 
@@ -562,7 +581,12 @@ interface LessonPrepRow {
   grade_level: string;
   source_file_names_json: string;
   steps_json: string;
+  template_id: string | null;
   sections_json: string;
+  header_values_json: string;
+  note_values_json: string;
+  table_columns_json: string;
+  table_rows_json: string;
   status: LessonPrepStatus;
   failure_reason: string | null;
   file_docx: string | null;
@@ -579,7 +603,12 @@ function rowToLessonPrep(row: LessonPrepRow): LessonPrepRequest {
     gradeLevel: row.grade_level,
     sourceFileNames: JSON.parse(row.source_file_names_json),
     steps: JSON.parse(row.steps_json),
+    templateId: row.template_id,
     sections: JSON.parse(row.sections_json) as LessonPrepSection[],
+    headerValues: JSON.parse(row.header_values_json) as LessonPrepFieldValue[],
+    noteValues: JSON.parse(row.note_values_json) as LessonPrepFieldValue[],
+    tableColumns: JSON.parse(row.table_columns_json),
+    tableRows: JSON.parse(row.table_rows_json) as LessonPrepTableRow[],
     status: row.status,
     failureReason: row.failure_reason,
     fileDocx: row.file_docx,
@@ -589,13 +618,18 @@ function rowToLessonPrep(row: LessonPrepRow): LessonPrepRequest {
 
 export function insertLessonPrep(request: LessonPrepRequest): void {
   db.prepare(
-    `INSERT INTO lesson_preps (id, teacher_id, subject_id, mode, lesson_title, grade_level, source_file_names_json, steps_json, sections_json, status, failure_reason, file_docx, created_at)
-     VALUES (@id, @teacherId, @subjectId, @mode, @lessonTitle, @gradeLevel, @sourceFileNamesJson, @stepsJson, @sectionsJson, @status, @failureReason, @fileDocx, @createdAt)`,
+    `INSERT INTO lesson_preps (id, teacher_id, subject_id, mode, lesson_title, grade_level, source_file_names_json, steps_json, template_id, sections_json, header_values_json, note_values_json, table_columns_json, table_rows_json, status, failure_reason, file_docx, created_at)
+     VALUES (@id, @teacherId, @subjectId, @mode, @lessonTitle, @gradeLevel, @sourceFileNamesJson, @stepsJson, @templateId, @sectionsJson, @headerValuesJson, @noteValuesJson, @tableColumnsJson, @tableRowsJson, @status, @failureReason, @fileDocx, @createdAt)`,
   ).run({
     ...request,
     sourceFileNamesJson: JSON.stringify(request.sourceFileNames),
     stepsJson: JSON.stringify(request.steps),
+    templateId: request.templateId ?? null,
     sectionsJson: JSON.stringify(request.sections),
+    headerValuesJson: JSON.stringify(request.headerValues),
+    noteValuesJson: JSON.stringify(request.noteValues),
+    tableColumnsJson: JSON.stringify(request.tableColumns),
+    tableRowsJson: JSON.stringify(request.tableRows),
   });
 }
 
@@ -611,4 +645,53 @@ export function findLessonPrep(id: string, teacherId: string): LessonPrepRequest
     | LessonPrepRow
     | undefined;
   return row ? rowToLessonPrep(row) : null;
+}
+
+// ---------- Lesson prep templates (teacher's own uploaded blank form) ----------
+
+interface LessonPrepTemplateRow {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
+  file_name: string;
+  schema_json: string;
+  created_at: string;
+}
+
+function rowToLessonPrepTemplate(row: LessonPrepTemplateRow): LessonPrepTemplate {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    subjectId: row.subject_id as SubjectId,
+    fileName: row.file_name,
+    schema: JSON.parse(row.schema_json) as LessonPrepTemplateSchema,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertLessonPrepTemplate(template: LessonPrepTemplate): void {
+  db.prepare(
+    `INSERT INTO lesson_prep_templates (id, teacher_id, subject_id, file_name, schema_json, created_at)
+     VALUES (@id, @teacherId, @subjectId, @fileName, @schemaJson, @createdAt)`,
+  ).run({ ...template, schemaJson: JSON.stringify(template.schema) });
+}
+
+export function findLatestLessonPrepTemplate(teacherId: string, subjectId: SubjectId): LessonPrepTemplate | null {
+  const row = db
+    .prepare(
+      `SELECT * FROM lesson_prep_templates WHERE teacher_id = ? AND subject_id = ? ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(teacherId, subjectId) as LessonPrepTemplateRow | undefined;
+  return row ? rowToLessonPrepTemplate(row) : null;
+}
+
+export function findLessonPrepTemplate(id: string, teacherId: string): LessonPrepTemplate | null {
+  const row = db.prepare(`SELECT * FROM lesson_prep_templates WHERE id = ? AND teacher_id = ?`).get(id, teacherId) as
+    | LessonPrepTemplateRow
+    | undefined;
+  return row ? rowToLessonPrepTemplate(row) : null;
+}
+
+export function deleteLessonPrepTemplate(id: string, teacherId: string): void {
+  db.prepare(`DELETE FROM lesson_prep_templates WHERE id = ? AND teacher_id = ?`).run(id, teacherId);
 }
