@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRight, FileDown, CheckCircle2, Table2 } from "lucide-react";
+import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getGenerationForTeacher } from "@/lib/generation";
+import { getGradingSessionsForExam } from "@/lib/grading";
 import { SiteHeader } from "@/components/SiteHeader";
+import { StartGradingSessionButton } from "@/components/StartGradingSessionButton";
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   سهل: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -22,6 +24,8 @@ export default async function ResultsPage({
 
   const generation = await getGenerationForTeacher(teacher.id, requestId);
   if (!generation) notFound();
+
+  const gradingSessions = getGradingSessionsForExam(generation.id, teacher.id);
 
   return (
     <>
@@ -76,6 +80,28 @@ export default async function ResultsPage({
           >
             <Table2 size={20} /> تنزيل شبكة التنقيط (Word)
           </a>
+        </section>
+
+        <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 flex items-center gap-2 font-bold text-brand-800">
+            <ClipboardCheck size={18} className="text-brand-500" /> تصحيح أوراق التلاميذ
+          </h2>
+          {gradingSessions.length > 0 && (
+            <ul className="mb-4 space-y-2">
+              {gradingSessions.map((s) => (
+                <li key={s.id}>
+                  <Link
+                    href={`/grading/${s.id}`}
+                    className="block rounded-xl border border-brand-100 px-4 py-3 text-sm transition hover:border-brand-300"
+                  >
+                    <span className="font-semibold text-brand-800">{s.title}</span>{" "}
+                    <span className="text-brand-500">— {new Date(s.createdAt).toLocaleString("ar")}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <StartGradingSessionButton examRequestId={generation.id} examTitle={generation.examTitle} />
         </section>
 
         <section className="space-y-4">

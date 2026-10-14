@@ -5,9 +5,13 @@ import type {
   CurriculumDocument,
   ExtractionStatus,
   GenerationRequest,
+  GradingSession,
+  PaperStatus,
   PaymentRequest,
   PaymentRequestStatus,
+  QuestionGradeResult,
   Session,
+  StudentPaper,
   SubjectId,
   SubscriptionStatus,
   Teacher,
@@ -17,10 +21,12 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "nourstore.sqlite3");
 export const GENERATED_DIR = path.join(DATA_DIR, "generated");
 export const RECEIPTS_DIR = path.join(DATA_DIR, "receipts");
+export const PAPERS_DIR = path.join(DATA_DIR, "papers");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(GENERATED_DIR, { recursive: true });
 fs.mkdirSync(RECEIPTS_DIR, { recursive: true });
+fs.mkdirSync(PAPERS_DIR, { recursive: true });
 
 function sleepSync(ms: number) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -113,6 +119,32 @@ withBusyRetry(() =>
   );
   CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON payment_requests(status);
   CREATE INDEX IF NOT EXISTS idx_payment_requests_teacher ON payment_requests(teacher_id);
+
+  CREATE TABLE IF NOT EXISTS grading_sessions (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    exam_request_id TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_grading_sessions_teacher ON grading_sessions(teacher_id);
+
+  CREATE TABLE IF NOT EXISTS student_papers (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES grading_sessions(id) ON DELETE CASCADE,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    student_name TEXT NOT NULL,
+    image_paths_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    failure_reason TEXT,
+    question_results_json TEXT NOT NULL DEFAULT '[]',
+    draft_total REAL,
+    approved_total REAL,
+    created_at TEXT NOT NULL,
+    graded_at TEXT,
+    approved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_student_papers_session ON student_papers(session_id);
 `),
 );
 
@@ -373,4 +405,128 @@ export function updatePaymentRequestStatus(id: string, status: PaymentRequestSta
     new Date().toISOString(),
     id,
   );
+}
+
+// ---------- Grading sessions & student papers ----------
+
+interface GradingSessionRow {
+  id: string;
+  teacher_id: string;
+  exam_request_id: string;
+  title: string;
+  created_at: string;
+}
+
+function rowToGradingSession(row: GradingSessionRow): GradingSession {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    examRequestId: row.exam_request_id,
+    title: row.title,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertGradingSession(session: GradingSession): void {
+  db.prepare(
+    `INSERT INTO grading_sessions (id, teacher_id, exam_request_id, title, created_at)
+     VALUES (@id, @teacherId, @examRequestId, @title, @createdAt)`,
+  ).run(session);
+}
+
+export function listGradingSessions(teacherId: string): GradingSession[] {
+  const rows = db
+    .prepare(`SELECT * FROM grading_sessions WHERE teacher_id = ? ORDER BY created_at DESC`)
+    .all(teacherId) as GradingSessionRow[];
+  return rows.map(rowToGradingSession);
+}
+
+export function findGradingSession(id: string, teacherId: string): GradingSession | null {
+  const row = db.prepare(`SELECT * FROM grading_sessions WHERE id = ? AND teacher_id = ?`).get(id, teacherId) as
+    | GradingSessionRow
+    | undefined;
+  return row ? rowToGradingSession(row) : null;
+}
+
+interface StudentPaperRow {
+  id: string;
+  session_id: string;
+  teacher_id: string;
+  student_name: string;
+  image_paths_json: string;
+  status: PaperStatus;
+  failure_reason: string | null;
+  question_results_json: string;
+  draft_total: number | null;
+  approved_total: number | null;
+  created_at: string;
+  graded_at: string | null;
+  approved_at: string | null;
+}
+
+function rowToStudentPaper(row: StudentPaperRow): StudentPaper {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    teacherId: row.teacher_id,
+    studentName: row.student_name,
+    imagePaths: JSON.parse(row.image_paths_json),
+    status: row.status,
+    failureReason: row.failure_reason,
+    questionResults: JSON.parse(row.question_results_json) as QuestionGradeResult[],
+    draftTotal: row.draft_total,
+    approvedTotal: row.approved_total,
+    createdAt: row.created_at,
+    gradedAt: row.graded_at,
+    approvedAt: row.approved_at,
+  };
+}
+
+export function insertStudentPaper(paper: StudentPaper): void {
+  db.prepare(
+    `INSERT INTO student_papers (id, session_id, teacher_id, student_name, image_paths_json, status, failure_reason, question_results_json, draft_total, approved_total, created_at, graded_at, approved_at)
+     VALUES (@id, @sessionId, @teacherId, @studentName, @imagePathsJson, @status, @failureReason, @questionResultsJson, @draftTotal, @approvedTotal, @createdAt, @gradedAt, @approvedAt)`,
+  ).run({
+    ...paper,
+    imagePathsJson: JSON.stringify(paper.imagePaths),
+    questionResultsJson: JSON.stringify(paper.questionResults),
+  });
+}
+
+export function listStudentPapers(sessionId: string, teacherId: string): StudentPaper[] {
+  const rows = db
+    .prepare(`SELECT * FROM student_papers WHERE session_id = ? AND teacher_id = ? ORDER BY created_at ASC`)
+    .all(sessionId, teacherId) as StudentPaperRow[];
+  return rows.map(rowToStudentPaper);
+}
+
+export function findStudentPaper(id: string, teacherId: string): StudentPaper | null {
+  const row = db.prepare(`SELECT * FROM student_papers WHERE id = ? AND teacher_id = ?`).get(id, teacherId) as
+    | StudentPaperRow
+    | undefined;
+  return row ? rowToStudentPaper(row) : null;
+}
+
+export function updateStudentPaperGraded(
+  id: string,
+  result: { status: PaperStatus; questionResults: QuestionGradeResult[]; draftTotal: number | null; failureReason: string | null },
+): void {
+  db.prepare(
+    `UPDATE student_papers
+     SET status = ?, question_results_json = ?, draft_total = ?, failure_reason = ?, graded_at = ?
+     WHERE id = ?`,
+  ).run(
+    result.status,
+    JSON.stringify(result.questionResults),
+    result.draftTotal,
+    result.failureReason,
+    new Date().toISOString(),
+    id,
+  );
+}
+
+export function approveStudentPaper(id: string, approvedTotal: number, questionResults: QuestionGradeResult[]): void {
+  db.prepare(
+    `UPDATE student_papers SET status = 'approved', approved_total = ?, question_results_json = ?, approved_at = ? WHERE id = ?`,
+  ).run(approvedTotal, JSON.stringify(questionResults), new Date().toISOString(), id);
 }

@@ -84,3 +84,39 @@ export interface GenerationRequest {
   createdAt: string;
   finishedAt?: string;
 }
+
+export interface GradingSession {
+  id: string;
+  teacherId: string;
+  examRequestId: string;
+  title: string;
+  createdAt: string;
+}
+
+export type PaperStatus = "pending" | "grading" | "graded" | "approved" | "failed";
+
+export interface QuestionGradeResult {
+  questionId: string;
+  topic: string;
+  maxPoints: number;
+  awardedPoints: number;
+  transcription: string;
+  feedback: string;
+  criteriaResults: { criterion: string; maxPoints: number; awardedPoints: number; note: string }[];
+}
+
+export interface StudentPaper {
+  id: string;
+  sessionId: string;
+  teacherId: string;
+  studentName: string;
+  imagePaths: string[];
+  status: PaperStatus;
+  failureReason: string | null;
+  questionResults: QuestionGradeResult[];
+  draftTotal: number | null;
+  approvedTotal: number | null;
+  createdAt: string;
+  gradedAt: string | null;
+  approvedAt: string | null;
+}
