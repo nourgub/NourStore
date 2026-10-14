@@ -120,3 +120,28 @@ export interface StudentPaper {
   gradedAt: string | null;
   approvedAt: string | null;
 }
+
+export type LessonPrepMode = "generate" | "merge";
+
+export type LessonPrepStatus = "done" | "failed";
+
+export interface LessonPrepSection {
+  heading: string;
+  body: string;
+}
+
+export interface LessonPrepRequest {
+  id: string;
+  teacherId: string;
+  subjectId: SubjectId;
+  mode: LessonPrepMode;
+  lessonTitle: string;
+  gradeLevel: string;
+  sourceFileNames: string[];
+  steps: AgentStep[];
+  sections: LessonPrepSection[];
+  status: LessonPrepStatus;
+  failureReason: string | null;
+  fileDocx: string | null;
+  createdAt: string;
+}

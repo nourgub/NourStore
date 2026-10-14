@@ -1,4 +1,5 @@
 import { AlignmentType, HeadingLevel, Paragraph, TextRun } from "docx";
+import { lineToRuns } from "./mathText";
 
 export const RTL_PARAGRAPH = { bidirectional: true, alignment: AlignmentType.RIGHT } as const;
 
@@ -19,14 +20,15 @@ export function headingParagraph(text: string, level: (typeof HeadingLevel)[keyo
   });
 }
 
+// Lines may contain inline math written as $...$ (e.g. "$x^2 + 1$",
+// "$\frac{a}{b}$") — lineToRuns renders those as super/subscript runs with
+// a small set of LaTeX-command-to-Unicode substitutions instead of a full
+// LaTeX toolchain. Plain text with no "$" renders exactly as before.
 export function bodyParagraph(text: string, opts: { bold?: boolean } = {}): Paragraph {
   return new Paragraph({
     ...RTL_PARAGRAPH,
     spacing: { after: 120 },
-    children: text.split("\n").flatMap((line, i, arr) => {
-      const run = new TextRun({ text: line, rightToLeft: true, bold: opts.bold, break: i > 0 ? 1 : undefined });
-      return [run];
-    }),
+    children: text.split("\n").flatMap((line, i) => lineToRuns(line, { rightToLeft: true, bold: opts.bold }, i > 0)),
   });
 }
 

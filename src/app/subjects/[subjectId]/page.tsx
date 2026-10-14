@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRight, FileText, History, Search, PenLine, CheckSquare, Grid3x3, ShieldCheck } from "lucide-react";
+import { ArrowRight, FileText, History, Search, PenLine, CheckSquare, Grid3x3, ShieldCheck, NotebookPen } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { listDocumentsForTeacher } from "@/lib/documents";
 import { listGenerationsForTeacher } from "@/lib/generation";
@@ -88,6 +88,23 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
             </ul>
           )}
           <UploadDocumentForm subjectId={subjectId as SubjectId} />
+        </section>
+
+        <section className="mb-8">
+          <Link
+            href={`/subjects/${subjectId}/lesson-prep`}
+            className="flex items-center gap-3 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-md"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
+              <NotebookPen size={20} />
+            </span>
+            <span>
+              <span className="block font-bold text-brand-800">تحضير الدرس</span>
+              <span className="block text-sm text-brand-600">
+                وَلِّد تحضيرًا من عنوان الدرس، أو ادمج مذكراتك المرفوعة (PDF، Word أو صور) في تحضير واحد جاهز للتنزيل
+              </span>
+            </span>
+          </Link>
         </section>
 
         <section className="mb-10">

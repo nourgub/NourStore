@@ -6,6 +6,9 @@ import type {
   ExtractionStatus,
   GenerationRequest,
   GradingSession,
+  LessonPrepRequest,
+  LessonPrepSection,
+  LessonPrepStatus,
   PaperStatus,
   PaymentRequest,
   PaymentRequestStatus,
@@ -145,6 +148,23 @@ withBusyRetry(() =>
     approved_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_student_papers_session ON student_papers(session_id);
+
+  CREATE TABLE IF NOT EXISTS lesson_preps (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    subject_id TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    lesson_title TEXT NOT NULL,
+    grade_level TEXT NOT NULL,
+    source_file_names_json TEXT NOT NULL DEFAULT '[]',
+    steps_json TEXT NOT NULL DEFAULT '[]',
+    sections_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL,
+    failure_reason TEXT,
+    file_docx TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_lesson_preps_teacher_subject ON lesson_preps(teacher_id, subject_id);
 `),
 );
 
@@ -529,4 +549,66 @@ export function approveStudentPaper(id: string, approvedTotal: number, questionR
   db.prepare(
     `UPDATE student_papers SET status = 'approved', approved_total = ?, question_results_json = ?, approved_at = ? WHERE id = ?`,
   ).run(approvedTotal, JSON.stringify(questionResults), new Date().toISOString(), id);
+}
+
+// ---------- Lesson prep ----------
+
+interface LessonPrepRow {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
+  mode: LessonPrepRequest["mode"];
+  lesson_title: string;
+  grade_level: string;
+  source_file_names_json: string;
+  steps_json: string;
+  sections_json: string;
+  status: LessonPrepStatus;
+  failure_reason: string | null;
+  file_docx: string | null;
+  created_at: string;
+}
+
+function rowToLessonPrep(row: LessonPrepRow): LessonPrepRequest {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    subjectId: row.subject_id as SubjectId,
+    mode: row.mode,
+    lessonTitle: row.lesson_title,
+    gradeLevel: row.grade_level,
+    sourceFileNames: JSON.parse(row.source_file_names_json),
+    steps: JSON.parse(row.steps_json),
+    sections: JSON.parse(row.sections_json) as LessonPrepSection[],
+    status: row.status,
+    failureReason: row.failure_reason,
+    fileDocx: row.file_docx,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertLessonPrep(request: LessonPrepRequest): void {
+  db.prepare(
+    `INSERT INTO lesson_preps (id, teacher_id, subject_id, mode, lesson_title, grade_level, source_file_names_json, steps_json, sections_json, status, failure_reason, file_docx, created_at)
+     VALUES (@id, @teacherId, @subjectId, @mode, @lessonTitle, @gradeLevel, @sourceFileNamesJson, @stepsJson, @sectionsJson, @status, @failureReason, @fileDocx, @createdAt)`,
+  ).run({
+    ...request,
+    sourceFileNamesJson: JSON.stringify(request.sourceFileNames),
+    stepsJson: JSON.stringify(request.steps),
+    sectionsJson: JSON.stringify(request.sections),
+  });
+}
+
+export function listLessonPreps(teacherId: string, subjectId: SubjectId): LessonPrepRequest[] {
+  const rows = db
+    .prepare(`SELECT * FROM lesson_preps WHERE teacher_id = ? AND subject_id = ? ORDER BY created_at DESC`)
+    .all(teacherId, subjectId) as LessonPrepRow[];
+  return rows.map(rowToLessonPrep);
+}
+
+export function findLessonPrep(id: string, teacherId: string): LessonPrepRequest | null {
+  const row = db.prepare(`SELECT * FROM lesson_preps WHERE id = ? AND teacher_id = ?`).get(id, teacherId) as
+    | LessonPrepRow
+    | undefined;
+  return row ? rowToLessonPrep(row) : null;
 }
