@@ -87,17 +87,34 @@ ${questionList}
 لكل سؤال من الأسئلة أعلاه (بنفس العدد والترتيب): اعثر على إجابة التلميذ المقابلة في الصور، انقلها بدقة، قارنها بالحل النموذجي، وامنح نقطة لكل معيار من معايير التصحيح (لا تتجاوز الحد الأقصى لكل معيار). إن كان السؤال بلا إجابة أو غير مقروء، امنح 0 لكل معاييره واذكر ذلك صراحة في الملاحظة والنقل.
 أعد بالضبط ${input.questions.length} نتيجة سؤال، بنفس ترتيب الأسئلة أعلاه.`;
 
-  const response = await getClient().messages.parse({
-    model: MODEL,
-    max_tokens: 8000,
-    messages: [
-      {
-        role: "user",
-        content: [...imageBlocks, { type: "text", text: instructions }],
-      },
-    ],
-    output_config: { format: zodOutputFormat(GradingResultSchema) },
-  });
+  let response;
+  try {
+    response = await getClient().messages.parse({
+      model: MODEL,
+      max_tokens: 16000,
+      messages: [
+        {
+          role: "user",
+          content: [...imageBlocks, { type: "text", text: instructions }],
+        },
+      ],
+      output_config: { format: zodOutputFormat(GradingResultSchema) },
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError) {
+      throw new GradingAgentError("تعذّر الاتصال بخدمة التصحيح — مفتاح API غير صالح، يرجى التواصل مع الإدارة");
+    }
+    if (err instanceof Anthropic.RateLimitError) {
+      throw new GradingAgentError("خدمة التصحيح مشغولة حاليًا — يرجى إعادة المحاولة بعد لحظات");
+    }
+    if (err instanceof Anthropic.APIConnectionError) {
+      throw new GradingAgentError("تعذّر الاتصال بخدمة التصحيح — تحقق من الاتصال بالإنترنت وأعد المحاولة");
+    }
+    if (err instanceof Anthropic.APIError) {
+      throw new GradingAgentError("حدث خطأ في خدمة التصحيح — يرجى إعادة المحاولة لاحقًا أو التواصل مع الإدارة");
+    }
+    throw err;
+  }
 
   const parsed = response.parsed_output;
   if (!parsed || parsed.questions.length !== input.questions.length) {
