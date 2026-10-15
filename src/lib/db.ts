@@ -125,6 +125,7 @@ withBusyRetry(() =>
     requested_plan_id TEXT NOT NULL DEFAULT 'full',
     receipt_path TEXT NOT NULL,
     receipt_mime_type TEXT NOT NULL,
+    receipt_date TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TEXT NOT NULL,
     reviewed_at TEXT
@@ -232,6 +233,9 @@ if (!paymentRequestColumns.some((c) => c.name === "requested_plan_id")) {
   withBusyRetry(() =>
     db.exec(`ALTER TABLE payment_requests ADD COLUMN requested_plan_id TEXT NOT NULL DEFAULT 'full'`),
   );
+}
+if (!paymentRequestColumns.some((c) => c.name === "receipt_date")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE payment_requests ADD COLUMN receipt_date TEXT NOT NULL DEFAULT ''`));
 }
 
 // ---------- Teachers ----------
@@ -441,6 +445,7 @@ interface PaymentRequestRow {
   requested_plan_id: PlanId;
   receipt_path: string;
   receipt_mime_type: string;
+  receipt_date: string;
   status: PaymentRequestStatus;
   created_at: string;
   reviewed_at: string | null;
@@ -453,6 +458,7 @@ function rowToPaymentRequest(row: PaymentRequestRow): PaymentRequest {
     requestedPlanId: row.requested_plan_id,
     receiptPath: row.receipt_path,
     receiptMimeType: row.receipt_mime_type,
+    receiptDate: row.receipt_date,
     status: row.status,
     createdAt: row.created_at,
     reviewedAt: row.reviewed_at,
@@ -461,8 +467,8 @@ function rowToPaymentRequest(row: PaymentRequestRow): PaymentRequest {
 
 export function insertPaymentRequest(request: PaymentRequest): void {
   db.prepare(
-    `INSERT INTO payment_requests (id, teacher_id, requested_plan_id, receipt_path, receipt_mime_type, status, created_at, reviewed_at)
-     VALUES (@id, @teacherId, @requestedPlanId, @receiptPath, @receiptMimeType, @status, @createdAt, @reviewedAt)`,
+    `INSERT INTO payment_requests (id, teacher_id, requested_plan_id, receipt_path, receipt_mime_type, receipt_date, status, created_at, reviewed_at)
+     VALUES (@id, @teacherId, @requestedPlanId, @receiptPath, @receiptMimeType, @receiptDate, @status, @createdAt, @reviewedAt)`,
   ).run(request);
 }
 

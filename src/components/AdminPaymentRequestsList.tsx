@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, CheckCircle2, XCircle, CalendarCheck } from "lucide-react";
 import { PLANS } from "@/lib/plans";
 import type { PlanId } from "@/lib/types";
 
@@ -11,6 +11,7 @@ interface PendingRequest {
   teacherEmail: string;
   requestedPlanId: PlanId;
   receiptMimeType: string;
+  receiptDate: string;
   createdAt: string;
 }
 
@@ -64,9 +65,14 @@ export function AdminPaymentRequestsList() {
             <span className="text-xs text-brand-500">{new Date(r.createdAt).toLocaleString("ar")}</span>
           </div>
 
-          <p className="mb-3 inline-block rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-            الباقة المطلوبة: {PLANS[r.requestedPlanId]?.displayName ?? r.requestedPlanId}
-          </p>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <span className="inline-block rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+              الباقة المطلوبة: {PLANS[r.requestedPlanId]?.displayName ?? r.requestedPlanId}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              <CalendarCheck size={12} /> تاريخ الوصل المُعلَن: {r.receiptDate} — قارنه بتاريخ الصورة أدناه
+            </span>
+          </div>
 
           {r.receiptMimeType === "application/pdf" ? (
             <a

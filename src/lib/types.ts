@@ -35,6 +35,10 @@ export interface PaymentRequest {
   requestedPlanId: PlanId;
   receiptPath: string;
   receiptMimeType: string;
+  // Date (YYYY-MM-DD) the teacher declares the receipt is from — the server
+  // only accepts today's date, and the admin cross-checks it against what's
+  // actually printed on the receipt photo before approving.
+  receiptDate: string;
   status: PaymentRequestStatus;
   createdAt: string;
   reviewedAt: string | null;

@@ -12,9 +12,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "الرجاء اختيار ملف الوصل" }, { status: 400 });
   }
   const planId = String(form.get("planId") ?? "");
+  const receiptDate = String(form.get("receiptDate") ?? "");
 
   try {
-    const paymentRequest = await submitPaymentReceipt(teacher.id, file, planId);
+    const paymentRequest = await submitPaymentReceipt(teacher.id, file, planId, receiptDate);
     return NextResponse.json({ paymentRequest });
   } catch (err) {
     if (err instanceof BillingError) {

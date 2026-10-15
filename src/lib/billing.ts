@@ -23,8 +23,23 @@ const ALLOWED_MIME_TO_EXT: Record<string, string> = {
 
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10MB
 
-export async function submitPaymentReceipt(teacherId: string, file: File, planId: string): Promise<PaymentRequest> {
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function todayDateString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export async function submitPaymentReceipt(
+  teacherId: string,
+  file: File,
+  planId: string,
+  receiptDate: string,
+): Promise<PaymentRequest> {
   if (!isPlanId(planId)) throw new BillingError("يجب اختيار باقة صالحة");
+  if (!DATE_PATTERN.test(receiptDate)) throw new BillingError("يجب تحديد تاريخ الوصل");
+  if (receiptDate !== todayDateString()) {
+    throw new BillingError("يجب أن يكون تاريخ الوصل هو تاريخ اليوم — ارفع وصل دفع تم اليوم فقط");
+  }
   if (file.size === 0) throw new BillingError("الملف فارغ");
   if (file.size > MAX_RECEIPT_BYTES) throw new BillingError("حجم الملف يتجاوز الحد المسموح (10 ميغابايت)");
 
@@ -45,6 +60,7 @@ export async function submitPaymentReceipt(teacherId: string, file: File, planId
     requestedPlanId: planId as PlanId,
     receiptPath,
     receiptMimeType: file.type,
+    receiptDate,
     status: "pending",
     createdAt: new Date().toISOString(),
     reviewedAt: null,

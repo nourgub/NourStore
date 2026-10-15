@@ -6,10 +6,13 @@ import { UploadCloud } from "lucide-react";
 import { PLAN_LIST } from "@/lib/plans";
 import type { PlanId } from "@/lib/types";
 
+const todayDateString = () => new Date().toISOString().slice(0, 10);
+
 export function BillingUploadForm() {
   const router = useRouter();
   const [planId, setPlanId] = useState<PlanId>("full");
   const [file, setFile] = useState<File | null>(null);
+  const [receiptDate, setReceiptDate] = useState(todayDateString());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -24,6 +27,7 @@ export function BillingUploadForm() {
     const form = new FormData();
     form.set("file", file);
     form.set("planId", planId);
+    form.set("receiptDate", receiptDate);
     const res = await fetch("/api/billing/submit", { method: "POST", body: form });
     const data = await res.json();
     setLoading(false);
@@ -55,6 +59,20 @@ export function BillingUploadForm() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-brand-800">تاريخ الوصل</label>
+        <input
+          type="date"
+          required
+          value={receiptDate}
+          min={todayDateString()}
+          max={todayDateString()}
+          onChange={(e) => setReceiptDate(e.target.value)}
+          className="w-full rounded-lg border border-brand-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+        <p className="mt-1 text-xs text-brand-500">يجب أن يكون الوصل بتاريخ اليوم نفسه.</p>
       </div>
 
       <div>
