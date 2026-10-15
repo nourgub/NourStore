@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
+import { getUsageSummary } from "@/lib/usage";
+import { PLANS } from "@/lib/plans";
 import { SiteHeader } from "@/components/SiteHeader";
 
 const SUBJECTS = [
@@ -47,6 +49,40 @@ export default async function DashboardPage() {
                 : "لم نتمكن من تأكيد وصل الدفع السابق — اضغط هنا لإرسال وصل جديد."}
             </p>
           </Link>
+        )}
+
+        {teacher.subscriptionStatus === "active" && teacher.planId && (
+          <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-bold text-brand-800">باقتك: {PLANS[teacher.planId].displayName}</h2>
+              <Link href="/billing" className="text-xs font-semibold text-brand-600 hover:underline">
+                تغيير الباقة
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {getUsageSummary(teacher)
+                .filter((entry) => entry.enabled)
+                .map((entry) => {
+                  const pct = entry.limit > 0 ? Math.min(100, Math.round((entry.used / entry.limit) * 100)) : 0;
+                  return (
+                    <div key={entry.feature}>
+                      <div className="mb-1 flex justify-between text-xs text-brand-600">
+                        <span>{entry.label}</span>
+                        <span>
+                          {entry.used} / {entry.limit} هذا الشهر
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-100">
+                        <div
+                          className={`h-full rounded-full ${pct >= 100 ? "bg-rose-500" : "bg-brand-600"}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </section>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">

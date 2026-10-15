@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { hash, salt } = hashPassword(password);
+  const isAdmin = email === getAdminEmail();
   const teacher: Teacher = {
     id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     fullName,
@@ -33,7 +34,8 @@ export async function POST(request: NextRequest) {
     passwordHash: hash,
     passwordSalt: salt,
     // The platform owner's own account shouldn't need to pay itself.
-    subscriptionStatus: email === getAdminEmail() ? "active" : "pending",
+    subscriptionStatus: isAdmin ? "active" : "pending",
+    planId: isAdmin ? "full" : null,
     createdAt: new Date().toISOString(),
   };
 

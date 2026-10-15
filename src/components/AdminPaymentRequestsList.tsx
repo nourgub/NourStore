@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { FileText, CheckCircle2, XCircle } from "lucide-react";
+import { PLANS } from "@/lib/plans";
+import type { PlanId } from "@/lib/types";
 
 interface PendingRequest {
   id: string;
   teacherName: string;
   teacherEmail: string;
+  requestedPlanId: PlanId;
   receiptMimeType: string;
   createdAt: string;
 }
@@ -60,6 +63,10 @@ export function AdminPaymentRequestsList() {
             </div>
             <span className="text-xs text-brand-500">{new Date(r.createdAt).toLocaleString("ar")}</span>
           </div>
+
+          <p className="mb-3 inline-block rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+            الباقة المطلوبة: {PLANS[r.requestedPlanId]?.displayName ?? r.requestedPlanId}
+          </p>
 
           {r.receiptMimeType === "application/pdf" ? (
             <a

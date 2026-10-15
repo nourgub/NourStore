@@ -3,6 +3,7 @@ import { MessageCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getLatestPaymentRequest } from "@/lib/billing";
 import { BILLING_CONFIG } from "@/lib/billingConfig";
+import { PLANS } from "@/lib/plans";
 import { SiteHeader } from "@/components/SiteHeader";
 import { BillingUploadForm } from "@/components/BillingUploadForm";
 
@@ -26,7 +27,10 @@ export default async function BillingPage() {
         {teacher.subscriptionStatus === "active" ? (
           <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
             <CheckCircle2 size={24} />
-            <p className="font-semibold">اشتراكك مفعّل — يمكنك استخدام المنصة بحرية.</p>
+            <p className="font-semibold">
+              اشتراكك مفعّل — باقتك الحالية: {teacher.planId ? PLANS[teacher.planId].displayName : "—"} (
+              {teacher.planId ? PLANS[teacher.planId].priceLabel : ""})
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -46,10 +50,6 @@ export default async function BillingPage() {
             <section className="rounded-2xl border border-brand-200 bg-white p-5">
               <h2 className="mb-3 font-bold text-brand-800">معلومات الدفع</h2>
               <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-brand-600">السعر</dt>
-                  <dd className="font-semibold text-brand-900">{BILLING_CONFIG.priceLabel}</dd>
-                </div>
                 <div className="flex justify-between">
                   <dt className="text-brand-600">اسم صاحب الحساب</dt>
                   <dd className="font-semibold text-brand-900">{BILLING_CONFIG.accountHolderName}</dd>

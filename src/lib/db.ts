@@ -16,12 +16,14 @@ import type {
   PaperStatus,
   PaymentRequest,
   PaymentRequestStatus,
+  PlanId,
   QuestionGradeResult,
   Session,
   StudentPaper,
   SubjectId,
   SubscriptionStatus,
   Teacher,
+  UsageFeature,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -118,6 +120,7 @@ withBusyRetry(() =>
   CREATE TABLE IF NOT EXISTS payment_requests (
     id TEXT PRIMARY KEY,
     teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    requested_plan_id TEXT NOT NULL DEFAULT 'full',
     receipt_path TEXT NOT NULL,
     receipt_mime_type TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
@@ -126,6 +129,16 @@ withBusyRetry(() =>
   );
   CREATE INDEX IF NOT EXISTS idx_payment_requests_status ON payment_requests(status);
   CREATE INDEX IF NOT EXISTS idx_payment_requests_teacher ON payment_requests(teacher_id);
+
+  CREATE TABLE IF NOT EXISTS usage_counters (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    period TEXT NOT NULL,
+    feature TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(teacher_id, period, feature)
+  );
+  CREATE INDEX IF NOT EXISTS idx_usage_counters_teacher_period ON usage_counters(teacher_id, period);
 
   CREATE TABLE IF NOT EXISTS grading_sessions (
     id TEXT PRIMARY KEY,
@@ -193,6 +206,16 @@ const teacherColumns = db.prepare(`PRAGMA table_info(teachers)`).all() as { name
 if (!teacherColumns.some((c) => c.name === "subscription_status")) {
   withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'pending'`));
 }
+if (!teacherColumns.some((c) => c.name === "plan_id")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN plan_id TEXT`));
+}
+
+const paymentRequestColumns = db.prepare(`PRAGMA table_info(payment_requests)`).all() as { name: string }[];
+if (!paymentRequestColumns.some((c) => c.name === "requested_plan_id")) {
+  withBusyRetry(() =>
+    db.exec(`ALTER TABLE payment_requests ADD COLUMN requested_plan_id TEXT NOT NULL DEFAULT 'full'`),
+  );
+}
 
 // ---------- Teachers ----------
 
@@ -203,6 +226,7 @@ interface TeacherRow {
   password_hash: string;
   password_salt: string;
   subscription_status: SubscriptionStatus;
+  plan_id: PlanId | null;
   created_at: string;
 }
 
@@ -214,15 +238,16 @@ function rowToTeacher(row: TeacherRow): Teacher {
     passwordHash: row.password_hash,
     passwordSalt: row.password_salt,
     subscriptionStatus: row.subscription_status,
+    planId: row.plan_id,
     createdAt: row.created_at,
   };
 }
 
 export function insertTeacher(teacher: Teacher): void {
   db.prepare(
-    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, created_at)
-     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @createdAt)`,
-  ).run(teacher);
+    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, plan_id, created_at)
+     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @planId, @createdAt)`,
+  ).run({ ...teacher, planId: teacher.planId ?? null });
 }
 
 export function findTeacherByEmail(email: string): Teacher | null {
@@ -237,6 +262,10 @@ export function findTeacherById(id: string): Teacher | null {
 
 export function updateTeacherSubscriptionStatus(teacherId: string, status: SubscriptionStatus): void {
   db.prepare(`UPDATE teachers SET subscription_status = ? WHERE id = ?`).run(status, teacherId);
+}
+
+export function updateTeacherPlan(teacherId: string, planId: PlanId): void {
+  db.prepare(`UPDATE teachers SET plan_id = ? WHERE id = ?`).run(planId, teacherId);
 }
 
 // ---------- Sessions ----------
@@ -384,6 +413,7 @@ export function findRequest(id: string, teacherId: string): GenerationRequest | 
 interface PaymentRequestRow {
   id: string;
   teacher_id: string;
+  requested_plan_id: PlanId;
   receipt_path: string;
   receipt_mime_type: string;
   status: PaymentRequestStatus;
@@ -395,6 +425,7 @@ function rowToPaymentRequest(row: PaymentRequestRow): PaymentRequest {
   return {
     id: row.id,
     teacherId: row.teacher_id,
+    requestedPlanId: row.requested_plan_id,
     receiptPath: row.receipt_path,
     receiptMimeType: row.receipt_mime_type,
     status: row.status,
@@ -405,8 +436,8 @@ function rowToPaymentRequest(row: PaymentRequestRow): PaymentRequest {
 
 export function insertPaymentRequest(request: PaymentRequest): void {
   db.prepare(
-    `INSERT INTO payment_requests (id, teacher_id, receipt_path, receipt_mime_type, status, created_at, reviewed_at)
-     VALUES (@id, @teacherId, @receiptPath, @receiptMimeType, @status, @createdAt, @reviewedAt)`,
+    `INSERT INTO payment_requests (id, teacher_id, requested_plan_id, receipt_path, receipt_mime_type, status, created_at, reviewed_at)
+     VALUES (@id, @teacherId, @requestedPlanId, @receiptPath, @receiptMimeType, @status, @createdAt, @reviewedAt)`,
   ).run(request);
 }
 
@@ -694,4 +725,26 @@ export function findLessonPrepTemplate(id: string, teacherId: string): LessonPre
 
 export function deleteLessonPrepTemplate(id: string, teacherId: string): void {
   db.prepare(`DELETE FROM lesson_prep_templates WHERE id = ? AND teacher_id = ?`).run(id, teacherId);
+}
+
+// ---------- Usage counters (monthly plan caps) ----------
+
+export function getUsageCount(teacherId: string, period: string, feature: UsageFeature): number {
+  const row = db
+    .prepare(`SELECT count FROM usage_counters WHERE teacher_id = ? AND period = ? AND feature = ?`)
+    .get(teacherId, period, feature) as { count: number } | undefined;
+  return row?.count ?? 0;
+}
+
+export function incrementUsageCount(teacherId: string, period: string, feature: UsageFeature): void {
+  db.prepare(
+    `INSERT INTO usage_counters (id, teacher_id, period, feature, count)
+     VALUES (@id, @teacherId, @period, @feature, 1)
+     ON CONFLICT(teacher_id, period, feature) DO UPDATE SET count = count + 1`,
+  ).run({
+    id: `uc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    teacherId,
+    period,
+    feature,
+  });
 }

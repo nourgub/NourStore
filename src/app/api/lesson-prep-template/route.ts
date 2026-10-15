@@ -7,6 +7,7 @@ import {
   removeLessonPrepTemplate,
   uploadLessonPrepTemplate,
 } from "@/lib/lessonPrepTemplate";
+import { assertFeatureEnabled, UsageLimitError } from "@/lib/usage";
 import type { SubjectId } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -23,6 +24,13 @@ export async function POST(request: NextRequest) {
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   if (teacher.subscriptionStatus !== "active") {
     return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
+  }
+
+  try {
+    assertFeatureEnabled(teacher, "lessonPrep");
+  } catch (err) {
+    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
   }
 
   const form = await request.formData().catch(() => null);

@@ -2,6 +2,10 @@ export type SubjectId = "math" | "arabic";
 
 export type SubscriptionStatus = "pending" | "active" | "rejected";
 
+export type PlanId = "full" | "lessons_only" | "exams_only" | "grading_only";
+
+export type UsageFeature = "lessonPrep" | "exams" | "grading";
+
 export interface Teacher {
   id: string;
   fullName: string;
@@ -9,6 +13,7 @@ export interface Teacher {
   passwordHash: string;
   passwordSalt: string;
   subscriptionStatus: SubscriptionStatus;
+  planId: PlanId | null;
   createdAt: string;
 }
 
@@ -17,6 +22,7 @@ export type PaymentRequestStatus = "pending" | "approved" | "rejected";
 export interface PaymentRequest {
   id: string;
   teacherId: string;
+  requestedPlanId: PlanId;
   receiptPath: string;
   receiptMimeType: string;
   status: PaymentRequestStatus;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
 import { createGeneration, GenerationError } from "@/lib/generation";
+import { assertFeatureAllowed, recordUsage, UsageLimitError } from "@/lib/usage";
 import type { SubjectId } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
@@ -8,6 +9,13 @@ export async function POST(request: NextRequest) {
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   if (teacher.subscriptionStatus !== "active") {
     return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
+  }
+
+  try {
+    assertFeatureAllowed(teacher, "exams");
+  } catch (err) {
+    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
   }
 
   const body = await request.json().catch(() => null);
@@ -24,6 +32,7 @@ export async function POST(request: NextRequest) {
       numQuestions: Number(body.numQuestions) || 6,
       difficultyMix: body.difficultyMix === "سهل" || body.difficultyMix === "صعب" ? body.difficultyMix : "متوازن",
     });
+    recordUsage(teacher.id, "exams");
     return NextResponse.json({ request: request_ });
   } catch (err) {
     if (err instanceof GenerationError) {

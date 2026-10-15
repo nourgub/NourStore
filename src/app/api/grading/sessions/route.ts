@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
 import { createGradingSession, getGradingSessionsForTeacher, GradingError } from "@/lib/grading";
+import { assertFeatureEnabled, UsageLimitError } from "@/lib/usage";
 
 export async function GET() {
   const teacher = await getCurrentTeacher();
@@ -15,6 +16,13 @@ export async function POST(request: NextRequest) {
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   if (teacher.subscriptionStatus !== "active") {
     return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
+  }
+
+  try {
+    assertFeatureEnabled(teacher, "grading");
+  } catch (err) {
+    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
   }
 
   const body = await request.json().catch(() => null);

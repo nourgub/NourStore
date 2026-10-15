@@ -7,9 +7,11 @@ import {
   insertPaymentRequest,
   listPendingPaymentRequests,
   updatePaymentRequestStatus,
+  updateTeacherPlan,
   updateTeacherSubscriptionStatus,
 } from "./db";
-import type { PaymentRequest } from "./types";
+import { isPlanId } from "./plans";
+import type { PaymentRequest, PlanId } from "./types";
 
 export class BillingError extends Error {}
 
@@ -21,7 +23,8 @@ const ALLOWED_MIME_TO_EXT: Record<string, string> = {
 
 export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10MB
 
-export async function submitPaymentReceipt(teacherId: string, file: File): Promise<PaymentRequest> {
+export async function submitPaymentReceipt(teacherId: string, file: File, planId: string): Promise<PaymentRequest> {
+  if (!isPlanId(planId)) throw new BillingError("يجب اختيار باقة صالحة");
   if (file.size === 0) throw new BillingError("الملف فارغ");
   if (file.size > MAX_RECEIPT_BYTES) throw new BillingError("حجم الملف يتجاوز الحد المسموح (10 ميغابايت)");
 
@@ -39,6 +42,7 @@ export async function submitPaymentReceipt(teacherId: string, file: File): Promi
   const request: PaymentRequest = {
     id: requestId,
     teacherId,
+    requestedPlanId: planId as PlanId,
     receiptPath,
     receiptMimeType: file.type,
     status: "pending",
@@ -63,6 +67,7 @@ export function approvePaymentRequest(id: string): PaymentRequest {
   const request = findPaymentRequest(id);
   if (!request) throw new BillingError("الطلب غير موجود");
   updatePaymentRequestStatus(id, "approved");
+  updateTeacherPlan(request.teacherId, request.requestedPlanId);
   updateTeacherSubscriptionStatus(request.teacherId, "active");
   return { ...request, status: "approved" };
 }
