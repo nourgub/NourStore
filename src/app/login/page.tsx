@@ -21,7 +21,12 @@ export default async function LoginPage() {
           <h1 className="mb-1 text-xl font-bold text-brand-900">تسجيل الدخول</h1>
           <p className="mb-6 text-sm text-brand-600">مساعدك في إعداد المحتوى التربوي</p>
           <AuthForm mode="login" />
-          <p className="mt-6 text-center text-sm text-brand-700">
+          <p className="mt-4 text-center text-sm">
+            <Link href="/forgot-password" className="font-semibold text-brand-600 hover:underline">
+              نسيت كلمة المرور؟
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-brand-700">
             ليس لديك حساب؟{" "}
             <Link href="/signup" className="font-semibold text-brand-600 hover:underline">
               أنشئ حسابًا جديدًا

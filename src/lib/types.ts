@@ -17,6 +17,16 @@ export interface Teacher {
   createdAt: string;
 }
 
+export type PasswordResetStatus = "pending" | "resolved";
+
+export interface PasswordResetRequest {
+  id: string;
+  teacherId: string;
+  status: PasswordResetStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
 export type PaymentRequestStatus = "pending" | "approved" | "rejected";
 
 export interface PaymentRequest {

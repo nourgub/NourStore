@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findTeacherByEmail } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth";
 import { createSessionCookie } from "@/lib/session";
+import { enforceRateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -10,6 +11,13 @@ export async function POST(request: NextRequest) {
 
   if (!email || !password) {
     return NextResponse.json({ error: "البريد الإلكتروني وكلمة المرور مطلوبان" }, { status: 400 });
+  }
+
+  try {
+    enforceRateLimit(`login:${getClientIp(request)}:${email}`, 5, 15 * 60);
+  } catch (err) {
+    if (err instanceof RateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
+    throw err;
   }
 
   const teacher = findTeacherByEmail(email);

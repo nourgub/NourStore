@@ -3,6 +3,7 @@ import { getCurrentTeacher } from "@/lib/session";
 import { isAdminEmail } from "@/lib/billingConfig";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AdminPaymentRequestsList } from "@/components/AdminPaymentRequestsList";
+import { AdminPasswordResetsList } from "@/components/AdminPasswordResetsList";
 
 export default async function AdminPage() {
   const teacher = await getCurrentTeacher();
@@ -16,6 +17,10 @@ export default async function AdminPage() {
         <h1 className="mb-1 text-2xl font-bold text-brand-900">طلبات تفعيل الاشتراك</h1>
         <p className="mb-8 text-sm text-brand-600">راجع وصل الدفع ثم فعّل الحساب أو ارفض الطلب</p>
         <AdminPaymentRequestsList />
+
+        <h2 className="mb-1 mt-12 text-xl font-bold text-brand-900">طلبات استعادة كلمة المرور</h2>
+        <p className="mb-6 text-sm text-brand-600">عيّن كلمة مرور جديدة للأستاذ وأرسلها له مباشرة</p>
+        <AdminPasswordResetsList />
       </main>
     </>
   );

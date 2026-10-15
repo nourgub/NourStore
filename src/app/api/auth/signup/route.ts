@@ -3,9 +3,17 @@ import { findTeacherByEmail, insertTeacher } from "@/lib/db";
 import { hashPassword, isValidEmail } from "@/lib/auth";
 import { createSessionCookie } from "@/lib/session";
 import { getAdminEmail } from "@/lib/billingConfig";
+import { enforceRateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 import type { Teacher } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
+  try {
+    enforceRateLimit(`signup:${getClientIp(request)}`, 5, 60 * 60);
+  } catch (err) {
+    if (err instanceof RateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
+    throw err;
+  }
+
   const body = await request.json().catch(() => null);
   const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";

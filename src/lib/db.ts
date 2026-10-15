@@ -14,6 +14,8 @@ import type {
   LessonPrepTemplate,
   LessonPrepTemplateSchema,
   PaperStatus,
+  PasswordResetRequest,
+  PasswordResetStatus,
   PaymentRequest,
   PaymentRequestStatus,
   PlanId,
@@ -139,6 +141,21 @@ withBusyRetry(() =>
     UNIQUE(teacher_id, period, feature)
   );
   CREATE INDEX IF NOT EXISTS idx_usage_counters_teacher_period ON usage_counters(teacher_id, period);
+
+  CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    resolved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_status ON password_reset_requests(status);
+
+  CREATE TABLE IF NOT EXISTS rate_limit_attempts (
+    key TEXT PRIMARY KEY,
+    count INTEGER NOT NULL DEFAULT 0,
+    window_start TEXT NOT NULL
+  );
 
   CREATE TABLE IF NOT EXISTS grading_sessions (
     id TEXT PRIMARY KEY,
@@ -266,6 +283,14 @@ export function updateTeacherSubscriptionStatus(teacherId: string, status: Subsc
 
 export function updateTeacherPlan(teacherId: string, planId: PlanId): void {
   db.prepare(`UPDATE teachers SET plan_id = ? WHERE id = ?`).run(planId, teacherId);
+}
+
+export function updateTeacherPassword(teacherId: string, passwordHash: string, passwordSalt: string): void {
+  db.prepare(`UPDATE teachers SET password_hash = ?, password_salt = ? WHERE id = ?`).run(
+    passwordHash,
+    passwordSalt,
+    teacherId,
+  );
 }
 
 // ---------- Sessions ----------
@@ -747,4 +772,94 @@ export function incrementUsageCount(teacherId: string, period: string, feature: 
     period,
     feature,
   });
+}
+
+// ---------- Password reset requests (admin-assisted — no email infra exists) ----------
+
+interface PasswordResetRequestRow {
+  id: string;
+  teacher_id: string;
+  status: PasswordResetStatus;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+function rowToPasswordResetRequest(row: PasswordResetRequestRow): PasswordResetRequest {
+  return {
+    id: row.id,
+    teacherId: row.teacher_id,
+    status: row.status,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at,
+  };
+}
+
+export function insertPasswordResetRequest(request: PasswordResetRequest): void {
+  db.prepare(
+    `INSERT INTO password_reset_requests (id, teacher_id, status, created_at, resolved_at)
+     VALUES (@id, @teacherId, @status, @createdAt, @resolvedAt)`,
+  ).run(request);
+}
+
+export function listPendingPasswordResetRequests(): (PasswordResetRequest & {
+  teacherName: string;
+  teacherEmail: string;
+})[] {
+  const rows = db
+    .prepare(
+      `SELECT prr.*, t.full_name AS teacher_full_name, t.email AS teacher_email
+       FROM password_reset_requests prr JOIN teachers t ON t.id = prr.teacher_id
+       WHERE prr.status = 'pending'
+       ORDER BY prr.created_at ASC`,
+    )
+    .all() as (PasswordResetRequestRow & { teacher_full_name: string; teacher_email: string })[];
+  return rows.map((row) => ({
+    ...rowToPasswordResetRequest(row),
+    teacherName: row.teacher_full_name,
+    teacherEmail: row.teacher_email,
+  }));
+}
+
+export function findPasswordResetRequest(id: string): PasswordResetRequest | null {
+  const row = db.prepare(`SELECT * FROM password_reset_requests WHERE id = ?`).get(id) as
+    | PasswordResetRequestRow
+    | undefined;
+  return row ? rowToPasswordResetRequest(row) : null;
+}
+
+export function resolvePasswordResetRequestStatus(id: string): void {
+  db.prepare(`UPDATE password_reset_requests SET status = 'resolved', resolved_at = ? WHERE id = ?`).run(
+    new Date().toISOString(),
+    id,
+  );
+}
+
+// ---------- Rate limiting (DB-backed, no Redis available) ----------
+
+export function checkAndIncrementRateLimit(key: string, maxAttempts: number, windowSeconds: number): boolean {
+  const now = Date.now();
+  const row = db.prepare(`SELECT count, window_start FROM rate_limit_attempts WHERE key = ?`).get(key) as
+    | { count: number; window_start: string }
+    | undefined;
+
+  if (!row) {
+    db.prepare(`INSERT INTO rate_limit_attempts (key, count, window_start) VALUES (?, 1, ?)`).run(
+      key,
+      new Date(now).toISOString(),
+    );
+    return true;
+  }
+
+  const windowStartMs = new Date(row.window_start).getTime();
+  if (now - windowStartMs > windowSeconds * 1000) {
+    db.prepare(`UPDATE rate_limit_attempts SET count = 1, window_start = ? WHERE key = ?`).run(
+      new Date(now).toISOString(),
+      key,
+    );
+    return true;
+  }
+
+  if (row.count >= maxAttempts) return false;
+  db.prepare(`UPDATE rate_limit_attempts SET count = count + 1 WHERE key = ?`).run(key);
+  return true;
 }
