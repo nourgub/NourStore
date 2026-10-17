@@ -41,9 +41,11 @@ export async function POST(request: NextRequest) {
     email,
     passwordHash: hash,
     passwordSalt: salt,
-    // The platform owner's own account shouldn't need to pay itself.
+    // The platform owner's own account shouldn't need to pay itself, and
+    // never expires (subscriptionExpiresAt stays null).
     subscriptionStatus: isAdmin ? "active" : "pending",
     planId: isAdmin ? "full" : null,
+    subscriptionExpiresAt: null,
     createdAt: new Date().toISOString(),
   };
 

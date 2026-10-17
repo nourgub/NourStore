@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MessageCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
-import { getLatestPaymentRequest } from "@/lib/billing";
+import { getLatestPaymentRequest, SUBSCRIPTION_PERIOD_DAYS } from "@/lib/billing";
 import { BILLING_CONFIG } from "@/lib/billingConfig";
 import { PLANS } from "@/lib/plans";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -25,12 +25,26 @@ export default async function BillingPage() {
         <p className="mb-8 text-sm text-brand-600">فعّل حسابك لتتمكن من توليد الامتحانات والملفات</p>
 
         {teacher.subscriptionStatus === "active" ? (
-          <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
-            <CheckCircle2 size={24} />
-            <p className="font-semibold">
-              اشتراكك مفعّل — باقتك الحالية: {teacher.planId ? PLANS[teacher.planId].displayName : "—"} (
-              {teacher.planId ? PLANS[teacher.planId].priceLabel : ""})
-            </p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
+              <CheckCircle2 size={24} />
+              <p className="font-semibold">
+                اشتراكك مفعّل — باقتك الحالية: {teacher.planId ? PLANS[teacher.planId].displayName : "—"} (
+                {teacher.planId ? PLANS[teacher.planId].priceLabel : ""})
+              </p>
+            </div>
+            {teacher.subscriptionExpiresAt && (
+              <p className="text-sm text-brand-600">
+                صالح حتى: {new Date(teacher.subscriptionExpiresAt).toLocaleDateString("ar")} — يمكنك إرسال وصل
+                التجديد قبل هذا التاريخ فلا يضيع أي يوم من اشتراكك الحالي.
+              </p>
+            )}
+            {teacher.subscriptionExpiresAt && (
+              <section className="rounded-2xl border border-brand-200 bg-white p-5">
+                <h2 className="mb-3 font-bold text-brand-800">تجديد الاشتراك</h2>
+                <BillingUploadForm />
+              </section>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -44,6 +58,15 @@ export default async function BillingPage() {
               <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
                 <XCircle size={20} />
                 <p className="text-sm font-semibold">لم نتمكن من تأكيد وصل الدفع السابق — تحقق من البيانات وأرسل وصلاً جديدًا.</p>
+              </div>
+            )}
+            {teacher.subscriptionStatus === "expired" && (
+              <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
+                <XCircle size={20} />
+                <p className="text-sm font-semibold">
+                  انتهت مدة اشتراكك ({SUBSCRIPTION_PERIOD_DAYS} يومًا) — أرسل وصل دفع جديدًا لتجديده ومتابعة استخدام
+                  المنصة.
+                </p>
               </div>
             )}
 
@@ -64,6 +87,7 @@ export default async function BillingPage() {
             </section>
 
             {(teacher.subscriptionStatus === "rejected" ||
+              teacher.subscriptionStatus === "expired" ||
               !latestRequest ||
               latestRequest.status !== "pending") && (
               <section className="rounded-2xl border border-brand-200 bg-white p-5">

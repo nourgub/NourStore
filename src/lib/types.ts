@@ -1,6 +1,6 @@
 export type SubjectId = "math" | "arabic";
 
-export type SubscriptionStatus = "pending" | "active" | "rejected";
+export type SubscriptionStatus = "pending" | "active" | "expired" | "rejected";
 
 export type PlanId = "full" | "lessons_only" | "exams_only" | "grading_only";
 
@@ -14,6 +14,10 @@ export interface Teacher {
   passwordSalt: string;
   subscriptionStatus: SubscriptionStatus;
   planId: PlanId | null;
+  // ISO date the current subscription period ends. null means it never
+  // expires (the platform owner's own admin account, or an account approved
+  // before this field existed).
+  subscriptionExpiresAt: string | null;
   createdAt: string;
 }
 

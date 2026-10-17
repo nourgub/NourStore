@@ -46,7 +46,9 @@ export default async function DashboardPage() {
             <p className="text-sm font-semibold">
               {teacher.subscriptionStatus === "pending"
                 ? "فعّل اشتراكك لتتمكن من توليد الامتحانات — اضغط هنا لإتمام الدفع."
-                : "لم نتمكن من تأكيد وصل الدفع السابق — اضغط هنا لإرسال وصل جديد."}
+                : teacher.subscriptionStatus === "expired"
+                  ? "انتهت مدة اشتراكك — اضغط هنا لتجديده ومتابعة استخدام المنصة."
+                  : "لم نتمكن من تأكيد وصل الدفع السابق — اضغط هنا لإرسال وصل جديد."}
             </p>
           </Link>
         )}

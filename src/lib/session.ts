@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { deleteSession, findSession, findTeacherById, insertSession } from "./db";
+import { deleteSession, findSession, findTeacherById, insertSession, updateTeacherSubscriptionStatus } from "./db";
 import { generateToken } from "./auth";
 import type { Teacher } from "./types";
 
@@ -46,5 +46,20 @@ export async function getCurrentTeacher(): Promise<Teacher | null> {
     deleteSession(token);
     return null;
   }
-  return findTeacherById(session.teacherId);
+
+  const teacher = findTeacherById(session.teacherId);
+  if (!teacher) return null;
+
+  // Lazily flip a lapsed subscription to "expired" — no cron job needed,
+  // every request that loads the current teacher self-heals the status.
+  if (
+    teacher.subscriptionStatus === "active" &&
+    teacher.subscriptionExpiresAt &&
+    new Date(teacher.subscriptionExpiresAt).getTime() < Date.now()
+  ) {
+    updateTeacherSubscriptionStatus(teacher.id, "expired");
+    return { ...teacher, subscriptionStatus: "expired" };
+  }
+
+  return teacher;
 }
