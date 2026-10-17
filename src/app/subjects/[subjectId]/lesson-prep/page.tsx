@@ -4,6 +4,7 @@ import { ArrowRight, History, XCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { listLessonPrepsForTeacher } from "@/lib/lessonPrep";
 import { getActiveLessonPrepTemplate } from "@/lib/lessonPrepTemplate";
+import { hasFreeTrialAvailable } from "@/lib/usage";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LessonPrepForm } from "@/components/LessonPrepForm";
 import { UploadLessonPrepTemplateForm } from "@/components/UploadLessonPrepTemplateForm";
@@ -16,7 +17,7 @@ export default async function LessonPrepListPage({ params }: { params: Promise<{
 
   const teacher = await getCurrentTeacher();
   if (!teacher) redirect("/login");
-  if (teacher.subscriptionStatus !== "active") redirect("/billing");
+  if (teacher.subscriptionStatus !== "active" && !hasFreeTrialAvailable(teacher)) redirect("/billing");
 
   const lessonPreps = listLessonPrepsForTeacher(teacher.id, subjectId as SubjectId);
   const template = getActiveLessonPrepTemplate(teacher.id, subjectId as SubjectId);

@@ -76,6 +76,7 @@ withBusyRetry(() =>
     password_salt TEXT NOT NULL,
     subscription_status TEXT NOT NULL DEFAULT 'pending',
     subscription_expires_at TEXT,
+    free_trial_used_at TEXT,
     created_at TEXT NOT NULL
   );
 
@@ -231,6 +232,9 @@ if (!teacherColumns.some((c) => c.name === "plan_id")) {
 if (!teacherColumns.some((c) => c.name === "subscription_expires_at")) {
   withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN subscription_expires_at TEXT`));
 }
+if (!teacherColumns.some((c) => c.name === "free_trial_used_at")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN free_trial_used_at TEXT`));
+}
 
 const paymentRequestColumns = db.prepare(`PRAGMA table_info(payment_requests)`).all() as { name: string }[];
 if (!paymentRequestColumns.some((c) => c.name === "requested_plan_id")) {
@@ -253,6 +257,7 @@ interface TeacherRow {
   subscription_status: SubscriptionStatus;
   plan_id: PlanId | null;
   subscription_expires_at: string | null;
+  free_trial_used_at: string | null;
   created_at: string;
 }
 
@@ -266,15 +271,21 @@ function rowToTeacher(row: TeacherRow): Teacher {
     subscriptionStatus: row.subscription_status,
     planId: row.plan_id,
     subscriptionExpiresAt: row.subscription_expires_at,
+    freeTrialUsedAt: row.free_trial_used_at,
     createdAt: row.created_at,
   };
 }
 
 export function insertTeacher(teacher: Teacher): void {
   db.prepare(
-    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, plan_id, subscription_expires_at, created_at)
-     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @planId, @subscriptionExpiresAt, @createdAt)`,
-  ).run({ ...teacher, planId: teacher.planId ?? null, subscriptionExpiresAt: teacher.subscriptionExpiresAt ?? null });
+    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, plan_id, subscription_expires_at, free_trial_used_at, created_at)
+     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @planId, @subscriptionExpiresAt, @freeTrialUsedAt, @createdAt)`,
+  ).run({
+    ...teacher,
+    planId: teacher.planId ?? null,
+    subscriptionExpiresAt: teacher.subscriptionExpiresAt ?? null,
+    freeTrialUsedAt: teacher.freeTrialUsedAt ?? null,
+  });
 }
 
 export function findTeacherByEmail(email: string): Teacher | null {
@@ -297,6 +308,10 @@ export function activateTeacherSubscription(teacherId: string, expiresAt: string
     expiresAt,
     teacherId,
   );
+}
+
+export function markFreeTrialUsed(teacherId: string): void {
+  db.prepare(`UPDATE teachers SET free_trial_used_at = ? WHERE id = ?`).run(new Date().toISOString(), teacherId);
 }
 
 export function updateTeacherPlan(teacherId: string, planId: PlanId): void {

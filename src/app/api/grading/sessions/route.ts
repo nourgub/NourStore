@@ -14,9 +14,6 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
-  if (teacher.subscriptionStatus !== "active") {
-    return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
-  }
 
   try {
     assertFeatureEnabled(teacher, "grading");

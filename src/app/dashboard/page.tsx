@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle } from "lucide-react";
+import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle, Gift } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
-import { getUsageSummary } from "@/lib/usage";
+import { getUsageSummary, hasFreeTrialAvailable } from "@/lib/usage";
 import { PLANS } from "@/lib/plans";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -37,7 +37,16 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-brand-600">اختر مادة لبدء العمل مع فريق الوكلاء الخاص بها</p>
         </div>
 
-        {teacher.subscriptionStatus !== "active" && (
+        {teacher.subscriptionStatus === "pending" && hasFreeTrialAvailable(teacher) && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+            <Gift size={20} className="shrink-0" />
+            <p className="text-sm font-semibold">
+              لديك تجربة مجانية واحدة — جرّب أي ميزة تريدها (تحضير درس، توليد امتحان، أو تصحيح ورقة) مجانًا قبل الاشتراك.
+            </p>
+          </div>
+        )}
+
+        {teacher.subscriptionStatus !== "active" && !hasFreeTrialAvailable(teacher) && (
           <Link
             href="/billing"
             className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 transition hover:bg-amber-100"
@@ -45,7 +54,7 @@ export default async function DashboardPage() {
             <AlertCircle size={20} className="shrink-0" />
             <p className="text-sm font-semibold">
               {teacher.subscriptionStatus === "pending"
-                ? "فعّل اشتراكك لتتمكن من توليد الامتحانات — اضغط هنا لإتمام الدفع."
+                ? "استعملت تجربتك المجانية — فعّل اشتراكك لمتابعة الاستخدام — اضغط هنا لإتمام الدفع."
                 : teacher.subscriptionStatus === "expired"
                   ? "انتهت مدة اشتراكك — اضغط هنا لتجديده ومتابعة استخدام المنصة."
                   : "لم نتمكن من تأكيد وصل الدفع السابق — اضغط هنا لإرسال وصل جديد."}

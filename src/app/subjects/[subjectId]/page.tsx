@@ -4,6 +4,7 @@ import { ArrowRight, FileText, History, Search, PenLine, CheckSquare, Grid3x3, S
 import { getCurrentTeacher } from "@/lib/session";
 import { listDocumentsForTeacher } from "@/lib/documents";
 import { listGenerationsForTeacher } from "@/lib/generation";
+import { hasFreeTrialAvailable } from "@/lib/usage";
 import { UploadDocumentForm } from "@/components/UploadDocumentForm";
 import { GenerateExamForm } from "@/components/GenerateExamForm";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -24,7 +25,7 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
 
   const teacher = await getCurrentTeacher();
   if (!teacher) redirect("/login");
-  if (teacher.subscriptionStatus !== "active") redirect("/billing");
+  if (teacher.subscriptionStatus !== "active" && !hasFreeTrialAvailable(teacher)) redirect("/billing");
 
   const [documents, generations] = await Promise.all([
     listDocumentsForTeacher(teacher.id, subjectId as SubjectId),

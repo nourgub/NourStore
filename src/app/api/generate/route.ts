@@ -7,9 +7,6 @@ import type { SubjectId } from "@/lib/types";
 export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
-  if (teacher.subscriptionStatus !== "active") {
-    return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
-  }
 
   try {
     assertFeatureAllowed(teacher, "exams");
@@ -32,7 +29,7 @@ export async function POST(request: NextRequest) {
       numQuestions: Number(body.numQuestions) || 6,
       difficultyMix: body.difficultyMix === "سهل" || body.difficultyMix === "صعب" ? body.difficultyMix : "متوازن",
     });
-    recordUsage(teacher.id, "exams");
+    recordUsage(teacher, "exams");
     return NextResponse.json({ request: request_ });
   } catch (err) {
     if (err instanceof GenerationError) {

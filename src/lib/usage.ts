@@ -1,4 +1,4 @@
-import { getUsageCount, incrementUsageCount } from "./db";
+import { getUsageCount, incrementUsageCount, markFreeTrialUsed } from "./db";
 import { featureLabel, PLANS } from "./plans";
 import type { Teacher, UsageFeature } from "./types";
 
@@ -9,14 +9,24 @@ function currentPeriod(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// A teacher who never had a plan (never paid) gets exactly one free
+// operation, any single feature, before the paywall applies.
+export function hasFreeTrialAvailable(teacher: Teacher): boolean {
+  return !teacher.planId && !teacher.freeTrialUsedAt;
+}
+
 // Throws a clear Arabic error if the teacher's plan doesn't include this
 // feature at all, or if they've already used up this month's allowance.
+// A teacher with no plan but an unused free trial is let through once.
 // Does not consume a usage slot by itself — call recordUsage after the
 // feature's action actually runs (see createGeneration/createLessonPrep/
 // submitStudentPaper call sites).
 export function assertFeatureAllowed(teacher: Teacher, feature: UsageFeature): void {
   if (!teacher.planId) {
-    throw new UsageLimitError("اشتراكك غير مفعّل بعد — يجب اختيار باقة وتفعيلها أولاً.");
+    if (hasFreeTrialAvailable(teacher)) return;
+    throw new UsageLimitError(
+      "اشتراكك غير مفعّل، وقد استعملت تجربتك المجانية الوحيدة بالفعل — يجب اختيار باقة وتفعيلها.",
+    );
   }
   const plan = PLANS[teacher.planId];
   if (!plan.features[feature]) {
@@ -35,16 +45,27 @@ export function assertFeatureAllowed(teacher: Teacher, feature: UsageFeature): v
   }
 }
 
-export function recordUsage(teacherId: string, feature: UsageFeature): void {
-  incrementUsageCount(teacherId, currentPeriod(), feature);
+// Call once the feature's action actually succeeds. A teacher still on
+// their free trial (no plan yet) has that trial marked used instead of
+// incrementing a monthly counter that doesn't apply to them yet.
+export function recordUsage(teacher: Teacher, feature: UsageFeature): void {
+  if (!teacher.planId) {
+    markFreeTrialUsed(teacher.id);
+    return;
+  }
+  incrementUsageCount(teacher.id, currentPeriod(), feature);
 }
 
 // Checks plan inclusion only, without touching the monthly cap — for
 // prerequisite actions (starting a grading session, uploading a lesson-prep
-// template) that don't themselves consume a usage slot.
+// template) that don't themselves consume a usage slot. Same free-trial
+// carve-out as assertFeatureAllowed.
 export function assertFeatureEnabled(teacher: Teacher, feature: UsageFeature): void {
   if (!teacher.planId) {
-    throw new UsageLimitError("اشتراكك غير مفعّل بعد — يجب اختيار باقة وتفعيلها أولاً.");
+    if (hasFreeTrialAvailable(teacher)) return;
+    throw new UsageLimitError(
+      "اشتراكك غير مفعّل، وقد استعملت تجربتك المجانية الوحيدة بالفعل — يجب اختيار باقة وتفعيلها.",
+    );
   }
   const plan = PLANS[teacher.planId];
   if (!plan.features[feature]) {

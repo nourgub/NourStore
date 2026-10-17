@@ -18,6 +18,9 @@ export interface Teacher {
   // expires (the platform owner's own admin account, or an account approved
   // before this field existed).
   subscriptionExpiresAt: string | null;
+  // When the teacher's one free trial operation (any single feature, before
+  // ever paying) was used. null means it's still available.
+  freeTrialUsedAt: string | null;
   createdAt: string;
 }
 

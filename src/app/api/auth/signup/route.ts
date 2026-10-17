@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     subscriptionStatus: isAdmin ? "active" : "pending",
     planId: isAdmin ? "full" : null,
     subscriptionExpiresAt: null,
+    freeTrialUsedAt: null,
     createdAt: new Date().toISOString(),
   };
 

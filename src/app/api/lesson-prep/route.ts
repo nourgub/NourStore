@@ -16,9 +16,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
-  if (teacher.subscriptionStatus !== "active") {
-    return NextResponse.json({ error: "الاشتراك غير مفعّل بعد" }, { status: 403 });
-  }
 
   try {
     assertFeatureAllowed(teacher, "lessonPrep");
@@ -47,7 +44,7 @@ export async function POST(request: NextRequest) {
       styleNotes,
       files,
     });
-    recordUsage(teacher.id, "lessonPrep");
+    recordUsage(teacher, "lessonPrep");
     return NextResponse.json({ lessonPrep });
   } catch (err) {
     if (err instanceof LessonPrepError) {
