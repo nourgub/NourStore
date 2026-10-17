@@ -661,6 +661,22 @@ export function approveStudentPaper(id: string, approvedTotal: number, questionR
   ).run(approvedTotal, JSON.stringify(questionResults), new Date().toISOString(), id);
 }
 
+// Papers approved long enough ago that their source images (sensitive,
+// never deleted otherwise) are due for cleanup. The grades/feedback/
+// transcription stay forever — only the raw photos are removed.
+export function listApprovedPapersForImageCleanup(cutoffIso: string): StudentPaper[] {
+  const rows = db
+    .prepare(
+      `SELECT * FROM student_papers WHERE status = 'approved' AND approved_at < ? AND image_paths_json != '[]'`,
+    )
+    .all(cutoffIso) as StudentPaperRow[];
+  return rows.map(rowToStudentPaper);
+}
+
+export function clearStudentPaperImagePaths(id: string): void {
+  db.prepare(`UPDATE student_papers SET image_paths_json = '[]' WHERE id = ?`).run(id);
+}
+
 // ---------- Lesson prep ----------
 
 interface LessonPrepRow {

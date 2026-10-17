@@ -1,13 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import {
   PAPERS_DIR,
   approveStudentPaper,
+  clearStudentPaperImagePaths,
   findGradingSession,
   findRequest,
   findStudentPaper,
   insertGradingSession,
   insertStudentPaper,
+  listApprovedPapersForImageCleanup,
   listGradingSessions,
   listStudentPapers,
   updateStudentPaperGraded,
@@ -18,8 +21,16 @@ import type { GradingSession, QuestionGradeResult, StudentPaper } from "./types"
 export class GradingError extends Error {}
 
 const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png"]);
-export const MAX_PAPER_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per page
-const MAX_PAGES_PER_PAPER = 6;
+export const MAX_PAPER_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per page (pre-compression upload limit)
+const MAX_PAGES_PER_PAPER = 4;
+
+// Claude's vision pipeline resizes images to fit within ~1568px on the long
+// edge before reading them — anything bigger costs more tokens (and more
+// storage) with no accuracy benefit. Re-encoding every page to this size as
+// JPEG also caps per-customer storage growth, since nothing here is ever
+// deleted automatically.
+const MAX_IMAGE_DIMENSION = 1568;
+const JPEG_QUALITY = 82;
 
 export async function createGradingSession(
   teacherId: string,
@@ -90,12 +101,16 @@ export async function submitStudentPaper(
   const imageMimeTypes: string[] = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const ext = file.type === "image/png" ? "png" : "jpg";
-    const imagePath = path.join(paperDir, `page-${i + 1}.${ext}`);
-    const buffer = Buffer.from(await file.arrayBuffer());
-    fs.writeFileSync(imagePath, buffer);
+    const imagePath = path.join(paperDir, `page-${i + 1}.jpg`);
+    const original = Buffer.from(await file.arrayBuffer());
+    const resized = await sharp(original)
+      .rotate() // respect EXIF orientation from phone cameras before stripping metadata
+      .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: JPEG_QUALITY })
+      .toBuffer();
+    fs.writeFileSync(imagePath, resized);
     imagePaths.push(imagePath);
-    imageMimeTypes.push(file.type);
+    imageMimeTypes.push("image/jpeg");
   }
 
   const paper: StudentPaper = {
@@ -144,6 +159,39 @@ export async function submitStudentPaper(
     updateStudentPaperGraded(paperId, { status: "failed", questionResults: [], draftTotal: null, failureReason });
     return { ...paper, status: "failed", failureReason };
   }
+}
+
+export const DEFAULT_IMAGE_RETENTION_DAYS = 90;
+
+// Admin-triggered cleanup (never runs automatically): deletes the stored
+// page photos of papers approved more than `olderThanDays` ago. The grade,
+// transcription and feedback for each paper are kept — only the raw images
+// (the sensitive, storage-heavy part) are removed.
+export function cleanupOldApprovedPaperImages(olderThanDays: number = DEFAULT_IMAGE_RETENTION_DAYS): {
+  papersCleaned: number;
+  filesDeleted: number;
+  bytesFreed: number;
+} {
+  const cutoffIso = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
+  const papers = listApprovedPapersForImageCleanup(cutoffIso);
+
+  let filesDeleted = 0;
+  let bytesFreed = 0;
+  for (const paper of papers) {
+    for (const imagePath of paper.imagePaths) {
+      try {
+        const stat = fs.statSync(imagePath);
+        fs.unlinkSync(imagePath);
+        bytesFreed += stat.size;
+        filesDeleted++;
+      } catch {
+        // Already missing — nothing to free, still clear the DB reference below.
+      }
+    }
+    clearStudentPaperImagePaths(paper.id);
+  }
+
+  return { papersCleaned: papers.length, filesDeleted, bytesFreed };
 }
 
 export function approvePaperGrade(
