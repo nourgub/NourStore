@@ -16,7 +16,8 @@ import { OAUTH_STATE_COOKIE, COOKIE_NAME } from "@shared/const";
 import { ENV } from "./env";
 import { getSessionCookieOptions } from "./cookies";
 import { createSessionToken } from "./session";
-import * as db from "../db";
+import { logEvent } from "../db/bacPlatform";
+import * as db from "../db/usersAuth";
 
 const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -35,11 +36,9 @@ function buildRedirectUri(req: Request): string {
 export function registerGoogleAuthRoutes(app: Express) {
   app.get("/api/auth/google/login", (req: Request, res: Response) => {
     if (!isGoogleConfigured()) {
-      // Every "sign in" / "start learning" entry point across the client
-      // (Home, Support, CourseDetail, LessonViewer, Pricing, the shared
-      // Shell/AccessGate, useAuth's own redirect-on-unauthenticated effect,
-      // main.tsx's top-level auth guard — a dozen call sites in total) calls
-      // startLogin(), which just does window.location.href to this route.
+      // Every "sign in" entry point in the client (useAuth's own
+      // redirect-on-unauthenticated effect, main.tsx's top-level auth guard)
+      // calls startLogin(), which just does window.location.href to this route.
       // None of them know or check whether Google is actually configured.
       // Failing here with a raw 501 text response used to mean every one of
       // those entry points dead-ended a visitor on an unstyled error page
@@ -151,6 +150,8 @@ export function registerGoogleAuthRoutes(app: Express) {
         lastSignedIn: signedInAt,
       });
 
+      const signedIn = await db.getUserByOpenId(openId);
+      await logEvent(signedIn?.id ?? null, "login", { method: "google" });
       const sessionToken = await createSessionToken(openId, {
         name: googleUser.name || "",
       });

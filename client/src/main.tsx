@@ -9,7 +9,7 @@ import { startLogin } from "./const";
 import "./index.css";
 
 // A default staleTime of 0 (React Query's own default) means every query
-// — including the public course catalog and subjects list, which change
+// — including the lesson catalog and subscription offers, which change
 // rarely — refetches on every component mount and window refocus. 30s is
 // a real, meaningful caching win for exactly the kind of mostly-static,
 // public data this app serves most often, on exactly the slow/metered
@@ -21,7 +21,18 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
+      // A refusal (no subscription, not allowed, not found, invalid) gives
+      // the same answer every time: show it at once instead of after three
+      // retries. Network failures and server errors are still retried.
+      retry: (failureCount, error) => {
+        const status = error instanceof TRPCClientError ? (error.data as { httpStatus?: number } | undefined)?.httpStatus : undefined;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 3;
+      },
     },
+    // Offline, an action must fail with a visible error rather than wait
+    // silently (react-query pauses mutations offline by default).
+    mutations: { networkMode: "always" },
   },
 });
 
@@ -132,11 +143,11 @@ createRoot(document.getElementById("root")!).render(
 // calls skipWaiting() automatically). When a waiting worker is detected, we
 // dispatch a real DOM event the UI listens for (see UpdateBanner in App.tsx)
 // instead of silently swapping the app under the person while they're using
-// it. Clicking "update" calls window.__nourixApplyUpdate(), which tells the
+// it. Clicking "update" calls window.__tafawoqApplyUpdate(), which tells the
 // waiting worker to take over and reloads once it does.
 declare global {
   interface Window {
-    __nourixApplyUpdate?: () => void;
+    __tafawoqApplyUpdate?: () => void;
   }
 }
 
@@ -146,7 +157,7 @@ if ("serviceWorker" in navigator) {
       .register("/sw.js")
       .then(registration => {
         const notifyUpdateAvailable = () =>
-          window.dispatchEvent(new CustomEvent("nourix:sw-update-available"));
+          window.dispatchEvent(new CustomEvent("tafawoq:sw-update-available"));
 
         if (registration.waiting && navigator.serviceWorker.controller)
           notifyUpdateAvailable();
@@ -165,14 +176,18 @@ if ("serviceWorker" in navigator) {
           });
         });
 
-        window.__nourixApplyUpdate = () => {
+        window.__tafawoqApplyUpdate = () => {
           if (!registration.waiting) return;
           registration.waiting.postMessage("SKIP_WAITING");
         };
 
+        // The first worker of a fresh visit takes control too (clients.claim):
+        // reloading then would wipe what the visitor already typed. Reload
+        // only when a previous worker was in control, i.e. an update.
+        const hadController = Boolean(navigator.serviceWorker.controller);
         let hasReloaded = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (hasReloaded) return;
+          if (hasReloaded || !hadController) return;
           hasReloaded = true;
           window.location.reload();
         });

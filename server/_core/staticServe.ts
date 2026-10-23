@@ -30,7 +30,7 @@ export function serveStatic(app: Express) {
     express.static(distPath, {
       // Real caching, not the framework default (effectively none): Vite
       // gives every built file in /assets a content hash in its filename
-      // (e.g. CourseCatalog-BvcYjlq3.js) — a new deploy that changes the
+      // (e.g. Legal-BvcYjlq3.js) — a new deploy that changes the
       // file always changes the filename too, so these can be cached
       // essentially forever with zero staleness risk. This matters most
       // on exactly the slow/metered mobile connections this app needs to
@@ -52,6 +52,13 @@ export function serveStatic(app: Express) {
       },
     })
   );
+
+  // An unknown /api/* address is a real 404, never the app's page with a
+  // 200 — a caller of a removed endpoint (an old webhook, for instance)
+  // must not read that as success.
+  app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

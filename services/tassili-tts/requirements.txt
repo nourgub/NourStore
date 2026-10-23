@@ -1,0 +1,9 @@
+# CPU wheels: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+# (on a GPU host, install the CUDA build of torch/torchaudio first instead).
+torch==2.8.0
+torchaudio==2.8.0
+habibi-tts==0.1.1
+fastapi>=0.115
+uvicorn[standard]>=0.30
+soundfile>=0.12
+numpy

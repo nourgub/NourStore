@@ -4,20 +4,17 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerGoogleAuthRoutes } from "./googleAuth";
-import { registerGoogleCalendarRoutes } from "./googleCalendar";
 import { registerProtectedFileRoutes } from "../protectedFiles";
-import { registerSitemap } from "../sitemap";
-import { registerCertificateDownload } from "../certificateDownload";
-import { registerPaymentWebhooks } from "../paymentsWebhook";
-import { registerWhatsAppWebhook } from "../whatsappWebhook";
-import { registerScheduledJobRoutes } from "../scheduledJobs";
+import { registerTafawoqTtsRoutes } from "../tafawoq/ttsRoute";
 import { appRouter } from "../routers";
-import { getDb } from "../db";
+import { getDb } from "../db/shared";
 import { logError, isUnexpectedError } from "../db/errorLog";
 import { checkRateLimit } from "../rateLimit";
 import { createContext } from "./context";
 import { serveStatic } from "./staticServe";
 import { assertEnvOrExit } from "./env";
+import { requestGuard } from "./requestGuard";
+import { startReminders } from "../tafawoq/platform/reminders";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -53,33 +50,15 @@ async function startServer() {
   // X-Forwarded-For value on every request.
   app.set("trust proxy", 1);
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads.
-  // The `verify` callback captures the exact, unparsed raw bytes onto
-  // req.rawBody before JSON parsing — real webhook signature verification
-  // (WhatsApp's X-Hub-Signature-256, and any real payment provider's
-  // equivalent) must be computed over these exact bytes, not a
-  // re-serialized JSON.stringify(req.body), which is not guaranteed to
-  // byte-for-byte match what the sender actually signed.
-  // 170mb accommodates a base64-encoded video upload up to
-  // MAX_VIDEO_UPLOAD_BYTES (server/uploadValidation.ts) — base64 inflates
-  // the raw byte size by ~33%.
-  app.use(
-    express.json({
-      limit: "170mb",
-      verify: (req, _res, buf) => {
-        (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
-      },
-    })
-  );
-  app.use(express.urlencoded({ limit: "170mb", extended: true }));
+  // JSON bodies up to 12 MB: the largest request is a student's photo of an
+  // exercise (6 MB, base64-encoded — see MAX_EXERCISE_IMAGE_BYTES in
+  // server/tafawoq/service.ts).
+  app.use(requestGuard);
+  app.use(express.json({ limit: "12mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
   registerGoogleAuthRoutes(app);
-  registerGoogleCalendarRoutes(app);
   registerProtectedFileRoutes(app);
-  registerSitemap(app);
-  registerCertificateDownload(app);
-  registerPaymentWebhooks(app);
-  registerWhatsAppWebhook(app);
-  registerScheduledJobRoutes(app);
+  registerTafawoqTtsRoutes(app);
   // Real health check for load balancers / uptime monitors / container
   // orchestration — actually verifies database connectivity rather than
   // just returning 200 unconditionally, so a broken DB connection shows up
@@ -166,6 +145,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+  startReminders();
 }
 
 startServer().catch(console.error);

@@ -1,66 +1,58 @@
 import { useState } from "react";
-import { GraduationCap, School, UserRound } from "lucide-react";
+import { GraduationCap, HeartHandshake } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { getStoredLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 
 type Lang = "ar" | "fr" | "en";
-type Role = "learner" | "teacher" | "institution";
+type Role = "learner" | "parent";
 
 const copy = {
   ar: {
     title: "من أنت؟",
     hint: "اختر نوع حسابك لنُظهر لك اللوحة والأدوات المناسبة — يمكن لاحقًا لإدارة المنصة تعديل هذا إن احتجت.",
-    learner: "متعلم",
-    learnerDesc: "أتابع دورات وأخوض اختبارات وأحصل على شهادات.",
-    teacher: "أستاذ",
-    teacherDesc: "أنشئ دورات ودروسًا واختبارات وأصحّح إجابات المتعلمين.",
-    institution: "إداري (مؤسسة)",
-    institutionDesc: "أدير عدة أساتذة ومتعلمين ضمن مؤسسة تعليمية.",
+    learner: "تلميذ",
+    learnerDesc: "أحضّر البكالوريا: دروس وتمارين واختبارات مع الأستاذ الذكي.",
+    parent: "ولي",
+    parentDesc: "أتابع مستوى ابني وتقدمه برمز يعطيني إياه من حسابه.",
+    teacherNote: "أستاذ؟ تُفعِّل الإدارة حسابات الأساتذة: أنشئ حسابك ثم تواصل معها.",
     confirm: "تأكيد الاختيار",
   },
   fr: {
     title: "Qui êtes-vous ?",
     hint: "Choisissez votre type de compte pour afficher le tableau de bord adapté — l’administration pourra le modifier plus tard si besoin.",
-    learner: "Apprenant",
-    learnerDesc:
-      "Je suis des cours, passe des évaluations et obtiens des certificats.",
-    teacher: "Enseignant",
-    teacherDesc:
-      "Je crée des cours, des leçons, des quiz et je corrige les réponses.",
-    institution: "Administrateur (institution)",
-    institutionDesc:
-      "Je gère plusieurs enseignants et apprenants au sein d’un établissement.",
+    learner: "Élève",
+    learnerDesc: "Je prépare le BAC : leçons, exercices et tests avec le professeur IA.",
+    parent: "Parent",
+    parentDesc: "Je suis le niveau et les progrès de mon enfant grâce au code qu’il me donne.",
+    teacherNote: "Enseignant ? L’administration active les comptes enseignants : créez votre compte puis contactez-la.",
     confirm: "Confirmer le choix",
   },
   en: {
     title: "Who are you?",
     hint: "Choose your account type to see the right dashboard and tools — the administration can change this later if needed.",
-    learner: "Learner",
-    learnerDesc: "I follow courses, take assessments, and earn certificates.",
-    teacher: "Teacher",
-    teacherDesc:
-      "I create courses, lessons, quizzes, and grade learner answers.",
-    institution: "Administrator (institution)",
-    institutionDesc:
-      "I manage multiple teachers and learners within an institution.",
+    learner: "Student",
+    learnerDesc: "I'm preparing the BAC: lessons, exercises and tests with the AI teacher.",
+    parent: "Parent",
+    parentDesc: "I follow my child's level and progress with a code they give me.",
+    teacherNote: "A teacher? The administration activates teacher accounts: create your account, then contact it.",
     confirm: "Confirm choice",
   },
 } as const;
 
 /**
  * Shown exactly once per account, right after a brand-new visitor's first
- * login — while `user.roleChosenAt` is still null. Deliberately offers only
- * three categories (learner / teacher / institution); "admin" is never a
- * selectable option here, since letting any visitor grant themselves the
- * platform's superuser role would be a severe privilege-escalation hole.
- * Admin is only ever granted via the OWNER_OPEN_ID bootstrap or an existing
- * admin's manual promotion (StaffSpace → user management).
+ * login — while `user.roleChosenAt` is still null. Offers only the roles
+ * that grant nothing on their own (student / parent). "teacher" and "admin"
+ * are never self-selectable: a teacher sees students' submitted exercises,
+ * so an admin grants it (Tafawoq admin → الحسابات); admin comes from the
+ * OWNER_OPEN_ID bootstrap or an existing admin.
  */
 export default function RoleOnboardingModal() {
   const { user, refresh } = useAuth();
   const [lang] = useState<Lang>(
-    () => (localStorage.getItem("nourix-language") as Lang) || "ar"
+    () => getStoredLanguage() ?? "ar"
   );
   const [selected, setSelected] = useState<Role | null>(null);
   const t = copy[lang];
@@ -85,13 +77,7 @@ export default function RoleOnboardingModal() {
       title: t.learner,
       desc: t.learnerDesc,
     },
-    { role: "teacher", icon: UserRound, title: t.teacher, desc: t.teacherDesc },
-    {
-      role: "institution",
-      icon: School,
-      title: t.institution,
-      desc: t.institutionDesc,
-    },
+    { role: "parent", icon: HeartHandshake, title: t.parent, desc: t.parentDesc },
   ];
 
   return (
@@ -178,6 +164,7 @@ export default function RoleOnboardingModal() {
             </button>
           ))}
         </div>
+        <p style={{ margin: "0 0 16px", fontSize: 12, opacity: 0.65, color: "#f7f4ec", lineHeight: 1.7 }}>{t.teacherNote}</p>
         <Button
           className="gold-button"
           style={{ width: "100%", justifyContent: "center" }}

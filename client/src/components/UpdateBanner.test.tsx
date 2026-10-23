@@ -5,7 +5,7 @@ import UpdateBanner from "./UpdateBanner";
 
 afterEach(() => {
   cleanup();
-  delete (window as any).__nourixApplyUpdate;
+  delete (window as any).__tafawoqApplyUpdate;
 });
 
 describe("UpdateBanner (real DOM rendering)", () => {
@@ -18,19 +18,19 @@ describe("UpdateBanner (real DOM rendering)", () => {
 
   it("shows the update banner once the real service-worker event fires", async () => {
     render(<UpdateBanner />);
-    window.dispatchEvent(new CustomEvent("nourix:sw-update-available"));
+    window.dispatchEvent(new CustomEvent("tafawoq:sw-update-available"));
     expect(
       await screen.findByText("نسخة جديدة من المنصة متوفرة")
     ).toBeInTheDocument();
   });
 
-  it("clicking 'update now' calls the real window.__nourixApplyUpdate hook main.tsx installs", async () => {
+  it("clicking 'update now' calls the real window.__tafawoqApplyUpdate hook main.tsx installs", async () => {
     const applyUpdate = vi.fn();
-    (window as any).__nourixApplyUpdate = applyUpdate;
+    (window as any).__tafawoqApplyUpdate = applyUpdate;
 
     const user = userEvent.setup();
     render(<UpdateBanner />);
-    window.dispatchEvent(new CustomEvent("nourix:sw-update-available"));
+    window.dispatchEvent(new CustomEvent("tafawoq:sw-update-available"));
 
     const button = await screen.findByRole("button", { name: "تحديث الآن" });
     await user.click(button);
@@ -39,10 +39,10 @@ describe("UpdateBanner (real DOM rendering)", () => {
   });
 
   it("disables the button and shows a loading label after being clicked, so a person can't double-trigger the update", async () => {
-    (window as any).__nourixApplyUpdate = vi.fn();
+    (window as any).__tafawoqApplyUpdate = vi.fn();
     const user = userEvent.setup();
     render(<UpdateBanner />);
-    window.dispatchEvent(new CustomEvent("nourix:sw-update-available"));
+    window.dispatchEvent(new CustomEvent("tafawoq:sw-update-available"));
 
     const button = await screen.findByRole("button", { name: "تحديث الآن" });
     await user.click(button);
@@ -57,7 +57,7 @@ describe("UpdateBanner (real DOM rendering)", () => {
     const { unmount } = render(<UpdateBanner />);
     unmount();
     expect(removeSpy).toHaveBeenCalledWith(
-      "nourix:sw-update-available",
+      "tafawoq:sw-update-available",
       expect.any(Function)
     );
     removeSpy.mockRestore();

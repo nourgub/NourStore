@@ -1,0 +1,1572 @@
+// Tafawoq AI Teacher — the personal teacher (interface in ar / fr / en).
+//   /tafawoq             profile registration + choosing subject & lesson
+//   /tafawoq/:lessonKey  placement test → analysis → personal workspace
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useRoute } from "wouter";
+import {
+  BarChart3,
+  BookOpen,
+  Camera,
+  ClipboardCheck,
+  FileText,
+  GraduationCap,
+  Languages,
+  LogOut,
+  Mic,
+  Phone,
+  MessageCircle,
+  PenLine,
+  PlayCircle,
+  RefreshCw,
+  Send,
+  Shield,
+  Sparkles,
+  Target,
+  Trophy,
+  UserCog,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { setDocumentMeta } from "@/lib/documentMeta";
+import type { Lang } from "@/lib/language";
+import { BAC_STREAMS, SCHOOL_LEVELS, type BacStream, type SchoolLevel } from "@shared/tafawoq";
+import {
+  AnalysisView,
+  MasteryBar,
+  PlanView,
+  QuestionRunner,
+  ResultItems,
+  SkillMastery,
+  SourceChip,
+  M,
+  percent,
+  type SubmitResult,
+  type ParentReportOutput,
+  type WorkspaceOutput,
+} from "./components";
+import { Content, StringsProvider, useLang, useT, useTafawoqLang, type TafawoqStrings } from "./i18n";
+import { LiveTutor } from "./LiveTutor";
+import { RoadmapCard } from "./RoadmapCard";
+import { FOREIGN_REQUESTS, darjaSuggestions, foreignSuggestions, styleIn, stylesFor, useTeacherStyle, useTeacherVoice, type TeacherStyle } from "./teacherStyle";
+import { TAUGHT_LANGUAGES, foreignLanguageOfLesson } from "@shared/taughtLanguages";
+import type { BacSubject } from "@shared/bacPlatform";
+import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
+import { VideoPlayer } from "./VideoPlayer";
+import { bacError, useB } from "./bacI18n";
+import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker, ThirdLanguagePicker } from "./Onboarding";
+import { MistakesPage, StudentDashboard } from "./Dashboard";
+import { DailyPlanView } from "./DailyPlan";
+import { StreamRequestPage, SubscriptionPage } from "./Subscription";
+import { AchievementsPage, RevisionPage } from "./Revision";
+import { ChildBacInfo, MyNotifications } from "./ParentBac";
+import { StructuredMessage, TeacherQuickActions, useVoiceMode } from "./TeacherPanel";
+import "./tafawoq.css";
+
+// Screens only some visitors open (admin, teacher, a call, an exam…) are
+// loaded on demand, so a student's first page downloads less. The daily
+// pages (dashboard, lesson, plan, revision — revision must open offline)
+// stay in the main bundle.
+const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.AdminPanel })));
+const TeacherInbox = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.TeacherInbox })));
+const ExerciseHelp = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.ExerciseHelp })));
+const TutorSessions = lazy(() => import("./Sessions").then(m => ({ default: m.TutorSessions })));
+const Whiteboard = lazy(() => import("./Whiteboard").then(m => ({ default: m.Whiteboard })));
+const TrialLesson = lazy(() => import("./TrialLesson").then(m => ({ default: m.TrialLesson })));
+const SessionsPage = lazy(() => import("./Sessions").then(m => ({ default: m.SessionsPage })));
+const CallScreen = lazy(() => import("./CallScreen").then(m => ({ default: m.CallScreen })));
+const ExamView = lazy(() => import("./ExamView").then(m => ({ default: m.ExamView })));
+const ExamHistory = lazy(() => import("./ExamView").then(m => ({ default: m.ExamHistory })));
+const WeeklyTestPage = lazy(() => import("./WeeklyTest").then(m => ({ default: m.WeeklyTestPage })));
+const AccountPage = lazy(() => import("./AccountPage").then(m => ({ default: m.AccountPage })));
+const TopicBankPage = lazy(() => import("./TopicBank").then(m => ({ default: m.TopicBankPage })));
+
+function PageLoading() {
+  return (
+    <p className="tfq-muted" aria-busy="true">
+      …
+    </p>
+  );
+}
+
+function errorMessage(t: TafawoqStrings, error: { message: string }) {
+  if (error.message.includes("Database not configured")) return t.errors.database;
+  if (error.message.includes("Too many requests")) return t.errors.rate;
+  return t.errors.generic;
+}
+
+export default function TafawoqApp() {
+  const { lang, setLang, t, dir } = useTafawoqLang();
+  const [, params] = useRoute<{ lessonKey: string }>("/tafawoq/:lessonKey");
+  const { user, loading, isAuthenticated, logout } = useAuth();
+
+  useEffect(() => {
+    setDocumentMeta({ title: t.metaTitle, description: t.metaDescription });
+  }, [t]);
+
+  return (
+    <StringsProvider lang={lang}>
+      <div className="tfq" dir={dir} lang={lang}>
+        <header className="tfq-header">
+          <Link href="/tafawoq" className="tfq-brand">
+            <span className="tfq-brand-mark">
+              <GraduationCap size={20} />
+            </span>
+            <span>
+              TAFAWOQ<span className="tfq-brand-long"> AI TEACHER</span>
+              <small>{t.brand}</small>
+            </span>
+          </Link>
+          <div className="tfq-header-actions">
+            <label className="tfq-lang" title={t.language}>
+              <Languages size={14} />
+              <select value={lang} onChange={event => setLang(event.target.value as Lang)} aria-label={t.language}>
+                <option value="ar">العربية</option>
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            {user?.role === "admin" && (
+              <Link href="/tafawoq/admin" className="tfq-btn ghost small">
+                <Shield size={14} /> <span className="tfq-btn-label">Admin</span>
+              </Link>
+            )}
+            {isAuthenticated && (
+              <Link href="/tafawoq/account" className="tfq-btn ghost small" aria-label={t.myAccount}>
+                <UserCog size={14} /> <span className="tfq-btn-label">{t.myAccount}</span>
+              </Link>
+            )}
+            {isAuthenticated && (
+              <button type="button" className="tfq-btn ghost small" onClick={() => logout()}>
+                <LogOut size={14} /> <span className="tfq-btn-label">{t.logout}</span>
+              </button>
+            )}
+          </div>
+        </header>
+        <main className="tfq-main">
+          <Suspense fallback={<PageLoading />}>
+            {params?.lessonKey === "try" ? (
+              // The free trial lesson: open to visitors and to accounts without a profile yet.
+              <TrialLesson />
+            ) : loading ? (
+              <p className="tfq-muted">{t.loading}</p>
+            ) : !isAuthenticated ? (
+              // Quick revision opens from the copy saved on the device, even offline.
+              params?.lessonKey === "revision" && hasOfflineRevision() ? <RevisionPage /> : <Landing />
+            ) : params?.lessonKey === "account" ? (
+              <AccountPage />
+            ) : user?.role === "parent" || (user?.role === "admin" && params?.lessonKey === "parent") ? (
+              <ParentView />
+            ) : user?.role === "teacher" || (user?.role === "admin" && params?.lessonKey === "inbox") ? (
+              <TeacherHome />
+            ) : user?.role === "admin" && params?.lessonKey === "admin" ? (
+              <AdminPanel />
+            ) : user && user.role !== "learner" && user.role !== "admin" ? (
+              <div className="tfq-card tfq-empty">
+                <h2>{t.staffOnly}</h2>
+                <p className="tfq-muted">{t.staffOnlyDesc}</p>
+              </div>
+            ) : (
+              <LearnerRoutes route={params?.lessonKey ?? null} />
+            )}
+          </Suspense>
+        </main>
+      </div>
+    </StringsProvider>
+  );
+}
+
+/** Where the student is in the sign-up: profile → stream → second subject → placement. */
+function OnboardingSteps({ current }: { current: number }) {
+  const t = useT();
+  return (
+    <ol className="tfq-onboard-steps" aria-label={t.onboardSteps.label}>
+      {t.onboardSteps.names.map((name, index) => (
+        <li key={name} className={index === current ? "current" : index < current ? "done" : ""} aria-current={index === current ? "step" : undefined}>
+          <span aria-hidden="true">{index < current ? "✓" : index + 1}</span> {name}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Landing() {
+  const t = useT();
+  return (
+    <section className="tfq-hero">
+      <div className="tfq-kicker">{t.heroKicker}</div>
+      <h1>{t.heroTitle}</h1>
+      <p className="tfq-muted">{t.heroText}</p>
+      <div className="tfq-row" style={{ justifyContent: "center" }}>
+        <a className="tfq-btn" href="/register?next=/tafawoq">
+          <Sparkles size={16} /> {t.start}
+        </a>
+        <a className="tfq-btn ghost" href="/login?next=/tafawoq">
+          {t.haveAccount}
+        </a>
+      </div>
+      <p style={{ marginTop: 10 }}>
+        <Link href="/tafawoq/try" className="tfq-btn ghost small">
+          {t.trial.cta}
+        </Link>
+      </p>
+      <p style={{ marginTop: 14 }}>
+        <a className="tfq-muted" href="/register?next=/tafawoq" style={{ textDecoration: "underline" }}>
+          <Users size={14} /> {t.imParent}
+        </a>
+      </p>
+      <div className="tfq-steps">
+        {t.steps.map(([title, desc], index) => (
+          <div className="tfq-step" key={title}>
+            <span className="tfq-kicker">0{index + 1}</span>
+            <strong>{title}</strong>
+            <span className="tfq-muted" style={{ fontSize: 14 }}>{desc}</span>
+          </div>
+        ))}
+      </div>
+      <p style={{ marginTop: 18, fontSize: 13 }}>
+        <a className="tfq-muted" href="/legal/privacy" style={{ textDecoration: "underline" }}>
+          {t.privacyLink}
+        </a>
+        {" · "}
+        <a className="tfq-muted" href="/legal/terms" style={{ textDecoration: "underline" }}>
+          {t.termsLink}
+        </a>
+      </p>
+    </section>
+  );
+}
+
+/**
+ * The phone call, front and centre: the teacher calls on the lesson where
+ * today's work is worth the most (or the last lesson worked on). Before
+ * any placement the teacher can't know the student yet, so the card
+ * starts the short placement test instead.
+ */
+function HomeCallCard({
+  lessons,
+  placedKeys,
+  bac,
+}: {
+  lessons: Array<{ key: string; title: string; subject: string }>;
+  placedKeys: string[];
+  bac: boolean;
+}) {
+  const t = useT();
+  const b = useB();
+  const lang = useLang();
+  const [chosenStyle, setStyle] = useTeacherStyle();
+  const [calling, setCalling] = useState(false);
+  const road = trpc.tafawoq.roadmap.useQuery(undefined, { enabled: bac });
+  const today = road.data?.today?.lessonKey;
+  const lessonKey = today && placedKeys.includes(today) ? today : placedKeys.find(key => lessons.some(lesson => lesson.key === key));
+  const lesson = lessons.find(entry => entry.key === lessonKey);
+  const style = styleIn(chosenStyle, lesson?.key);
+  // The teacher of today's lesson's subject calls: philosophy, German, history…
+  const subjectName = b.subjects[(lesson?.subject ?? "math") as BacSubject] ?? b.subjects.math;
+  return (
+    <section className="tfq-card tfq-home-call">
+      {calling && lesson && (
+        <Suspense fallback={null}>
+          <CallScreen
+            lessonKey={lesson.key}
+            lang={lang}
+            style={style}
+            teacherName={`أستاذ ${b.subjects[(lesson.subject as BacSubject)] ?? lesson.title}`}
+            onClose={() => setCalling(false)}
+          />
+        </Suspense>
+      )}
+      <div className="tfq-home-call-icon" aria-hidden>
+        <Phone size={30} />
+      </div>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <h2 style={{ margin: 0 }}>{t.homeCallTitle(subjectName)}</h2>
+        <Content className="tfq-muted">{lesson ? t.homeCallText(lesson.title) : t.homeCallFirst}</Content>
+        <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
+          <span className="tfq-muted">{t.teacherStyle}</span>
+          {stylesFor(lesson?.key).map(option => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={style === option}
+              className={`tfq-btn small ${style === option ? "" : "ghost"}`}
+              onClick={() => setStyle(option)}
+            >
+              {styleLabel(t, option, lesson?.key)}
+            </button>
+          ))}
+        </div>
+        <VoiceSwitch />
+      </div>
+      {lesson ? (
+        <button type="button" className="tfq-btn tfq-call-open" onClick={() => { unlockAudio(); setCalling(true); }}>
+          <Phone size={18} /> {t.homeCallGo}
+        </button>
+      ) : (
+        <Link href={`/tafawoq/${lessons[0].key}`} className="tfq-btn">
+          {t.homeCallPlacement}
+        </Link>
+      )}
+    </section>
+  );
+}
+
+/** The style's name on its switch (a taught language by its own name: "Deutsch", "Español", "Italiano"). */
+function styleLabel(t: ReturnType<typeof useT>, style: TeacherStyle, lessonKey: string | null | undefined) {
+  const taught = foreignLanguageOfLesson(lessonKey);
+  if (style === "foreign" && taught) return TAUGHT_LANGUAGES[taught].label;
+  return style === "darja" ? t.styleDarja : t.styleFusha;
+}
+
+function hasOfflineRevision() {
+  try {
+    return Boolean(localStorage.getItem("tfq-revision-pack"));
+  } catch {
+    return false;
+  }
+}
+
+/** A teacher's space: exercises sent by students, and live sessions. */
+function TeacherHome() {
+  const b = useB();
+  const [tab, setTab] = useState<"exercises" | "sessions">("exercises");
+  return (
+    <>
+      <nav className="tfq-tabs" role="tablist">
+        {(["exercises", "sessions"] as const).map(key => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key} className={`tfq-tab ${tab === key ? "active" : ""}`} onClick={() => setTab(key)}>
+            {key === "exercises" ? b.sessions.tabExercises : b.sessions.tabSessions}
+          </button>
+        ))}
+      </nav>
+      {tab === "exercises" ? <TeacherInbox /> : <TutorSessions />}
+    </>
+  );
+}
+
+function LearnerRoutes({ route }: { route: string | null }) {
+  const t = useT();
+  const b = useB();
+  const state = trpc.bac.state.useQuery();
+  if (state.isLoading) return <p className="tfq-muted" aria-busy="true">{t.loading}</p>;
+  if (state.error) return <div className="tfq-card">{bacError(b, state.error)}</div>;
+  const data = state.data!;
+  // Onboarding first: profile → stream (locked) → second subject → placement.
+  // The server refuses every other page's data until then anyway.
+  if (data.step === "profile")
+    return (
+      <>
+        <OnboardingSteps current={0} />
+        <RegisterForm student={null} onDone={() => undefined} />
+        <p style={{ textAlign: "center" }}>
+          <Link href="/tafawoq/try" className="tfq-muted" style={{ textDecoration: "underline" }}>
+            {t.trial.cta}
+          </Link>
+        </p>
+      </>
+    );
+  if (data.step === "stream")
+    return (
+      <>
+        <OnboardingSteps current={1} />
+        <StreamPicker />
+      </>
+    );
+  if (data.step === "language")
+    return (
+      <>
+        <OnboardingSteps current={1} />
+        <ThirdLanguagePicker />
+      </>
+    );
+  if (route === "profile") return <ProfileRoute />;
+  if (data.step === "second")
+    return (
+      <>
+        <OnboardingSteps current={2} />
+        <SecondSubjectPicker state={data} />
+      </>
+    );
+  if (route === "second-subject") return <SecondSubjectPicker state={data} />;
+  if (route === "stream-request") return <StreamRequestPage />;
+  if (route === "sessions") return <SessionsPage />;
+  if (route === "subscription") return <SubscriptionPage />;
+  if (data.step === "placement")
+    return (
+      <>
+        <OnboardingSteps current={3} />
+        <PlacementRoute />
+      </>
+    );
+  if (route === "placement") return <PlacementRoute />;
+  switch (route) {
+    case null:
+      return <DashboardHome lessons={data.lessons} />;
+    case "plan":
+      return <DailyPlanView />;
+    case "weekly":
+      return <WeeklyTestPage />;
+    case "bank":
+      return <TopicBankPage />;
+    case "revision":
+      return <RevisionPage />;
+    case "mistakes":
+      return <MistakesPage />;
+    case "achievements":
+      return <AchievementsPage />;
+    case "exam":
+      return <ExamView />;
+    case "exercises":
+      return <ExerciseHelp lessons={data.lessons.map(lesson => ({ key: lesson.key, title: lesson.title }))} />;
+    default:
+      return <LessonPage lessonKey={route} />;
+  }
+}
+
+function PlacementRoute() {
+  const done = trpc.bac.placementResult.useQuery();
+  const [fresh, setFresh] = useState<Parameters<typeof PlacementResult>[0]["result"] | null>(null);
+  if (fresh) return <PlacementResult result={fresh} />;
+  if (done.isLoading) return <p className="tfq-muted">…</p>;
+  if (done.data) return <PlacementResult result={done.data} />;
+  return <PlacementTest onDone={setFresh} />;
+}
+
+function ProfileRoute() {
+  const overview = trpc.tafawoq.overview.useQuery();
+  const [, navigate] = useLocation();
+  if (overview.isLoading) return <p className="tfq-muted">…</p>;
+  return <RegisterForm student={overview.data?.student ?? null} onDone={() => navigate("/tafawoq")} />;
+}
+
+/** The dashboard, with the teacher's phone call and the road to the BAC mark below it. */
+function DashboardHome({ lessons }: { lessons: Array<{ key: string; title: string; subject: string }> }) {
+  const t = useT();
+  const overview = trpc.tafawoq.overview.useQuery();
+  const dashboard = trpc.bac.dashboard.useQuery();
+  const active = dashboard.data?.subscription.active ?? false;
+
+  return (
+    <>
+      <StudentDashboard />
+      {active && lessons.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <HomeCallCard
+            lessons={lessons}
+            placedKeys={(overview.data?.lessons ?? []).map(entry => entry.key)}
+            bac
+          />
+          <RoadmapCard />
+        </div>
+      )}
+      <p className="tfq-muted" style={{ marginTop: 18, fontSize: 13 }}>
+        <Link href="/tafawoq/profile">{t.editProfile}</Link>
+      </p>
+    </>
+  );
+}
+
+function RegisterForm({
+  student,
+  onDone,
+}: {
+  student: { displayName: string; age: number; schoolLevel: SchoolLevel; stream: BacStream | null; goals: string | null } | null;
+  onDone: () => void;
+}) {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const [displayName, setDisplayName] = useState(student?.displayName ?? user?.name ?? "");
+  const [age, setAge] = useState(String(student?.age ?? ""));
+  // BAC platform: every student is at BAC level; the stream is chosen (and
+  // locked by the server) on its own page, never from this form.
+  const schoolLevel: SchoolLevel = "bac";
+  const [goals, setGoals] = useState(student?.goals ?? "");
+  const register = trpc.tafawoq.register.useMutation({
+    onSuccess: async () => {
+      await utils.tafawoq.overview.invalidate();
+      await utils.bac.invalidate();
+      onDone();
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const ageNumber = Number(age);
+  const valid =
+    displayName.trim().length >= 2 && ageNumber >= 6 && ageNumber <= 25;
+  return (
+    <div className="tfq-card" style={{ maxWidth: 620, margin: "0 auto" }}>
+      <div className="tfq-kicker">{t.step1}</div>
+      <h2>{student ? t.editYourProfile : t.introduce}</h2>
+      <p className="tfq-muted">{t.introduceDesc}</p>
+      <form
+        className="tfq-form"
+        onSubmit={event => {
+          event.preventDefault();
+          if (valid)
+            register.mutate({
+              displayName,
+              age: ageNumber,
+              schoolLevel,
+              goals: goals || undefined,
+            });
+        }}
+      >
+        <label className="tfq-field">
+          {t.name}
+          <input className="tfq-input" dir="auto" value={displayName} onChange={event => setDisplayName(event.target.value)} maxLength={100} required />
+        </label>
+        <label className="tfq-field">
+          {t.age}
+          <input className="tfq-input" type="number" min={6} max={25} value={age} onChange={event => setAge(event.target.value)} required />
+        </label>
+        <label className="tfq-field">
+          {t.goals}
+          <textarea className="tfq-textarea" dir="auto" value={goals} maxLength={500} placeholder={t.goalsPlaceholder} onChange={event => setGoals(event.target.value)} />
+        </label>
+        <div className="tfq-row">
+          <button className="tfq-btn" type="submit" disabled={!valid || register.isPending}>
+            {register.isPending ? t.loading : t.saveContinue}
+          </button>
+          {student && (
+            <button className="tfq-btn ghost" type="button" onClick={onDone}>
+              {t.cancel}
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lesson: placement, analysis, workspace
+// ---------------------------------------------------------------------------
+
+function LessonPage({ lessonKey }: { lessonKey: string }) {
+  const t = useT();
+  const b = useB();
+  const overview = trpc.tafawoq.overview.useQuery();
+  const workspace = trpc.tafawoq.workspace.useQuery({ lessonKey }, { retry: false });
+  const [, navigate] = useLocation();
+  const [placementResult, setPlacementResult] = useState<SubmitResult | null>(null);
+  useSpeechLesson(lessonKey);
+
+  useEffect(() => {
+    if (overview.data && !overview.data.student) navigate("/tafawoq");
+  }, [overview.data, navigate]);
+
+  if (workspace.isLoading) return <p className="tfq-muted">{t.loading}</p>;
+  if (workspace.error) {
+    const code = workspace.error.message;
+    return (
+      <div className="tfq-card tfq-empty">
+        <p>
+          {workspace.error.data?.code === "NOT_FOUND"
+            ? t.lessonNotFound
+            : workspace.error.data?.code === "FORBIDDEN"
+              ? bacError(b, workspace.error)
+              : errorMessage(t, workspace.error)}
+        </p>
+        <div className="tfq-row" style={{ justifyContent: "center" }}>
+          {code === "STREAM_LOCKED" && (
+            <Link href="/tafawoq/stream-request" className="tfq-btn">
+              {b.requestStreamChange}
+            </Link>
+          )}
+          {code === "SUBSCRIPTION_REQUIRED" && (
+            <Link href="/tafawoq/subscription" className="tfq-btn">
+              {b.manageSubscription}
+            </Link>
+          )}
+          <Link href="/tafawoq" className="tfq-btn ghost">
+            {t.back}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  const data = workspace.data!;
+  if (placementResult) {
+    return <PlacementReport result={placementResult} onContinue={() => setPlacementResult(null)} lessonKey={lessonKey} />;
+  }
+  if (!data.placed) {
+    return <PlacementFlow lessonKey={lessonKey} lessonTitle={data.lessonTitle} onGraded={setPlacementResult} />;
+  }
+  return <Workspace lessonKey={lessonKey} data={data} />;
+}
+
+function PlacementFlow({
+  lessonKey,
+  lessonTitle,
+  onGraded,
+}: {
+  lessonKey: string;
+  lessonTitle: string;
+  onGraded: (result: SubmitResult) => void;
+}) {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const start = trpc.tafawoq.startPlacement.useMutation({ onError: error => toast.error(errorMessage(t, error)) });
+  const submit = trpc.tafawoq.submitAssessment.useMutation({
+    onSuccess: async result => {
+      onGraded(result);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+      await utils.tafawoq.overview.invalidate();
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  if (!start.data) {
+    return (
+      <div className="tfq-card" style={{ maxWidth: 680, margin: "0 auto" }}>
+        <div className="tfq-kicker">
+          <ClipboardCheck size={14} /> {t.placement}
+        </div>
+        <Content>
+          <h2>{lessonTitle}</h2>
+        </Content>
+        <p>{t.placementText}</p>
+        <p className="tfq-muted">{t.placementHint}</p>
+        <button type="button" className="tfq-btn" disabled={start.isPending} onClick={() => start.mutate({ lessonKey })}>
+          {start.isPending ? t.loading : t.startTest}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <QuestionRunner
+        questions={start.data.questions}
+        submitting={submit.isPending}
+        submitLabel={t.sendAnalyze}
+        onSubmit={answers => submit.mutate({ assessmentId: start.data!.assessmentId, answers })}
+      />
+    </div>
+  );
+}
+
+function PlacementReport({
+  result,
+  onContinue,
+  lessonKey,
+}: {
+  result: SubmitResult;
+  onContinue: () => void;
+  lessonKey: string;
+}) {
+  const t = useT();
+  const [showDetails, setShowDetails] = useState(false);
+  const utils = trpc.useUtils();
+  const startTutor = trpc.tafawoq.startTutor.useMutation({
+    onSettled: async () => {
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+      onContinue();
+    },
+  });
+  return (
+    <>
+      <div className="tfq-card">
+        <div className="tfq-kicker">{t.analysis}</div>
+        <div className="tfq-spread">
+          <h2>{t.yourScore(result.correct, result.total)}</h2>
+          <span className="tfq-chip">{t.tiers[result.tierAfter]}</span>
+        </div>
+        <p className="tfq-muted">{t.analysisDesc}</p>
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <AnalysisView analysis={result.analysis} />
+      </div>
+      {result.errorsThisTime.length > 0 && (
+        <div className="tfq-card" style={{ marginTop: 16 }}>
+          <h3>{t.errorsFound}</h3>
+          <Content>
+            <ul className="tfq-list">
+              {result.errorsThisTime.map(error => (
+                <li key={error.key}><M>{error.label}</M></li>
+              ))}
+            </ul>
+          </Content>
+        </div>
+      )}
+      <div className="tfq-card" style={{ marginTop: 16 }}>
+        <h3>{t.skillMastery}</h3>
+        <SkillMastery skills={result.analysis.skills} />
+      </div>
+      <div className="tfq-card" style={{ marginTop: 16 }}>
+        <h3>
+          <Target size={16} /> {t.yourPlan}
+        </h3>
+        <PlanView plan={result.analysis.plan} />
+      </div>
+      <div className="tfq-row" style={{ marginTop: 18 }}>
+        <button type="button" className="tfq-btn" disabled={startTutor.isPending} onClick={() => startTutor.mutate({ lessonKey })}>
+          <MessageCircle size={16} /> {startTutor.isPending ? t.preparing : t.startSession}
+        </button>
+        <button type="button" className="tfq-btn ghost" onClick={() => setShowDetails(!showDetails)}>
+          {showDetails ? t.hideCorrection : t.showCorrection}
+        </button>
+      </div>
+      {showDetails && (
+        <div className="tfq-card" style={{ marginTop: 16 }}>
+          <ResultItems items={result.items} />
+        </div>
+      )}
+    </>
+  );
+}
+
+type WorkspaceData = Extract<WorkspaceOutput, { placed: true }>;
+
+const TABS = [
+  { key: "teacher", icon: MessageCircle },
+  { key: "board", icon: PenLine },
+  { key: "lesson", icon: BookOpen },
+  { key: "video", icon: PlayCircle },
+  { key: "practice", icon: ClipboardCheck },
+  { key: "progress", icon: BarChart3 },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
+  const t = useT();
+  const [tab, setTab] = useState<TabKey>(() => {
+    const asked = new URLSearchParams(window.location.search).get("tab");
+    return TABS.some(entry => entry.key === asked) ? (asked as TabKey) : "teacher";
+  });
+  const analysis = data.analysis;
+  return (
+    <>
+      <div className="tfq-spread">
+        <div>
+          <Link href="/tafawoq" className="tfq-muted" style={{ fontSize: 13 }}>
+            {t.allLessons}
+          </Link>
+          <Content>
+            <h1 style={{ marginBottom: 4 }}>{data.lessonTitle}</h1>
+          </Content>
+          <div className="tfq-row">
+            <span className="tfq-chip">{t.tiers[analysis.tier]}</span>
+            {data.complete && <span className="tfq-chip good">{t.lessonComplete}</span>}
+            <span className="tfq-muted" style={{ fontSize: 14 }}>
+              {t.mastery} {percent(analysis.mastery)}
+            </span>
+          </div>
+        </div>
+        <div style={{ minWidth: 200, flex: "0 1 280px" }}>
+          <MasteryBar value={analysis.mastery} />
+        </div>
+      </div>
+      {data.review !== "approved" && (
+        <p className="tfq-banner" role="note">
+          {data.review === "changed" ? t.reviewChanged : t.unreviewed}
+        </p>
+      )}
+      <nav className="tfq-tabs" role="tablist">
+        {TABS.map(({ key, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={`tfq-tab ${tab === key ? "active" : ""}`}
+            onClick={() => setTab(key)}
+          >
+            <Icon size={15} /> {t.tabs[key]}
+          </button>
+        ))}
+      </nav>
+      {tab === "teacher" && <TeacherTab lessonKey={lessonKey} data={data} />}
+      {tab === "board" && <Whiteboard lessonKey={lessonKey} />}
+      {tab === "lesson" && <LessonTab lessonKey={lessonKey} data={data} />}
+      {tab === "video" && <VideoTab lessonKey={lessonKey} data={data} />}
+      {tab === "practice" && <PracticeTab lessonKey={lessonKey} data={data} />}
+      {tab === "progress" && <ProgressTab data={data} />}
+    </>
+  );
+}
+
+/** The student picks a male or a female teacher's voice (server/tafawoq/tts.ts). */
+function VoiceSwitch() {
+  const t = useT();
+  const [voice, setVoice] = useTeacherVoice();
+  // The choice is kept with the student (every device), and on this device for the voice requests.
+  const state = trpc.bac.state.useQuery(undefined, { staleTime: 60_000 });
+  const saved = state.data?.student?.teacherVoice ?? null;
+  const save = trpc.bac.setTeacherVoice.useMutation();
+  useEffect(() => {
+    if (saved && saved !== voice) setVoice(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved]);
+  // What each teacher's voice really is on this server (never assumed).
+  const [voices, setVoices] = useState<Record<"male" | "female", { provider: string; accent: string } | null> | null>(null);
+  const [exclusive, setExclusive] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/tafawoq/tts/status")
+      .then(response => (response.ok ? response.json() : null))
+      .then(body => {
+        if (!alive || !body) return;
+        if (body.voices) setVoices(body.voices);
+        setExclusive(body.exclusive ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const note = (option: "male" | "female") => {
+    if (!voices) return null;
+    const entry = voices[option];
+    if (!entry) return t.voiceNotConfigured;
+    return entry.accent === "algerian" ? t.voiceAlgerianShort : t.voiceNotAlgerian;
+  };
+  // The owner chose one teacher voice for the whole platform: no choice to offer.
+  if (exclusive) return null;
+  return (
+    <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherVoice}>
+      <span className="tfq-muted">{t.teacherVoice}</span>
+      {(["male", "female"] as const).map(option => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={voice === option}
+          className={`tfq-btn small ${voice === option ? "" : "ghost"}`}
+          onClick={() => {
+            setVoice(option);
+            if (state.data?.student) save.mutate({ voice: option });
+          }}
+        >
+          {option === "male" ? t.voiceMale : t.voiceFemale}
+          {note(option) && <small style={{ opacity: 0.75 }}> · {note(option)}</small>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
+  const t = useT();
+  const lang = useLang();
+  const [live, setLive] = useState(false);
+  const [call, setCall] = useState(false);
+  const teacherName = `أستاذ ${data.analysis.subjectName}`;
+  const [chosenStyle, setStyle] = useTeacherStyle();
+  // "Deutsch" only in the German lessons; elsewhere the teacher speaks Arabic.
+  const style = styleIn(chosenStyle, lessonKey);
+  const taught = style === "foreign" ? foreignLanguageOfLesson(lessonKey) : null;
+  const utils = trpc.useUtils();
+  const [draft, setDraft] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  // Written and spoken: in "talk" mode each new teacher message is also read aloud.
+  const [voiceMode, setVoiceMode] = useVoiceMode();
+  const seenUpTo = useRef<number | null>(null);
+  if (seenUpTo.current === null) seenUpTo.current = data.messages.at(-1)?.id ?? 0;
+  const spokenUpTo = useRef(seenUpTo.current);
+  useEffect(() => {
+    const fresh = data.messages.filter(message => message.role === "tutor" && message.id > spokenUpTo.current && !message.structured);
+    const last = data.messages.at(-1);
+    if (last) spokenUpTo.current = Math.max(spokenUpTo.current, last.id);
+    if (voiceMode !== "talk" || !fresh.length) return;
+    const stop = speakArabic(fresh.map(message => message.content).join("\n"));
+    return () => stop();
+  }, [data.messages, voiceMode]);
+  const startTutor = trpc.tafawoq.startTutor.useMutation({
+    onSettled: () => utils.tafawoq.workspace.invalidate({ lessonKey }),
+  });
+  const send = trpc.tafawoq.sendMessage.useMutation({
+    onSettled: async () => {
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+      setPending(null);
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const started = useRef(false);
+  useEffect(() => {
+    if (!data.messages.length && !started.current) {
+      started.current = true;
+      startTutor.mutate({ lessonKey, style });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.messages.length, lessonKey]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [data.messages.length, pending]);
+
+  const suggestions = useMemo(
+    () =>
+      taught
+        ? foreignSuggestions(taught)
+        : style === "darja"
+          ? darjaSuggestions(data.analysis.focusSkills[0]?.name)
+          : t.suggestions(data.analysis.focusSkills[0]?.name),
+    [t, data.analysis.focusSkills, style, taught]
+  );
+
+  // The microphone is explained once before the browser asks for it.
+  const [micAsk, setMicAsk] = useState<"call" | "live" | null>(null);
+  const openWithMic = (kind: "call" | "live") => {
+    let explained = false;
+    try {
+      explained = localStorage.getItem("tfq-mic-explained") === "1";
+    } catch {
+      explained = false;
+    }
+    if (!explained) setMicAsk(kind);
+    else if (kind === "call") setCall(true);
+    else setLive(true);
+  };
+
+  const submit = (message: string) => {
+    if (!message.trim() || send.isPending) return;
+    setPending(message.trim());
+    setDraft("");
+    send.mutate({ lessonKey, message: message.trim(), style });
+  };
+
+  return (
+    <div className="tfq-card">
+      {live && <LiveTutor lessonKey={lessonKey} lang={lang} style={style} onClose={() => setLive(false)} />}
+      {call && (
+        <Suspense fallback={null}>
+          <CallScreen lessonKey={lessonKey} lang={lang} style={style} teacherName={teacherName} onClose={() => setCall(false)} />
+        </Suspense>
+      )}
+      <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherStyle}>
+        <span className="tfq-muted">{t.teacherStyle}</span>
+        {stylesFor(lessonKey).map(option => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={style === option}
+            className={`tfq-btn small ${style === option ? "" : "ghost"}`}
+            onClick={() => setStyle(option)}
+          >
+            {styleLabel(t, option, lessonKey)}
+          </button>
+        ))}
+      </div>
+      <VoiceSwitch />
+      <div className="tfq-call-row">
+        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => { unlockAudio(); openWithMic("call"); }}>
+          <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>
+        </button>
+        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => { unlockAudio(); openWithMic("live"); }}>
+          <Mic size={18} /> {t.liveButton}
+        </button>
+      </div>
+      {micAsk && (
+        <div className="tfq-live" role="dialog" aria-modal="true" aria-labelledby="tfq-mic-title">
+          <div className="tfq-live-panel">
+            <h3 id="tfq-mic-title" style={{ marginTop: 0 }}>{t.micTitle}</h3>
+            <p>{t.micExplain}</p>
+            <div className="tfq-row">
+              <button
+                type="button"
+                className="tfq-btn"
+                autoFocus
+                onClick={() => {
+                  try {
+                    localStorage.setItem("tfq-mic-explained", "1");
+                  } catch {
+                    // shown again next time
+                  }
+                  if (micAsk === "call") setCall(true);
+                  else setLive(true);
+                  setMicAsk(null);
+                }}
+              >
+                {t.micContinue}
+              </button>
+              <button type="button" className="tfq-btn ghost" onClick={() => setMicAsk(null)}>
+                {t.micTypeInstead}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="tfq-chat" aria-live="polite">
+        {data.messages.map(message =>
+          message.structured ? (
+            <div key={message.id} className="tfq-bubble tutor structured">
+              <StructuredMessage message={message.structured} autoRead={voiceMode === "talk" && message.id > (seenUpTo.current ?? 0)} />
+            </div>
+          ) : (
+            <div key={message.id} className={`tfq-bubble ${message.role}`} dir="auto">
+              <M>{message.content}</M>
+            </div>
+          )
+        )}
+        {pending && (
+          <div className="tfq-bubble student" dir="auto">
+            {pending}
+          </div>
+        )}
+        {(send.isPending || startTutor.isPending) && <div className="tfq-bubble tutor tfq-muted">{t.typing}</div>}
+        <div ref={bottom} />
+      </div>
+      <TeacherQuickActions
+        lessonKey={lessonKey}
+        style={style}
+        voiceMode={voiceMode}
+        setVoiceMode={setVoiceMode}
+        busy={send.isPending}
+        onQuiz={() => submit(taught ? FOREIGN_REQUESTS[taught].quiz : style === "darja" ? "سقسيني" : "اختبرني")}
+        onUnderstood={understood =>
+          submit(
+            taught
+              ? understood
+                ? FOREIGN_REQUESTS[taught].understood
+                : FOREIGN_REQUESTS[taught].notUnderstood
+              : understood
+                ? "فهمت، شكراً"
+                : "لم أفهم"
+          )
+        }
+      />
+      <div className="tfq-row" style={{ marginTop: 12 }}>
+        {suggestions.map(suggestion => (
+          <button key={suggestion} type="button" className="tfq-btn ghost small" dir="auto" onClick={() => submit(suggestion)}>
+            {suggestion}
+          </button>
+        ))}
+      </div>
+      <form
+        className="tfq-chat-input"
+        onSubmit={event => {
+          event.preventDefault();
+          submit(draft);
+        }}
+      >
+        <input
+          className="tfq-input"
+          dir="auto"
+          value={draft}
+          maxLength={2000}
+          placeholder={t.askPlaceholder}
+          onChange={event => setDraft(event.target.value)}
+        />
+        <button type="submit" className="tfq-btn" disabled={!draft.trim() || send.isPending} aria-label={t.send}>
+          <Send size={16} className="tfq-flip" />
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function LessonTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const generate = trpc.tafawoq.generateLesson.useMutation({
+    onSuccess: () => utils.tafawoq.workspace.invalidate({ lessonKey }),
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const lesson = data.personalLesson;
+  const outdated = lesson && lesson.tier !== data.analysis.tier;
+  if (!lesson) {
+    return (
+      <div className="tfq-card tfq-empty">
+        <BookOpen size={28} />
+        <h2>{t.yourLesson}</h2>
+        <p className="tfq-muted">
+          {t.lessonWillFocus(data.analysis.focusSkills.map(skill => skill.name).join("، ") || t.enrichment)}
+        </p>
+        <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
+          <Sparkles size={16} /> {generate.isPending ? t.writing : t.createLesson}
+        </button>
+      </div>
+    );
+  }
+  const content = lesson.content;
+  return (
+    <>
+      <div className="tfq-spread" style={{ marginBottom: 12 }}>
+        <div className="tfq-row">
+          <SourceChip source={lesson.source} />
+          <span className="tfq-chip info">{t.explanationLevel(t.tiers[lesson.tier])}</span>
+        </div>
+        <button type="button" className="tfq-btn ghost small" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
+          <RefreshCw size={14} /> {generate.isPending ? t.loading : t.newLesson}
+        </button>
+      </div>
+      {outdated && <div className="tfq-banner">{t.lessonOutdated}</div>}
+      <Content>
+        <article className="tfq-card">
+          <h2>{content.title}</h2>
+          <p><M>{content.intro}</M></p>
+        </article>
+        {content.sections.map((section, index) => (
+          <article className="tfq-card" key={`${section.skill}-${index}`}>
+            <div className="tfq-kicker">{t.part(index + 1)}</div>
+            <h3>{section.heading}</h3>
+            <p style={{ whiteSpace: "pre-wrap" }}><M>{section.explanation}</M></p>
+            {section.examples.map((example, position) => (
+              <div className="tfq-example" key={position}>
+                <strong>{t.example(position + 1)}: </strong>
+                <span><M>{example.problem}</M></span>
+                <ol>
+                  {example.steps.map((step, stepIndex) => (
+                    <li key={stepIndex}>
+                      <M>{step}</M>
+                    </li>
+                  ))}
+                </ol>
+                <div>
+                  ✔ <strong><M>{example.answer}</M></strong>
+                </div>
+              </div>
+            ))}
+            {section.commonMistake && <div className="tfq-mistake"><M>{section.commonMistake}</M></div>}
+          </article>
+        ))}
+        <article className="tfq-card">
+          <h3>{t.remember}</h3>
+          <ul className="tfq-list">
+            {content.summary.map((line, index) => (
+              <li key={index}><M>{line}</M></li>
+            ))}
+          </ul>
+          <p className="tfq-muted" style={{ marginTop: 10 }}>
+            {content.nextStep}
+          </p>
+        </article>
+      </Content>
+    </>
+  );
+}
+
+function VideoTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const [selected, setSelected] = useState(0);
+  const generate = trpc.tafawoq.generateVideo.useMutation({
+    onSuccess: async () => {
+      setSelected(0);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const video = data.videos[selected];
+  return (
+    <>
+      <div className="tfq-spread" style={{ marginBottom: 12 }}>
+        <p className="tfq-muted" style={{ margin: 0 }}>
+          {t.videoIntro}
+        </p>
+        <button type="button" className="tfq-btn small" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
+          <Sparkles size={14} /> {generate.isPending ? t.creatingVideo : data.videos.length ? t.newVideo : t.createVideo}
+        </button>
+      </div>
+      {video ? (
+        <>
+          <div className="tfq-row" style={{ marginBottom: 10 }}>
+            <Content as="span">
+              <strong>{video.script.title}</strong>
+            </Content>
+            <SourceChip source={video.source} />
+          </div>
+          <VideoPlayer script={video.script} />
+          {data.videos.length > 1 && (
+            <div className="tfq-row" style={{ marginTop: 12 }}>
+              <span className="tfq-muted" style={{ fontSize: 13 }}>
+                {t.previousVideos}
+              </span>
+              {data.videos.map((entry, index) => (
+                <button key={entry.id} type="button" className={`tfq-tab ${index === selected ? "active" : ""}`} onClick={() => setSelected(index)}>
+                  {new Date(entry.createdAt).toLocaleDateString()}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="tfq-card tfq-empty">
+          <PlayCircle size={32} />
+          <p className="tfq-muted">{t.noVideo}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PracticeTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceData }) {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const generate = trpc.tafawoq.generatePractice.useMutation({
+    onSuccess: async () => {
+      setResult(null);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const problem = trpc.tafawoq.generateProblem.useMutation({
+    onSuccess: async () => {
+      setResult(null);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const problemButton =
+    data.problemsCount > 0 ? (
+      <button
+        type="button"
+        className="tfq-btn ghost"
+        title={t.bacProblemHint}
+        disabled={problem.isPending || generate.isPending}
+        onClick={() => problem.mutate({ lessonKey })}
+      >
+        <Trophy size={16} /> {problem.isPending ? t.loading : t.bacProblem}
+      </button>
+    ) : null;
+  const submit = trpc.tafawoq.submitAssessment.useMutation({
+    onSuccess: async graded => {
+      setResult(graded);
+      await utils.tafawoq.workspace.invalidate({ lessonKey });
+      await utils.tafawoq.overview.invalidate();
+    },
+    onError: error => toast.error(errorMessage(t, error)),
+  });
+  const practice = data.openPractice;
+
+  if (result) {
+    const delta = result.masteryAfter - result.masteryBefore;
+    return (
+      <>
+        <div className="tfq-card">
+          <div className="tfq-kicker">{t.autoCorrection}</div>
+          <div className="tfq-spread">
+            <h2>{t.correctCount(result.correct, result.total)}</h2>
+            <div className="tfq-row">
+              <span className="tfq-muted">{t.mastery}</span>
+              <strong>{percent(result.masteryBefore)}</strong>
+              <span className="tfq-flip">←</span>
+              <strong style={{ color: delta >= 0 ? "#4fbf7f" : "#e07b7b" }}>{percent(result.masteryAfter)}</strong>
+            </div>
+          </div>
+          {result.tierBefore && result.tierBefore !== result.tierAfter && (
+            <div className="tfq-banner" style={{ marginTop: 10 }}>
+              {t.levelUpdate(t.tiers[result.tierBefore], t.tiers[result.tierAfter])}
+            </div>
+          )}
+          <h3 style={{ marginTop: 12 }}>{t.skillEvolution}</h3>
+          {result.skillChanges
+            .filter(change => change.before !== null && Math.abs(change.after - (change.before ?? 0)) > 0.005)
+            .map(change => (
+              <div className="tfq-skill-row" key={change.skill}>
+                <Content as="span">{change.name}</Content>
+                <MasteryBar value={change.after} />
+                <strong style={{ textAlign: "end" }}>
+                  {change.after >= (change.before ?? 0) ? "▲" : "▼"} {percent(change.after)}
+                </strong>
+              </div>
+            ))}
+        </div>
+        <div className="tfq-card">
+          <ResultItems items={result.items} />
+        </div>
+        <div className="tfq-row" style={{ marginTop: 16 }}>
+          <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
+            <Sparkles size={16} /> {generate.isPending ? t.loading : t.newExercises}
+          </button>
+          {problemButton}
+        </div>
+      </>
+    );
+  }
+
+  if (!practice) {
+    return (
+      <div className="tfq-card tfq-empty">
+        <ClipboardCheck size={28} />
+        <h2>{t.yourExercises}</h2>
+        <p className="tfq-muted">
+          {t.exercisesTarget(data.analysis.focusSkills.map(skill => skill.name).join("، ") || t.allSkillsHard)}
+        </p>
+        <button type="button" className="tfq-btn" disabled={generate.isPending} onClick={() => generate.mutate({ lessonKey })}>
+          <Sparkles size={16} /> {generate.isPending ? t.preparingExercises : t.createExercises}
+        </button>
+        {problemButton && (
+          <>
+            {problemButton}
+            <p className="tfq-muted" style={{ fontSize: 13 }}>{t.bacProblemHint}</p>
+          </>
+        )}
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="tfq-row" style={{ marginBottom: 10 }}>
+        <SourceChip source={practice.source} />
+      </div>
+      <QuestionRunner
+        key={practice.assessmentId}
+        questions={practice.questions}
+        submitting={submit.isPending}
+        submitLabel={t.checkAnswers}
+        onSubmit={answers => submit.mutate({ assessmentId: practice.assessmentId, answers })}
+      />
+    </>
+  );
+}
+
+function ProgressTab({ data }: { data: WorkspaceData }) {
+  const t = useT();
+  return (
+    <>
+      <AnalysisView analysis={data.analysis} />
+      <div className="tfq-card" style={{ marginTop: 16 }}>
+        <h3>{t.skillMastery}</h3>
+        <SkillMastery skills={data.analysis.skills} />
+      </div>
+      <div className="tfq-card">
+        <h3>
+          <Target size={16} /> {t.plan}
+        </h3>
+        <PlanView plan={data.analysis.plan} />
+      </div>
+      <div className="tfq-card">
+        <h3>{t.history}</h3>
+        {data.history.map((entry, index) => (
+          <div className="tfq-skill-row" key={entry.id}>
+            <span>
+              {entry.kind === "placement" ? t.historyPlacement : entry.kind === "oral" ? t.historyOral : t.historyPractice(index)}
+              <span className="tfq-muted" style={{ fontSize: 12 }}>
+                {" "}
+                · {entry.gradedAt ? new Date(entry.gradedAt).toLocaleDateString() : ""}
+              </span>
+            </span>
+            <MasteryBar value={entry.masteryAfter ?? 0} />
+            <strong style={{ textAlign: "end" }}>{entry.score}%</strong>
+          </div>
+        ))}
+        <p className="tfq-muted" style={{ fontSize: 13, marginTop: 8 }}>
+          {t.historyNote}
+        </p>
+      </div>
+      <ShareWithParent />
+    </>
+  );
+}
+
+function ShareWithParent() {
+  const t = useT();
+  const create = trpc.tafawoq.createParentCode.useMutation({ onError: error => toast.error(errorMessage(t, error)) });
+  const days = create.data ? Math.max(1, Math.round((new Date(create.data.expiresAt).getTime() - Date.now()) / 86_400_000)) : 7;
+  return (
+    <div className="tfq-card">
+      <h3>
+        <Users size={16} /> {t.shareTitle}
+      </h3>
+      <p className="tfq-muted">{t.shareDesc}</p>
+      {create.data ? (
+        <div className="tfq-banner" style={{ fontSize: 16 }}>
+          <bdi dir="ltr" className="tfq-code">{create.data.code}</bdi>
+          <div className="tfq-muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {t.shareCode(create.data.code, days)}
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="tfq-btn ghost" disabled={create.isPending} onClick={() => create.mutate()}>
+          {create.isPending ? t.loading : t.shareButton}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Parent report
+// ---------------------------------------------------------------------------
+
+function ParentView() {
+  const t = useT();
+  const utils = trpc.useUtils();
+  const report = trpc.bac.parentOverview.useQuery();
+  const [code, setCode] = useState("");
+  const accept = trpc.parent.acceptInvite.useMutation({
+    onSuccess: async linked => {
+      if (linked) {
+        toast.success(t.parentLinked);
+        setCode("");
+        await utils.bac.parentOverview.invalidate();
+      } else {
+        toast.error(t.parentInvalid);
+      }
+    },
+    onError: () => toast.error(t.parentInvalid),
+  });
+  const children = report.data ?? [];
+  return (
+    <>
+      <div className="tfq-kicker">{t.parentTitle}</div>
+      <h1 style={{ marginBottom: 4 }}>{t.parentTitle}</h1>
+      <p className="tfq-muted">{t.parentDesc}</p>
+      <form
+        className="tfq-card tfq-row"
+        style={{ marginTop: 16 }}
+        onSubmit={event => {
+          event.preventDefault();
+          if (code.trim().length >= 6) accept.mutate({ code: code.trim().toUpperCase() });
+        }}
+      >
+        <label className="tfq-field" style={{ flex: "1 1 240px" }}>
+          {t.parentCodeLabel}
+          <input className="tfq-input" dir="ltr" value={code} maxLength={32} onChange={event => setCode(event.target.value)} />
+        </label>
+        <button type="submit" className="tfq-btn" disabled={code.trim().length < 6 || accept.isPending} style={{ alignSelf: "flex-end" }}>
+          {t.parentLink}
+        </button>
+      </form>
+      {report.isLoading ? (
+        <p className="tfq-muted">{t.loading}</p>
+      ) : report.error ? (
+        <div className="tfq-card">{errorMessage(t, report.error)}</div>
+      ) : !children.length ? (
+        <div className="tfq-card tfq-empty">{t.parentNoChildren}</div>
+      ) : (
+        children.map(child => (
+          <div key={child.linkId}>
+            <ChildReport child={child} />
+            <ChildBacInfo bac={child.bac} />
+          </div>
+        ))
+      )}
+      <MyNotifications />
+    </>
+  );
+}
+
+type ChildReportData = ParentReportOutput[number];
+
+function ChildReport({ child }: { child: ChildReportData }) {
+  const t = useT();
+  const adviceText = (item: ChildReportData["advice"][number]) => {
+    switch (item.kind) {
+      case "inactive":
+        return t.adviceInactive(item.days);
+      case "focus":
+        return t.adviceFocus(item.lessonTitle, item.skillName);
+      case "recurring":
+        return t.adviceRecurring(item.lessonTitle, item.errorLabel);
+      case "progress":
+        return t.adviceProgress(item.lessonTitle, percent(item.from), percent(item.to));
+      default:
+        return t.adviceComplete(item.lessonTitle);
+    }
+  };
+  return (
+    <section className="tfq-card" style={{ marginTop: 16 }}>
+      <div className="tfq-spread">
+        <h2 style={{ margin: 0 }}>
+          <Content as="span">{child.profile?.displayName ?? child.childName ?? "—"}</Content>
+        </h2>
+        {child.profile && (
+          <span className="tfq-muted" style={{ fontSize: 14 }}>
+            {t.years(child.profile.age)} · {t.levels[child.profile.schoolLevel]}
+            {child.profile.stream ? ` · ${t.streams[child.profile.stream]}` : ""}
+          </span>
+        )}
+      </div>
+      {!child.profile ? (
+        <p className="tfq-muted" style={{ marginTop: 10 }}>{t.parentNoProfile}</p>
+      ) : (
+        <>
+          {child.week && (
+            <div className="tfq-steps" style={{ marginTop: 14 }}>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.thisWeek}</span>
+                <strong>{t.answered(child.week.answered)}</strong>
+                <span className="tfq-muted" style={{ fontSize: 13 }}>
+                  {child.week.accuracy !== null ? t.accuracy(percent(child.week.accuracy)) : "—"}
+                </span>
+              </div>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.thisWeek}</span>
+                <strong>{t.minutes(child.week.minutes)}</strong>
+                <span className="tfq-muted" style={{ fontSize: 13 }}>{t.activeDays(child.week.activeDays)}</span>
+              </div>
+              <div className="tfq-step">
+                <span className="tfq-kicker">{t.lastActivity}</span>
+                <strong>{child.lastActivityAt ? new Date(child.lastActivityAt).toLocaleDateString() : t.never}</strong>
+              </div>
+            </div>
+          )}
+          {child.roadmap && (
+            <p style={{ marginTop: 12 }}>
+              <strong>{t.roadTitle}:</strong> {t.roadParent(child.roadmap.target, child.roadmap.predicted, child.roadmap.daysLeft)}
+            </p>
+          )}
+          {child.exams.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <ExamHistory exams={child.exams} />
+            </div>
+          )}
+          {child.advice.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h3>{t.advice}</h3>
+              <ul className="tfq-list">
+                {child.advice.map((item, index) => (
+                  <li key={index}>
+                    <M>{adviceText(item)}</M>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!child.lessons.length ? (
+            <p className="tfq-muted" style={{ marginTop: 10 }}>{t.parentNoLessons}</p>
+          ) : (
+            child.lessons.map(lesson => (
+              <div key={lesson.key} className="tfq-result-item">
+                <div className="tfq-spread">
+                  <Content as="span">
+                    <strong>{lesson.title}</strong>
+                  </Content>
+                  <div className="tfq-row">
+                    <span className={`tfq-chip ${lesson.complete ? "good" : ""}`}>
+                      {lesson.complete ? t.complete : t.tiers[lesson.tier]}
+                    </span>
+                    <span className="tfq-muted" style={{ fontSize: 13 }}>{t.sessions(lesson.sessions)}</span>
+                  </div>
+                </div>
+                <div className="tfq-row" style={{ marginTop: 8 }}>
+                  <span className="tfq-muted" style={{ fontSize: 13 }}>{percent(lesson.startMastery)}</span>
+                  <div style={{ flex: 1 }}>
+                    <MasteryBar value={lesson.mastery} />
+                  </div>
+                  <strong>{percent(lesson.mastery)}</strong>
+                </div>
+                <div className="tfq-grid" style={{ marginTop: 10, gap: 10 }}>
+                  <div>
+                    <div className="tfq-kicker">{t.strengths}</div>
+                    <Content>{lesson.strengths.length ? <M>{lesson.strengths.join("، ")}</M> : "—"}</Content>
+                  </div>
+                  <div>
+                    <div className="tfq-kicker">{t.weaknesses}</div>
+                    <Content>{lesson.weaknesses.length ? <M>{lesson.weaknesses.join("، ")}</M> : "—"}</Content>
+                  </div>
+                  <div>
+                    <div className="tfq-kicker">{t.recurring}</div>
+                    <Content>
+                      {lesson.recurringErrors.length ? (
+                        <M>{lesson.recurringErrors.map(error => error.label).join("، ")}</M>
+                      ) : (
+                        "—"
+                      )}
+                    </Content>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
+    </section>
+  );
+}

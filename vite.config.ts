@@ -20,6 +20,18 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Libraries change far less often than the app: in their own files
+        // they stay cached in students' browsers across deploys.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|wouter)[\\/]/.test(id)) return "react";
+          if (/[\\/]node_modules[\\/](@tanstack|@trpc|superjson)[\\/]/.test(id)) return "data";
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     host: true,

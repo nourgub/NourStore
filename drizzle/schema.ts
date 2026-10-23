@@ -1,9 +1,14 @@
 import {
   bigint,
+  char,
+  date,
+  double,
   index,
   int,
   mysqlEnum,
+  mediumtext,
   mysqlTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -44,6 +49,9 @@ export const users = mysqlTable("users", {
   accountStatus: mysqlEnum("accountStatus", ["active", "pending", "suspended"])
     .default("active")
     .notNull(),
+  // Bumped on every password change or reset: a session signed with an
+  // older version is refused (server/_core/session.ts).
+  sessionVersion: int("sessionVersion").default(0).notNull(),
   country: varchar("country", { length: 2 }),
   currency: varchar("currency", { length: 3 }).default("DZD"),
   language: varchar("language", { length: 5 }).default("ar"),
@@ -685,10 +693,13 @@ export const notifications = mysqlTable(
     title: varchar("title", { length: 255 }).notNull(),
     body: text("body").notNull(),
     readAt: timestamp("readAt"),
+    /** Scheduled reminders: one copy per (userId, dedupeKey), drizzle/0038. */
+    dedupeKey: varchar("dedupeKey", { length: 120 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => ({
     userIdx: index("notifications_userId_idx").on(table.userId),
+    dedupeIdx: uniqueIndex("notifications_dedupe_unique").on(table.userId, table.dedupeKey),
   })
 );
 
@@ -958,6 +969,9 @@ export const supportTickets = mysqlTable(
     priority: mysqlEnum("priority", ["low", "medium", "high"])
       .default("medium")
       .notNull(),
+    category: mysqlEnum("category", ["account", "payment", "content", "technical", "sessions", "other"]).default("other").notNull(),
+    /** Who wrote last (drizzle/0041): a student's reply shows as waiting for staff. */
+    lastSenderRole: mysqlEnum("lastSenderRole", ["user", "staff"]).default("user").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -1176,3 +1190,580 @@ export const googleCalendarConnections = mysqlTable("googleCalendarConnections",
 });
 
 export type GoogleCalendarConnection = typeof googleCalendarConnections.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// Tafawoq AI Teacher (server/tafawoq/). One personal-teacher profile per
+// user, a per-skill knowledge-tracing state, every assessment (placement
+// and practice) with its server-only answer key, a per-question attempt
+// log (the evidence behind mastery, learning speed and recurring errors),
+// and the generated lessons, videos and tutor dialogue.
+// ---------------------------------------------------------------------------
+
+export const tafawoqStudents = mysqlTable("tafawoqStudents", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique().references(() => users.id),
+  displayName: varchar("displayName", { length: 100 }).notNull(),
+  age: int("age").notNull(),
+  schoolLevel: mysqlEnum("schoolLevel", ["primary", "middle", "bem", "secondary", "bac"]).notNull(),
+  // BAC stream (شعبة); null below BAC, or for a BAC student who hasn't chosen.
+  stream: mysqlEnum("stream", ["sciences", "math", "techmath", "gestion", "lettres", "langues"]),
+  goals: text("goals"),
+  // BAC maths mark aimed for (out of 20); null until the student sets it.
+  targetMark: double("targetMark"),
+  // BAC platform: the stream is locked once chosen; only an admin changes it.
+  streamLockedAt: timestamp("streamLockedAt"),
+  secondSubject: varchar("secondSubject", { length: 32 }),
+  // Foreign-languages stream: german | spanish | italian, locked with the stream.
+  thirdLanguage: varchar("thirdLanguage", { length: 16 }),
+  placementDoneAt: timestamp("placementDoneAt"),
+  shareChatsWithParent: int("shareChatsWithParent").default(0).notNull(),
+  /** "male" | "female": the teacher voice chosen (drizzle/0036). */
+  teacherVoice: varchar("teacherVoice", { length: 8 }),
+  bonusDaysCredit: int("bonusDaysCredit").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TafawoqStudent = typeof tafawoqStudents.$inferSelect;
+
+/** The lesson whiteboard of a student (drizzle/0039); stateJson is validated by shared/board.ts. */
+export const tafawoqBoards = mysqlTable(
+  "tafawoqBoards",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    stateJson: mediumtext("stateJson").notNull(),
+    version: int("version").default(1).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    studentLessonUnique: uniqueIndex("tafawoqBoards_student_lesson").on(table.studentId, table.lessonKey),
+  })
+);
+
+export const tafawoqSkillStates = mysqlTable(
+  "tafawoqSkillStates",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    skillKey: varchar("skillKey", { length: 64 }).notNull(),
+    pKnown: double("pKnown").notNull(),
+    attempts: int("attempts").default(0).notNull(),
+    correct: int("correct").default(0).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    studentSkillUnique: uniqueIndex("tafawoqSkillStates_student_lesson_skill").on(
+      table.studentId,
+      table.lessonKey,
+      table.skillKey
+    ),
+  })
+);
+
+export const tafawoqAssessments = mysqlTable(
+  "tafawoqAssessments",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    // "oral": a one-question quiz asked by the tutor in conversation (often by voice).
+    kind: mysqlEnum("kind", ["placement", "practice", "oral"]).notNull(),
+    // Full items INCLUDING answer keys — never returned to the browser as-is.
+    itemsJson: mediumtext("itemsJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template", "bank"]).notNull(),
+    status: mysqlEnum("status", ["open", "graded"]).default("open").notNull(),
+    score: int("score"),
+    resultJson: mediumtext("resultJson"),
+    masteryBefore: double("masteryBefore"),
+    masteryAfter: double("masteryAfter"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    gradedAt: timestamp("gradedAt"),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqAssessments_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+// Mock BAC exam: a full paper (one practice assessment per exercise), marked
+// out of 20 once on hand-in.
+export const tafawoqExams = mysqlTable(
+  "tafawoqExams",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    stream: varchar("stream", { length: 16 }),
+    // [{ assessmentId, lessonKey, points }] in paper order.
+    paperJson: mediumtext("paperJson").notNull(),
+    status: mysqlEnum("status", ["open", "graded"]).default("open").notNull(),
+    score: double("score"),
+    resultJson: mediumtext("resultJson"),
+    kind: mysqlEnum("kind", ["mock", "weekly", "placement"]).default("mock").notNull(),
+    subject: varchar("subject", { length: 32 }),
+    weekKey: varchar("weekKey", { length: 10 }),
+    // Answers saved while the paper is open; time spent per exercise.
+    draftJson: mediumtext("draftJson"),
+    timeJson: text("timeJson"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    gradedAt: timestamp("gradedAt"),
+  },
+  table => ({
+    studentIdx: index("tafawoqExams_student_idx").on(table.studentId, table.createdAt),
+    studentKindIdx: index("tafawoqExams_student_kind_idx").on(table.studentId, table.kind, table.createdAt),
+  })
+);
+
+// "ارفع تمرينك": an exercise a student submits (typed and/or a photo). The
+// free solver answers recognised typed exercises at once ("auto"); others
+// wait ("open") for a teacher's detailed solution ("answered").
+export const tafawoqExercises = mysqlTable(
+  "tafawoqExercises",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }),
+    text: mediumtext("text"),
+    note: text("note"),
+    imageKey: varchar("imageKey", { length: 255 }),
+    imageMime: varchar("imageMime", { length: 32 }),
+    status: mysqlEnum("status", ["auto", "open", "answered"]).notNull(),
+    autoJson: mediumtext("autoJson"),
+    answer: mediumtext("answer"),
+    answeredBy: int("answeredBy").references(() => users.id),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    answeredAt: timestamp("answeredAt"),
+  },
+  table => ({
+    studentIdx: index("tafawoqExercises_student_idx").on(table.studentId, table.createdAt),
+    statusIdx: index("tafawoqExercises_status_idx").on(table.status, table.createdAt),
+  })
+);
+
+// Characters sent to the paid speech service per month (monthly cap).
+export const tafawoqTtsUsage = mysqlTable("tafawoqTtsUsage", {
+  month: varchar("month", { length: 32 }).primaryKey(),
+  characters: bigint("characters", { mode: "number" }).default(0).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const tafawoqAttempts = mysqlTable(
+  "tafawoqAttempts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    assessmentId: int("assessmentId").notNull().references(() => tafawoqAssessments.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    skillKey: varchar("skillKey", { length: 64 }).notNull(),
+    questionId: varchar("questionId", { length: 64 }).notNull(),
+    difficulty: int("difficulty").notNull(),
+    correct: int("correct").notNull(),
+    misconception: varchar("misconception", { length: 200 }),
+    // Kind of mistake (shared/bacPlatform.ts ERROR_TYPES); null when correct.
+    errorType: varchar("errorType", { length: 24 }),
+    responseMs: int("responseMs"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqAttempts_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+    studentCreatedIdx: index("tafawoqAttempts_student_created_idx").on(table.studentId, table.createdAt),
+  })
+);
+
+export const tafawoqLessons = mysqlTable(
+  "tafawoqLessons",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    tier: mysqlEnum("tier", ["weak", "intermediate", "advanced"]).notNull(),
+    contentJson: mediumtext("contentJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqLessons_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqVideos = mysqlTable(
+  "tafawoqVideos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    personalLessonId: int("personalLessonId").references(() => tafawoqLessons.id),
+    scriptJson: mediumtext("scriptJson").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqVideos_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+export const tafawoqMessages = mysqlTable(
+  "tafawoqMessages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    role: mysqlEnum("role", ["tutor", "student"]).notNull(),
+    content: text("content").notNull(),
+    source: mysqlEnum("source", ["ai", "template"]),
+    // Teacher message in the fixed format (shared/bacPlatform.ts TeacherMessage).
+    structuredJson: mediumtext("structuredJson"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentLessonIdx: index("tafawoqMessages_student_lesson_idx").on(
+      table.studentId,
+      table.lessonKey
+    ),
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Tafawoq BAC platform (drizzle/0032_add_tafawoq_bac_platform.sql)
+// ---------------------------------------------------------------------------
+
+export const tafawoqStreamRequests = mysqlTable(
+  "tafawoqStreamRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    userId: int("userId").notNull().references(() => users.id),
+    fromStream: varchar("fromStream", { length: 16 }).notNull(),
+    toStream: varchar("toStream", { length: 16 }).notNull(),
+    fromLanguage: varchar("fromLanguage", { length: 16 }),
+    toLanguage: varchar("toLanguage", { length: 16 }),
+    reason: text("reason").notNull(),
+    status: mysqlEnum("status", ["pending", "approved", "rejected"]).default("pending").notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id),
+    reviewNote: text("reviewNote"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    reviewedAt: timestamp("reviewedAt"),
+  },
+  table => ({
+    statusIdx: index("tafawoqStreamRequests_status_idx").on(table.status, table.createdAt),
+  })
+);
+
+export const tafawoqStreamChanges = mysqlTable("tafawoqStreamChanges", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+  studentName: varchar("studentName", { length: 100 }).notNull(),
+  fromStream: varchar("fromStream", { length: 16 }).notNull(),
+  toStream: varchar("toStream", { length: 16 }).notNull(),
+  fromLanguage: varchar("fromLanguage", { length: 16 }),
+  toLanguage: varchar("toLanguage", { length: 16 }),
+  reason: text("reason").notNull(),
+  adminId: int("adminId").notNull().references(() => users.id),
+  adminName: varchar("adminName", { length: 200 }),
+  requestId: int("requestId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const tafawoqSecondSubjectChanges = mysqlTable(
+  "tafawoqSecondSubjectChanges",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    fromSubject: varchar("fromSubject", { length: 32 }),
+    toSubject: varchar("toSubject", { length: 32 }),
+    changedBy: int("changedBy").notNull().references(() => users.id),
+    byAdmin: int("byAdmin").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentIdx: index("tafawoqSecondSubjectChanges_student_idx").on(table.studentId, table.createdAt),
+  })
+);
+
+// Sessions with a human teacher (drizzle/0034_add_tafawoq_tutoring.sql).
+export const tafawoqTutors = mysqlTable("tafawoqTutors", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").references(() => users.id).unique("tafawoqTutors_user_unique"),
+  displayName: varchar("displayName", { length: 120 }).notNull(),
+  /** BAC subject keys, comma-separated. */
+  subjects: varchar("subjects", { length: 255 }).notNull(),
+  bio: text("bio"),
+  /** Per session; 0 = included in the subscription. */
+  priceDa: int("priceDa").default(0).notNull(),
+  active: int("active").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const tafawoqTutorSlots = mysqlTable(
+  "tafawoqTutorSlots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tutorId: int("tutorId").notNull().references(() => tafawoqTutors.id),
+    startsAt: timestamp("startsAt").notNull(),
+    durationMin: int("durationMin").default(45).notNull(),
+    status: mysqlEnum("status", ["open", "booked", "cancelled"]).default("open").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    tutorIdx: index("tafawoqTutorSlots_tutor_idx").on(table.tutorId, table.startsAt),
+    statusIdx: index("tafawoqTutorSlots_status_idx").on(table.status, table.startsAt),
+  })
+);
+
+export const tafawoqBookings = mysqlTable(
+  "tafawoqBookings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    slotId: int("slotId").notNull().references(() => tafawoqTutorSlots.id),
+    tutorId: int("tutorId").notNull().references(() => tafawoqTutors.id),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    userId: int("userId").notNull().references(() => users.id),
+    subject: varchar("subject", { length: 32 }).notNull(),
+    note: text("note"),
+    status: mysqlEnum("status", ["requested", "confirmed", "declined", "cancelled", "done"]).default("requested").notNull(),
+    meetingUrl: varchar("meetingUrl", { length: 255 }),
+    tutorNote: text("tutorNote"),
+    cancelledBy: int("cancelledBy"),
+    // The subscription the booking was counted against (per-cycle allowance).
+    subscriptionId: int("subscriptionId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt"),
+  },
+  table => ({
+    userIdx: index("tafawoqBookings_user_idx").on(table.userId, table.status),
+    subscriptionIdx: index("tafawoqBookings_subscription_idx").on(table.subscriptionId, table.status),
+    tutorIdx: index("tafawoqBookings_tutor_idx").on(table.tutorId, table.status),
+    slotIdx: index("tafawoqBookings_slot_idx").on(table.slotId),
+  })
+);
+
+export const tafawoqSubscriptions = mysqlTable(
+  "tafawoqSubscriptions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    plan: varchar("plan", { length: 16 }).notNull(),
+    months: int("months").notNull(),
+    priceDa: int("priceDa").notNull(),
+    amountDa: int("amountDa").notNull(),
+    couponId: int("couponId").references(() => coupons.id),
+    referralCodeId: int("referralCodeId").references(() => referralCodes.id),
+    paymentMethod: varchar("paymentMethod", { length: 16 }).notNull(),
+    paymentReference: varchar("paymentReference", { length: 120 }),
+    status: mysqlEnum("status", ["pending_payment", "active", "rejected", "canceled"])
+      .default("pending_payment")
+      .notNull(),
+    startsAt: timestamp("startsAt"),
+    endsAt: timestamp("endsAt"),
+    bonusDays: int("bonusDays").default(0).notNull(),
+    reviewedBy: int("reviewedBy").references(() => users.id),
+    reviewNote: text("reviewNote"),
+    // What the admin actually received when confirming a manual payment.
+    paidAmountDa: int("paidAmountDa"),
+    paidReference: varchar("paidReference", { length: 120 }),
+    /** The student's payment receipt (drizzle/0037), private: owner and admins. */
+    receiptKey: varchar("receiptKey", { length: 255 }),
+    receiptMime: varchar("receiptMime", { length: 40 }),
+    receiptUploadedAt: timestamp("receiptUploadedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    reviewedAt: timestamp("reviewedAt"),
+  },
+  table => ({
+    userIdx: index("tafawoqSubscriptions_user_idx").on(table.userId, table.createdAt),
+    statusIdx: index("tafawoqSubscriptions_status_idx").on(table.status, table.endsAt),
+  })
+);
+
+export type TafawoqSubscription = typeof tafawoqSubscriptions.$inferSelect;
+
+export const tafawoqContentSettings = mysqlTable("tafawoqContentSettings", {
+  contentKey: varchar("contentKey", { length: 80 }).primaryKey(),
+  enabled: int("enabled").notNull(),
+  updatedBy: int("updatedBy"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const tafawoqDailyPlans = mysqlTable(
+  "tafawoqDailyPlans",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    day: varchar("day", { length: 10 }).notNull(),
+    planJson: mediumtext("planJson").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    studentDay: uniqueIndex("tafawoqDailyPlans_student_day").on(table.studentId, table.day),
+  })
+);
+
+export const tafawoqBankTopics = mysqlTable("tafawoqBankTopics", {
+  id: int("id").autoincrement().primaryKey(),
+  subject: varchar("subject", { length: 32 }).notNull(),
+  // Comma-separated platform streams.
+  streams: varchar("streams", { length: 64 }).notNull(),
+  year: int("year"),
+  unit: varchar("unit", { length: 120 }).notNull(),
+  difficulty: int("difficulty").notNull(),
+  questionType: varchar("questionType", { length: 16 }).notNull(),
+  kind: mysqlEnum("kind", ["full", "single"]).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  statement: mediumtext("statement").notNull(),
+  solution: mediumtext("solution").notNull(),
+  methodology: text("methodology"),
+  points: double("points"),
+  commonMistakes: text("commonMistakes"),
+  published: int("published").default(0).notNull(),
+  createdBy: int("createdBy").notNull().references(() => users.id),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TafawoqBankTopic = typeof tafawoqBankTopics.$inferSelect;
+
+export const tafawoqTopicAnswers = mysqlTable(
+  "tafawoqTopicAnswers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    topicId: int("topicId").notNull().references(() => tafawoqBankTopics.id),
+    answer: mediumtext("answer").notNull(),
+    selfScore: double("selfScore"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentIdx: index("tafawoqTopicAnswers_student_idx").on(table.studentId, table.topicId),
+  })
+);
+
+export const tafawoqSavedTopics = mysqlTable(
+  "tafawoqSavedTopics",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    topicId: varchar("topicId", { length: 120 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    studentTopic: uniqueIndex("tafawoqSavedTopics_student_topic").on(table.studentId, table.topicId),
+  })
+);
+
+export const tafawoqEvents = mysqlTable(
+  "tafawoqEvents",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId"),
+    event: varchar("event", { length: 48 }).notNull(),
+    detailsJson: text("detailsJson"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    eventIdx: index("tafawoqEvents_event_idx").on(table.event, table.createdAt),
+    userIdx: index("tafawoqEvents_user_idx").on(table.userId, table.createdAt),
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Launch readiness (drizzle/0035_launch_readiness.sql)
+// ---------------------------------------------------------------------------
+
+/** One-time password reset codes; only a SHA-256 of the code is stored. */
+export const passwordResetTokens = mysqlTable(
+  "passwordResetTokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    tokenHash: char("tokenHash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    hashUnique: uniqueIndex("passwordResetTokens_hash_unique").on(table.tokenHash),
+    userIdx: index("passwordResetTokens_user_idx").on(table.userId, table.createdAt),
+  })
+);
+
+/** A user's request to export their data or delete their account. */
+export const accountRequests = mysqlTable(
+  "accountRequests",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    kind: mysqlEnum("kind", ["export", "delete"]).notNull(),
+    status: mysqlEnum("status", ["open", "done", "rejected"]).default("open").notNull(),
+    note: text("note"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    resolvedAt: timestamp("resolvedAt"),
+    resolvedBy: int("resolvedBy"),
+  },
+  table => ({
+    statusIdx: index("accountRequests_status_idx").on(table.status, table.createdAt),
+    userIdx: index("accountRequests_user_idx").on(table.userId),
+  })
+);
+
+/** Daily counters of what costs money or capacity — numbers only. */
+export const tafawoqUsage = mysqlTable(
+  "tafawoqUsage",
+  {
+    day: date("day", { mode: "string" }).notNull(),
+    metric: varchar("metric", { length: 48 }).notNull(),
+    amount: bigint("amount", { mode: "number" }).default(0).notNull(),
+  },
+  table => ({ pk: primaryKey({ columns: [table.day, table.metric] }) })
+);
+
+/** Pedagogical review of each lesson by a human teacher. */
+export const tafawoqContentReviews = mysqlTable("tafawoqContentReviews", {
+  lessonKey: varchar("lessonKey", { length: 80 }).primaryKey(),
+  status: mysqlEnum("status", ["unreviewed", "in_review", "approved", "needs_changes"]).default("unreviewed").notNull(),
+  reviewerName: varchar("reviewerName", { length: 120 }),
+  note: text("note"),
+  updatedBy: int("updatedBy"),
+  /** Fingerprint of the lesson content when approved (drizzle/0040): a later change shows as stale. */
+  contentHash: varchar("contentHash", { length: 64 }),
+  /** Where the content comes from (official programme, textbook…), as the reviewer recorded it. */
+  source: varchar("source", { length: 255 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** A student's report on a question: a mistake, or unclear (drizzle/0040). */
+export const tafawoqContentFlags = mysqlTable(
+  "tafawoqContentFlags",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    questionId: varchar("questionId", { length: 64 }).notNull(),
+    kind: mysqlEnum("kind", ["error", "unclear"]).notNull(),
+    /** The question as the student saw it, from their own graded results. */
+    prompt: text("prompt").notNull(),
+    note: text("note"),
+    status: mysqlEnum("status", ["open", "reviewing", "resolved", "dismissed"]).default("open").notNull(),
+    adminNote: text("adminNote"),
+    resolvedBy: int("resolvedBy"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    once: uniqueIndex("tafawoqContentFlags_once").on(table.userId, table.questionId, table.kind),
+    statusIdx: index("tafawoqContentFlags_status").on(table.status, table.createdAt),
+    questionIdx: index("tafawoqContentFlags_question").on(table.questionId),
+  })
+);

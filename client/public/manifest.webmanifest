@@ -1,8 +1,8 @@
 {
-  "name": "Nourix Academy",
-  "short_name": "Nourix",
-  "description": "منصة Nourix Academy للتعلم عن بعد — الرياضيات والإعلام الآلي",
-  "start_url": "/?source=pwa",
+  "name": "Tafawoq — أستاذك الذكي للبكالوريا",
+  "short_name": "Tafawoq",
+  "description": "تفوّق — التحضير للبكالوريا في الجزائر مع أستاذ ذكي يشرح بالصوت",
+  "start_url": "/tafawoq?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -11,29 +11,64 @@
   "lang": "ar",
   "dir": "rtl",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
     {
-      "name": "لوحة التحكم",
-      "short_name": "لوحتي",
-      "url": "/dashboard?source=pwa-shortcut",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "خطتي اليوم",
+      "short_name": "خطتي",
+      "url": "/tafawoq?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "الدعم الفني",
-      "short_name": "الدعم",
-      "url": "/support?source=pwa-shortcut",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "مراجعة سريعة",
+      "short_name": "مراجعة",
+      "url": "/tafawoq/revision?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "name": "مختبر الخوارزميات",
-      "short_name": "المختبر",
-      "url": "/lab?source=pwa-shortcut",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "name": "حصة مع أستاذ",
+      "short_name": "حصة",
+      "url": "/tafawoq/sessions?source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

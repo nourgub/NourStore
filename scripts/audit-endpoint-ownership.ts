@@ -4,9 +4,9 @@
 //   npx tsx scripts/audit-endpoint-ownership.ts
 //
 // What it checks: every protectedProcedure/learnerProcedure/parentProcedure
-// (learner-facing) and every roleProcedure that allows "teacher" or
-// "institution" (content-authoring) whose input takes an id-like field
-// (courseId, lessonId, ticketId, etc.) MUST reference `ctx.user` somewhere
+// (learner-facing) and every procedure open to teachers (roleProcedure, or
+// teacherProcedure) whose input takes an id-like field
+// (exerciseId, bookingId, slotId, etc.) MUST reference `ctx.user` somewhere
 // in its handler body. A procedure that takes someone else's resource id
 // but never consults who's actually asking is the textbook shape of an
 // IDOR (insecure direct object reference) vulnerability — this doesn't
@@ -15,13 +15,9 @@
 // the class of mistake that's easy to introduce by accident (copy a
 // procedure, forget to wire ctx.user through) and easy to catch this way.
 //
-// Scans every file directly under server/routers/ (the actual 19 domain
-// routers) — NOT server/routers.ts itself, which has been a ~40-line
-// composition/barrel file importing those 19 files for a while now and
-// contains no procedure declarations of its own. Scanning only that
-// barrel silently found (and reported success on) zero procedures — a
-// real bug in this script itself, caught while re-verifying it for this
-// pass, not a new regression from this session's own file splits.
+// Scans every file directly under server/routers/ — NOT server/routers.ts
+// itself, a short composition file with no procedure declarations of its
+// own (scanning only it once silently reported success on zero procedures).
 //
 // Exits with a non-zero code and a clear report when it finds anything —
 // safe to wire into CI once this project has one.
@@ -110,8 +106,8 @@ function main() {
       relFile,
       lines,
       allStarts,
-      /^\s+(\w+):\s*(roleProcedure)\s*\(\s*\[([^\]]+)\]/,
-      m => m[3].includes("teacher") || m[3].includes("institution")
+      /^\s+(\w+):\s*(teacherProcedure|roleProcedure)\b(?:\s*\(\s*\[([^\]]+)\])?/,
+      m => m[2] === "teacherProcedure" || (m[3] ?? "").includes("teacher")
     );
 
     learnerScanned += learnerFamily.scanned;
@@ -124,7 +120,7 @@ function main() {
     `Scanned ${learnerScanned} learner-facing procedures (protectedProcedure/learnerProcedure/parentProcedure).`
   );
   console.log(
-    `Scanned ${authoringScanned} teacher/institution-facing roleProcedure procedures.`
+    `Scanned ${authoringScanned} teacher-facing procedures (teacherProcedure/roleProcedure).`
   );
 
   if (allFindings.length === 0) {

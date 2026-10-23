@@ -4,33 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050505" />
-    <title>Nourix Academy – نوريكس أكاديمي</title>
+    <title>تفوّق Tafawoq — أستاذك الذكي للبكالوريا</title>
     <meta
       name="description"
-      content="Nourix Academy — منصة تعليم إلكتروني للسوق الجزائرية، تدعم العربية والفرنسية والإنجليزية، وتركز على الرياضيات والإعلام الآلي — من التأسيس إلى التحضير لشهادتي BEM وBAC."
+      content="تفوّق (Tafawoq) — منصة التحضير لشهادة البكالوريا في الجزائر: دروس وتمارين واختبارات وبكالوريا تجريبية، أستاذ ذكي يشرح بالصوت، وحصص مع أساتذة. للعلوم التجريبية والآداب والفلسفة واللغات الأجنبية."
     />
 
     <!-- Open Graph / Twitter Card — real, complete tags so a shared link
          (WhatsApp, Facebook, Twitter/X) shows an actual title, description,
-         and preview image instead of a bare URL. Individual pages (course
-         detail, lesson) can override title/description/image at runtime
+         and preview image instead of a bare URL. Individual pages (a
+         lesson, for example) can override title/description/image at runtime
          via useDocumentMeta (see client/src/lib/documentMeta.ts) — these
          are the correct, real fallback for every other page and for the
          first paint before that JS runs. -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Nourix Academy" />
-    <meta property="og:title" content="Nourix Academy – نوريكس أكاديمي" />
+    <meta property="og:site_name" content="Tafawoq" />
+    <meta property="og:title" content="تفوّق Tafawoq — أستاذك الذكي للبكالوريا" />
     <meta
       property="og:description"
-      content="منصة تعليم إلكتروني للسوق الجزائرية — الرياضيات والإعلام الآلي، بالعربية والفرنسية والإنجليزية."
+      content="التحضير للبكالوريا في الجزائر: دروس وتمارين واختبارات وأستاذ ذكي يشرح بالصوت."
     />
     <meta property="og:image" content="/icon-512.png" />
     <meta property="og:locale" content="ar_DZ" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Nourix Academy – نوريكس أكاديمي" />
+    <meta name="twitter:title" content="تفوّق Tafawoq — أستاذك الذكي للبكالوريا" />
     <meta
       name="twitter:description"
-      content="منصة تعليم إلكتروني للسوق الجزائرية — الرياضيات والإعلام الآلي."
+      content="التحضير للبكالوريا في الجزائر: دروس وتمارين واختبارات وأستاذ ذكي يشرح بالصوت."
     />
     <meta name="twitter:image" content="/icon-512.png" />
 
@@ -71,7 +71,7 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Nourix" />
+    <meta name="apple-mobile-web-app-title" content="Tafawoq" />
   </head>
   <body>
     <!-- Runs before any React code, synchronously, so a returning visitor
@@ -83,7 +83,10 @@
          keep this in sync after the initial load too. -->
     <script>
       (function () {
-        var lang = localStorage.getItem("nourix-language");
+        var lang = null;
+        try {
+          lang = localStorage.getItem("tafawoq-language") || localStorage.getItem("nourix-language");
+        } catch (e) {}
         if (lang === "fr" || lang === "en") {
           document.documentElement.lang = lang;
           document.documentElement.dir = "ltr";
