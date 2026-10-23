@@ -28,6 +28,12 @@ const COPY = {
     exportTitle: "نسخة من بياناتي",
     exportText: "ملف JSON يضم ما نحفظه عنك: الحساب، الملف الدراسي، الاشتراكات، المحاولات، المحادثات، التمارين، الحصص، الإشعارات وروابط الولي.",
     exportBtn: "تنزيل بياناتي",
+    linksTitle: "الأولياء المرتبطون",
+    linksChild: "هؤلاء يرون مستواك وتقدمك واشتراكك. يمكنك إلغاء الربط متى شئت.",
+    linksParent: "التلاميذ المرتبطون بحسابك.",
+    linksNone: "لا يوجد ربط.",
+    unlink: "إلغاء الربط",
+    unlinkConfirm: "إلغاء هذا الربط؟ لن يرى الطرف الآخر شيئاً بعد الآن.",
     deleteTitle: "حذف الحساب",
     deleteText:
       "يُرسل الطلب إلى الإدارة لتأكيده. عند التنفيذ: يُمحى اسمك وبريدك وكلمة مرورك ومحادثاتك وتمارينك وصورك وإجاباتك المكتوبة وروابط الولي، ولن يعود الدخول ممكنًا. تبقى سجلات الدفع والاشتراك دون اسم (محاسبة)، ونتائج الإجابات صحيح/خطأ دون اسم (إحصاء). نزّل نسخة من بياناتك قبل الطلب إن أردت.",
@@ -60,6 +66,12 @@ const COPY = {
     exportTitle: "Copie de mes données",
     exportText: "Un fichier JSON avec ce que nous gardons sur vous : compte, profil, abonnements, réponses, conversations, exercices, séances, notifications et liens parent.",
     exportBtn: "Télécharger mes données",
+    linksTitle: "Liens parent",
+    linksChild: "Ces parents voient ton niveau, ta progression et ton abonnement. Tu peux annuler le lien à tout moment.",
+    linksParent: "Les élèves liés à votre compte.",
+    linksNone: "Aucun lien.",
+    unlink: "Annuler le lien",
+    unlinkConfirm: "Annuler ce lien ? L’autre personne ne verra plus rien.",
     deleteTitle: "Supprimer le compte",
     deleteText:
       "La demande est confirmée par l’administration. Ensuite : nom, e-mail, mot de passe, conversations, exercices, photos, réponses rédigées et liens parent sont effacés, et la connexion n’est plus possible. Restent, sans nom : les paiements et abonnements (comptabilité) et le juste/faux des réponses (statistiques). Téléchargez vos données avant si vous le souhaitez.",
@@ -92,6 +104,12 @@ const COPY = {
     exportTitle: "A copy of my data",
     exportText: "A JSON file with what we keep about you: account, profile, subscriptions, answers, chats, exercises, sessions, notifications and parent links.",
     exportBtn: "Download my data",
+    linksTitle: "Parent links",
+    linksChild: "These parents see your level, progress and subscription. You can unlink at any time.",
+    linksParent: "The students linked to your account.",
+    linksNone: "No link.",
+    unlink: "Unlink",
+    unlinkConfirm: "Remove this link? The other person will no longer see anything.",
     deleteTitle: "Delete the account",
     deleteText:
       "The request is confirmed by the administration. Then your name, email, password, chats, exercises, photos, written answers and parent links are erased and signing in is no longer possible. Kept without a name: payment and subscription records (accounting) and right/wrong answer results (statistics). Download your data first if you wish.",
@@ -214,6 +232,8 @@ export function AccountPage() {
         </button>
       </div>
 
+      <ParentLinks c={c} role={user?.role} />
+
       {user?.role !== "admin" && (
         <div className="tfq-card">
           <h2>
@@ -265,5 +285,50 @@ export function AccountPage() {
         </div>
       )}
     </section>
+  );
+}
+
+/** Who is linked to whom: a student sees their parents, a parent their children; either side can unlink. */
+function ParentLinks({ c, role }: { c: (typeof COPY)[Lang]; role: string | undefined }) {
+  const utils = trpc.useUtils();
+  const isParent = role === "parent";
+  const mine = trpc.parent.myParents.useQuery(undefined, { enabled: role === "learner" });
+  const children = trpc.parent.links.useQuery(undefined, { enabled: isParent });
+  const unlink = trpc.parent.unlink.useMutation({
+    onSuccess: async () => {
+      await utils.parent.invalidate();
+    },
+    onError: () => toast.error(c.error),
+  });
+  if (role !== "learner" && !isParent) return null;
+  const rows = isParent
+    ? (children.data ?? []).filter(row => row.status === "active").map(row => ({ id: row.id, name: row.childName }))
+    : (mine.data ?? []).map(row => ({ id: row.id, name: row.parentName }));
+  return (
+    <div className="tfq-card">
+      <h2>{c.linksTitle}</h2>
+      <p className="tfq-muted">{isParent ? c.linksParent : c.linksChild}</p>
+      {!rows.length ? (
+        <p className="tfq-muted">{c.linksNone}</p>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 8 }}>
+          {rows.map(row => (
+            <li key={row.id} className="tfq-spread">
+              <span dir="auto">{row.name || "—"}</span>
+              <button
+                type="button"
+                className="tfq-btn ghost small"
+                disabled={unlink.isPending}
+                onClick={() => {
+                  if (window.confirm(c.unlinkConfirm)) unlink.mutate({ linkId: row.id });
+                }}
+              >
+                {c.unlink}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

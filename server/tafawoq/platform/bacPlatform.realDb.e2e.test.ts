@@ -388,6 +388,31 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     await expect(parentCaller.bac.dashboard()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
+  it("a parent code works once, even for two parents at the same moment; a new code cancels the old; either side can unlink", async () => {
+    const student = appRouter.createCaller(ctxFor(sara));
+    const first = await student.bac.createParentCode();
+    const second = await student.bac.createParentCode();
+    // The first code was cancelled by the second.
+    expect(await appRouter.createCaller(ctxFor(otherParent)).parent.acceptInvite({ code: first.code })).toBe(false);
+    const results = await Promise.all([
+      appRouter.createCaller(ctxFor(otherParent)).parent.acceptInvite({ code: second.code }),
+      appRouter.createCaller(ctxFor(parent)).parent.acceptInvite({ code: second.code }),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    // The student sees who is linked and can unlink them.
+    const linked = await student.parent.myParents();
+    const winner = results[0] ? otherParent : parent;
+    const link = linked.find(row => row.parentName === winner.name);
+    expect(link).toBeTruthy();
+    expect(await student.parent.unlink({ linkId: link!.id })).toBe(true);
+    expect(await appRouter.createCaller(ctxFor(winner)).bac.parentOverview()).toEqual(
+      winner.id === parent.id ? expect.any(Array) : []
+    );
+    // Someone else's link cannot be removed.
+    const [parentLink] = await student.parent.myParents();
+    if (parentLink) expect(await appRouter.createCaller(ctxFor(otherParent)).parent.unlink({ linkId: parentLink.id })).toBe(false);
+  });
+
   it("keeps the admin panel for admins only", async () => {
     const student = appRouter.createCaller(ctxFor(sara));
     await expect(student.bacAdmin.students({})).rejects.toMatchObject({ code: "FORBIDDEN" });

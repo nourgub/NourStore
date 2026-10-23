@@ -13,6 +13,7 @@ import { checkRateLimit } from "../rateLimit";
 import { createContext } from "./context";
 import { serveStatic } from "./staticServe";
 import { assertEnvOrExit } from "./env";
+import { requestGuard } from "./requestGuard";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -51,6 +52,7 @@ async function startServer() {
   // JSON bodies up to 12 MB: the largest request is a student's photo of an
   // exercise (6 MB, base64-encoded — see MAX_EXERCISE_IMAGE_BYTES in
   // server/tafawoq/service.ts).
+  app.use(requestGuard);
   app.use(express.json({ limit: "12mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
   registerGoogleAuthRoutes(app);
