@@ -88,6 +88,9 @@ services:
       # Teacher voices. Piper (free) is fetched into the uploads volume on
       # first start; the paid voices are used only when their keys are set.
       TAFAWOQ_PIPER_DIR: ${TAFAWOQ_PIPER_DIR:-/app/uploads/piper}
+      PIPER_BIN: ${PIPER_BIN:-}
+      PIPER_MODEL: ${PIPER_MODEL:-}
+      PIPER_MODEL_FEMALE: ${PIPER_MODEL_FEMALE:-}
       TAFAWOQ_TTS_CACHE_DIR: ${TAFAWOQ_TTS_CACHE_DIR:-/app/uploads/tts-cache}
       TAFAWOQ_VOICE_PACK_MALE: ${TAFAWOQ_VOICE_PACK_MALE:-}
       TAFAWOQ_VOICE_PACK_FEMALE: ${TAFAWOQ_VOICE_PACK_FEMALE:-}

@@ -5,6 +5,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { foreignLanguageOfLesson, spokenParts, type ForeignLang, type SpokenPart } from "@shared/spokenArabic";
 import { TAUGHT_LANGUAGES } from "@shared/taughtLanguages";
+import { toast } from "sonner";
 import { readTeacherVoice } from "./teacherStyle";
 
 export { toSpokenArabic } from "@shared/spokenArabic";
@@ -218,6 +219,21 @@ function play(blob: Blob): Promise<boolean> {
  * the current one plays. Falls back to the browser's best voice when the
  * server has none. Returns a stop function.
  */
+const MISSING_NOTICE: Record<string, string> = {
+  ar: "بعض هذه الجمل لم تُسجَّل بعد بصوت الأستاذة: النص ظاهر على الشاشة.",
+  fr: "Certaines phrases ne sont pas encore enregistrées avec la voix de l'enseignante : le texte est affiché.",
+  en: "Some of these sentences are not recorded in the teacher's voice yet: the text is on screen.",
+};
+let lastMissingNotice = 0;
+
+/** Exclusive voice, recording missing: say so (at most once a minute) instead of staying silent unexplained. */
+function noticeMissingRecording() {
+  if (Date.now() - lastMissingNotice < 60_000) return;
+  lastMissingNotice = Date.now();
+  const lang = (typeof document !== "undefined" && document.querySelector(".tfq")?.getAttribute("lang")) || "ar";
+  toast.info(MISSING_NOTICE[lang] ?? MISSING_NOTICE.ar, { id: "voice-missing" });
+}
+
 export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign: ForeignLang | null = lessonLanguage) {
   const chunks = spokenParts(text, foreign);
   if (!chunks.length) {
@@ -251,8 +267,9 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
       fetchAt(index + 1);
       fetchAt(index + 2);
       if (blob === SKIP || (!blob && exclusiveVoice)) {
-        // Not in the only allowed voice: the text is on screen, nothing is said.
+        // Not in the only allowed voice: the text is on screen, nothing is said, and a notice says why.
         if (index === 0) handlers.onStart?.();
+        noticeMissingRecording();
         continue;
       }
       const ok = blob ? await (index === 0 ? (handlers.onStart?.(), play(blob)) : play(blob)) : false;
