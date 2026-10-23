@@ -25,6 +25,9 @@ import {
   tafawoqStudents,
   tafawoqSubscriptions,
   tafawoqTopicAnswers,
+  tafawoqBookings,
+  tafawoqTutorSlots,
+  tafawoqTutors,
   users,
 } from "../../drizzle/schema";
 import { getDb } from "./shared";
@@ -1120,11 +1123,13 @@ export async function studentUserIds(stream?: string) {
   return rows.map(row => row.userId);
 }
 
-export async function insertNotifications(rows: Array<{ userId: number; type: string; title: string; body: string }>) {
+export async function insertNotifications(rows: Array<{ userId: number; type: string; title: string; body: string; dedupeKey?: string }>) {
   if (!rows.length) return;
   const db = await requireDb();
   for (let index = 0; index < rows.length; index += 500) {
-    await db.insert(notifications).values(rows.slice(index, index + 500));
+    // A row whose (userId, dedupeKey) already exists is skipped, so a reminder
+    // sent by two instances at once arrives once. Rows without a key always go in.
+    await db.insert(notifications).ignore().values(rows.slice(index, index + 500));
   }
 }
 
@@ -1165,4 +1170,51 @@ export async function parentIdsOf(childUserId: number) {
     .from(parentLinks)
     .where(and(eq(parentLinks.childId, childUserId), eq(parentLinks.status, "active")));
   return rows.map(row => row.parentId);
+}
+
+// ---------------------------------------------------------------------------
+// Scheduled reminders (server/tafawoq/platform/reminders.ts)
+// ---------------------------------------------------------------------------
+
+/** Users with an active subscription ending between `from` and `to`. */
+export async function usersWithSubscriptionEndingBetween(from: Date, to: Date) {
+  const db = await requireDb();
+  const rows = await db
+    .selectDistinct({ userId: tafawoqSubscriptions.userId })
+    .from(tafawoqSubscriptions)
+    .where(and(eq(tafawoqSubscriptions.status, "active"), gte(tafawoqSubscriptions.endsAt, from), lte(tafawoqSubscriptions.endsAt, to)));
+  return rows.map(row => row.userId);
+}
+
+/** Confirmed sessions with a human teacher starting between `from` and `to`. */
+export async function confirmedSessionsBetween(from: Date, to: Date) {
+  const db = await requireDb();
+  return db
+    .select({ id: tafawoqBookings.id, userId: tafawoqBookings.userId, tutorUserId: tafawoqTutors.userId, startsAt: tafawoqTutorSlots.startsAt })
+    .from(tafawoqBookings)
+    .innerJoin(tafawoqTutorSlots, eq(tafawoqTutorSlots.id, tafawoqBookings.slotId))
+    .innerJoin(tafawoqTutors, eq(tafawoqTutors.id, tafawoqBookings.tutorId))
+    .where(and(eq(tafawoqBookings.status, "confirmed"), gte(tafawoqTutorSlots.startsAt, from), lte(tafawoqTutorSlots.startsAt, to)));
+}
+
+/** Subscribed students (active now) who have not handed in this week's weekly test. */
+export async function subscribersWithoutWeeklyTest(week: string, at: Date) {
+  const db = await requireDb();
+  const rows = await db
+    .selectDistinct({ userId: tafawoqStudents.userId })
+    .from(tafawoqStudents)
+    .innerJoin(tafawoqSubscriptions, eq(tafawoqSubscriptions.userId, tafawoqStudents.userId))
+    .leftJoin(
+      tafawoqExams,
+      and(eq(tafawoqExams.studentId, tafawoqStudents.id), eq(tafawoqExams.kind, "weekly"), eq(tafawoqExams.weekKey, week), eq(tafawoqExams.status, "graded"))
+    )
+    .where(
+      and(
+        eq(tafawoqSubscriptions.status, "active"),
+        lte(tafawoqSubscriptions.startsAt, at),
+        gt(tafawoqSubscriptions.endsAt, at),
+        isNull(tafawoqExams.id)
+      )
+    );
+  return rows.map(row => row.userId);
 }

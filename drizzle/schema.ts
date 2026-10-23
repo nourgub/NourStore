@@ -693,10 +693,13 @@ export const notifications = mysqlTable(
     title: varchar("title", { length: 255 }).notNull(),
     body: text("body").notNull(),
     readAt: timestamp("readAt"),
+    /** Scheduled reminders: one copy per (userId, dedupeKey), drizzle/0038. */
+    dedupeKey: varchar("dedupeKey", { length: 120 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   table => ({
     userIdx: index("notifications_userId_idx").on(table.userId),
+    dedupeIdx: uniqueIndex("notifications_dedupe_unique").on(table.userId, table.dedupeKey),
   })
 );
 

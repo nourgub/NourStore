@@ -1,14 +1,14 @@
 import express from "express";
 import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import type { TrpcContext } from "../_core/context";
 import { getDb } from "../db/shared";
 import { createEmailUser } from "../db/usersAuth";
 import { emailOpenId, hashPassword } from "../_core/emailAuth";
 import { createSessionToken } from "../_core/session";
 import { COOKIE_NAME } from "@shared/const";
-import { tafawoqSubscriptions, users, type User } from "../../drizzle/schema";
+import { notifications, tafawoqSubscriptions, users, type User } from "../../drizzle/schema";
 
 /**
  * REAL DATABASE: manual payments with a receipt — upload checked by content,
@@ -137,5 +137,38 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — manual 
     } finally {
       await adminCaller.bacAdmin.setSettings({ paymentMethods: ["ccp", "baridimob", "cash"] });
     }
+  });
+
+  it("sends the expiry reminder once when two instances run the reminders at the same time", async () => {
+    const { user, request } = await studentWithRequest("remind");
+    await appRouter.createCaller(ctxFor(admin)).bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa });
+    const db = (await getDb())!;
+    const count = async (prefix: string) =>
+      (await db.select().from(notifications).where(and(eq(notifications.userId, user.id), like(notifications.type, `${prefix}%`)))).length;
+    const { runReminders } = await import("./platform/reminders");
+
+    await db.update(tafawoqSubscriptions).set({ endsAt: new Date(Date.now() + 2 * 86_400_000) }).where(eq(tafawoqSubscriptions.id, request.id));
+    await Promise.all([runReminders(), runReminders(), runReminders()]);
+    await runReminders();
+    expect(await count("bac_sub_expiring:")).toBe(1);
+
+    // Ended yesterday: one "ended" notice, however many runs.
+    await db.update(tafawoqSubscriptions).set({ endsAt: new Date(Date.now() - 86_400_000) }).where(eq(tafawoqSubscriptions.id, request.id));
+    await Promise.all([runReminders(), runReminders()]);
+    expect(await count("bac_sub_expired:")).toBe(1);
+  });
+
+  it("refuses a payment only with a reason, which reaches the student", async () => {
+    const { user, caller, request } = await studentWithRequest("refused");
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    await expect(adminCaller.bacAdmin.closeSubscription({ id: request.id, status: "rejected" })).rejects.toMatchObject({ message: "REJECT_REASON_REQUIRED" });
+    await adminCaller.bacAdmin.closeSubscription({ id: request.id, status: "rejected", note: "الوصل غير مقروء" });
+    const page = await caller.bac.subscription();
+    expect(page.history.find(row => row.id === request.id)?.paymentState).toBe("rejected");
+    const db = (await getDb())!;
+    const [notice] = await db.select().from(notifications).where(and(eq(notifications.userId, user.id), eq(notifications.type, "bac_subscription_closed")));
+    expect(notice.body).toBe("الوصل غير مقروء");
+    // Refused, it can't be confirmed afterwards.
+    await expect(adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa })).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });

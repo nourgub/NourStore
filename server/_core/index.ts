@@ -14,6 +14,7 @@ import { createContext } from "./context";
 import { serveStatic } from "./staticServe";
 import { assertEnvOrExit } from "./env";
 import { requestGuard } from "./requestGuard";
+import { startReminders } from "../tafawoq/platform/reminders";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -144,6 +145,7 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+  startReminders();
 }
 
 startServer().catch(console.error);

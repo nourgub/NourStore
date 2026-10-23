@@ -115,7 +115,7 @@ function addMonths(date: Date, months: number) {
 // Subscription state
 // ---------------------------------------------------------------------------
 
-async function subscriptionSummary(userId: number) {
+export async function subscriptionSummary(userId: number) {
   const [current, pending, latestEnd] = await Promise.all([
     bac.getCurrentSubscription(userId),
     bac.getPendingSubscription(userId),
@@ -928,15 +928,20 @@ async function lastTestResult(student: Student) {
   return latest ? { kind: latest.kind, score: latest.row.score!, outOf: 20, date: latest.row.gradedAt ?? latest.row.createdAt } : null;
 }
 
-async function maybeNotifyExpiry(userId: number, summary: Awaited<ReturnType<typeof subscriptionSummary>>) {
+/**
+ * The expiry warning, for the student and linked parents. Sent from the
+ * dashboard and by the hourly reminders; the dedupe key makes it arrive once
+ * per end date whoever sends it first.
+ */
+export async function maybeNotifyExpiry(userId: number, summary: Awaited<ReturnType<typeof subscriptionSummary>>) {
   if (!summary.expiringSoon || !summary.endsAt) return;
   const type = `bac_sub_expiring:${dayKey(summary.endsAt)}`;
   if (await bac.hasNotificationSince(userId, type, new Date(Date.now() - 30 * DAY_MS))) return;
   const parents = await bac.parentIdsOf(userId);
-  const body = `ينتهي الاشتراك في ${dayKey(summary.endsAt)} (بعد ${summary.daysLeft} يوم).`;
+  const body = `ينتهي الاشتراك في ${dayKey(summary.endsAt)} (بعد ${summary.daysLeft} يوم). للتجديد: صفحة الاشتراك، ثم تأكيد الدفع من الإدارة. التجديد يبدأ من تاريخ نهاية الاشتراك الحالي.`;
   await bac.insertNotifications([
-    { userId, type, title: "اشتراكك يقترب من نهايته", body },
-    ...parents.map(parentId => ({ userId: parentId, type, title: "اشتراك ابنك يقترب من نهايته", body })),
+    { userId, type, title: "اشتراكك يقترب من نهايته", body, dedupeKey: type },
+    ...parents.map(parentId => ({ userId: parentId, type, title: "اشتراك ابنك يقترب من نهايته", body, dedupeKey: type })),
   ]);
 }
 
@@ -1681,6 +1686,8 @@ export async function adminConfirmSubscription(
 }
 
 export async function adminCloseSubscription(adminId: number, subscriptionId: number, status: "rejected" | "canceled", note: string | null) {
+  // The student is told why a payment was refused.
+  if (status === "rejected" && !note?.trim()) throw new TRPCError({ code: "BAD_REQUEST", message: "REJECT_REASON_REQUIRED" });
   const row = await bac.getSubscription(subscriptionId);
   if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
   const from: Array<"pending_payment" | "active"> = status === "rejected" ? ["pending_payment"] : ["active", "pending_payment"];

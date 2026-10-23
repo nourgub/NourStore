@@ -395,7 +395,7 @@ function Subscriptions() {
                             expectedDa={row.amountDa}
                             busy={confirm.isPending || close.isPending}
                             onConfirm={paid => confirm.mutate({ id: row.id, ...paid })}
-                            onReject={() => close.mutate({ id: row.id, status: "rejected" })}
+                            onReject={reason => close.mutate({ id: row.id, status: "rejected", note: reason })}
                           />
                         )}
                         {row.paidAmountDa !== null && (
@@ -433,12 +433,14 @@ function ConfirmPaymentForm({
   expectedDa: number;
   busy: boolean;
   onConfirm: (paid: { paidAmountDa: number; paidReference: string | null; note: string | null }) => void;
-  onReject: () => void;
+  onReject: (reason: string) => void;
 }) {
   const b = useB();
   const [amount, setAmount] = useState(expectedDa);
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
   const mismatch = amount !== expectedDa;
   return (
     <form
@@ -467,10 +469,21 @@ function ConfirmPaymentForm({
         <button type="submit" className="tfq-btn small" disabled={busy}>
           {b.confirmPayment}
         </button>
-        <button type="button" className="tfq-btn ghost small" disabled={busy} onClick={onReject}>
+        <button
+          type="button"
+          className="tfq-btn ghost small"
+          disabled={busy || (rejecting && !reason.trim())}
+          onClick={() => (rejecting ? onReject(reason.trim()) : setRejecting(true))}
+        >
           {b.reject}
         </button>
       </div>
+      {rejecting && (
+        <label className="tfq-field">
+          {b.rejectReason}
+          <input className="tfq-input" dir="auto" maxLength={1000} autoFocus value={reason} onChange={event => setReason(event.target.value)} />
+        </label>
+      )}
     </form>
   );
 }
