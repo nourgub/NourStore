@@ -21,8 +21,6 @@ jobs:
           --health-interval=5s --health-timeout=5s --health-retries=20
     env:
       JWT_SECRET: ci-only-secret-at-least-sixteen-chars
-      DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/tafawoq_test
-      TAFAWOQ_DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/tafawoq_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,7 +29,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit -p .
+      # Unit tests run without a database (as locally).
       - run: npm run test:unit
       - run: node scripts/migrate.mjs
+        env:
+          TAFAWOQ_DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/tafawoq_test
       - run: npm run test:db
+        env:
+          DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/tafawoq_test
       - run: npm run build
