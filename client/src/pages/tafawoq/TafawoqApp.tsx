@@ -730,11 +730,16 @@ function VoiceSwitch() {
   }, [saved]);
   // What each teacher's voice really is on this server (never assumed).
   const [voices, setVoices] = useState<Record<"male" | "female", { provider: string; accent: string } | null> | null>(null);
+  const [exclusive, setExclusive] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     fetch("/api/tafawoq/tts/status")
       .then(response => (response.ok ? response.json() : null))
-      .then(body => alive && body?.voices && setVoices(body.voices))
+      .then(body => {
+        if (!alive || !body) return;
+        if (body.voices) setVoices(body.voices);
+        setExclusive(body.exclusive ?? null);
+      })
       .catch(() => {});
     return () => {
       alive = false;
@@ -746,6 +751,8 @@ function VoiceSwitch() {
     if (!entry) return t.voiceNotConfigured;
     return entry.accent === "algerian" ? t.voiceAlgerianShort : t.voiceNotAlgerian;
   };
+  // The owner chose one teacher voice for the whole platform: no choice to offer.
+  if (exclusive) return null;
   return (
     <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherVoice}>
       <span className="tfq-muted">{t.teacherVoice}</span>

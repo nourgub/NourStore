@@ -104,6 +104,12 @@ function browserSpeak(chunks: SpokenPart[], handlers: SpeakHandlers, started: bo
 
 /** null = not tried yet; false = the server has no natural voice (use the browser's). */
 let serverVoice: boolean | null = null;
+/**
+ * The owner allows one voice only (server TAFAWOQ_VOICE_EXCLUSIVE): a sentence
+ * that voice does not have is not spoken at all — never by the device's voice.
+ */
+let exclusiveVoice = false;
+const SKIP = Symbol("not prepared in the only allowed voice");
 
 /**
  * Which voice the student last heard for the Arabic teacher, told plainly on
@@ -156,8 +162,8 @@ export function unlockAudio() {
   }
 }
 
-async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Promise<Blob | null> {
-  if (serverVoice === false) return null;
+async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Promise<Blob | typeof SKIP | null> {
+  if (serverVoice === false && !exclusiveVoice) return null;
   try {
     const response = await fetch("/api/tafawoq/tts", {
       method: "POST",
@@ -166,6 +172,11 @@ async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Prom
       body: JSON.stringify({ text, voice: readTeacherVoice(), lang }),
       signal,
     });
+    if (response.status === 409 && response.headers.get("X-Tafawoq-Voice-Exclusive") === "1") {
+      exclusiveVoice = true;
+      serverVoice = true;
+      return SKIP;
+    }
     if (response.status === 503 || response.status === 404 || response.status === 401) {
       // No voice for a taught language says nothing about the Arabic one.
       if (lang === "ar") serverVoice = false;
@@ -173,6 +184,7 @@ async function fetchVoice({ text, lang }: SpokenPart, signal: AbortSignal): Prom
     }
     if (!response.ok) return null;
     serverVoice = true;
+    if (response.headers.get("X-Tafawoq-Voice-Exclusive") === "1") exclusiveVoice = true;
     if (lang === "ar") {
       const accent = (response.headers.get("X-Tafawoq-Voice") ?? "").split(";")[2]?.trim();
       setHeardVoice(accent === "algerian" ? "algerian" : "arabic");
@@ -212,7 +224,11 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
     handlers.onEnd?.();
     return () => {};
   }
-  if (serverVoice === false || typeof Audio === "undefined") {
+  if (exclusiveVoice && typeof Audio === "undefined") {
+    handlers.onEnd?.();
+    return () => {};
+  }
+  if ((serverVoice === false && !exclusiveVoice) || typeof Audio === "undefined") {
     setHeardVoice("device");
     return browserSpeak(chunks, handlers, false);
   }
@@ -220,7 +236,7 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
   let stopped = false;
   let stopFallback: () => void = () => {};
   const controller = new AbortController();
-  const pending = new Map<number, Promise<Blob | null>>();
+  const pending = new Map<number, Promise<Blob | typeof SKIP | null>>();
   const fetchAt = (index: number) => {
     if (index < chunks.length && !pending.has(index)) pending.set(index, fetchVoice(chunks[index], controller.signal));
     return pending.get(index);
@@ -234,6 +250,11 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
       if (stopped) return;
       fetchAt(index + 1);
       fetchAt(index + 2);
+      if (blob === SKIP || (!blob && exclusiveVoice)) {
+        // Not in the only allowed voice: the text is on screen, nothing is said.
+        if (index === 0) handlers.onStart?.();
+        continue;
+      }
       const ok = blob ? await (index === 0 ? (handlers.onStart?.(), play(blob)) : play(blob)) : false;
       if (stopped) return;
       if (!ok && chunks[index].lang !== "ar" && serverVoice) {
@@ -243,6 +264,7 @@ export function speakArabic(text: string, handlers: SpeakHandlers = {}, foreign:
         if (stopped) return;
         continue;
       }
+      if (!ok && exclusiveVoice) continue;
       if (!ok) {
         // No natural voice (or it can't play here): say the rest with the browser's.
         setHeardVoice("device");

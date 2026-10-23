@@ -96,4 +96,32 @@ describe("voice pack", () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it("one voice only: with TAFAWOQ_VOICE_EXCLUSIVE the pack's voice speaks for both teachers, and nothing else ever does", async () => {
+    vi.resetModules();
+    const cacheDir = mkdtempSync(path.join(tmpdir(), "pack-only-"));
+    writeFileSync(path.join(cacheDir, "voice-pack-info.json"), JSON.stringify(packDeclaration("algerian", "owner's own voice, consent recorded", "TassiliTTS, MIT per card")));
+    vi.stubEnv("TAFAWOQ_TTS_CACHE_DIR", cacheDir);
+    vi.stubEnv("TAFAWOQ_VOICE_PACK_FEMALE", "dz-teacher-f");
+    vi.stubEnv("TAFAWOQ_VOICE_EXCLUSIVE", "female");
+    // Another voice is configured, and must still never be used.
+    vi.stubEnv("AZURE_SPEECH_KEY", "fake-key");
+    vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
+    vi.stubEnv("PIPER_MODEL", "/nonexistent.onnx");
+    try {
+      const tts = await import("./tts");
+      expect(tts.voiceExclusive()).toBe("female");
+      for (const gender of ["male", "female"] as const) {
+        expect(tts.engines(gender).map(engine => `${engine.provider}:${engine.gender}`)).toEqual(["pack:female"]);
+        expect(tts.engines(gender, "de")).toEqual([]);
+      }
+      const engine = { provider: "pack" as const, voice: "dz-teacher-f" };
+      await tts.store(tts.cachePath(engine, "sentence", "صحيت."), tts.pcmToMp3(tone(24_000, 400), 24_000));
+      expect(await tts.speak("صحيت.", "male")).toMatchObject({ provider: "pack", gender: "female", accent: "algerian" });
+      // Not prepared: no voice at all (the route answers 409, the client stays silent).
+      expect(await tts.speak("جملة غير محضرة.", "female")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

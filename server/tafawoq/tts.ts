@@ -605,8 +605,22 @@ function enginesFor(gender: VoiceGender, lang: SpeechLang): Engine[] {
   return list;
 }
 
+/**
+ * TAFAWOQ_VOICE_EXCLUSIVE=female (or male): the teacher speaks only in that
+ * one prepared voice — the voice pack, or the TassiliTTS service made from
+ * the same consenting speaker — whatever the student chose, and never in
+ * another voice: a sentence that voice does not have is shown as text only
+ * (the route answers 409 VOICE_NOT_PREPARED and the client stays silent).
+ */
+export function voiceExclusive(): VoiceGender | null {
+  const value = (process.env.TAFAWOQ_VOICE_EXCLUSIVE || "").trim().toLowerCase();
+  return value === "female" || value === "male" ? value : null;
+}
+
 /** The voices able to speak, in order: the chosen gender first, then any natural voice. */
 export function engines(gender: VoiceGender, lang: SpeechLang = "ar"): Engine[] {
+  const only = voiceExclusive();
+  if (only) return enginesFor(only, lang).filter(engine => engine.provider === "pack" || engine.provider === "tassili");
   return [...enginesFor(gender, lang), ...enginesFor(gender === "male" ? "female" : "male", lang)];
 }
 

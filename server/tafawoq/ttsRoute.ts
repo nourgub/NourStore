@@ -7,7 +7,7 @@ import { authenticateRequest } from "../_core/session";
 import { getTafawoqStudentByUser } from "../db/tafawoq";
 import { hasActiveSubscription } from "./platform/access";
 import { checkRateLimit } from "../rateLimit";
-import { MAX_TTS_CHARS, engineAccent, engines, refreshTassili, speak, ttsProviders } from "./tts";
+import { MAX_TTS_CHARS, engineAccent, engines, refreshTassili, speak, ttsProviders, voiceExclusive } from "./tts";
 import { startTtsWarmup } from "./ttsWarmup";
 import { isForeignLang } from "@shared/taughtLanguages";
 
@@ -31,11 +31,14 @@ export function registerTafawoqTtsRoutes(app: Express) {
     // ("algerian") or another Arabic voice ("arabic"); null = the device's voice.
     const first = (gender: "male" | "female") => {
       // This gender's own voice only: falling back to the other teacher is not "ready".
-      const engine = engines(gender, "ar").find(entry => entry.gender === gender);
+      const engine = voiceExclusive() ? engines(gender, "ar")[0] : engines(gender, "ar").find(entry => entry.gender === gender);
       return engine ? { provider: engine.provider, accent: engineAccent(engine) } : null;
     };
     res.json({
       available: providers.tassili || providers.pack || providers.azure || providers.google || providers.piper,
+      // One voice only, set by the owner: the client hides the male/female choice
+      // and never falls back to another voice.
+      exclusive: voiceExclusive(),
       voices: { male: first("male"), female: first("female") },
     });
   });
@@ -77,6 +80,12 @@ export function registerTafawoqTtsRoutes(app: Express) {
     }
     try {
       const voice = await speak(text, gender, await studentName(userId), lang);
+      if (!voice && voiceExclusive()) {
+        // The one allowed voice does not have this sentence: text only, no other voice.
+        res.setHeader("X-Tafawoq-Voice-Exclusive", "1");
+        res.status(409).json({ error: "VOICE_NOT_PREPARED" });
+        return;
+      }
       if (!voice) {
         res.status(503).json({ error: "No natural voice available." });
         return;
@@ -84,6 +93,7 @@ export function registerTafawoqTtsRoutes(app: Express) {
       res.setHeader("Content-Type", voice.contentType);
       res.setHeader("Cache-Control", "private, max-age=86400");
       res.setHeader("X-Tafawoq-Voice", `${voice.provider}; ${voice.gender}; ${voice.accent}`);
+      if (voiceExclusive()) res.setHeader("X-Tafawoq-Voice-Exclusive", "1");
       res.send(voice.audio);
     } catch (error) {
       console.warn("[tafawoq] TTS failed:", error instanceof Error ? error.message : error);
