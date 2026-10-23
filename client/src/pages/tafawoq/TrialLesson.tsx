@@ -62,6 +62,8 @@ export function TrialLesson() {
             setIndex(step + 1);
             setAttempt(1);
             setAnswer("");
+            // The next question starts clean: no hint left from the previous one.
+            setResult(null);
           } else {
             setAttempt(value => value + 1);
           }

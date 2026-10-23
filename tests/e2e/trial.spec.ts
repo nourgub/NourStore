@@ -16,12 +16,16 @@ test("a visitor takes the free trial lesson without an account", async ({ page }
   await page.getByRole("button", { name: "تحقّق" }).click();
   await expect(page.getByText(/السؤال 2 من/)).toBeVisible();
 
-  // The remaining steps: two wrong tries each show the answer and move on.
+  // The remaining steps: a wrong try shows the hint, a second one the answer and the next question.
   for (let step = 2; step <= 5; step++) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await answer.fill("لا أعرف");
-      await page.getByRole("button", { name: "تحقّق" }).click();
-      await page.waitForTimeout(150);
+    await answer.fill("لا أعرف");
+    await page.getByRole("button", { name: "تحقّق" }).click();
+    await expect(page.getByText("تلميح:")).toBeVisible();
+    await answer.fill("لا أعرف");
+    await page.getByRole("button", { name: "تحقّق" }).click();
+    if (step < 5) {
+      await expect(page.getByText(`السؤال ${step + 1} من`)).toBeVisible();
+      await expect(page.getByText("تلميح:")).toHaveCount(0);
     }
   }
   await expect(page.getByText("القاعدة:")).toBeVisible();
