@@ -8,6 +8,7 @@
 // one is configured, to explain the mistake.
 import type { BankQuestion } from "./curriculum";
 import { expressionsEquivalent } from "./mathExpr";
+import { gradeQuantity, parseAnswer, unitFromPrompt } from "./quantity";
 
 const DIGITS: Record<string, string> = {
   "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
@@ -53,37 +54,24 @@ export function answersMatch(expected: string, given: string): boolean {
 
 export type DeterministicGrade =
   | { status: "correct" }
-  | { status: "incorrect"; misconception: string | null }
+  | {
+      status: "incorrect";
+      misconception: string | null;
+      /** Physics answers: why, and the share of the credit kept (the right value without its required unit: 0.5). */
+      reason?: "wrong_value" | "wrong_unit" | "missing_unit";
+      credit?: number;
+    }
   | { status: "unmatched" };
 
-const SUPERSCRIPT_DIGITS: Record<string, string> = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9", "⁻": "-", "⁺": "+" };
-
-/**
- * The number in a physics answer: "2.5", "2,5 s", "1.2×10⁻³", "1.2e-3 mol",
- * "1,2 x 10^-3"; null when there is none. A trailing unit is ignored.
- */
+/** The number in an answer ("2,5 s" → 2.5), read from the whole answer; null when it is not a quantity. */
 export function parseQuantity(text: string): number | null {
-  let value = text
-    .trim()
-    .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
-    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]/g, char => SUPERSCRIPT_DIGITS[char])
-    .replace(/[−–]/g, "-")
-    .replace(/\s+/g, "")
-    .replace(/(\d),(\d)/g, "$1.$2");
-  value = value.replace(/(?:[×x*·]|\.)10\^?\(?([+-]?\d+)\)?/i, "e$1");
-  const match = value.match(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
-  if (!match) return null;
-  const number = Number(match[0]);
-  return Number.isFinite(number) ? number : null;
-}
-
-function closeEnough(expected: number, value: number) {
-  if (expected === 0) return Math.abs(value) < 1e-9;
-  return Math.abs(value - expected) <= Math.abs(expected) * 0.02;
+  const parsed = parseAnswer(text);
+  return parsed.kind === "quantity" ? parsed.value * (parsed.unit?.factor ?? 1) : null;
 }
 
 export function gradeDeterministic(
-  question: Pick<BankQuestion, "type" | "answer" | "accept" | "distractors" | "options" | "grading">,
+  question: Pick<BankQuestion, "type" | "answer" | "accept" | "distractors" | "options" | "grading"> &
+    Partial<Pick<BankQuestion, "prompt" | "unit" | "unitRequired" | "tolerance">>,
   given: string
 ): DeterministicGrade {
   if (question.type === "mcq") {
@@ -98,11 +86,16 @@ export function gradeDeterministic(
   if (!normalizeAnswer(given)) return { status: "incorrect", misconception: null };
   const accepted = [question.answer, ...(question.accept ?? [])];
   if (question.grading === "numeric") {
-    // A measured quantity: any written form of the same value, its unit or not, to 2 %.
-    const expected = accepted.map(parseQuantity).filter((value): value is number => value !== null);
-    const value = parseQuantity(given);
-    if (value !== null && expected.some(target => closeEnough(target, value))) return { status: "correct" };
-    return value === null ? { status: "unmatched" } : { status: "incorrect", misconception: null };
+    // A measured quantity: the whole answer is read (value and unit), converted
+    // to the unit the question asks for, compared within the item's tolerance.
+    const expected = accepted
+      .map(form => parseAnswer(form))
+      .flatMap(parsed => (parsed.kind === "quantity" && !parsed.unit ? [parsed.value] : []));
+    const unit = question.unit ?? (question.prompt ? unitFromPrompt(question.prompt) : null);
+    const grade = gradeQuantity(expected, given, { unit, unitRequired: question.unitRequired, tolerance: question.tolerance });
+    if (grade.status === "correct") return { status: "correct" };
+    if (grade.status === "unmatched") return { status: "unmatched" };
+    return { status: "incorrect", misconception: null, reason: grade.reason, credit: grade.credit };
   }
   if (accepted.some(form => answersMatch(form, given))) return { status: "correct" };
   if (question.grading !== "exact" && accepted.some(form => expressionsEquivalent(form, given))) {

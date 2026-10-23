@@ -99,6 +99,12 @@ export type BankQuestion = {
   promptTaught?: string;
   /** "exact": only the listed forms pass (no equivalence), e.g. "simplify". */
   grading?: "expression" | "exact" | "numeric";
+  /** numeric: the unit the answer is in ("m/s²", "mJ"); default: read from the prompt (./quantity.ts). */
+  unit?: string;
+  /** numeric: an answer without its unit earns half credit (default: the unit may be left out). */
+  unitRequired?: boolean;
+  /** numeric: relative tolerance (default 0.02 = 2 %). */
+  tolerance?: number;
   explanation: string;
   /** Worked solution (generated items). */
   steps?: string[];

@@ -544,7 +544,14 @@ export async function submitAssessment(
       const deterministic = gradeDeterministic(item, given);
       let correct = deterministic.status === "correct";
       let misconception = deterministic.status === "incorrect" ? deterministic.misconception : null;
-      let feedback: string | null = null;
+      let feedback: string | null =
+        deterministic.status === "incorrect" && deterministic.reason === "wrong_unit"
+          ? "الوحدة التي كتبتها لا تناسب المقدار المطلوب: راجع وحدة الجواب."
+          : deterministic.status === "incorrect" && deterministic.reason === "missing_unit"
+            ? "القيمة صحيحة، لكن الوحدة مطلوبة في هذا السؤال: نصف العلامة."
+            : null;
+      // A right value without its required unit keeps part of the credit.
+      const credit = deterministic.status === "correct" ? 1 : deterministic.status === "incorrect" ? deterministic.credit ?? 0 : 0;
       // How this answer was marked, shown to the student: "auto" (checked by
       // the answer's rules — choice, number, equivalent expression), "ai"
       // (an unusual form judged by the AI: may be wrong), "unchecked" (an
@@ -570,7 +577,7 @@ export async function submitAssessment(
         submitted?.responseMs !== undefined
           ? Math.round(Math.min(30 * 60_000, Math.max(0, submitted.responseMs)))
           : null;
-      return { item, given, correct, misconception, feedback, responseMs, gradedBy };
+      return { item, given, correct, misconception, feedback, responseMs, gradedBy, credit: correct ? 1 : credit };
     })
   );
 
@@ -589,7 +596,8 @@ export async function submitAssessment(
   const masteryBefore = before ? overallMastery(before) : 0;
   const masteryAfter = overallMastery(nextStates);
   const correctCount = graded.filter(entry => entry.correct).length;
-  const score = items.length ? Math.round((correctCount / items.length) * 100) : 0;
+  const earned = graded.reduce((sum, entry) => sum + entry.credit, 0);
+  const score = items.length ? Math.round((earned / items.length) * 100) : 0;
   // Beyond right/wrong: what kind of mistake, where it happened, the rule,
   // a similar worked example and the remedy (./platform/diagnosis.ts).
   const diagnoses = graded.map(entry =>
