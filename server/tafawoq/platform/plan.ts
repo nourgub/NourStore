@@ -79,6 +79,8 @@ export type PlanLesson = {
 };
 
 export type PlanMistake = {
+  /** The question answered wrong (to report it). Empty for old results without one. */
+  questionId?: string;
   lessonKey: string;
   lessonTitle: string;
   skillKey: string;

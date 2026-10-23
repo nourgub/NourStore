@@ -302,6 +302,58 @@ export function QuestionRunner({
   );
 }
 
+/** «الإبلاغ عن خطأ» / «السؤال غير واضح» on a corrected question (one report per kind). */
+export function FlagQuestion({ questionId }: { questionId: string }) {
+  const t = useT();
+  const [kind, setKind] = useState<"error" | "unclear" | null>(null);
+  const [note, setNote] = useState("");
+  const [done, setDone] = useState<string | null>(null);
+  const flag = trpc.tafawoq.flagQuestion.useMutation({
+    onSuccess: result => {
+      setDone(result.created ? t.flag.thanks : t.flag.already);
+      setKind(null);
+    },
+  });
+  if (!questionId) return null;
+  if (done) return <p className="tfq-muted" role="status" style={{ fontSize: 13 }}>{done}</p>;
+  return (
+    <div className="tfq-flag">
+      {kind === null ? (
+        <>
+          <button type="button" className="tfq-link-btn" onClick={() => setKind("error")}>
+            {t.flag.error}
+          </button>
+          <button type="button" className="tfq-link-btn" onClick={() => setKind("unclear")}>
+            {t.flag.unclear}
+          </button>
+        </>
+      ) : (
+        <form
+          className="tfq-form"
+          onSubmit={event => {
+            event.preventDefault();
+            flag.mutate({ questionId, kind, note: note.trim() || null });
+          }}
+        >
+          <label className="tfq-field">
+            {kind === "error" ? t.flag.error : t.flag.unclear} — {t.flag.note}
+            <input className="tfq-input" dir="auto" maxLength={1000} value={note} onChange={event => setNote(event.target.value)} />
+          </label>
+          <div className="tfq-row">
+            <button type="submit" className="tfq-btn small" disabled={flag.isPending}>
+              {t.flag.send}
+            </button>
+            <button type="button" className="tfq-btn ghost small" onClick={() => setKind(null)}>
+              {t.flag.cancel}
+            </button>
+          </div>
+          {flag.error && <p className="tfq-error" role="alert">{t.flag.failed}</p>}
+        </form>
+      )}
+    </div>
+  );
+}
+
 export function ResultItems({ items }: { items: SubmitResult["items"] }) {
   const t = useT();
   return (
@@ -342,6 +394,7 @@ export function ResultItems({ items }: { items: SubmitResult["items"] }) {
             </div>
           )}
           {!item.correct && <Diagnosis item={item} />}
+          <FlagQuestion questionId={item.questionId} />
         </div>
       ))}
     </div>

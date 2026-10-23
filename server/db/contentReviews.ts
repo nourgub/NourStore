@@ -18,6 +18,9 @@ export async function saveContentReview(input: {
   reviewerName: string | null;
   note: string | null;
   updatedBy: number;
+  /** Set when approving: the fingerprint of the content approved. */
+  contentHash: string | null;
+  source: string | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -25,6 +28,13 @@ export async function saveContentReview(input: {
     .insert(tafawoqContentReviews)
     .values(input)
     .onDuplicateKeyUpdate({
-      set: { status: input.status, reviewerName: input.reviewerName, note: input.note, updatedBy: input.updatedBy },
+      set: {
+        status: input.status,
+        reviewerName: input.reviewerName,
+        note: input.note,
+        updatedBy: input.updatedBy,
+        contentHash: input.contentHash,
+        source: input.source,
+      },
     });
 }

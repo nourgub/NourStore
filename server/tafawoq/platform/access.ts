@@ -11,6 +11,7 @@ import { ACCESS_ERRORS } from "@shared/bacPlatform";
 import * as bac from "../../db/bacPlatform";
 import * as store from "../../db/tafawoq";
 import { checkLessonAccess, checkSubjectAccess, type ContentSwitches } from "./catalog";
+import { requireReviewedOrStarted } from "./reviewPolicy";
 
 let cachedSwitches: { at: number; value: ContentSwitches } | null = null;
 const SWITCHES_TTL_MS = 15_000;
@@ -68,6 +69,7 @@ export async function requireLessonAccess(
     requireSubscription: options.requireSubscription,
   });
   if (!decision.ok) await deny(userId, decision.reason, { lessonKey, stream: student.stream });
+  if (options.requireSubscription) await requireReviewedOrStarted(student.id, lessonKey);
   return student;
 }
 

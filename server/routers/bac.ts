@@ -17,6 +17,10 @@ import * as tutoring from "../tafawoq/platform/tutoring";
 import * as bacDb from "../db/bacPlatform";
 import * as reviews from "../db/contentReviews";
 import { allBacLessons, contentInventory } from "../tafawoq/contentInventory";
+import * as quality from "../tafawoq/platform/quality";
+import { clearReviewCache } from "../tafawoq/platform/reviewPolicy";
+import { getLesson } from "../tafawoq/curriculum";
+import { setPlatformSetting } from "../db/platformSettings";
 import { usageSince } from "../db/usage";
 import { logAdminAction } from "../db/adminAudit";
 import { TRPCError } from "@trpc/server";
@@ -304,7 +308,23 @@ export const bacAdminRouter = router({
     inventory: contentInventory(),
     lessons: allBacLessons(),
     reviews: await reviews.listContentReviews(),
+    // "changed": approved, then the content moved; it needs a new review.
+    states: Object.fromEntries(await quality.reviewStates()),
+    policy: await quality.contentPolicy(),
   })),
+  setContentPolicy: adminProcedure.input(z.object({ policy: z.enum(["trial", "commercial"]) })).mutation(async ({ ctx, input }) => {
+    await setPlatformSetting("bac.contentPolicy", input.policy);
+    clearReviewCache();
+    await logAdminAction({ actorId: ctx.user.id, action: "content_policy", targetType: "setting", targetId: "bac.contentPolicy", details: { policy: input.policy } });
+    return { ok: true };
+  }),
+  contentFlags: adminProcedure
+    .input(z.object({ status: z.enum(["open", "reviewing", "resolved", "dismissed"]).default("open") }))
+    .query(({ input }) => quality.adminFlags(input.status)),
+  setContentFlag: adminProcedure
+    .input(z.object({ id: z.number().int().positive(), status: z.enum(["reviewing", "resolved", "dismissed"]), adminNote: z.string().trim().max(2000).nullish() }))
+    .mutation(({ ctx, input }) => quality.adminSetFlag(ctx.user.id, { id: input.id, status: input.status, adminNote: input.adminNote ?? null })),
+  missedQuestions: adminProcedure.query(() => quality.adminMissedQuestions()),
   setContentReview: adminProcedure
     .input(
       z.object({
@@ -312,6 +332,7 @@ export const bacAdminRouter = router({
         status: z.enum(["unreviewed", "in_review", "approved", "needs_changes"]),
         reviewerName: z.string().trim().max(120).optional(),
         note: z.string().trim().max(2000).optional(),
+        source: z.string().trim().max(255).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -326,7 +347,10 @@ export const bacAdminRouter = router({
         reviewerName: input.reviewerName || null,
         note: input.note || null,
         updatedBy: ctx.user.id,
+        contentHash: input.status === "approved" ? quality.lessonContentHash(getLesson(input.lessonKey)!) : null,
+        source: input.source || null,
       });
+      clearReviewCache();
       await logAdminAction({ actorId: ctx.user.id, action: "content_review", targetType: "lesson", targetId: input.lessonKey, details: { status: input.status, reviewer: input.reviewerName ?? null } });
       return { ok: true };
     }),

@@ -758,6 +758,11 @@ function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
           <MasteryBar value={analysis.mastery} />
         </div>
       </div>
+      {data.review !== "approved" && (
+        <p className="tfq-banner" role="note">
+          {data.review === "changed" ? t.reviewChanged : t.unreviewed}
+        </p>
+      )}
       <nav className="tfq-tabs" role="tablist">
         {TABS.map(({ key, icon: Icon }) => (
           <button

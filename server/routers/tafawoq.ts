@@ -8,6 +8,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { learnerProcedure, parentProcedure, rateLimit, teacherProcedure } from "../_core/procedures";
 import * as tafawoq from "../tafawoq/service";
 import { trialCheck, trialLesson } from "../tafawoq/trial";
+import { flagQuestion } from "../tafawoq/platform/quality";
 import { checkRateLimit } from "../rateLimit";
 import { TRPCError } from "@trpc/server";
 import { boardState } from "@shared/board";
@@ -67,6 +68,11 @@ export const tafawoqRouter = router({
     .mutation(({ ctx, input }) =>
       tafawoq.submitAssessment(ctx.user.id, input.assessmentId, input.answers)
     ),
+
+  flagQuestion: learnerProcedure
+    .use(rateLimit("tafawoq-flag", 30, HOUR))
+    .input(z.object({ questionId: z.string().min(1).max(64), kind: z.enum(["error", "unclear"]), note: z.string().trim().max(1000).nullish() }))
+    .mutation(({ ctx, input }) => flagQuestion(ctx.user.id, { questionId: input.questionId, kind: input.kind, note: input.note ?? null })),
 
   board: learnerProcedure.input(z.object({ lessonKey })).query(({ ctx, input }) => tafawoq.board(ctx.user.id, input.lessonKey)),
 

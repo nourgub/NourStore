@@ -716,6 +716,7 @@ async function recentMistakes(student: Student, limit = 12): Promise<PlanMistake
     for (const item of JSON.parse(row.resultJson) as Array<Partial<ItemResult>>) {
       if (item.correct || !item.skill) continue;
       mistakes.push({
+        questionId: item.questionId,
         lessonKey: row.lessonKey,
         lessonTitle: lesson.title,
         skillKey: item.skill,

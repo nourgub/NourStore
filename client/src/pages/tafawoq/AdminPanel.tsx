@@ -24,7 +24,7 @@ import { useLang } from "./i18n";
 import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubscriptionBadge } from "./Dashboard";
 
-const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors", "accounts", "logs"] as const;
+const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "quality", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors", "accounts", "logs"] as const;
 type Tab = (typeof TABS)[number];
 
 function useAdminMutationOptions() {
@@ -68,6 +68,7 @@ export function AdminPanel() {
       {tab === "changes" && <Changes />}
       {tab === "subscriptions" && <Subscriptions />}
       {tab === "content" && <ContentSwitches />}
+      {tab === "quality" && <ContentQuality />}
       {tab === "bank" && <BankTopics />}
       {tab === "coupons" && <Coupons />}
       {tab === "notify" && <Broadcast />}
@@ -574,6 +575,136 @@ function ContentSwitches() {
   );
 }
 
+/** Students' reports, most-missed questions, and the policy for content not approved. */
+function ContentQuality() {
+  const b = useB();
+  const r = b.review;
+  const [status, setStatus] = useState<"open" | "reviewing" | "resolved" | "dismissed">("open");
+  const flags = trpc.bacAdmin.contentFlags.useQuery({ status });
+  const missed = trpc.bacAdmin.missedQuestions.useQuery();
+  const inventory = trpc.bacAdmin.contentInventory.useQuery();
+  const setFlag = trpc.bacAdmin.setContentFlag.useMutation(useAdminMutationOptions());
+  const setPolicy = trpc.bacAdmin.setContentPolicy.useMutation(useAdminMutationOptions());
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  return (
+    <>
+      <div className="tfq-card">
+        <h3 style={{ marginTop: 0 }}>{r.policyTitle}</h3>
+        {inventory.data && (
+          <fieldset className="tfq-form" style={{ border: 0, padding: 0 }}>
+            {(["trial", "commercial"] as const).map(policy => (
+              <label key={policy} className="tfq-check">
+                <input
+                  type="radio"
+                  name="content-policy"
+                  checked={inventory.data.policy === policy}
+                  disabled={setPolicy.isPending}
+                  onChange={() => setPolicy.mutate({ policy })}
+                />{" "}
+                {policy === "trial" ? r.policyTrial : r.policyCommercial}
+              </label>
+            ))}
+          </fieldset>
+        )}
+      </div>
+
+      <div className="tfq-card">
+        <h3 style={{ marginTop: 0 }}>{r.flagsTitle}</h3>
+        <div className="tfq-chips">
+          {(["open", "reviewing", "resolved", "dismissed"] as const).map(key => (
+            <button key={key} type="button" className={`tfq-chip ${status === key ? "info" : ""}`} aria-pressed={status === key} onClick={() => setStatus(key)}>
+              {r.flagStatuses[key]}
+            </button>
+          ))}
+        </div>
+        <Loading query={flags}>
+          {rows =>
+            rows.length ? (
+              <ul className="tfq-list">
+                {rows.map(row => (
+                  <li key={row.id} style={{ marginBottom: 12 }}>
+                    <span className="tfq-chip">{r.flagKinds[row.kind]}</span> <strong dir="auto">{row.lessonTitle}</strong>{" "}
+                    <small className="tfq-muted">
+                      {row.userName ?? "—"} · {new Date(row.createdAt).toLocaleString()} · {r.reportsOnQuestion(row.reportsOnQuestion)}
+                    </small>
+                    <p dir="auto" style={{ margin: "4px 0" }}>{row.prompt}</p>
+                    {row.note && <p dir="auto" className="tfq-muted" style={{ margin: "4px 0" }}>« {row.note} »</p>}
+                    {row.adminNote && <p dir="auto" style={{ margin: "4px 0" }}>{r.adminNote}: {row.adminNote}</p>}
+                    {status !== "resolved" && status !== "dismissed" && (
+                      <div className="tfq-row">
+                        <input
+                          className="tfq-input"
+                          dir="auto"
+                          placeholder={r.adminNote}
+                          aria-label={r.adminNote}
+                          value={notes[row.id] ?? ""}
+                          onChange={event => setNotes({ ...notes, [row.id]: event.target.value })}
+                        />
+                        {(["reviewing", "resolved", "dismissed"] as const)
+                          .filter(next => next !== status)
+                          .map(next => (
+                            <button
+                              key={next}
+                              type="button"
+                              className="tfq-btn ghost small"
+                              disabled={setFlag.isPending}
+                              onClick={() => setFlag.mutate({ id: row.id, status: next, adminNote: notes[row.id] || null })}
+                            >
+                              {r.flagStatuses[next]}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="tfq-muted">{r.noFlags}</p>
+            )
+          }
+        </Loading>
+      </div>
+
+      <div className="tfq-card">
+        <h3 style={{ marginTop: 0 }}>{r.missedTitle}</h3>
+        <p className="tfq-muted">{r.missedIntro(10)}</p>
+        <Loading query={missed}>
+          {rows =>
+            rows.length ? (
+              <div className="tfq-table-wrap">
+                <table className="tfq-table">
+                  <thead>
+                    <tr>
+                      <th>{r.lessons}</th>
+                      <th>{r.questions}</th>
+                      <th>{r.wrongRate}</th>
+                      <th>{r.attempts}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(row => (
+                      <tr key={`${row.lessonKey}-${row.key}`}>
+                        <td dir="auto">{row.lessonTitle}</td>
+                        <td dir="auto">{row.prompt ?? (row.generated ? `${r.template}: ${row.key}` : row.key)}</td>
+                        <td dir="ltr">{Math.round(row.wrongRate * 100)}%</td>
+                        <td dir="ltr">
+                          {row.attempts} ({row.students})
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="tfq-muted">{r.noMissed}</p>
+            )
+          }
+        </Loading>
+      </div>
+    </>
+  );
+}
+
 /** Inventory per stream/subject and each lesson's review by a named teacher. */
 function ContentReviews() {
   const b = useB();
@@ -581,7 +712,7 @@ function ContentReviews() {
   const query = trpc.bacAdmin.contentInventory.useQuery();
   const save = trpc.bacAdmin.setContentReview.useMutation(useAdminMutationOptions());
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ status: "unreviewed", reviewerName: "", note: "" });
+  const [draft, setDraft] = useState({ status: "unreviewed", reviewerName: "", note: "", source: "" });
   return (
     <Loading query={query}>
       {data => {
@@ -617,15 +748,19 @@ function ContentReviews() {
             {data.lessons.map(lesson => {
               const review = byKey.get(lesson.key);
               const status = review?.status ?? "unreviewed";
+              const changed = data.states[lesson.key] === "changed";
               return (
                 <div key={lesson.key} className="tfq-skill-row" style={{ flexWrap: "wrap" }}>
                   <span dir="auto">
                     {lesson.title} <small className="tfq-muted">({b.subjects[lesson.subject] ?? lesson.subject})</small>
                   </span>
-                  <span className={`tfq-chip ${status === "approved" ? "good" : ""}`}>
+                  <span className={`tfq-chip ${status === "approved" && !changed ? "good" : ""}`}>
                     {r.statuses[status]}
                     {review?.reviewerName ? ` — ${review.reviewerName}` : ""}
+                    {review?.updatedAt ? ` · ${new Date(review.updatedAt).toLocaleDateString()}` : ""}
                   </span>
+                  {changed && <span className="tfq-chip">{r.changed}</span>}
+                  {review?.source && <small className="tfq-muted" dir="auto">{review.source}</small>}
                   {editing === lesson.key ? (
                     <form
                       className="tfq-row"
@@ -638,6 +773,7 @@ function ContentReviews() {
                             status: draft.status as "unreviewed",
                             reviewerName: draft.reviewerName.trim() || undefined,
                             note: draft.note.trim() || undefined,
+                            source: draft.source.trim() || undefined,
                           },
                           { onSuccess: () => setEditing(null) }
                         );
@@ -652,6 +788,7 @@ function ContentReviews() {
                       </select>
                       <input className="tfq-input" placeholder={r.reviewer} aria-label={r.reviewer} value={draft.reviewerName} onChange={event => setDraft({ ...draft, reviewerName: event.target.value })} />
                       <input className="tfq-input" placeholder={r.note} aria-label={r.note} value={draft.note} onChange={event => setDraft({ ...draft, note: event.target.value })} />
+                      <input className="tfq-input" placeholder={r.source} aria-label={r.source} value={draft.source} onChange={event => setDraft({ ...draft, source: event.target.value })} />
                       <button type="submit" className="tfq-btn small" disabled={save.isPending}>
                         {r.save}
                       </button>
@@ -661,7 +798,7 @@ function ContentReviews() {
                       type="button"
                       className="tfq-btn ghost small"
                       onClick={() => {
-                        setDraft({ status, reviewerName: review?.reviewerName ?? "", note: review?.note ?? "" });
+                        setDraft({ status, reviewerName: review?.reviewerName ?? "", note: review?.note ?? "", source: review?.source ?? "" });
                         setEditing(lesson.key);
                       }}
                     >

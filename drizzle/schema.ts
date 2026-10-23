@@ -1733,5 +1733,34 @@ export const tafawoqContentReviews = mysqlTable("tafawoqContentReviews", {
   reviewerName: varchar("reviewerName", { length: 120 }),
   note: text("note"),
   updatedBy: int("updatedBy"),
+  /** Fingerprint of the lesson content when approved (drizzle/0040): a later change shows as stale. */
+  contentHash: varchar("contentHash", { length: 64 }),
+  /** Where the content comes from (official programme, textbook…), as the reviewer recorded it. */
+  source: varchar("source", { length: 255 }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+/** A student's report on a question: a mistake, or unclear (drizzle/0040). */
+export const tafawoqContentFlags = mysqlTable(
+  "tafawoqContentFlags",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    questionId: varchar("questionId", { length: 64 }).notNull(),
+    kind: mysqlEnum("kind", ["error", "unclear"]).notNull(),
+    /** The question as the student saw it, from their own graded results. */
+    prompt: text("prompt").notNull(),
+    note: text("note"),
+    status: mysqlEnum("status", ["open", "reviewing", "resolved", "dismissed"]).default("open").notNull(),
+    adminNote: text("adminNote"),
+    resolvedBy: int("resolvedBy"),
+    resolvedAt: timestamp("resolvedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  table => ({
+    once: uniqueIndex("tafawoqContentFlags_once").on(table.userId, table.questionId, table.kind),
+    statusIdx: index("tafawoqContentFlags_status").on(table.status, table.createdAt),
+    questionIdx: index("tafawoqContentFlags_question").on(table.questionId),
+  })
+);

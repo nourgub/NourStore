@@ -25,7 +25,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { BacSubject, ErrorType } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
-import { MasteryBar, percent } from "./components";
+import { FlagQuestion, MasteryBar, percent } from "./components";
 import { Content, useLang } from "./i18n";
 import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubjectChips } from "./Onboarding";
@@ -502,6 +502,7 @@ export function MistakesPage() {
               <Link href={`/tafawoq/${entry.lessonKey}`} className="tfq-btn small">
                 {b.home.practice}
               </Link>
+              {entry.questionId && <FlagQuestion questionId={entry.questionId} />}
             </li>
           ))}
         </ol>

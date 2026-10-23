@@ -30,6 +30,7 @@ import {
 } from "./curriculum";
 import { buildStudentContext, type StudentContext } from "./context";
 import { createRng, randomSeed, spokenSeed } from "./generators/core";
+import { lessonReviewState } from "./platform/reviewPolicy";
 import { boardState, EMPTY_BOARD, MAX_BOARD_BYTES, type BoardState } from "@shared/board";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
@@ -746,6 +747,8 @@ export async function workspace(userId: number, lessonKey: string) {
   return {
     placed: true as const,
     lessonTitle: lesson.title,
+    /** Whether a teacher approved this lesson's content (shown as a notice when not). */
+    review: await lessonReviewState(lesson.key),
     analysis: context,
     complete: isLessonComplete(states),
     problemsCount: problemsFor(lesson, student.stream).length,
