@@ -417,7 +417,9 @@ export function templateTutorReply(
     .map(key => lesson.skills.find(entry => entry.key === key)?.name)
     .filter((name): name is string => Boolean(name));
   const rule = skill.dialogue?.rule ?? skill.explanation;
-  const step = lastWorkedStep(lastTutor);
+  // The step quoted in the question itself (the board's «لم أفهم هذه الخطوة»), else the last one written.
+  const quoted = /(?:الخطوة|step|l.étape|étape)\s*(\d+)\s*:?\s*[«"“]\s*([^»"”]+?)\s*[»"”]/i.exec(message);
+  const step = quoted ? { n: Number(quoted[1]), text: quoted[2] } : lastWorkedStep(lastTutor);
 
   switch (intent) {
     case "repeat": {

@@ -1223,6 +1223,22 @@ export const tafawoqStudents = mysqlTable("tafawoqStudents", {
 
 export type TafawoqStudent = typeof tafawoqStudents.$inferSelect;
 
+/** The lesson whiteboard of a student (drizzle/0039); stateJson is validated by shared/board.ts. */
+export const tafawoqBoards = mysqlTable(
+  "tafawoqBoards",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    studentId: int("studentId").notNull().references(() => tafawoqStudents.id),
+    lessonKey: varchar("lessonKey", { length: 64 }).notNull(),
+    stateJson: mediumtext("stateJson").notNull(),
+    version: int("version").default(1).notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => ({
+    studentLessonUnique: uniqueIndex("tafawoqBoards_student_lesson").on(table.studentId, table.lessonKey),
+  })
+);
+
 export const tafawoqSkillStates = mysqlTable(
   "tafawoqSkillStates",
   {

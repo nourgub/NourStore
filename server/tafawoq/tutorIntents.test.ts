@@ -49,4 +49,10 @@ describe("tutor: «عاود», «علاش؟», «منين جات؟» in the cont
     // A lesson question is still answered.
     expect(templateTutorReply(limits, context, "كيف نحسب نهاية كثير حدود عند اللانهاية", 1)).not.toContain("خارج");
   });
+
+  it("answers about the step quoted in the question (the board's «لم أفهم هذه الخطوة»)", () => {
+    const reply = templateTutorReply(limits, context, "منين جات الخطوة 3: «2 × (−∞) = −∞»؟", 1);
+    expect(reply).toContain("الخطوة 3");
+    expect(reply).toContain("2 × (−∞) = −∞");
+  });
 });

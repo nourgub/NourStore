@@ -63,5 +63,34 @@ test("student journey from sign-up to unlocked content, with an admin confirming
   await student.getByRole("link", { name: /راجع أخطائي/ }).click();
   await expect(student.getByRole("heading", { name: "أخطائي الأخيرة" })).toBeVisible();
   await expectNoHorizontalScroll(student);
+
+  // Whiteboard: draw with the pointer, a curve, the teacher's steps; restored after a reload; kept while offline.
+  await student.setViewportSize({ width: 375, height: 800 });
+  await student.goto("/tafawoq/math-limits?tab=board");
+  const canvas = student.locator("canvas.tfq-board-canvas");
+  await expect(canvas).toBeVisible();
+  const stroke = async (from: [number, number], to: [number, number]) => {
+    await canvas.scrollIntoViewIfNeeded();
+    const box = (await canvas.boundingBox())!;
+    await student.mouse.move(box.x + from[0], box.y + from[1]);
+    await student.mouse.down();
+    await student.mouse.move(box.x + to[0], box.y + to[1], { steps: 8 });
+    await student.mouse.up();
+  };
+  await stroke([40, 40], [140, 90]);
+  await student.getByLabel("منحنى y =").fill("x^2 - 2x");
+  await student.getByRole("button", { name: "ارسم" }).click();
+  await student.getByRole("button", { name: "الخطوة التالية" }).click();
+  await expect(student.locator(".tfq-board-steplist li.current")).toHaveCount(1);
+  await expect(student.getByRole("status").filter({ hasText: "محفوظ" })).toBeVisible({ timeout: 10_000 });
+  await expectNoHorizontalScroll(student);
+  await student.reload();
+  await expect(student.getByRole("button", { name: /y = x\^2 - 2x/ })).toBeVisible();
+  await expect(student.locator(".tfq-board-steplist li")).toHaveCount(1);
+  await student.context().setOffline(true);
+  await stroke([60, 120], [160, 140]);
+  await expect(student.getByText("غير متصل: محفوظ على هذا الجهاز")).toBeVisible({ timeout: 10_000 });
+  await student.context().setOffline(false);
+  await expect(student.getByRole("status").filter({ hasText: /^محفوظ$/ })).toBeVisible({ timeout: 10_000 });
   await adminContext.close();
 });

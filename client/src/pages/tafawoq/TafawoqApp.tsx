@@ -15,6 +15,7 @@ import {
   Mic,
   Phone,
   MessageCircle,
+  PenLine,
   PlayCircle,
   RefreshCw,
   Send,
@@ -71,6 +72,7 @@ const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.Adm
 const TeacherInbox = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.TeacherInbox })));
 const ExerciseHelp = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.ExerciseHelp })));
 const TutorSessions = lazy(() => import("./Sessions").then(m => ({ default: m.TutorSessions })));
+const Whiteboard = lazy(() => import("./Whiteboard").then(m => ({ default: m.Whiteboard })));
 const TrialLesson = lazy(() => import("./TrialLesson").then(m => ({ default: m.TrialLesson })));
 const SessionsPage = lazy(() => import("./Sessions").then(m => ({ default: m.SessionsPage })));
 const CallScreen = lazy(() => import("./CallScreen").then(m => ({ default: m.CallScreen })));
@@ -719,6 +721,7 @@ type WorkspaceData = Extract<WorkspaceOutput, { placed: true }>;
 
 const TABS = [
   { key: "teacher", icon: MessageCircle },
+  { key: "board", icon: PenLine },
   { key: "lesson", icon: BookOpen },
   { key: "video", icon: PlayCircle },
   { key: "practice", icon: ClipboardCheck },
@@ -770,6 +773,7 @@ function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
         ))}
       </nav>
       {tab === "teacher" && <TeacherTab lessonKey={lessonKey} data={data} />}
+      {tab === "board" && <Whiteboard lessonKey={lessonKey} />}
       {tab === "lesson" && <LessonTab lessonKey={lessonKey} data={data} />}
       {tab === "video" && <VideoTab lessonKey={lessonKey} data={data} />}
       {tab === "practice" && <PracticeTab lessonKey={lessonKey} data={data} />}

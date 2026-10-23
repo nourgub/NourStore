@@ -10,6 +10,7 @@ import * as tafawoq from "../tafawoq/service";
 import { trialCheck, trialLesson } from "../tafawoq/trial";
 import { checkRateLimit } from "../rateLimit";
 import { TRPCError } from "@trpc/server";
+import { boardState } from "@shared/board";
 
 const lessonKey = z.string().min(1).max(64);
 const HOUR = 60 * 60 * 1000;
@@ -66,6 +67,13 @@ export const tafawoqRouter = router({
     .mutation(({ ctx, input }) =>
       tafawoq.submitAssessment(ctx.user.id, input.assessmentId, input.answers)
     ),
+
+  board: learnerProcedure.input(z.object({ lessonKey })).query(({ ctx, input }) => tafawoq.board(ctx.user.id, input.lessonKey)),
+
+  saveBoard: learnerProcedure
+    .use(rateLimit("tafawoq-board", 600, HOUR))
+    .input(z.object({ lessonKey, state: boardState }))
+    .mutation(({ ctx, input }) => tafawoq.saveBoardState(ctx.user.id, input.lessonKey, input.state)),
 
   workspace: learnerProcedure
     .input(z.object({ lessonKey }))

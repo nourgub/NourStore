@@ -427,6 +427,28 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const after = await mastery();
       expect(after.pKnown).toBe(before.pKnown);
       expect(after.attempts).toBe(before.attempts);
+
+      // Whiteboard: saved and restored, versioned, invalid content refused.
+      const empty = await caller.tafawoq.board({ lessonKey: key });
+      expect(empty.version).toBe(0);
+      expect(empty.examples.length).toBeGreaterThan(0);
+      const drawn = {
+        v: 1 as const,
+        strokes: [{ tool: "pen" as const, color: "#f5f1e6" as const, width: 3, points: [0.1, 0.1, 0.4, 0.3] }],
+        texts: [{ x: 0.2, y: 0.5, text: "f'(x) = 2x", math: true, color: "#e0b43a" as const }],
+        axes: true,
+        curves: ["x^2 - 2x"],
+        example: { skill: empty.examples[0].skill, shown: 2 },
+      };
+      expect((await caller.tafawoq.saveBoard({ lessonKey: key, state: drawn })).version).toBe(1);
+      expect((await caller.tafawoq.saveBoard({ lessonKey: key, state: drawn })).version).toBe(2);
+      expect((await caller.tafawoq.board({ lessonKey: key })).state).toEqual(drawn);
+      await expect(
+        caller.tafawoq.saveBoard({ lessonKey: key, state: { ...drawn, strokes: [{ ...drawn.strokes[0], color: "red" as never }] } })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      await expect(
+        caller.tafawoq.saveBoard({ lessonKey: key, state: { ...drawn, strokes: [{ ...drawn.strokes[0], points: Array(5000).fill(0.5) }] } })
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
   }
 );

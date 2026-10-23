@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   tafawoqAssessments,
   tafawoqAttempts,
+  tafawoqBoards,
   tafawoqExams,
   tafawoqExercises,
   tafawoqLessons,
@@ -499,4 +500,28 @@ export async function answerExercise(id: number, teacherUserId: number, answer: 
     .set({ status: "answered", answer, answeredBy: teacherUserId, answeredAt: new Date() })
     .where(and(eq(tafawoqExercises.id, id), eq(tafawoqExercises.status, "open")));
   return result.affectedRows === 1;
+}
+
+// ---------------------------------------------------------------------------
+// Lesson whiteboard (drizzle/0039)
+// ---------------------------------------------------------------------------
+
+export async function getBoard(studentId: number, lessonKey: string) {
+  const db = await requireDb();
+  const rows = await db
+    .select()
+    .from(tafawoqBoards)
+    .where(and(eq(tafawoqBoards.studentId, studentId), eq(tafawoqBoards.lessonKey, lessonKey)))
+    .limit(1);
+  return rows[0];
+}
+
+/** Stores the board; the version goes up by one on every save. */
+export async function saveBoard(studentId: number, lessonKey: string, stateJson: string) {
+  const db = await requireDb();
+  await db
+    .insert(tafawoqBoards)
+    .values({ studentId, lessonKey, stateJson })
+    .onDuplicateKeyUpdate({ set: { stateJson, version: sql`${tafawoqBoards.version} + 1` } });
+  return getBoard(studentId, lessonKey);
 }

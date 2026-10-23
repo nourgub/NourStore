@@ -30,6 +30,7 @@ import {
 } from "./curriculum";
 import { buildStudentContext, type StudentContext } from "./context";
 import { createRng, randomSeed, spokenSeed } from "./generators/core";
+import { boardState, EMPTY_BOARD, MAX_BOARD_BYTES, type BoardState } from "@shared/board";
 import { instantiate } from "./generators/instantiate";
 import { instantiateProblem } from "./problems";
 import { inStyle, type TeacherStyle } from "./darja";
@@ -1090,6 +1091,38 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
     masteryBefore: oral[0]?.masteryBefore ?? context.mastery,
     masteryAfter: context.mastery,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Lesson whiteboard: the student's drawing, text and curves, plus the
+// teacher's worked examples (hand-written, reviewed) written step by step.
+// ---------------------------------------------------------------------------
+
+export async function board(userId: number, lessonKey: string) {
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
+  const lesson = lessonOrThrow(lessonKey, student.stream);
+  const [row, context] = await Promise.all([store.getBoard(student.id, lesson.key), loadContext(student, lesson)]);
+  let state: BoardState = EMPTY_BOARD;
+  if (row) {
+    const parsed = boardState.safeParse(JSON.parse(row.stateJson));
+    if (parsed.success) state = parsed.data;
+  }
+  return {
+    state,
+    version: row?.version ?? 0,
+    updatedAt: row?.updatedAt ?? null,
+    focusSkill: context.focusSkills[0]?.key ?? lesson.skills[0]?.key ?? null,
+    examples: lesson.skills.map(skill => ({ skill: skill.key, name: skill.name, problem: skill.example.problem, steps: skill.example.steps, answer: skill.example.answer })),
+  };
+}
+
+export async function saveBoardState(userId: number, lessonKey: string, state: BoardState) {
+  const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
+  const lesson = lessonOrThrow(lessonKey, student.stream);
+  const json = JSON.stringify(state);
+  if (json.length > MAX_BOARD_BYTES) throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "BOARD_TOO_LARGE" });
+  const row = await store.saveBoard(student.id, lesson.key, json);
+  return { version: row?.version ?? 1, updatedAt: row?.updatedAt ?? new Date() };
 }
 
 /** Explanations followed by a check question. */
