@@ -1552,6 +1552,10 @@ export const tafawoqSubscriptions = mysqlTable(
     // What the admin actually received when confirming a manual payment.
     paidAmountDa: int("paidAmountDa"),
     paidReference: varchar("paidReference", { length: 120 }),
+    /** The student's payment receipt (drizzle/0037), private: owner and admins. */
+    receiptKey: varchar("receiptKey", { length: 255 }),
+    receiptMime: varchar("receiptMime", { length: 40 }),
+    receiptUploadedAt: timestamp("receiptUploadedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     reviewedAt: timestamp("reviewedAt"),
   },

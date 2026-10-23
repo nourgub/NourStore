@@ -8,11 +8,13 @@ import { Shield } from "lucide-react";
 import { toast } from "sonner";
 import {
   BAC_SUBJECTS,
+  PAYMENT_METHODS,
   PLATFORM_STREAMS,
   SECOND_SUBJECT_OPTIONS,
   isPlatformStream,
   type BacSubject,
   type ErrorType,
+  type PaymentMethod,
   type PlatformStream,
   type SubscriptionPlan,
 } from "@shared/bacPlatform";
@@ -364,9 +366,24 @@ function Subscriptions() {
                         {b.methods[row.paymentMethod as keyof typeof b.methods] ?? row.paymentMethod}
                         <br />
                         <small dir="ltr">{row.paymentReference ?? "—"}</small>
+                        <br />
+                        {row.hasReceipt ? (
+                          <a href={`/api/protected-files/payment-receipt/${row.id}`} target="_blank" rel="noreferrer">
+                            {b.pay.view}
+                          </a>
+                        ) : (
+                          <small className="tfq-muted">{b.pay.noReceipt}</small>
+                        )}
                       </td>
                       <td>
                         <SubscriptionBadge status={row.status} />
+                        {row.status === "pending_payment" && <span className="tfq-chip info">{b.pay.states[row.paymentState]}</span>}
+                        {row.sameReference.length > 0 && (
+                          <>
+                            <br />
+                            <small className="tfq-error">{b.pay.sameReference(row.sameReference.map(id => `#${id}`).join("، "))}</small>
+                          </>
+                        )}
                         <br />
                         <small>
                           {row.startsAt ? `${formatDate(row.startsAt, lang)} → ${formatDate(row.endsAt, lang)}` : dateTime(row.createdAt, lang)}
@@ -1137,6 +1154,7 @@ function Settings() {
     secondSubjectChange: boolean;
     referralBonusDays: number;
     paymentInstructions: string;
+    paymentMethods: PaymentMethod[];
     sessionsPerMonth: number;
     maxUpcomingSessions: number;
   } | null>(null);
@@ -1176,6 +1194,24 @@ function Settings() {
               {b.paymentInstructionsLabel}
               <textarea className="tfq-textarea" dir="auto" maxLength={2000} value={value.paymentInstructions} onChange={event => setDraft({ ...value, paymentInstructions: event.target.value })} />
             </label>
+            <fieldset className="tfq-field" style={{ border: 0, padding: 0 }}>
+              <legend>{b.pay.methodsLabel}</legend>
+              {PAYMENT_METHODS.map(method => (
+                <label key={method} className="tfq-check">
+                  <input
+                    type="checkbox"
+                    checked={value.paymentMethods.includes(method)}
+                    onChange={event =>
+                      setDraft({
+                        ...value,
+                        paymentMethods: event.target.checked ? [...value.paymentMethods, method] : value.paymentMethods.filter(entry => entry !== method),
+                      })
+                    }
+                  />
+                  <span>{b.methods[method]}</span>
+                </label>
+              ))}
+            </fieldset>
             <button type="submit" className="tfq-btn" disabled={save.isPending}>
               {b.saveSettings}
             </button>

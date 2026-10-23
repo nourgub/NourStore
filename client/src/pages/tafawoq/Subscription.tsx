@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { CreditCard, Gift, Repeat } from "lucide-react";
 import { toast } from "sonner";
-import { PAYMENT_METHODS, PLATFORM_STREAMS, type PaymentMethod, type PlatformStream, type SubscriptionPlan, type ThirdLanguage } from "@shared/bacPlatform";
+import { PLATFORM_STREAMS, type PaymentMethod, type PlatformStream, type SubscriptionPlan, type ThirdLanguage } from "@shared/bacPlatform";
 import { trpc } from "@/lib/trpc";
 import { useLang } from "./i18n";
 import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
@@ -92,6 +92,7 @@ export function SubscriptionPage() {
           <p>{b.pendingCard(b.da(summary.pending.amountDa))}</p>
           <p className="tfq-muted">{b.manualNotice}</p>
           <PaymentInstructions text={data.paymentInstructions} />
+          <ReceiptForm row={data.history.find(row => row.id === summary.pending!.id) ?? null} maxBytes={data.maxReceiptBytes} />
           <button type="button" className="tfq-btn ghost small" disabled={cancel.isPending} onClick={() => cancel.mutate({ id: summary.pending!.id })}>
             {b.cancelRequest}
           </button>
@@ -132,7 +133,7 @@ export function SubscriptionPage() {
             <label className="tfq-field">
               {b.paymentMethod}
               <select className="tfq-select" value={method} onChange={event => setMethod(event.target.value as PaymentMethod)}>
-                {PAYMENT_METHODS.map(entry => (
+                {data.paymentMethods.map(entry => (
                   <option key={entry} value={entry}>
                     {b.methods[entry]}
                   </option>
@@ -355,5 +356,72 @@ export function StreamRequestPage() {
         )}
       </div>
     </section>
+  );
+}
+
+/** The pending request: its payment state, and the receipt (photo/PDF) and reference the student sends. */
+function ReceiptForm({
+  row,
+  maxBytes,
+}: {
+  row: { id: number; paymentState: string; hasReceipt: boolean; paymentReference: string | null } | null;
+  maxBytes: number;
+}) {
+  const b = useB();
+  const utils = trpc.useUtils();
+  const [file, setFile] = useState<File | null>(null);
+  const [reference, setReference] = useState(row?.paymentReference ?? "");
+  const upload = trpc.bac.uploadReceipt.useMutation({
+    onSuccess: async () => {
+      toast.success(b.pay.sent);
+      setFile(null);
+      await utils.bac.subscription.invalidate();
+    },
+    onError: error => toast.error(bacError(b, error)),
+  });
+  if (!row) return null;
+  return (
+    <form
+      className="tfq-form"
+      style={{ margin: "12px 0" }}
+      onSubmit={async event => {
+        event.preventDefault();
+        if (!file) return;
+        if (file.size > maxBytes) {
+          toast.error(b.errors.FILE_TOO_LARGE);
+          return;
+        }
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        upload.mutate({ subscriptionId: row.id, file: { mimeType: file.type, base64 }, reference: reference.trim() || null });
+      }}
+    >
+      <p>
+        {b.pay.stateLabel}: <span className={`tfq-chip ${row.paymentState === "awaiting_review" ? "info" : ""}`}>{b.pay.states[row.paymentState]}</span>
+        {row.hasReceipt && (
+          <>
+            {" "}
+            · <a href={`/api/protected-files/payment-receipt/${row.id}`} target="_blank" rel="noreferrer">{b.pay.view}</a>
+          </>
+        )}
+      </p>
+      <strong>{b.pay.receiptTitle}</strong>
+      <small className="tfq-muted">{b.pay.receiptHint}</small>
+      <label className="tfq-field">
+        {b.pay.receiptFile}
+        <input className="tfq-input" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => setFile(event.target.files?.[0] ?? null)} />
+      </label>
+      <label className="tfq-field">
+        {b.pay.reference}
+        <input className="tfq-input" dir="ltr" maxLength={120} value={reference} onChange={event => setReference(event.target.value)} />
+      </label>
+      <button type="submit" className="tfq-btn small" disabled={!file || upload.isPending}>
+        {row.hasReceipt ? b.pay.replace : b.pay.send}
+      </button>
+    </form>
   );
 }

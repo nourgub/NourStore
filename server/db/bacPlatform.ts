@@ -394,6 +394,51 @@ export async function getSubscription(id: number) {
   return rows[0];
 }
 
+/** Attaches the student's receipt (and reference) to their own pending request. False when not theirs or not pending. */
+export async function setSubscriptionReceipt(input: { subscriptionId: number; userId: number; key: string; mime: string; reference: string | null }) {
+  const db = await requireDb();
+  const [result] = await db
+    .update(tafawoqSubscriptions)
+    .set({
+      receiptKey: input.key,
+      receiptMime: input.mime,
+      receiptUploadedAt: new Date(),
+      ...(input.reference ? { paymentReference: input.reference } : {}),
+    })
+    .where(
+      and(
+        eq(tafawoqSubscriptions.id, input.subscriptionId),
+        eq(tafawoqSubscriptions.userId, input.userId),
+        eq(tafawoqSubscriptions.status, "pending_payment")
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows === 1;
+}
+
+/**
+ * Other subscriptions (not rejected or cancelled) whose student or admin
+ * reference equals `reference`, ignoring case and spaces: the same slip
+ * presented twice, or a coincidence the admin must look at.
+ */
+export async function subscriptionsWithReference(reference: string, excludeId: number) {
+  const db = await requireDb();
+  const normalized = reference.replace(/\s+/g, "").toLowerCase();
+  if (normalized.length < 4) return [];
+  const column = (value: typeof tafawoqSubscriptions.paymentReference | typeof tafawoqSubscriptions.paidReference) =>
+    sql`LOWER(REPLACE(${value}, ' ', ''))`;
+  return db
+    .select({ id: tafawoqSubscriptions.id, userId: tafawoqSubscriptions.userId, status: tafawoqSubscriptions.status })
+    .from(tafawoqSubscriptions)
+    .where(
+      and(
+        sql`${tafawoqSubscriptions.id} <> ${excludeId}`,
+        inArray(tafawoqSubscriptions.status, ["pending_payment", "active"]),
+        or(sql`${column(tafawoqSubscriptions.paymentReference)} = ${normalized}`, sql`${column(tafawoqSubscriptions.paidReference)} = ${normalized}`)
+      )
+    )
+    .limit(10);
+}
+
 export async function listUserSubscriptions(userId: number) {
   const db = await requireDb();
   return db
@@ -540,6 +585,8 @@ export async function listSubscriptions(status?: "pending_payment" | "active" | 
       bonusDays: tafawoqSubscriptions.bonusDays,
       createdAt: tafawoqSubscriptions.createdAt,
       reviewNote: tafawoqSubscriptions.reviewNote,
+      hasReceipt: sql<number>`${tafawoqSubscriptions.receiptKey} IS NOT NULL`,
+      receiptUploadedAt: tafawoqSubscriptions.receiptUploadedAt,
     })
     .from(tafawoqSubscriptions)
     .innerJoin(users, eq(users.id, tafawoqSubscriptions.userId))

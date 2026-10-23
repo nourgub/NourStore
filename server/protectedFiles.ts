@@ -16,7 +16,9 @@ import path from "path";
 import { eq } from "drizzle-orm";
 import { UPLOAD_ROOT } from "./storageProviders/local";
 import { getDb } from "./db/shared";
-import { tafawoqExercises, tafawoqStudents } from "../drizzle/schema";
+import { tafawoqExercises, tafawoqStudents, tafawoqSubscriptions } from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { storageGetSignedUrl } from "./storage";
 import { authenticateRequest } from "./_core/session";
 import type { User } from "../drizzle/schema";
 
@@ -26,7 +28,18 @@ const CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".pdf": "application/pdf",
 };
+
+/** Local disk: streamed after the check; S3: a short-lived signed URL, after the same check. */
+async function sendStoredFile(res: Response, storageKey: string, mimeType: string | null) {
+  if (ENV.storageProvider === "s3") {
+    res.setHeader("Cache-Control", "private, no-store");
+    res.redirect(302, await storageGetSignedUrl(storageKey));
+    return;
+  }
+  await streamProtectedFile(res, storageKey, mimeType);
+}
 
 /** Path-traversal guard, re-verified here independently rather than trusted from write time. */
 async function streamProtectedFile(
@@ -105,7 +118,35 @@ export function registerProtectedFileRoutes(app: Express) {
         res.status(403).json({ error: "Not authorized to view this photo." });
         return;
       }
-      await streamProtectedFile(res, exercise.storageKey, exercise.mimeType);
+      await sendStoredFile(res, exercise.storageKey, exercise.mimeType);
     }
   );
+
+  // A payment receipt: the student who sent it, and admins, only.
+  app.get("/api/protected-files/payment-receipt/:subscriptionId", async (req: Request, res: Response) => {
+    const user = await requireUser(req, res);
+    if (!user) return;
+    const subscriptionId = Number(req.params.subscriptionId);
+    if (!Number.isInteger(subscriptionId) || subscriptionId <= 0) {
+      res.status(400).json({ error: "Invalid id." });
+      return;
+    }
+    const db = await getDb();
+    if (!db) {
+      res.status(503).json({ error: "Database unavailable." });
+      return;
+    }
+    const [row] = await db
+      .select({ key: tafawoqSubscriptions.receiptKey, mime: tafawoqSubscriptions.receiptMime, userId: tafawoqSubscriptions.userId })
+      .from(tafawoqSubscriptions)
+      .where(eq(tafawoqSubscriptions.id, subscriptionId))
+      .limit(1);
+    // Same answer for "no such receipt" and "not yours".
+    if (!row?.key || (row.userId !== user.id && user.role !== "admin")) {
+      res.status(404).json({ error: "Receipt not found." });
+      return;
+    }
+    res.setHeader("Content-Disposition", "inline");
+    await sendStoredFile(res, row.key, row.mime);
+  });
 }

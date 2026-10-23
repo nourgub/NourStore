@@ -108,6 +108,17 @@ export const bacRouter = router({
     )
     .mutation(({ ctx, input }) => platform.requestSubscription(ctx.user.id, input)),
 
+  uploadReceipt: learnerProcedure
+    .use(rateLimit("bac-receipt", 10, HOUR))
+    .input(
+      z.object({
+        subscriptionId: id,
+        file: z.object({ mimeType: z.string().max(40), base64: z.string().max(7_200_000) }),
+        reference: z.string().trim().max(120).nullish(),
+      })
+    )
+    .mutation(({ ctx, input }) => platform.uploadReceipt(ctx.user.id, input)),
+
   cancelPendingSubscription: learnerProcedure
     .input(z.object({ id }))
     .mutation(({ ctx, input }) => platform.cancelPendingSubscription(ctx.user.id, input.id)),
@@ -380,7 +391,7 @@ export const bacAdminRouter = router({
 
   subscriptions: adminProcedure
     .input(z.object({ status: z.enum(["pending_payment", "active", "rejected", "canceled"]).optional() }))
-    .query(({ input }) => bacDb.listSubscriptions(input.status)),
+    .query(({ input }) => platform.adminSubscriptions(input.status)),
 
   confirmSubscription: adminProcedure
     .input(
@@ -457,6 +468,7 @@ export const bacAdminRouter = router({
         secondSubjectChange: z.boolean().optional(),
         referralBonusDays: z.number().int().min(0).max(60).optional(),
         paymentInstructions: z.string().max(2000).optional(),
+        paymentMethods: z.array(z.enum(PAYMENT_METHODS)).max(PAYMENT_METHODS.length).optional(),
         sessionsPerMonth: z.number().int().min(0).max(30).optional(),
         maxUpcomingSessions: z.number().int().min(1).max(10).optional(),
       })

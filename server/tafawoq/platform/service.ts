@@ -23,6 +23,7 @@ import {
   type BacSubject,
   type ErrorType,
   type PaymentMethod,
+  PAYMENT_METHODS,
   type PlatformStream,
   type SubscriptionPlan,
   type TeacherAction,
@@ -33,6 +34,9 @@ import * as bac from "../../db/bacPlatform";
 import * as store from "../../db/tafawoq";
 import { getPlatformSetting, getSettingNumber, setPlatformSetting } from "../../db/platformSettings";
 import { logAdminAction } from "../../db/adminAudit";
+import { checkedUpload } from "../uploads";
+import { storageDelete, storagePut } from "../../storage";
+import { randomUUID } from "crypto";
 import { createParentInvite, getParentLinks } from "../../db/parent";
 import { getLesson, lessonForStream, type BankQuestion, type Lesson } from "../curriculum";
 import { createRng, randomSeed, spokenSeed } from "../generators/core";
@@ -304,6 +308,50 @@ export async function setShareChats(userId: number, share: boolean) {
 // Subscription (manual payment confirmation — nothing is ever simulated)
 // ---------------------------------------------------------------------------
 
+/**
+ * Where a manual payment stands, for the student and the admin:
+ * awaiting_payment (request made, no receipt or reference yet) →
+ * awaiting_review (receipt or reference sent) → accepted | rejected
+ * (canceled: withdrawn). Separate from whether a subscription is running.
+ */
+export function paymentState(row: { status: string; paymentReference: string | null; receiptKey?: string | null; hasReceipt?: number | boolean | null }) {
+  if (row.status === "active") return "accepted" as const;
+  if (row.status === "rejected") return "rejected" as const;
+  if (row.status === "canceled") return "canceled" as const;
+  return row.receiptKey || row.hasReceipt || row.paymentReference ? ("awaiting_review" as const) : ("awaiting_payment" as const);
+}
+
+/** The payment methods the admin offers (all by default). */
+export async function enabledPaymentMethods(): Promise<PaymentMethod[]> {
+  const raw = (await getPlatformSetting("bac.paymentMethods"))?.trim();
+  if (!raw) return [...PAYMENT_METHODS];
+  const chosen = raw.split(",").map(entry => entry.trim()).filter((entry): entry is PaymentMethod => (PAYMENT_METHODS as readonly string[]).includes(entry));
+  return chosen.length ? chosen : [...PAYMENT_METHODS];
+}
+
+export const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+
+/** The student attaches the receipt (photo or PDF) of their payment, and optionally its reference, to their pending request. */
+export async function uploadReceipt(
+  userId: number,
+  input: { subscriptionId: number; file: { mimeType: string; base64: string }; reference?: string | null }
+) {
+  const row = await bac.getSubscription(input.subscriptionId);
+  if (!row || row.userId !== userId) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+  if (row.status !== "pending_payment") throw new TRPCError({ code: "CONFLICT", message: "NOT_PENDING" });
+  const file = checkedUpload(input.file, ["image/jpeg", "image/png", "image/webp", "application/pdf"], MAX_RECEIPT_BYTES);
+  const stored = await storagePut(`payment-receipts/${userId}/${randomUUID()}.${file.extension}`, file.bytes, file.mimeType);
+  const reference = input.reference?.trim() || null;
+  if (!(await bac.setSubscriptionReceipt({ subscriptionId: row.id, userId, key: stored.key, mime: file.mimeType, reference }))) {
+    await storageDelete(stored.key).catch(() => {});
+    throw new TRPCError({ code: "CONFLICT", message: "NOT_PENDING" });
+  }
+  // The previous receipt (a re-upload) is not kept.
+  if (row.receiptKey) await storageDelete(row.receiptKey).catch(() => {});
+  await bac.logEvent(userId, "payment_receipt_uploaded", { subscriptionId: row.id });
+  return { ok: true, paymentState: "awaiting_review" as const };
+}
+
 export async function subscriptionPage(userId: number) {
   const student = await store.getTafawoqStudentByUser(userId);
   const switches = await contentSwitches();
@@ -332,7 +380,13 @@ export async function subscriptionPage(userId: number) {
       bonusDays: row.bonusDays,
       createdAt: row.createdAt,
       reviewNote: row.reviewNote,
+      paymentReference: row.paymentReference,
+      hasReceipt: Boolean(row.receiptKey),
+      receiptUploadedAt: row.receiptUploadedAt,
+      paymentState: paymentState(row),
     })),
+    paymentMethods: await enabledPaymentMethods(),
+    maxReceiptBytes: MAX_RECEIPT_BYTES,
     paymentInstructions: instructions?.trim() || null,
     // No online gateway is wired for subscriptions: an admin confirms each payment.
     gateway: "manual" as const,
@@ -383,6 +437,7 @@ export async function requestSubscription(
   }
 ) {
   await lockedStudent(userId);
+  if (!(await enabledPaymentMethods()).includes(input.paymentMethod)) throw new TRPCError({ code: "BAD_REQUEST", message: "PAYMENT_METHOD_OFF" });
   if (await bac.getPendingSubscription(userId)) throw new TRPCError({ code: "CONFLICT", message: "PENDING_EXISTS" });
   const { months, priceDa } = PLAN_DETAILS[input.plan];
   const coupon = input.couponCode?.trim() ? await validCoupon(userId, input.couponCode) : null;
@@ -1569,6 +1624,12 @@ export async function adminConfirmSubscription(
   if (row.status !== "pending_payment") throw new TRPCError({ code: "CONFLICT", message: "NOT_PENDING" });
   // A received amount different from what was asked must be explained.
   if (paid.amountDa !== row.amountDa && !note?.trim()) throw new TRPCError({ code: "BAD_REQUEST", message: "AMOUNT_MISMATCH_NOTE" });
+  // A reference already on another live subscription: the same slip twice, or
+  // a legitimate case (a family paying for two) the admin must explain.
+  const duplicates = (
+    await Promise.all([row.paymentReference, paid.reference].filter((ref): ref is string => !!ref).map(ref => bac.subscriptionsWithReference(ref, row.id)))
+  ).flat();
+  if (duplicates.length && !note?.trim()) throw new TRPCError({ code: "BAD_REQUEST", message: "DUPLICATE_REFERENCE_NOTE" });
   const student = await store.getTafawoqStudentByUser(row.userId);
   const latestEnd = await bac.getLatestActiveEnd(row.userId);
   // Whole seconds: MySQL TIMESTAMP rounds milliseconds to the nearest
@@ -1611,6 +1672,8 @@ export async function adminConfirmSubscription(
       method: row.paymentMethod,
       studentReference: row.paymentReference,
       receivedReference: paid.reference,
+      receipt: Boolean(row.receiptKey),
+      sameReferenceOn: duplicates.map(entry => entry.id),
     },
   });
   await bac.logEvent(adminId, "subscription_activated", { subscriptionId: row.id, userId: row.userId });
@@ -1718,11 +1781,28 @@ export async function adminBroadcast(adminId: number, input: { title: string; bo
   return { sent: userIds.length };
 }
 
+/** The admin's payment list: each row with its payment state and the other live subscriptions sharing its reference. */
+export async function adminSubscriptions(status?: "pending_payment" | "active" | "rejected" | "canceled") {
+  const rows = await bac.listSubscriptions(status);
+  return Promise.all(
+    rows.map(async row => ({
+      ...row,
+      hasReceipt: Boolean(row.hasReceipt),
+      paymentState: paymentState(row),
+      sameReference:
+        row.status === "pending_payment" && (row.paymentReference || row.paidReference)
+          ? (await bac.subscriptionsWithReference((row.paymentReference || row.paidReference)!, row.id)).map(entry => entry.id)
+          : [],
+    }))
+  );
+}
+
 export async function adminSettings() {
   return {
     secondSubjectChange: await settingFlag("bac.secondSubjectChange", true),
     referralBonusDays: await settingNumber("bac.referralBonusDays", 7),
     paymentInstructions: (await getPlatformSetting("bac.paymentInstructions")) ?? "",
+    paymentMethods: await enabledPaymentMethods(),
     // Trial values until the owner decides the commercial ones.
     sessionsPerMonth: await settingNumber("bac.sessionsPerMonth", 2),
     maxUpcomingSessions: await settingNumber("bac.maxUpcomingSessions", 3),
@@ -1735,6 +1815,7 @@ export async function adminSetSettings(
     secondSubjectChange?: boolean;
     referralBonusDays?: number;
     paymentInstructions?: string;
+    paymentMethods?: PaymentMethod[];
     sessionsPerMonth?: number;
     maxUpcomingSessions?: number;
   }
@@ -1742,6 +1823,10 @@ export async function adminSetSettings(
   if (input.secondSubjectChange !== undefined) await setPlatformSetting("bac.secondSubjectChange", input.secondSubjectChange ? "1" : "0");
   if (input.referralBonusDays !== undefined) await setPlatformSetting("bac.referralBonusDays", String(input.referralBonusDays));
   if (input.paymentInstructions !== undefined) await setPlatformSetting("bac.paymentInstructions", input.paymentInstructions);
+  if (input.paymentMethods !== undefined) {
+    if (!input.paymentMethods.length) throw new TRPCError({ code: "BAD_REQUEST", message: "PAYMENT_METHOD_REQUIRED" });
+    await setPlatformSetting("bac.paymentMethods", input.paymentMethods.join(","));
+  }
   if (input.sessionsPerMonth !== undefined) await setPlatformSetting("bac.sessionsPerMonth", String(input.sessionsPerMonth));
   if (input.maxUpcomingSessions !== undefined) await setPlatformSetting("bac.maxUpcomingSessions", String(input.maxUpcomingSessions));
   await logAdminAction({ actorId: adminId, action: "bac.settings", details: input as Record<string, unknown> });
