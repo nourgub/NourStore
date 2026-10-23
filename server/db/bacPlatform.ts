@@ -166,6 +166,11 @@ export async function markPlacementDone(studentId: number) {
   await db.update(tafawoqStudents).set({ placementDoneAt: new Date() }).where(eq(tafawoqStudents.id, studentId));
 }
 
+export async function setTeacherVoice(studentId: number, voice: "male" | "female") {
+  const db = await requireDb();
+  await db.update(tafawoqStudents).set({ teacherVoice: voice }).where(eq(tafawoqStudents.id, studentId));
+}
+
 export async function setShareChats(studentId: number, share: boolean) {
   const db = await requireDb();
   await db.update(tafawoqStudents).set({ shareChatsWithParent: share ? 1 : 0 }).where(eq(tafawoqStudents.id, studentId));

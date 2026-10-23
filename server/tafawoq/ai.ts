@@ -294,12 +294,23 @@ const LANGUAGE_NAMES: Record<ForeignLang, string> = {
   en: "اللغة الإنجليزية",
 };
 
+/** How the teacher speaks when the student chose Algerian Darja. */
+export const DARJA_REGISTER =
+  "التلميذ اختار أن يكلمه الأستاذ بالدارجة الجزائرية. التزم بهذه القواعد: " +
+  "اشرح وبسّط وشجّع وتفاعل بالدارجة الجزائرية (مثل: «واش فهمت؟»، «صحّيت»، «خمّم معايا»)؛ " +
+  "اقرأ التعاريف والقواعد والنظريات كما هي بالعربية الفصحى، وقدّمها بجملة مثل «القاعدة تقول:»؛ " +
+  "عند حل تمرين تكلم بالدارجة مع المصطلحات الرياضية الصحيحة (المشتقة، النهاية، الدالة الأسية…) ولا تحرّفها؛ " +
+  "اكتب المعادلات بالرموز كما هي ولا تكتبها بالكلمات؛ " +
+  "اطرح سؤالاً توجيهياً قصيراً واحداً في كل رد، ولا تعطِ الحل النهائي قبل أن يحاول التلميذ، وبسّط أكثر إذا قال إنه لم يفهم.";
+
 export async function tutorReply(
   context: StudentContext,
   history: TutorTurn[],
   message: string | null,
   /** A language lesson taught in its own language (the teacher speaking it). */
-  language?: ForeignLang
+  language?: ForeignLang,
+  /** The student chose the teacher in Algerian Darja. */
+  darja = false
 ): Promise<string> {
   const messages: Anthropic.Beta.BetaMessageParam[] = [];
   // The profile is the first user turn so the (stable) system prompt stays
@@ -310,12 +321,14 @@ export async function tutorReply(
 
 أنت في حصة خاصة مع هذا التلميذ. ردودك قصيرة (3 إلى 6 جمل) كما في محادثة حقيقية: اشرح بمثال، اطرح سؤالاً واحداً للتحقق من الفهم، ولا تعطِ الحل النهائي لتمرين قبل أن يحاول. ${
       message === null
-        ? "ابدأ الحصة الآن: رحّب به (نادِه «${NAME_PLACEHOLDER}»)، قل له بصدق ما لاحظته من تحليل مستواه (ما يتقنه وما يصعب عليه)، واشرح كيف سنتقدم معاً، ثم اطرح عليه سؤالاً أولاً بسيطاً."
+        ? `ابدأ الحصة الآن: رحّب به (نادِه «${NAME_PLACEHOLDER}»)، قل له بصدق ما لاحظته من تحليل مستواه (ما يتقنه وما يصعب عليه)، واشرح كيف سنتقدم معاً، ثم اطرح عليه سؤالاً أولاً بسيطاً.`
         : "تابع الحوار."
     }${
       language
         ? `\n\nهذه حصة ${LANGUAGE_NAMES[language]} والتلميذ اختار أن يكلمه الأستاذ بها: اكتب ردودك بهذه اللغة البسيطة (مستوى A2 إلى B1) وبجمل قصيرة، وأضف ترجمة عربية قصيرة بين قوسين للكلمة الصعبة فقط، واشرح بالعربية فقط إذا قال التلميذ إنه لم يفهم.`
-        : ""
+        : darja
+          ? `\n\n${DARJA_REGISTER}`
+          : ""
     }`,
   });
   for (const turn of history) {

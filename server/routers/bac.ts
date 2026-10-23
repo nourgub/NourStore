@@ -79,6 +79,10 @@ export const bacRouter = router({
     .input(z.object({ bookingId: z.number().int().positive() }))
     .mutation(({ ctx, input }) => tutoring.cancelMyBooking(ctx.user.id, input.bookingId)),
 
+  setTeacherVoice: learnerProcedure
+    .input(z.object({ voice: z.enum(["male", "female"]) }))
+    .mutation(({ ctx, input }) => platform.setTeacherVoice(ctx.user.id, input.voice)),
+
   setShareChats: learnerProcedure
     .input(z.object({ share: z.boolean() }))
     .mutation(({ ctx, input }) => platform.setShareChats(ctx.user.id, input.share)),

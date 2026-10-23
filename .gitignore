@@ -27,3 +27,7 @@ uploads/
 .replit-data/
 playwright-report/
 test-results/
+services/tassili-tts/models/
+services/tassili-tts/voices.json
+__pycache__/
+.pytest_cache/

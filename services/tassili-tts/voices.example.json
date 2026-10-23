@@ -1,0 +1,13 @@
+{
+  "_comment": "Copy to voices.json (not committed). A voice is offered only with a reference recording (5-15 s, clean, mono), its exact transcript in Arabic script, and a reference to the speaker's written consent to commercial use of a cloned voice. Leave a voice out rather than use anyone's recording without that consent.",
+  "male": {
+    "ref_audio": "/data/voices/male-reference.wav",
+    "ref_text": "النص المنطوق في التسجيل المرجعي بالحرف",
+    "consent_ref": "contract reference, date, where the signed copy is kept"
+  },
+  "female": {
+    "ref_audio": "/data/voices/female-reference.wav",
+    "ref_text": "النص المنطوق في التسجيل المرجعي بالحرف",
+    "consent_ref": "contract reference, date, where the signed copy is kept"
+  }
+}

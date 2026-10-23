@@ -226,4 +226,16 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — account
     // Back to its initial state so a repeated run starts the same.
     await adminCaller.bacAdmin.setContentReview({ lessonKey: "math-derivatives", status: "unreviewed" });
   });
+
+  it("keeps the student's teacher voice (male/female) with the account", async () => {
+    const user = await fixtureUser("voice");
+    const caller = appRouter.createCaller(ctxFor(user));
+    await caller.tafawoq.register({ displayName: "Voice Test", age: 17, schoolLevel: "bac" });
+    expect((await caller.bac.state()).student?.teacherVoice).toBeNull();
+    await caller.bac.setTeacherVoice({ voice: "female" });
+    expect((await caller.bac.state()).student?.teacherVoice).toBe("female");
+    await caller.bac.setTeacherVoice({ voice: "male" });
+    expect((await caller.bac.state()).student?.teacherVoice).toBe("male");
+    await expect(caller.bac.setTeacherVoice({ voice: "robot" as never })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
 });

@@ -720,6 +720,32 @@ function Workspace({ lessonKey, data }: { lessonKey: string; data: WorkspaceData
 function VoiceSwitch() {
   const t = useT();
   const [voice, setVoice] = useTeacherVoice();
+  // The choice is kept with the student (every device), and on this device for the voice requests.
+  const state = trpc.bac.state.useQuery(undefined, { staleTime: 60_000 });
+  const saved = state.data?.student?.teacherVoice ?? null;
+  const save = trpc.bac.setTeacherVoice.useMutation();
+  useEffect(() => {
+    if (saved && saved !== voice) setVoice(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved]);
+  // What each teacher's voice really is on this server (never assumed).
+  const [voices, setVoices] = useState<Record<"male" | "female", { provider: string; accent: string } | null> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/tafawoq/tts/status")
+      .then(response => (response.ok ? response.json() : null))
+      .then(body => alive && body?.voices && setVoices(body.voices))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const note = (option: "male" | "female") => {
+    if (!voices) return null;
+    const entry = voices[option];
+    if (!entry) return t.voiceNotConfigured;
+    return entry.accent === "algerian" ? t.voiceAlgerianShort : t.voiceNotAlgerian;
+  };
   return (
     <div className="tfq-style-switch" role="radiogroup" aria-label={t.teacherVoice}>
       <span className="tfq-muted">{t.teacherVoice}</span>
@@ -730,9 +756,13 @@ function VoiceSwitch() {
           role="radio"
           aria-checked={voice === option}
           className={`tfq-btn small ${voice === option ? "" : "ghost"}`}
-          onClick={() => setVoice(option)}
+          onClick={() => {
+            setVoice(option);
+            if (state.data?.student) save.mutate({ voice: option });
+          }}
         >
           {option === "male" ? t.voiceMale : t.voiceFemale}
+          {note(option) && <small style={{ opacity: 0.75 }}> · {note(option)}</small>}
         </button>
       ))}
     </div>

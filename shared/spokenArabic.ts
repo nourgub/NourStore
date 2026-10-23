@@ -72,6 +72,8 @@ export function toSpokenArabic(text: string): string {
   out = out.replace(/τ/g, " تاو ").replace(/λ/g, " لامدا ").replace(/ω/g, " أوميغا ").replace(/α/g, " ألفا ").replace(/β/g, " بيتا ").replace(/γ/g, " غاما ").replace(/μ/g, " ميو ");
   // f′(x) → إف مشتقة إكس ; (uv)′ → … مشتقة ; z̄ → مرافق زد ; |z| → طويلة زد
   out = out
+    // A prime typed as an apostrophe (’ ' ʹ) means the same as ′ after a function letter.
+    .replace(/([a-zA-Z)])[′’'ʹ](?=\s*\()/g, "$1 مشتقة ")
     .replace(/([a-zA-Z)])′/g, "$1 مشتقة ")
     .replace(/([a-zA-Z])\u0304/g, " مرافق $1")
     .replace(/\|([^|]+)\|/g, " طويلة $1 ");

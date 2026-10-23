@@ -40,6 +40,7 @@ import path from "path";
 import { Mp3Encoder } from "@breezystack/lamejs";
 import { sql } from "drizzle-orm";
 import { HAS_WORD, bareWord, spokenSegments, withoutName } from "../../shared/spokenArabic";
+import { spellNumbers } from "../../shared/arabicNumbers";
 import { ENV } from "../_core/env";
 import { getDb } from "../db/shared";
 import { storageGetSignedUrl, storagePut } from "../storage";
@@ -53,7 +54,7 @@ const PIPER_DIR = path.resolve(process.env.TAFAWOQ_PIPER_DIR || path.join(proces
 const PIPER_BIN = process.env.PIPER_BIN || path.join(PIPER_DIR, "piper", "piper");
 
 export type VoiceGender = "male" | "female";
-type Provider = "pack" | "azure" | "google" | "piper";
+type Provider = "pack" | "tassili" | "azure" | "google" | "piper";
 type Paid = "azure" | "google";
 
 /**
@@ -189,6 +190,8 @@ export function voicePackInfo(): VoicePackInfo | null {
 
 export function engineAccent(engine: Pick<Engine, "provider" | "voice">): VoiceAccent {
   if (engine.provider === "pack") return voicePackInfo()?.accent ?? "arabic";
+  // TassiliTTS speaks Algerian Dardja, in the configured reference voice.
+  if (engine.provider === "tassili") return "algerian";
   if (engine.provider === "azure") return /^ar-DZ-/i.test(engine.voice) ? "algerian" : "arabic";
   return "arabic";
 }
@@ -198,8 +201,71 @@ const piperReady = (gender: VoiceGender, lang: SpeechLang = "ar") => {
   return Boolean(model) && existsSync(PIPER_BIN) && existsSync(model!);
 };
 
+// ---------------------------------------------------------------------------
+// TassiliTTS (services/tassili-tts): an Algerian Dardja voice served by our
+// own Python service. Optional: only with TAFAWOQ_TASSILI_URL and
+// TAFAWOQ_TASSILI_TOKEN, and only for a teacher voice the service reports
+// ready (a reference recording with the speaker's consent). Its /health is
+// read at most once a minute; a failure falls through to the next voice.
+// ---------------------------------------------------------------------------
+
+const tassiliUrl = () => (process.env.TAFAWOQ_TASSILI_URL || "").replace(/\/+$/, "");
+const tassiliToken = () => process.env.TAFAWOQ_TASSILI_TOKEN || "";
+const TASSILI_TIMEOUT_MS = () => Number(process.env.TAFAWOQ_TASSILI_TIMEOUT_MS || 90_000);
+type TassiliHealth = { at: number; voices: Record<VoiceGender, boolean> };
+let tassiliHealth: TassiliHealth | null = null;
+let tassiliChecking: Promise<void> | null = null;
+
+/** Reads the service's /health when the last answer is over a minute old. */
+export async function refreshTassili(force = false): Promise<void> {
+  if (!tassiliUrl() || !tassiliToken()) return;
+  if (!force && tassiliHealth && Date.now() - tassiliHealth.at < 60_000) return;
+  tassiliChecking ??= (async () => {
+    let voices: Record<VoiceGender, boolean> = { male: false, female: false };
+    try {
+      const response = await fetch(`${tassiliUrl()}/health`, { signal: AbortSignal.timeout(3_000) });
+      const body = (await response.json()) as { model_loaded?: boolean; voices?: Record<string, { ready?: boolean }> };
+      if (body.model_loaded) voices = { male: !!body.voices?.male?.ready, female: !!body.voices?.female?.ready };
+    } catch {
+      // unreachable: no TassiliTTS voice until the next check
+    }
+    tassiliHealth = { at: Date.now(), voices };
+  })().finally(() => {
+    tassiliChecking = null;
+  });
+  await tassiliChecking;
+}
+
+/** Text TassiliTTS can read: Arabic script only, numbers in words. Null if something Latin is left. */
+export function tassiliText(text: string): string | null {
+  const spelled = spellNumbers(text)
+    .replace(/[\u064B-\u0652\u0670]/g, "")
+    .replace(/[^\u0621-\u063A\u0641-\u064A\u0671-\u06D3\sA-Za-z،؛؟!.,:-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!spelled || /[A-Za-z]/.test(spelled)) return null;
+  return spelled;
+}
+
+let tassiliRate = 24_000;
+async function tassiliPcm(text: string, gender: VoiceGender): Promise<Buffer> {
+  const readable = tassiliText(text);
+  if (!readable) throw new Error("TassiliTTS reads Arabic script only");
+  const response = await fetch(`${tassiliUrl()}/synthesize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tassiliToken()}` },
+    body: JSON.stringify({ text: readable, voice: gender }),
+    signal: AbortSignal.timeout(TASSILI_TIMEOUT_MS()),
+  });
+  if (!response.ok) throw new Error(`TassiliTTS ${response.status}: ${(await response.text()).slice(0, 200)}`);
+  const wav = Buffer.from(await response.arrayBuffer());
+  tassiliRate = wavRate(wav) ?? tassiliRate;
+  return wavData(wav);
+}
+
 export function ttsProviders() {
   return {
+    tassili: Boolean(tassiliUrl() && tassiliToken() && (tassiliHealth?.voices.male || tassiliHealth?.voices.female)),
     pack: Boolean((VOICE_PACKS.male || VOICE_PACKS.female) && voicePackInfo()),
     azure: Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     google: Boolean(process.env.GOOGLE_TTS_API_KEY),
@@ -249,6 +315,19 @@ export function trimSilence(pcm: Buffer, sampleRate: number, threshold = 400): B
 }
 
 const silence = (sampleRate: number, ms: number) => Buffer.alloc(Math.round((sampleRate * ms) / 1000) * 2);
+
+/** The sample rate written in a WAV file's header, or null. */
+export function wavRate(wav: Buffer): number | null {
+  if (wav.subarray(0, 4).toString("ascii") !== "RIFF") return null;
+  let offset = 12;
+  while (offset + 8 <= wav.length) {
+    const id = wav.subarray(offset, offset + 4).toString("ascii");
+    const size = wav.readUInt32LE(offset + 4);
+    if (id === "fmt ") return wav.readUInt32LE(offset + 12);
+    offset += 8 + size + (size % 2);
+  }
+  return null;
+}
 
 /** The PCM samples of a WAV file (Google's LINEAR16 answer). */
 export function wavData(wav: Buffer): Buffer {
@@ -479,6 +558,16 @@ function enginesFor(gender: VoiceGender, lang: SpeechLang): Engine[] {
     };
     list.push({ provider: "pack", voice: pack, gender, mp3: notLive, pcm: notLive, rate: async () => PACK_RATE });
   }
+  if (lang === "ar" && tassiliUrl() && tassiliToken() && tassiliHealth?.voices[gender]) {
+    list.push({
+      provider: "tassili",
+      voice: `tassili-${gender}`,
+      gender,
+      mp3: async text => pcmToMp3(await tassiliPcm(text, gender), tassiliRate),
+      pcm: text => tassiliPcm(text, gender),
+      rate: async () => tassiliRate,
+    });
+  }
   if (providers.azure) {
     const voice = AZURE_VOICES[lang][gender];
     list.push({
@@ -574,7 +663,7 @@ async function readCached(file: string): Promise<Buffer | null> {
 
 /** A paid request: a slot this minute and characters this month, or false. */
 async function mayRequest(engine: Engine, characters: number, allowance: Allowance, waitMs: number, share: number) {
-  if (engine.provider === "piper") return true;
+  if (engine.provider === "piper" || engine.provider === "tassili") return true;
   if (engine.provider === "pack") return false;
   return (await requestSlot(engine.provider, waitMs, share)) && (await reserveQuota(engine.provider, characters, allowance));
 }
@@ -588,13 +677,22 @@ export async function synthesizeSentence(
   share = 1
 ): Promise<Buffer | null> {
   const file = cachePath(engine, "sentence", text);
-  const hit = await readCached(file);
-  if (hit) return hit;
-  if (!(await mayRequest(engine, text.length, allowance, waitMs, share))) return null;
-  const audio = await engine.mp3(text);
-  await store(file, audio);
-  return audio;
+  // The same sentence asked twice at once (prefetch + play, two students on
+  // the same lesson) is synthesised once: the second request waits for the first.
+  const running = inFlight.get(file);
+  if (running) return running;
+  const work = (async () => {
+    const hit = await readCached(file);
+    if (hit) return hit;
+    if (!(await mayRequest(engine, text.length, allowance, waitMs, share))) return null;
+    const audio = await engine.mp3(text);
+    await store(file, audio);
+    return audio;
+  })().finally(() => inFlight.delete(file));
+  inFlight.set(file, work);
+  return work;
 }
+const inFlight = new Map<string, Promise<Buffer | null>>();
 
 /** A piece (trimmed PCM), cached or synthesised now; null when the allowance says no. */
 export async function piece(engine: Engine, text: string, allowance: Allowance, waitMs: number, share = 1): Promise<Buffer | null> {
@@ -640,10 +738,12 @@ export async function speak(text: string, gender: VoiceGender = "male", name?: s
   if (!clean) return null;
   const nameless = name ? withoutName(clean, name) : clean;
   const named = nameless !== clean && HAS_WORD.test(nameless) ? [clean, nameless] : [clean];
+  if (lang === "ar") await refreshTassili();
   for (const engine of engines(gender, lang)) {
-    // The student's name never goes to an external service (Azure, Google):
-    // they get the sentence without it. Piper runs on this server.
-    const external = engine.provider === "azure" || engine.provider === "google";
+    // The student's name never goes to an external service (Azure, Google,
+    // or a TassiliTTS service that may run elsewhere): they get the sentence
+    // without it. Piper runs on this server.
+    const external = engine.provider === "azure" || engine.provider === "google" || engine.provider === "tassili";
     if (external && nameless !== clean && !HAS_WORD.test(nameless)) continue;
     const sentences = external ? [nameless] : named;
     const found = (audio: Buffer): Voice => ({ audio, contentType: "audio/mpeg", provider: engine.provider, gender: engine.gender, accent: engineAccent(engine) });

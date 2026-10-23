@@ -83,6 +83,7 @@ Without this step no account can open the admin panel.
 | `STORAGE_PROVIDER=s3` + `S3_*` | files on S3/R2/B2 instead of local disk |
 | `REDIS_URL` | rate limits shared across several app instances |
 | `ANTHROPIC_API_KEY` | optional Claude-written content for the AI teacher |
+| `TAFAWOQ_TASSILI_URL`, `TAFAWOQ_TASSILI_TOKEN` | optional Algerian Dardja voice from the TassiliTTS service (`services/tassili-tts`, licence to check first) |
 | `AZURE_SPEECH_*`, `GOOGLE_TTS_API_KEY`, `TAFAWOQ_*` | optional voices and teacher settings |
 | `DATABASE_CA_CERT` | a managed MySQL that requires TLS with its own CA |
 

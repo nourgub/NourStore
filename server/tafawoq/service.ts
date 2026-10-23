@@ -840,11 +840,12 @@ async function tutorText(
   lesson: Lesson,
   history: ai.TutorTurn[],
   message: string | null,
-  taught: ForeignLang | null = null
+  taught: ForeignLang | null = null,
+  style: TeacherStyle = "fusha"
 ): Promise<{ text: string; source: ContentSource }> {
   if (ai.isAiConfigured()) {
     try {
-      return { text: await ai.tutorReply(context, history, message, taught ?? undefined), source: "ai" };
+      return { text: await ai.tutorReply(context, history, message, taught ?? undefined, style === "darja"), source: "ai" };
     } catch (error) {
       logAiFailure("tutor reply", error);
     }
@@ -868,7 +869,7 @@ export async function startTutor(userId: number, lessonKey: string, style?: Teac
   const existing = await store.listMessages(student.id, lesson.key);
   if (existing.length) return { started: false };
   const context = await loadContext(student, lesson);
-  const opening = await tutorText(context, lesson, [], null, taughtLanguage(style, lesson));
+  const opening = await tutorText(context, lesson, [], null, taughtLanguage(style, lesson), style);
   const text = opening.source === "ai" ? opening.text : inStyle(opening.text, style);
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source: opening.source });
   return { started: true };
@@ -1106,7 +1107,7 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
     return { reply: oral, source: "template" as ContentSource };
   }
-  const answered = await tutorText(context, lesson, history, message, taught);
+  const answered = await tutorText(context, lesson, history, message, taught, style);
   // A question in the middle of a dialogue is answered, then the dialogue
   // picks up where it was (unless the student moved on to a quiz).
   const paused = detectIntent(message) !== "quiz" ? dialogueState(lesson, lastTutor) : null;

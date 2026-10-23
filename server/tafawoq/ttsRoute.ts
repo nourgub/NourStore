@@ -7,7 +7,7 @@ import { authenticateRequest } from "../_core/session";
 import { getTafawoqStudentByUser } from "../db/tafawoq";
 import { hasActiveSubscription } from "./platform/access";
 import { checkRateLimit } from "../rateLimit";
-import { MAX_TTS_CHARS, engineAccent, engines, speak, ttsProviders } from "./tts";
+import { MAX_TTS_CHARS, engineAccent, engines, refreshTassili, speak, ttsProviders } from "./tts";
 import { startTtsWarmup } from "./ttsWarmup";
 import { isForeignLang } from "@shared/taughtLanguages";
 
@@ -24,16 +24,18 @@ async function studentName(userId: number): Promise<string | undefined> {
 
 export function registerTafawoqTtsRoutes(app: Express) {
   startTtsWarmup();
-  app.get("/api/tafawoq/tts/status", (_req: Request, res: Response) => {
+  app.get("/api/tafawoq/tts/status", async (_req: Request, res: Response) => {
+    await refreshTassili();
     const providers = ttsProviders();
     // The first voice tried for each teacher, and whether it is Algerian
     // ("algerian") or another Arabic voice ("arabic"); null = the device's voice.
     const first = (gender: "male" | "female") => {
-      const engine = engines(gender, "ar")[0];
+      // This gender's own voice only: falling back to the other teacher is not "ready".
+      const engine = engines(gender, "ar").find(entry => entry.gender === gender);
       return engine ? { provider: engine.provider, accent: engineAccent(engine) } : null;
     };
     res.json({
-      available: providers.pack || providers.azure || providers.google || providers.piper,
+      available: providers.tassili || providers.pack || providers.azure || providers.google || providers.piper,
       voices: { male: first("male"), female: first("female") },
     });
   });

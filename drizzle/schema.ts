@@ -1211,6 +1211,8 @@ export const tafawoqStudents = mysqlTable("tafawoqStudents", {
   thirdLanguage: varchar("thirdLanguage", { length: 16 }),
   placementDoneAt: timestamp("placementDoneAt"),
   shareChatsWithParent: int("shareChatsWithParent").default(0).notNull(),
+  /** "male" | "female": the teacher voice chosen (drizzle/0036). */
+  teacherVoice: varchar("teacherVoice", { length: 8 }),
   bonusDaysCredit: int("bonusDaysCredit").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

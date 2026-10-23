@@ -160,6 +160,7 @@ export async function state(userId: number) {
       thirdLanguage: isThirdLanguage(student.thirdLanguage) ? student.thirdLanguage : null,
       placementDone: Boolean(student.placementDoneAt),
       shareChatsWithParent: student.shareChatsWithParent === 1,
+      teacherVoice: student.teacherVoice === "female" ? ("female" as const) : student.teacherVoice === "male" ? ("male" as const) : null,
     },
   };
   if (!locked) return { step: "stream" as const, ...base };
@@ -284,6 +285,12 @@ export async function requestStreamChange(userId: number, toStream: PlatformStre
 export async function myStreamRequests(userId: number) {
   const student = await tafawoq.studentOrThrow(userId);
   return bac.listStudentStreamRequests(student.id);
+}
+
+export async function setTeacherVoice(userId: number, voice: "male" | "female") {
+  const student = await tafawoq.studentOrThrow(userId);
+  await bac.setTeacherVoice(student.id, voice);
+  return { voice };
 }
 
 export async function setShareChats(userId: number, share: boolean) {
