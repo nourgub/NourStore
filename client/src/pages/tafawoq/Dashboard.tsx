@@ -13,6 +13,7 @@ import {
   FileText,
   Flame,
   Layers,
+  ListChecks,
   MessageCircle,
   PlayCircle,
   Repeat,
@@ -48,6 +49,9 @@ export function StudentDashboard() {
   const lessonsBySubject = new Map<string, typeof data.lessons>();
   for (const lesson of data.lessons) lessonsBySubject.set(lesson.subject, [...(lessonsBySubject.get(lesson.subject) ?? []), lesson]);
   const teacherLesson = data.continueLesson;
+  const nextTask = data.plan?.tasks.find(task => !task.done) ?? null;
+  const startLesson = nextTask?.lessonKey ?? teacherLesson;
+  const suggested = data.lessons.find(lesson => lesson.key === startLesson) ?? null;
   const topErrors = (Object.entries(data.errorCounts) as Array<[ErrorType, number]>).sort((a, c) => c[1] - a[1]).slice(0, 2);
 
   return (
@@ -88,7 +92,71 @@ export function StudentDashboard() {
         </div>
       )}
 
-      <div className="tfq-actions">
+      <section className="tfq-card tfq-today" aria-labelledby="tfq-today-title">
+        <h2 id="tfq-today-title">{b.home.today}</h2>
+        <dl className="tfq-today-list">
+          <div>
+            <dt>{b.home.todayTask}</dt>
+            <dd>
+              {nextTask ? (
+                <>
+                  {b.taskKinds[nextTask.kind]} — <Content as="span">{nextTask.lessonTitle}</Content>
+                </>
+              ) : sub.active ? (
+                b.home.noTask
+              ) : (
+                b.subscribeToUnlock
+              )}
+            </dd>
+          </div>
+          {suggested && (
+            <div>
+              <dt>{b.home.suggested}</dt>
+              <dd>
+                <Content as="span">{suggested.title}</Content>
+              </dd>
+            </div>
+          )}
+          <div>
+            <dt>{b.home.progress}</dt>
+            <dd>
+              <span dir="ltr">{percent(data.overallProgress)}</span>
+              <MasteryBar value={data.overallProgress} />
+            </dd>
+          </div>
+          <div>
+            <dt>{b.home.weakest}</dt>
+            <dd>
+              {data.weakest ? (
+                <Content as="span">
+                  {data.weakest.name} <span className="tfq-muted">— {data.weakest.lessonTitle}</span>
+                </Content>
+              ) : (
+                <span className="tfq-muted">{b.home.notEnough}</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+        <div className="tfq-row">
+          {sub.active && startLesson ? (
+            <Link href={`/tafawoq/${startLesson}`} className="tfq-btn">
+              <PlayCircle size={16} /> {b.home.start}
+            </Link>
+          ) : (
+            <Link href="/tafawoq/subscription" className="tfq-btn">
+              <CreditCard size={16} /> {b.manageSubscription}
+            </Link>
+          )}
+          <Link href="/tafawoq/mistakes" className="tfq-btn ghost">
+            <ListChecks size={16} /> {b.home.review}
+            {data.mistakeCount > 0 && <span className="tfq-chip">{data.mistakeCount}</span>}
+          </Link>
+        </div>
+      </section>
+
+      <details className="tfq-more">
+        <summary>{b.home.more}</summary>
+        <div className="tfq-actions">
         {teacherLesson && sub.active && (
           <Link href={`/tafawoq/${teacherLesson}`} className="tfq-btn">
             <PlayCircle size={16} /> {b.continueLearning}
@@ -109,6 +177,8 @@ export function StudentDashboard() {
           <Repeat size={16} /> {b.requestStreamChange}
         </Link>
       </div>
+
+      </details>
 
       <div className="tfq-dash-grid">
         <section className="tfq-card">
@@ -377,5 +447,65 @@ function ParentLinkCard() {
       </label>
       <p className="tfq-muted" style={{ fontSize: 13 }}>{b.shareChatsPolicy}</p>
     </section>
+  );
+}
+
+/** «راجع أخطائي»: the latest wrong answers, with the right answer and a way back to practise. */
+export function MistakesPage() {
+  const b = useB();
+  const mistakes = trpc.bac.mistakes.useQuery();
+  return (
+    <div className="tfq-dash">
+      <Link href="/tafawoq" className="tfq-btn ghost small">
+        {b.home.back}
+      </Link>
+      <h1>{b.home.mistakesTitle}</h1>
+      <p className="tfq-muted">{b.home.mistakesHint}</p>
+      {mistakes.isLoading ? (
+        <p className="tfq-muted" aria-busy="true">…</p>
+      ) : mistakes.error ? (
+        <div className="tfq-card" role="alert">
+          <p>{b.home.loadError}</p>
+          <button type="button" className="tfq-btn small" onClick={() => void mistakes.refetch()}>
+            {b.home.retry}
+          </button>
+        </div>
+      ) : !mistakes.data?.length ? (
+        <div className="tfq-card tfq-empty">{b.home.noMistakes}</div>
+      ) : (
+        <ol className="tfq-mistakes">
+          {mistakes.data.map((entry, index) => (
+            <li key={`${entry.lessonKey}-${index}`} className="tfq-card">
+              <div className="tfq-chips">
+                <span className="tfq-chip info">
+                  <Content as="span">{entry.lessonTitle}</Content>
+                </span>
+                <span className="tfq-chip">
+                  <Content as="span">{entry.skillName}</Content>
+                </span>
+                {entry.errorType && <span className="tfq-chip">{b.errorTypes[entry.errorType]}</span>}
+              </div>
+              <Content>
+                <p className="tfq-mistake-prompt">{entry.prompt}</p>
+              </Content>
+              <p>
+                <strong>{b.home.yourAnswer}:</strong> <bdi dir="auto">{entry.given || "—"}</bdi>
+              </p>
+              <p>
+                <strong>{b.home.correctAnswer}:</strong> <bdi dir="auto">{entry.correctAnswer}</bdi>
+              </p>
+              {entry.explanation && (
+                <Content>
+                  <p className="tfq-muted">{entry.explanation}</p>
+                </Content>
+              )}
+              <Link href={`/tafawoq/${entry.lessonKey}`} className="tfq-btn small">
+                {b.home.practice}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

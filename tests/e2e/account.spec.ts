@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "fs";
-import { login, PASSWORD, register, unique } from "./helpers";
+import { chooseStudentRole, login, PASSWORD, register, unique } from "./helpers";
 
 test("forgot password answers the same for any email, and a bad link is refused", async ({ page }) => {
   await page.goto("/login");
@@ -20,6 +20,7 @@ test("forgot password answers the same for any email, and a bad link is refused"
 test("my account: export my data, then sign out everywhere ends the session", async ({ page }) => {
   const email = unique("account");
   await register(page, email);
+  await chooseStudentRole(page);
   await page.goto("/tafawoq/account");
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "تنزيل بياناتي" }).click();

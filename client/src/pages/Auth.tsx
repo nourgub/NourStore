@@ -129,6 +129,7 @@ const copy = {
     saveNew: "حفظ كلمة المرور",
     resetDone: "تم تغيير كلمة المرور. سجّل الدخول بها الآن.",
     noToken: "الرابط ناقص. افتح الرابط كاملًا من الرسالة أو اطلب رابطًا جديدًا.",
+    offline: "لا يوجد اتصال بالإنترنت. تحقّق من الاتصال ثم أعد المحاولة.",
     backLogin: "العودة لتسجيل الدخول",
   },
   fr: {
@@ -162,6 +163,7 @@ const copy = {
     saveNew: "Enregistrer",
     resetDone: "Mot de passe changé. Connectez-vous avec le nouveau.",
     noToken: "Lien incomplet. Ouvrez le lien complet du message ou demandez-en un nouveau.",
+    offline: "Pas de connexion Internet. Vérifiez la connexion puis réessayez.",
     backLogin: "Retour à la connexion",
   },
   en: {
@@ -195,6 +197,7 @@ const copy = {
     saveNew: "Save password",
     resetDone: "Password changed. Log in with it now.",
     noToken: "The link is incomplete. Open the full link from the email or ask for a new one.",
+    offline: "No internet connection. Check the connection and try again.",
     backLogin: "Back to log in",
   },
 } as const;
@@ -237,7 +240,10 @@ export default function AuthPage({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setRawError] = useState<string | null>(null);
+  // A request that never reached the server has no message of ours: say so in the page's language.
+  const setFormError = (message: string | null) =>
+    setRawError(message && (/failed to fetch|networkerror|load failed|network request failed/i.test(message) || !navigator.onLine) ? t.offline : message);
   const registerMutation = trpc.auth.registerWithEmail.useMutation({
     onSuccess: () => {
       refresh();

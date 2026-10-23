@@ -2,6 +2,9 @@ import { expect, type Page } from "@playwright/test";
 
 export const PASSWORD = "a-long-password-1";
 export const OWNER_EMAIL = "owner-e2e@tafawoq.test";
+/** Exactly /tafawoq: "**\/tafawoq" also matches /login?next=/tafawoq, before the form is even sent. */
+export const atHome = (url: URL) => url.pathname === "/tafawoq";
+
 export const unique = (label: string) => `${label}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@tafawoq.test`;
 
 /** Signs up with email and password (Arabic interface) and lands on /tafawoq. */
@@ -11,7 +14,7 @@ export async function register(page: Page, email: string, name = "Sara Test") {
   await page.fill("#auth-email", email);
   await page.fill("#auth-password", PASSWORD);
   await page.locator("#auth-password").press("Enter");
-  await page.waitForURL("**/tafawoq");
+  await page.waitForURL(atHome);
 }
 
 export async function login(page: Page, email: string, password = PASSWORD) {
@@ -19,7 +22,7 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await page.fill("#auth-email", email);
   await page.fill("#auth-password", password);
   await page.locator("#auth-password").press("Enter");
-  await page.waitForURL("**/tafawoq");
+  await page.waitForURL(atHome);
 }
 
 /** The admin account (OWNER_OPEN_ID): created on first use, signed in after. */
@@ -29,8 +32,16 @@ export async function signInOwner(page: Page) {
   await page.fill("#auth-password", PASSWORD);
   await page.locator("#auth-password").press("Enter");
   const failed = page.getByRole("alert");
-  await Promise.race([page.waitForURL("**/tafawoq"), failed.waitFor()]);
-  if (!page.url().endsWith("/tafawoq")) await register(page, OWNER_EMAIL, "Owner");
+  await Promise.race([page.waitForURL(atHome), failed.waitFor()]);
+  if (new URL(page.url()).pathname !== "/tafawoq") await register(page, OWNER_EMAIL, "Owner");
+}
+
+/** A new account first says who it is (student/parent). */
+export async function chooseStudentRole(page: Page) {
+  await page.getByText("من أنت؟").waitFor();
+  await page.getByRole("button", { name: /تلميذ/ }).first().click();
+  await page.getByRole("button", { name: "تأكيد الاختيار" }).click();
+  await page.getByText("من أنت؟").waitFor({ state: "detached" });
 }
 
 /** Role → profile → stream (sciences) → second subject → placement test answered → result. */

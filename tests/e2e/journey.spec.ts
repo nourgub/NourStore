@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, onboardStudent, register, signInOwner, unique } from "./helpers";
+import { expectNoHorizontalScroll, login, onboardStudent, register, signInOwner, unique } from "./helpers";
 
 /**
  * The core journey, in the browser, against the real server and database:
@@ -22,7 +22,7 @@ test("student journey from sign-up to unlocked content, with an admin confirming
   // Subscription request (CCP), sent twice by an impatient double click.
   await student.goto("/tafawoq/subscription");
   await student.locator("main select").first().selectOption("ccp");
-  await student.locator('main input[maxlength="120"]').fill("CCP-E2E-001");
+  await student.locator('main input[maxlength="120"]').fill(`CCP-E2E-${Date.now()}`); // unique: a reused reference needs an admin note
   await student.getByRole("button", { name: "إرسال طلب الاشتراك" }).dblclick();
   await expect(student.getByText(/بانتظار|قيد المراجعة|في انتظار/).first()).toBeVisible();
 
@@ -48,6 +48,20 @@ test("student journey from sign-up to unlocked content, with an admin confirming
   await student.context().clearCookies();
   await login(student, studentEmail);
   await student.goto("/tafawoq/subscription");
-  await expect(student.locator("main")).toContainText("نشط");
+  await expect(student.locator("main")).toContainText("مفعّل");
+
+  // Home: today's card first, with the two main actions; "review my mistakes" opens.
+  await student.goto("/tafawoq");
+  await expect(student.getByRole("heading", { name: "اليوم", exact: true })).toBeVisible();
+  await expect(student.getByRole("link", { name: /ابدأ درس اليوم/ })).toBeVisible();
+  await expect(student.getByText(/أضعف مهارة/)).toBeVisible();
+  for (const width of [320, 360, 390]) {
+    await student.setViewportSize({ width, height: 740 });
+    await expectNoHorizontalScroll(student);
+  }
+  if (process.env.E2E_SHOTS) await student.screenshot({ path: `${process.env.E2E_SHOTS}/home-390.png` });
+  await student.getByRole("link", { name: /راجع أخطائي/ }).click();
+  await expect(student.getByRole("heading", { name: "أخطائي الأخيرة" })).toBeVisible();
+  await expectNoHorizontalScroll(student);
   await adminContext.close();
 });

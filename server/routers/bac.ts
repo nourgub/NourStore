@@ -137,6 +137,7 @@ export const bacRouter = router({
 
   // Dashboard, plan, motivation ---------------------------------------------------
   dashboard: learnerProcedure.query(({ ctx }) => platform.dashboard(ctx.user.id)),
+  mistakes: learnerProcedure.query(({ ctx }) => platform.myMistakes(ctx.user.id)),
   achievements: learnerProcedure.query(({ ctx }) => platform.achievements(ctx.user.id)),
   markNotificationsRead: learnerProcedure.mutation(({ ctx }) => platform.markNotificationsRead(ctx.user.id)),
 

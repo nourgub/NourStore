@@ -7,6 +7,9 @@ import { BAC_STREAMS, SCHOOL_LEVELS } from "@shared/tafawoq";
 import { publicProcedure, router } from "../_core/trpc";
 import { learnerProcedure, parentProcedure, rateLimit, teacherProcedure } from "../_core/procedures";
 import * as tafawoq from "../tafawoq/service";
+import { trialCheck, trialLesson } from "../tafawoq/trial";
+import { checkRateLimit } from "../rateLimit";
+import { TRPCError } from "@trpc/server";
 
 const lessonKey = z.string().min(1).max(64);
 const HOUR = 60 * 60 * 1000;
@@ -26,6 +29,18 @@ const style = z.enum(["fusha", "darja", "foreign"]).optional();
 
 export const tafawoqRouter = router({
   catalog: publicProcedure.query(() => tafawoq.catalog()),
+
+  /** The free trial lesson: open without an account, nothing stored. */
+  trialLesson: publicProcedure.query(() => trialLesson()),
+
+  trialCheck: publicProcedure
+    .input(z.object({ step: z.union([z.number().int().min(0).max(20), z.literal("exercise")]), answer: z.string().trim().min(1).max(200), attempt: z.number().int().min(1).max(10) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await checkRateLimit(`trial:${ctx.req.ip ?? "unknown"}`, 120, HOUR))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many requests, please try again later" });
+      }
+      return trialCheck(input);
+    }),
 
   overview: learnerProcedure.query(({ ctx }) => tafawoq.overview(ctx.user.id)),
 

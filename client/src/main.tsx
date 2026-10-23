@@ -30,6 +30,9 @@ const queryClient = new QueryClient({
         return failureCount < 3;
       },
     },
+    // Offline, an action must fail with a visible error rather than wait
+    // silently (react-query pauses mutations offline by default).
+    mutations: { networkMode: "always" },
   },
 });
 
@@ -178,9 +181,13 @@ if ("serviceWorker" in navigator) {
           registration.waiting.postMessage("SKIP_WAITING");
         };
 
+        // The first worker of a fresh visit takes control too (clients.claim):
+        // reloading then would wipe what the visitor already typed. Reload
+        // only when a previous worker was in control, i.e. an update.
+        const hadController = Boolean(navigator.serviceWorker.controller);
         let hasReloaded = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (hasReloaded) return;
+          if (hasReloaded || !hadController) return;
           hasReloaded = true;
           window.location.reload();
         });

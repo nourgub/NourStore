@@ -81,6 +81,8 @@ import {
 import { pickSkill, teacherMessage, teacherMessageText } from "./teacher";
 
 const DAY_MS = 86_400_000;
+/** Graded answers on a skill before the home page calls it the weakest. */
+const MIN_EVIDENCE = 3;
 
 type Student = NonNullable<Awaited<ReturnType<typeof store.getTafawoqStudentByUser>>>;
 type SubmittedAnswer = tafawoq.SubmittedAnswer;
@@ -731,6 +733,12 @@ async function recentMistakes(student: Student, limit = 12): Promise<PlanMistake
   return mistakes;
 }
 
+/** "Review my mistakes": the latest wrong answers, the student's own results only. */
+export async function myMistakes(userId: number) {
+  const student = await lockedStudent(userId);
+  return recentMistakes(student, 30);
+}
+
 async function activeDays(student: Student, days = 60) {
   const since = new Date(Date.now() - days * DAY_MS);
   const [times, plans] = await Promise.all([bac.attemptTimesSince(student.id, since), bac.listDailyPlans(student.id, days)]);
@@ -968,6 +976,15 @@ export async function dashboard(userId: number) {
     )
     .sort((a, b) => a.mastery - b.mastery)
     .slice(0, 5);
+  // The weakest skill on the home page: only from skills with enough graded
+  // answers (MIN_EVIDENCE), never from the starting estimate alone.
+  const evidenced = entries.flatMap(entry =>
+    entry.states
+      .filter(state => state.attempts >= MIN_EVIDENCE && state.pKnown < STRENGTH)
+      .map(state => ({ lessonKey: entry.lesson.key, lessonTitle: entry.lesson.title, skill: state.skill, name: skillName(entry.lesson, state.skill), mastery: state.pKnown }))
+  );
+  const weakest = evidenced.sort((a, b) => a.mastery - b.mastery)[0] ?? null;
+  const gradedAnswers = entries.reduce((sum, entry) => sum + entry.states.reduce((inner, state) => inner + state.attempts, 0), 0);
   const overall = entries.length ? entries.reduce((sum, entry) => sum + (entry.mastery ?? 0), 0) / entries.length : 0;
   const continueLesson = plan?.tasks.find(task => !task.done)?.lessonKey ?? entries.find(entry => entry.mastery !== null)?.lesson.key ?? entries[0]?.lesson.key ?? null;
   return {
@@ -991,6 +1008,9 @@ export async function dashboard(userId: number) {
     weakSkills,
     errorCounts: errorCounts as Partial<Record<ErrorType, number>>,
     recentMistakes: mistakes.slice(0, 3),
+    mistakeCount: mistakes.length,
+    weakest,
+    gradedAnswers,
     points: activity.points,
     badges: activity.badges,
     streak: activity.streak,

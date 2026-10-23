@@ -55,7 +55,7 @@ import { speakArabic, unlockAudio, useSpeechLesson } from "./speech";
 import { VideoPlayer } from "./VideoPlayer";
 import { bacError, useB } from "./bacI18n";
 import { PlacementResult, PlacementTest, SecondSubjectPicker, StreamPicker, ThirdLanguagePicker } from "./Onboarding";
-import { StudentDashboard } from "./Dashboard";
+import { MistakesPage, StudentDashboard } from "./Dashboard";
 import { DailyPlanView } from "./DailyPlan";
 import { StreamRequestPage, SubscriptionPage } from "./Subscription";
 import { AchievementsPage, RevisionPage } from "./Revision";
@@ -71,6 +71,7 @@ const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.Adm
 const TeacherInbox = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.TeacherInbox })));
 const ExerciseHelp = lazy(() => import("./ExerciseHelp").then(m => ({ default: m.ExerciseHelp })));
 const TutorSessions = lazy(() => import("./Sessions").then(m => ({ default: m.TutorSessions })));
+const TrialLesson = lazy(() => import("./TrialLesson").then(m => ({ default: m.TrialLesson })));
 const SessionsPage = lazy(() => import("./Sessions").then(m => ({ default: m.SessionsPage })));
 const CallScreen = lazy(() => import("./CallScreen").then(m => ({ default: m.CallScreen })));
 const ExamView = lazy(() => import("./ExamView").then(m => ({ default: m.ExamView })));
@@ -143,7 +144,10 @@ export default function TafawoqApp() {
         </header>
         <main className="tfq-main">
           <Suspense fallback={<PageLoading />}>
-            {loading ? (
+            {params?.lessonKey === "try" ? (
+              // The free trial lesson: open to visitors and to accounts without a profile yet.
+              <TrialLesson />
+            ) : loading ? (
               <p className="tfq-muted">{t.loading}</p>
             ) : !isAuthenticated ? (
               // Quick revision opens from the copy saved on the device, even offline.
@@ -171,6 +175,20 @@ export default function TafawoqApp() {
   );
 }
 
+/** Where the student is in the sign-up: profile → stream → second subject → placement. */
+function OnboardingSteps({ current }: { current: number }) {
+  const t = useT();
+  return (
+    <ol className="tfq-onboard-steps" aria-label={t.onboardSteps.label}>
+      {t.onboardSteps.names.map((name, index) => (
+        <li key={name} className={index === current ? "current" : index < current ? "done" : ""} aria-current={index === current ? "step" : undefined}>
+          <span aria-hidden="true">{index < current ? "✓" : index + 1}</span> {name}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Landing() {
   const t = useT();
   return (
@@ -186,6 +204,11 @@ function Landing() {
           {t.haveAccount}
         </a>
       </div>
+      <p style={{ marginTop: 10 }}>
+        <Link href="/tafawoq/try" className="tfq-btn ghost small">
+          {t.trial.cta}
+        </Link>
+      </p>
       <p style={{ marginTop: 14 }}>
         <a className="tfq-muted" href="/register?next=/tafawoq" style={{ textDecoration: "underline" }}>
           <Users size={14} /> {t.imParent}
@@ -331,15 +354,52 @@ function LearnerRoutes({ route }: { route: string | null }) {
   const data = state.data!;
   // Onboarding first: profile → stream (locked) → second subject → placement.
   // The server refuses every other page's data until then anyway.
-  if (data.step === "profile") return <RegisterForm student={null} onDone={() => undefined} />;
-  if (data.step === "stream") return <StreamPicker />;
-  if (data.step === "language") return <ThirdLanguagePicker />;
+  if (data.step === "profile")
+    return (
+      <>
+        <OnboardingSteps current={0} />
+        <RegisterForm student={null} onDone={() => undefined} />
+        <p style={{ textAlign: "center" }}>
+          <Link href="/tafawoq/try" className="tfq-muted" style={{ textDecoration: "underline" }}>
+            {t.trial.cta}
+          </Link>
+        </p>
+      </>
+    );
+  if (data.step === "stream")
+    return (
+      <>
+        <OnboardingSteps current={1} />
+        <StreamPicker />
+      </>
+    );
+  if (data.step === "language")
+    return (
+      <>
+        <OnboardingSteps current={1} />
+        <ThirdLanguagePicker />
+      </>
+    );
   if (route === "profile") return <ProfileRoute />;
-  if (data.step === "second" || route === "second-subject") return <SecondSubjectPicker state={data} />;
+  if (data.step === "second")
+    return (
+      <>
+        <OnboardingSteps current={2} />
+        <SecondSubjectPicker state={data} />
+      </>
+    );
+  if (route === "second-subject") return <SecondSubjectPicker state={data} />;
   if (route === "stream-request") return <StreamRequestPage />;
   if (route === "sessions") return <SessionsPage />;
   if (route === "subscription") return <SubscriptionPage />;
-  if (data.step === "placement" || route === "placement") return <PlacementRoute />;
+  if (data.step === "placement")
+    return (
+      <>
+        <OnboardingSteps current={3} />
+        <PlacementRoute />
+      </>
+    );
+  if (route === "placement") return <PlacementRoute />;
   switch (route) {
     case null:
       return <DashboardHome lessons={data.lessons} />;
@@ -351,6 +411,8 @@ function LearnerRoutes({ route }: { route: string | null }) {
       return <TopicBankPage />;
     case "revision":
       return <RevisionPage />;
+    case "mistakes":
+      return <MistakesPage />;
     case "achievements":
       return <AchievementsPage />;
     case "exam":
