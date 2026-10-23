@@ -47,3 +47,23 @@ test("a lost connection shows an error instead of hanging, and recovers", async 
   await page.locator("#auth-password").press("Enter");
   await expect(page.getByRole("alert")).toContainText("البريد الإلكتروني أو كلمة المرور غير صحيحة");
 });
+
+test("signing out removes the study kept on the device (board drafts, revision pack)", async ({ page }) => {
+  const email = unique("device");
+  await register(page, email);
+  await chooseStudentRole(page);
+  await page.evaluate(() => {
+    localStorage.setItem("tfq-board:math-limits", JSON.stringify({ state: {}, savedAt: 1, synced: false }));
+    localStorage.setItem("tfq-revision-pack", "{}");
+    localStorage.setItem("tfq-teacher-voice", "female");
+  });
+  await page.goto("/tafawoq/account");
+  await page.getByRole("button", { name: "الخروج من كل الأجهزة" }).click();
+  await page.waitForURL("**/login");
+  const kept = await page.evaluate(() => ({
+    board: localStorage.getItem("tfq-board:math-limits"),
+    pack: localStorage.getItem("tfq-revision-pack"),
+    voice: localStorage.getItem("tfq-teacher-voice"),
+  }));
+  expect(kept).toEqual({ board: null, pack: null, voice: "female" });
+});

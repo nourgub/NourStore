@@ -11,7 +11,7 @@
 // real scope of what a service worker can deliver without a dedicated
 // offline-data-sync architecture (a separate, much larger project).
 
-const CACHE_NAME = "tafawoq-shell-v1";
+const CACHE_NAME = "tafawoq-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {
@@ -31,6 +31,16 @@ self.addEventListener("activate", (event) => {
 // The update banner (main.tsx) posts this once the person clicks "update now".
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
+  // Sign-out (useAuth.ts): keep only the app shell.
+  if (event.data === "CLEAR_RUNTIME") {
+    event.waitUntil(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.keys().then((requests) =>
+          Promise.all(requests.filter((request) => !APP_SHELL.includes(new URL(request.url).pathname)).map((request) => cache.delete(request)))
+        )
+      )
+    );
+  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -44,8 +54,11 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        // Only successful same-origin answers: an error page must not be served later as if it were the app.
+        if (response.ok && response.type === "basic") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
         return response;
       })
       .catch(() =>

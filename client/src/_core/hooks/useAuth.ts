@@ -8,6 +8,24 @@ type UseAuthOptions = {
   redirectPath?: string;
 };
 
+/**
+ * After signing out, nothing of the person's study stays on a shared device:
+ * whiteboard drafts and the offline revision pack are removed, and the
+ * service worker drops what it cached at run time (it never caches /api).
+ * Preferences (language, teacher voice) stay.
+ */
+export function clearPrivateDeviceData() {
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index--) {
+      const key = localStorage.key(index);
+      if (key && (key.startsWith("tfq-board:") || key === "tfq-revision-pack")) localStorage.removeItem(key);
+    }
+  } catch {
+    // storage blocked: nothing was saved there either
+  }
+  navigator.serviceWorker?.controller?.postMessage("CLEAR_RUNTIME");
+}
+
 export function useAuth(options?: UseAuthOptions) {
   // Login is started via startLogin() in the effect below, only when we
   // actually navigate — a plain redirect to the Google OAuth flow.
@@ -37,6 +55,7 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
+      clearPrivateDeviceData();
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }

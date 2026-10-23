@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Download, KeyRound, LogOut, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { clearPrivateDeviceData, useAuth } from "@/_core/hooks/useAuth";
 import type { Lang } from "@/lib/language";
 import { formatDate } from "./bacI18n";
 import { useLang } from "./i18n";
@@ -149,6 +149,7 @@ export function AccountPage() {
   });
   const logoutAll = trpc.auth.logoutEverywhere.useMutation({
     onSuccess: () => {
+      clearPrivateDeviceData();
       window.location.href = "/login";
     },
     onError: () => toast.error(c.error),
