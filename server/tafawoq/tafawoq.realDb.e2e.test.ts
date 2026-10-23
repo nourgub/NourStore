@@ -388,5 +388,45 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       const mine = await caller.tafawoq.myExercises();
       expect(mine.find(entry => entry.id === asked.id)?.answer).toContain("فيثاغورس");
     });
+
+    it("re-explains, answers «منين جات؟», checks understanding, and counts a question answered correctly only once", async () => {
+      const learner = await fixtureUser("tutorctx");
+      const caller = appRouter.createCaller(ctxFor(learner));
+      await caller.tafawoq.register({ displayName: "سارة", age: 17, schoolLevel: "bac" });
+      await enroll(learner);
+      const key = "math-limits";
+      const placement = await caller.tafawoq.startPlacement({ lessonKey: key });
+      await caller.tafawoq.submitAssessment({ assessmentId: placement.assessmentId, answers: placement.questions.map(question => ({ questionId: question.id, answer: "0" })) });
+      // An explanation ends with a check question, graded on the next answer.
+      const explained = await caller.tafawoq.sendMessage({ lessonKey: key, message: "اشرح" });
+      expect(explained.reply).toContain("للتأكد أنك فهمت");
+      const check = await latestOral(learner.id);
+      expect(check.status).toBe("open");
+      // «منين جات؟» about the example's last step; the check question stays open.
+      const origin = await caller.tafawoq.sendMessage({ lessonKey: key, message: "منين جات هذي؟" });
+      expect(origin.reply).toMatch(/الخطوة \d+/);
+      expect((await latestOral(learner.id)).id).toBe(check.id);
+      // «عاود»: another way, a different example.
+      const again = await caller.tafawoq.sendMessage({ lessonKey: key, message: "عاود" });
+      expect(again.reply).toContain("بطريقة أخرى");
+
+      const [item] = JSON.parse(check.itemsJson) as BankQuestion[];
+      const say = (entry: BankQuestion) => (entry.type === "mcq" ? `${"أبجد"[entry.options!.indexOf(entry.answer)]}` : entry.answer);
+      const first = await caller.tafawoq.sendMessage({ lessonKey: key, message: say(item) });
+      expect(first.reply).toContain("صحيح");
+
+      // The same question served again and answered again: graded, not counted twice.
+      const db = (await getDb())!;
+      const { tafawoqSkillStates } = await import("../../drizzle/schema");
+      const mastery = async () =>
+        (await db.select().from(tafawoqSkillStates).where(and(eq(tafawoqSkillStates.studentId, check.studentId), eq(tafawoqSkillStates.skillKey, item.skill))))[0];
+      const before = await mastery();
+      await db.insert(tafawoqAssessments).values({ studentId: check.studentId, lessonKey: key, kind: "oral", itemsJson: check.itemsJson, source: check.source });
+      const second = await caller.tafawoq.sendMessage({ lessonKey: key, message: say(item) });
+      expect(second.reply).toContain("صحيح");
+      const after = await mastery();
+      expect(after.pKnown).toBe(before.pKnown);
+      expect(after.attempts).toBe(before.attempts);
+    });
   }
 );

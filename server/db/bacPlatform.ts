@@ -1129,7 +1129,24 @@ export async function insertNotifications(rows: Array<{ userId: number; type: st
   for (let index = 0; index < rows.length; index += 500) {
     // A row whose (userId, dedupeKey) already exists is skipped, so a reminder
     // sent by two instances at once arrives once. Rows without a key always go in.
-    await db.insert(notifications).ignore().values(rows.slice(index, index + 500));
+    const batch = rows.slice(index, index + 500);
+    await retryOnDeadlock(() => db.insert(notifications).ignore().values(batch));
+  }
+}
+
+/**
+ * Two instances inserting the same keyed rows at once can deadlock on the
+ * unique index (InnoDB gap locks); the insert is idempotent, so try again.
+ */
+async function retryOnDeadlock<T>(run: () => Promise<T>, tries = 4): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      const code = (error as { cause?: { code?: string }; code?: string }).cause?.code ?? (error as { code?: string }).code;
+      if (code !== "ER_LOCK_DEADLOCK" || attempt >= tries) throw error;
+      await new Promise(resolve => setTimeout(resolve, 20 * attempt + Math.random() * 30));
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   tafawoqAssessments,
@@ -297,6 +297,24 @@ export async function getAttempts(studentId: number, lessonKey: string) {
     responseMs: row.responseMs,
     misconception: row.misconception,
   }));
+}
+
+/** Questions this student already answered correctly in this lesson (they don't raise mastery again). */
+export async function getCorrectlyAnsweredIds(studentId: number, lessonKey: string, questionIds: string[]) {
+  if (!questionIds.length) return [];
+  const db = await requireDb();
+  const rows = await db
+    .selectDistinct({ questionId: tafawoqAttempts.questionId })
+    .from(tafawoqAttempts)
+    .where(
+      and(
+        eq(tafawoqAttempts.studentId, studentId),
+        eq(tafawoqAttempts.lessonKey, lessonKey),
+        eq(tafawoqAttempts.correct, 1),
+        inArray(tafawoqAttempts.questionId, questionIds)
+      )
+    );
+  return rows.map(row => row.questionId);
 }
 
 export async function getAttemptedQuestionIds(studentId: number, lessonKey: string) {

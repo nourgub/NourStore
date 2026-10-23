@@ -247,6 +247,8 @@ export function dialogueReply(
     if (!state.hinted) return `${phrases.thinkWithMe}\n💡 ${step.hint}\n\n${stepLine(state.dialogue, state.index)}`;
     return advance(state, name, phrases.answer(step.answer));
   }
+  // «عاود»: the same small question again, with its hint this time.
+  if (intent === "repeat") return `💡 ${step.hint}\n\n${stepLine(state.dialogue, state.index)}`;
   if (dialogueAnswerMatches(step, message)) return advance(state, name, phrases.praise[seed % phrases.praise.length]);
   // A question or a request is not an attempt at the answer.
   if (intent !== "explain" || /[؟?]/.test(message)) return null;

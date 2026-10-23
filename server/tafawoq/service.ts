@@ -582,7 +582,11 @@ export async function submitAssessment(
   );
 
   const previousStates = await orderedSkillStates(student.id, lesson);
-  const observations: Observation[] = graded.map(entry => ({
+  // Mastery moves on real evidence only: a question already answered
+  // correctly before (the same item served again, the same answer resent)
+  // is graded and shown but does not count a second time.
+  const known = new Set(await store.getCorrectlyAnsweredIds(student.id, lesson.key, graded.map(entry => entry.item.id)));
+  const observations: Observation[] = graded.filter(entry => !known.has(entry.item.id)).map(entry => ({
     skill: entry.item.skill,
     correct: entry.correct,
     difficulty: entry.item.difficulty,
@@ -849,7 +853,8 @@ async function tutorText(
   history: ai.TutorTurn[],
   message: string | null,
   taught: ForeignLang | null = null,
-  style: TeacherStyle = "fusha"
+  style: TeacherStyle = "fusha",
+  lastTutor?: string
 ): Promise<{ text: string; source: ContentSource }> {
   if (ai.isAiConfigured()) {
     try {
@@ -865,7 +870,7 @@ async function tutorText(
     };
   }
   return {
-    text: message === null ? templateOpening(context) : templateTutorReply(lesson, context, message),
+    text: message === null ? templateOpening(context) : templateTutorReply(lesson, context, message, spokenSeed(), lastTutor),
     source: "template",
   };
 }
@@ -1087,6 +1092,22 @@ export async function callSummary(userId: number, lessonKey: string, afterId: nu
   };
 }
 
+/** Explanations followed by a check question. */
+const CHECK_AFTER = new Set(["explain", "simpler", "repeat", "why", "origin", "example"]);
+const OUT_OF_SCOPE_MARK = "خارج ما يستطيع الأستاذ الآلي";
+
+async function askCheckQuestion(student: Awaited<ReturnType<typeof studentOrThrow>>, lesson: Lesson, context: StudentContext) {
+  const item = pickOralItem(lesson, context, new Set(await store.getAttemptedQuestionIds(student.id, lesson.key)));
+  await store.createAssessment({
+    studentId: student.id,
+    lessonKey: lesson.key,
+    kind: "oral",
+    itemsJson: JSON.stringify([item]),
+    source: item.id.startsWith("g-") ? "template" : "bank",
+  });
+  return `للتأكد أنك فهمت — ${oralQuestionText(item)}`;
+}
+
 export async function sendTutorMessage(userId: number, lessonKey: string, message: string, style?: TeacherStyle) {
   const student = await requireLessonAccess(userId, lessonKey, { requireSubscription: true });
   const lesson = lessonOrThrow(lessonKey, student.stream);
@@ -1115,12 +1136,21 @@ export async function sendTutorMessage(userId: number, lessonKey: string, messag
     await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: oral, source: "template" });
     return { reply: oral, source: "template" as ContentSource };
   }
-  const answered = await tutorText(context, lesson, history, message, taught, style);
+  const answered = await tutorText(context, lesson, history, message, taught, style, lastTutor);
   // A question in the middle of a dialogue is answered, then the dialogue
   // picks up where it was (unless the student moved on to a quiz).
-  const paused = detectIntent(message) !== "quiz" ? dialogueState(lesson, lastTutor) : null;
+  const intent = detectIntent(message);
+  const paused = intent !== "quiz" ? dialogueState(lesson, lastTutor) : null;
   const said = answered.source === "ai" ? answered.text : inStyle(answered.text, style);
-  const text = paused ? `${said}\n\n${inStyle(resumeLine(paused), style)}` : said;
+  // After an explanation, a small question checks it was understood; the
+  // next answer is graded like any oral question (and counts for mastery).
+  const openOral = await store.getOpenAssessment(student.id, lesson.key, "oral");
+  const questionPending = Boolean(openOral && Date.now() - openOral.createdAt.getTime() < ORAL_WINDOW_MS);
+  const check =
+    !paused && !questionPending && !taught && answered.source === "template" && CHECK_AFTER.has(intent) && !said.includes(OUT_OF_SCOPE_MARK)
+      ? await askCheckQuestion(student, lesson, context)
+      : null;
+  const text = paused ? `${said}\n\n${inStyle(resumeLine(paused), style)}` : check ? `${said}\n\n${inStyle(check, style)}` : said;
   const source = answered.source;
   await store.addMessage({ studentId: student.id, lessonKey: lesson.key, role: "tutor", content: text, source });
   return { reply: text, source };

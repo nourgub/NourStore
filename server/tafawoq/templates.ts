@@ -283,14 +283,32 @@ export function templateOpening(context: StudentContext): string {
   return parts.join(" ");
 }
 
-export type TutorIntent = "quiz" | "giveUp" | "dialogue" | "example" | "mistake" | "simpler" | "challenge" | "thanks" | "explain";
+export type TutorIntent =
+  | "quiz"
+  | "giveUp"
+  | "dialogue"
+  | "example"
+  | "mistake"
+  | "simpler"
+  | "challenge"
+  | "thanks"
+  | "repeat"
+  | "origin"
+  | "why"
+  | "explain";
 
 const INTENT_WORDS: Array<[TutorIntent, RegExp]> = [
   ["quiz", /اختبرني|امتحني|اسألني|اسالني|سؤال آخر|سؤالا آخر|سؤالاً|سؤال جديد|سقسيني|اسقسيني|عطيني سؤال|اعطيني سؤال|ديرلي سؤال|ديرلي تمرين|interroge|teste-moi|pose-moi|quiz|test me|ask me|frag mich|teste mich|prüf mich|prüfe mich|noch eine frage|neue frage|pregúntame|preguntame|otra pregunta|hazme una pregunta|fammi una domanda|interrogami|un.altra domanda/],
   ["giveUp", /لا أعرف|لا اعرف|ما نعرفش|مانعرفش|ما عرفتش|معلاباليش|ما علاباليش|ماعلاباليش|ما لقيتش|مالقيتش|أعطني الحل|اعطني الحل|^الحل$|je ne sais pas|je sais pas|i don.t know|give up|ich wei(?:ß|ss) (?:es )?nicht|keine ahnung|gib mir die (?:lösung|antwort)|no (?:lo )?sé|no lo se|ni idea|non lo so|non so\b/],
   ["dialogue", /بالحوار|حوار|خطوة خطوة|خطوة بخطوة|علمني|علّمني|فهمني|فهّمني|نكتشف|dialogue|pas à pas|step by step|teach me|im dialog|bring mir .*bei|schritt für schritt|en diálogo|en dialogo|paso a paso|enséñame|in dialogo|passo dopo passo|insegnami/],
   ["thanks", /شكر|merci|thank|danke|gracias|grazie|يعطيك الصحة|صحيت|صحّيت|بارك الله فيك|ربي يحفظك/],
-  ["mistake", /لماذا|خطأ|أخطئ|اخطئ|غلط|علاش|علاه|pourquoi|erreur|faute|why|mistake|wrong|warum|wieso|fehler|por qué|porqué|perché|errore|error/],
+  // "Where does this come from?" — about a step the teacher just wrote.
+  ["origin", /منين جات|منين جا|منين خرجت|منين خرج|من وين جات|من أين جاء|من اين جاء|من أين أتت|من اين أتت|من أين أتى|d.où (?:vient|sort)|where (?:does|did) .*come from|where.s that from|woher kommt|de dónde (?:sale|viene)|da dove (?:viene|esce)/],
+  // "Why do I keep making mistakes?" — the recurring errors.
+  ["mistake", /خطأ|أخطئ|اخطئ|غلط|نغلط|erreur|faute|je me trompe|mistake|wrong|get (?:it|this) wrong|fehler|mache ich falsch|errore|sbaglio|sbagli|error|equivoco|equivocas/],
+  // A bare "why?": the reason for the current step.
+  ["why", /لماذا|علاش|علاه|pourquoi|(?<![a-z])why(?![a-z])|warum|wieso|por qué|porqué|perché/],
+  ["repeat", /^\s*(?:عاود|عاودلي|عاودها|أعد|اعد|أعدها|كرر|كرّر|répète|repete|répétez|again|repeat|nochmal|noch einmal|wiederhole|repite|otra vez|ripeti|di nuovo)(?=[\s؟?!.،,]|$)|عاود(?:لي)? (?:الشرح|اشرح)|أعد الشرح|اعد الشرح|explique encore|explain again|erkläre? (?:es )?nochmal|explica otra vez|spiega di nuovo/],
   ["simpler", /لم أفهم|لم افهم|ما فهمت|مافهمتش|ماشي فاهم|ما راني فاهم|مراني فاهم|بالشوية|صعيبة عليا|صعيبة علي|صعب|بسط|ببساطة|simple|comprends pas|pas compris|don.t understand|didn.t understand|easier|nicht verstanden|verstehe (?:das |es )?nicht|einfacher|langsamer|no entiendo|no (?:lo )?he entendido|no entendí|más fácil|mas facil|non ho capito|non capisco|più facile/],
   ["challenge", /تحد|أصعب|اصعب|متقدم|زيدني|حاجة صعيبة|défi|difficile|challenge|harder|schwerer|herausforderung|más difícil|reto|più difficile|sfida/],
   ["example", /مثال|أمثلة|امثلة|وريني|ورّيني|exemple|example|beispiel|ejemplo|esempio/],
@@ -333,11 +351,57 @@ export function formatExample(example: LessonExample): string {
  * answers from the student model, the lesson's explanations and remedies,
  * and freshly generated worked examples. No model call.
  */
+/** The last numbered step ("2) …") of the teacher's last message: what «علاش؟» or «منين جات؟» is about. */
+export function lastWorkedStep(lastTutor: string | undefined): { n: number; text: string } | null {
+  if (!lastTutor) return null;
+  let last: { n: number; text: string } | null = null;
+  for (const line of lastTutor.split("\n")) {
+    const match = /^\s*(\d+)[).]\s*(.+)$/.exec(line);
+    if (match) last = { n: Number(match[1]), text: match[2].trim() };
+  }
+  return last;
+}
+
+const stem = (word: string) => word.replace(/^(?:و|ف|ب|ل)?ال/, "").replace(/(?:ات|ة|ه)$/, "");
+const wordsOf = (text: string) =>
+  text
+    .toLowerCase()
+    .split(/[\s.,:;!?؟،()«»"'=+×÷^√\-−–—/]+/)
+    .filter(word => word.length > 2)
+    .map(stem);
+
+/** The sentence of the skill's explanation that shares the most words with a step. */
+function closestSentence(explanation: string, text: string): string {
+  const sentences = explanation.split(/(?<=[.:])\s+/).filter(Boolean);
+  const words = new Set(wordsOf(text));
+  let best = sentences[0] ?? explanation;
+  let score = -1;
+  for (const sentence of sentences) {
+    const shared = wordsOf(sentence).filter(word => words.has(word)).length;
+    if (shared > score) {
+      score = shared;
+      best = sentence;
+    }
+  }
+  return best;
+}
+
+/** A question with nothing in common with the lesson: the free tutor says it can't answer it here. */
+function outOfScope(lesson: Lesson, message: string): boolean {
+  const words = wordsOf(message);
+  if (words.length < 4) return false;
+  const known = new Set(
+    wordsOf([lesson.title, ...lesson.skills.flatMap(skill => [skill.name, skill.explanation, skill.example.problem])].join(" "))
+  );
+  return !words.some(word => known.has(word)) && !/[=+×÷^√∫]|\d/.test(message);
+}
+
 export function templateTutorReply(
   lesson: Lesson,
   context: StudentContext,
   message: string,
-  seed: number = spokenSeed()
+  seed: number = spokenSeed(),
+  lastTutor?: string
 ): string {
   const intent = detectIntent(message);
   const skill =
@@ -349,7 +413,27 @@ export function templateTutorReply(
   const example = (tier: StudentContext["tier"]) =>
     generatedExamples(lesson, skill.key, tier, seed)?.[0] ?? skill.example;
 
+  const prerequisites = skill.prerequisites
+    .map(key => lesson.skills.find(entry => entry.key === key)?.name)
+    .filter((name): name is string => Boolean(name));
+  const rule = skill.dialogue?.rule ?? skill.explanation;
+  const step = lastWorkedStep(lastTutor);
+
   switch (intent) {
+    case "repeat": {
+      // Not the same words again: the rule said another way, and a new example.
+      const other = generatedExamples(lesson, skill.key, "weak", seed + 7)?.[0] ?? skill.example;
+      return `نعاودها بطريقة أخرى — ${skill.name}:\n${rule}\n\nبمثال جديد:\n${formatExample(other)}`;
+    }
+    case "why":
+    case "origin": {
+      const reason = step ? closestSentence(skill.explanation, step.text) : skill.explanation.split(/(?<=[.:])\s+/)[0];
+      const before = prerequisites.length ? `\nتعتمد على ما تعلمته قبلها: ${prerequisites.join("، ")}.` : "";
+      if (!step) {
+        return `${intent === "origin" ? "أي خطوة تقصد؟ اكتب رقمها أو انسخها، وسأشرح من أين جاءت." : "سؤال جيد."}\nفي «${skill.name}»: ${reason}${before}`;
+      }
+      return `${intent === "origin" ? "من أين جاءت" : "لماذا"} الخطوة ${step.n}: «${step.text}»؟\nلأن: ${reason}\nوالقاعدة كاملة: ${rule}${before}`;
+    }
     case "thanks":
       return `بالتوفيق يا ${context.name}! ${
         context.focusSkills[0] ? `خطوتك التالية: ${context.focusSkills[0].name}. ` : ""
@@ -375,6 +459,12 @@ export function templateTutorReply(
     case "example":
       return `مثال محلول في ${skill.name}:\n${formatExample(example(context.tier))}\n\nاطلب «مثال» مرة أخرى لمثال جديد بأرقام مختلفة.`;
     default:
+      if (!mentionedSkill(lesson, message) && outOfScope(lesson, message)) {
+        return `هذا السؤال خارج ما يستطيع الأستاذ الآلي الإجابة عنه في درس «${lesson.title}». أستطيع شرح مهارات هذا الدرس: ${lesson.skills
+          .slice(0, 4)
+          .map(entry => entry.name)
+          .join("، ")}. لسؤال آخر: أرسل التمرين من «تمارين الأستاذ» أو احجز حصة.`;
+      }
       return `${skill.name}: ${skill.explanation}\n\nمثال:\n${formatExample(example(context.tier))}\n\nهل تريد مثالاً آخر أو شرحاً أبسط؟`;
   }
 }
