@@ -76,5 +76,6 @@ TASSILI_TEST_URL=http://127.0.0.1:8009 TASSILI_TEST_TOKEN=t npx vitest run serve
 - **To try and listen:** `colab_tassili_tts.ipynb` in Google Colab (free T4 GPU).
   Colab is not a host: sessions stop after a few hours and the address changes.
 - **To serve students:** a GPU host that runs a container (e.g. a small cloud GPU,
-  a Hugging Face Space with GPU hardware). CPU works but is slow — see the measured
-  figures in `docs/TASSILI_TTS.md`. Every hosted option costs money: none was bought.
+  a Hugging Face Space with GPU hardware). CPU works but is slow: measured here at
+  48 s for 3.5 s of speech (4 cores, `TASSILI_NFE_STEP=16`) — see `docs/TASSILI_TTS.md`.
+  Every hosted option costs money: none was bought.

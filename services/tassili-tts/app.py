@@ -241,21 +241,29 @@ async def synthesize(body: SynthesisRequest, request: Request) -> Response:
         raise HTTPException(503, "busy: too many requests waiting")
     state.waiting += 1
     try:
-        async with state.lock:  # one synthesis at a time: the model is not re-entrant on one device
-            if await request.is_disconnected():
-                raise HTTPException(499, "client went away before its turn")
-            started = time.perf_counter()
-            loop = asyncio.get_running_loop()
-            try:
-                audio, rate = await asyncio.wait_for(
-                    loop.run_in_executor(None, state.backend.synthesize, voice, body.text, body.speed),  # type: ignore[union-attr]
-                    timeout=TIMEOUT_S,
-                )
-            except asyncio.TimeoutError:
-                raise HTTPException(504, "synthesis took too long")
-            elapsed = time.perf_counter() - started
+        # One synthesis at a time: the model is not re-entrant on one device.
+        await state.lock.acquire()
     finally:
         state.waiting -= 1
+    release_now = True
+    try:
+        if await request.is_disconnected():
+            raise HTTPException(499, "client went away before its turn")
+        started = time.perf_counter()
+        loop = asyncio.get_running_loop()
+        future = loop.run_in_executor(None, state.backend.synthesize, voice, body.text, body.speed)  # type: ignore[union-attr]
+        try:
+            audio, rate = await asyncio.wait_for(asyncio.shield(future), timeout=TIMEOUT_S)
+        except asyncio.TimeoutError:
+            # The computation cannot be stopped: keep the lock until it ends,
+            # so the next request does not compete with it for the CPU/GPU.
+            release_now = False
+            future.add_done_callback(lambda _: state.lock.release())
+            raise HTTPException(504, "synthesis took too long")
+        elapsed = time.perf_counter() - started
+    finally:
+        if release_now:
+            state.lock.release()
     if not len(audio):
         raise HTTPException(500, "the model returned no audio")
     log.info("synthesised %d chars in %.2fs (%.2fs of audio)", len(body.text), elapsed, len(audio) / rate)

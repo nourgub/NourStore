@@ -93,3 +93,24 @@ def test_diacritics_are_removed_not_refused(tmp_path, monkeypatch):
     with make_client(tmp_path, monkeypatch, {"male": CONSENTED}) as client:
         response = client.post("/synthesize", json={"text": "مَرْحَبًا", "voice": "male"}, headers=AUTH)
         assert response.status_code == 200
+
+
+def test_a_timed_out_synthesis_keeps_the_model_busy_until_it_ends(tmp_path, monkeypatch):
+    import time as _time
+
+    monkeypatch.setenv("TASSILI_TIMEOUT_S", "0.2")
+    with make_client(tmp_path, monkeypatch, {"male": CONSENTED}) as client:
+        module = sys.modules["app"]
+        calls = []
+
+        def slow(voice, text, speed):
+            calls.append(_time.perf_counter())
+            _time.sleep(0.6)
+            return module.FakeBackend().synthesize(voice, text, speed)
+
+        monkeypatch.setattr(module.state.backend, "synthesize", slow)
+        first = client.post("/synthesize", json={"text": "واش راك", "voice": "male"}, headers=AUTH)
+        assert first.status_code == 504
+        # The next request starts only after the first computation has ended.
+        client.post("/synthesize", json={"text": "واش راك", "voice": "male"}, headers=AUTH)
+        assert len(calls) == 2 and calls[1] - calls[0] >= 0.55
