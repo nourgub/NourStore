@@ -72,3 +72,6 @@ export function numberToArabicWords(raw: string): string {
 export function spellNumbers(text: string): string {
   return text.replace(/\d+(?:[.,]\d+)?/g, match => ` ${numberToArabicWords(match)} `).replace(/\s+/g, " ").trim();
 }
+
+/** The name the voice-pack export (scripts/voice-pack/export.ts) uses. */
+export const numbersInWords = spellNumbers;
