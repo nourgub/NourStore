@@ -7,6 +7,11 @@ packages = ["mariadb", "nodejs_22", "libaio"]
 
 [env]
 NODE_ENV = "development"
+# The female teacher speaks with the owner's voice pack (uploads/tts-cache,
+# docs/VOICE_PACK_INSTALL.md). Unused when the pack is not there.
+TAFAWOQ_VOICE_PACK_FEMALE = "dz-teacher-f"
+# Uncomment for the owner's voice only (text without voice where the pack lacks a sentence):
+# TAFAWOQ_VOICE_EXCLUSIVE = "female"
 
 [[ports]]
 localPort = 3000
