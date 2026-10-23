@@ -118,6 +118,7 @@ export function ExerciseHelp({ lessons }: { lessons: Array<{ key: string; title:
   const [note, setNote] = useState("");
   const [lessonKey, setLessonKey] = useState("");
   const [photo, setPhoto] = useState<{ mimeType: "image/jpeg"; base64: string; preview: string } | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const submit = trpc.tafawoq.submitExercise.useMutation({
@@ -125,6 +126,7 @@ export function ExerciseHelp({ lessons }: { lessons: Array<{ key: string; title:
       setText("");
       setNote("");
       setPhoto(null);
+      setConfirmed(false);
       await utils.tafawoq.myExercises.invalidate();
     },
     onError: error => toast.error(error.message),
@@ -148,6 +150,7 @@ export function ExerciseHelp({ lessons }: { lessons: Array<{ key: string; title:
               note: note.trim() || null,
               lessonKey: lessonKey || null,
               image: photo ? { mimeType: photo.mimeType, base64: photo.base64 } : null,
+              textConfirmed: photo && text.trim() ? confirmed : null,
             });
           }}
         >
@@ -197,6 +200,18 @@ export function ExerciseHelp({ lessons }: { lessons: Array<{ key: string; title:
             <button type="button" className="tfq-btn ghost" onClick={() => fileInput.current?.click()}>
               <Camera size={16} /> {t.exPhoto}
             </button>
+          )}
+          {photo && (
+            <>
+              <p className="tfq-muted" role="note" style={{ fontSize: 13 }}>
+                {t.exPhotoHint}
+              </p>
+              {text.trim() && (
+                <label className="tfq-check">
+                  <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> {t.exConfirm}
+                </label>
+              )}
+            </>
           )}
           <input className="tfq-input" dir="auto" maxLength={1000} value={note} placeholder={t.exNote} onChange={event => setNote(event.target.value)} />
           <label className="tfq-row" style={{ gap: 8 }}>

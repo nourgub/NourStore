@@ -362,6 +362,13 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)(
       });
       expect(asked.status).toBe("open");
       expect(asked.imageUrl).toBe(`/api/protected-files/tafawoq-exercise/${asked.id}`);
+      // A photo with a solvable text: solved automatically only once the
+      // student confirms the text is what the photo says.
+      const unconfirmed = await caller.tafawoq.submitExercise({ text: "احسب مشتقة f(x)=x^2", image: { mimeType: "image/png", base64: tinyPng } });
+      expect(unconfirmed.status).toBe("open");
+      const confirmedPhoto = await caller.tafawoq.submitExercise({ text: "احسب مشتقة f(x)=x^2", image: { mimeType: "image/png", base64: tinyPng }, textConfirmed: true });
+      expect(confirmedPhoto.status).toBe("auto");
+      expect(confirmedPhoto.auto?.answer).toBeTruthy();
       // A renamed file is refused (the bytes must really be an image).
       await expect(
         caller.tafawoq.submitExercise({ image: { mimeType: "image/png", base64: Buffer.from("not an image").toString("base64") } })

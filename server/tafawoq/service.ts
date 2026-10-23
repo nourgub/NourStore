@@ -1365,6 +1365,7 @@ export async function submitExercise(
     note?: string | null;
     lessonKey?: string | null;
     image?: { mimeType: string; base64: string } | null;
+    textConfirmed?: boolean | null;
   }
 ) {
   const student = await studentOrThrow(userId);
@@ -1395,7 +1396,10 @@ export async function submitExercise(
   }
 
   const solution = text ? solveExercise(text) : null;
-  // A photo always reaches a teacher (it can't be read automatically for free).
+  // The photo itself is never read automatically (no free reader is used).
+  // With a photo, the text is solved automatically only when the student
+  // confirmed it is what the photo says; otherwise a teacher answers.
+  const autoSolved = Boolean(solution) && (!imageKey || input.textConfirmed === true);
   const id = await store.createExercise({
     studentId: student.id,
     lessonKey,
@@ -1403,7 +1407,7 @@ export async function submitExercise(
     note,
     imageKey,
     imageMime,
-    status: solution && !imageKey ? "auto" : "open",
+    status: autoSolved ? "auto" : "open",
     autoJson: solution ? JSON.stringify(solution) : null,
   });
   return publicExercise((await store.getExercise(id))!);

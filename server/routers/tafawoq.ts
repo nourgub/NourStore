@@ -136,6 +136,8 @@ export const tafawoqRouter = router({
           text: z.string().max(4000).nullish(),
           note: z.string().max(1000).nullish(),
           lessonKey: z.string().max(64).nullish(),
+          /** With a photo: the student confirms the typed text is what the photo says. */
+          textConfirmed: z.boolean().nullish(),
           image: z
             .object({
               mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
