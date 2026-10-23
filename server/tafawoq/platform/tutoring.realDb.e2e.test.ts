@@ -236,10 +236,13 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — session
     const caller = appRouter.createCaller(ctxFor(user));
     await caller.tafawoq.register({ displayName: "payer", age: 17, schoolLevel: "bac" });
     await caller.bac.chooseStream({ stream: "sciences" });
+    // References unique per run: a reused test database keeps earlier ones.
+    const studentRef = `CCP-${Date.now()}`;
+    const paidRef = `RX-${Date.now()}`;
     // Double click on "request": one pending request only.
     const requests = await Promise.allSettled([
-      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: "CCP-123" }),
-      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: "CCP-123" }),
+      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: studentRef }),
+      caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp", paymentReference: studentRef }),
     ]);
     expect(requests.filter(result => result.status === "fulfilled")).toHaveLength(1);
     expect(requests.find(result => result.status === "rejected")).toMatchObject({ reason: { message: "PENDING_EXISTS" } });
@@ -250,18 +253,18 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — session
     });
     // Two admins (or a double click) confirming at once: activated once.
     const confirmations = await Promise.allSettled([
-      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: "RX-1" }),
-      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: "RX-1" }),
+      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: paidRef }),
+      adminCaller.bacAdmin.confirmSubscription({ id: request.id, paidAmountDa: request.amountDa, paidReference: paidRef }),
     ]);
     expect(confirmations.filter(result => result.status === "fulfilled")).toHaveLength(1);
     expect(confirmations.find(result => result.status === "rejected")).toMatchObject({ reason: { code: "CONFLICT" } });
     const db = await getDb();
     const rows = await db!.select().from(tafawoqSubscriptions).where(eq(tafawoqSubscriptions.userId, user.id));
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ status: "active", paidAmountDa: request.amountDa, paidReference: "RX-1", paymentReference: "CCP-123" });
+    expect(rows[0]).toMatchObject({ status: "active", paidAmountDa: request.amountDa, paidReference: paidRef, paymentReference: studentRef });
     const log = await adminCaller.admin.auditLog({ limit: 100, action: "bac.subscription_confirmed" });
     const entry = log.find(row => row.targetId === String(request.id));
-    expect(JSON.parse(entry!.detailsJson!)).toMatchObject({ expectedDa: request.amountDa, receivedDa: request.amountDa, receivedReference: "RX-1" });
+    expect(JSON.parse(entry!.detailsJson!)).toMatchObject({ expectedDa: request.amountDa, receivedDa: request.amountDa, receivedReference: paidRef });
   });
 
   it("refuses a cancellation less than 12 hours before, and lets an admin see and answer every booking", async () => {

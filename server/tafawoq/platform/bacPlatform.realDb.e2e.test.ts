@@ -138,7 +138,7 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     const page = await caller.bac.subscription();
     expect(page.plans.find(plan => plan.key === "monthly")?.priceDa).toBe(3000);
     expect(page.gateway).toBe("manual");
-    const request = await caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "baridimob", paymentReference: "REF-1" });
+    const request = await caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "baridimob", paymentReference: `REF-${Date.now()}` });
     expect(request.status).toBe("pending_payment");
     await expect(caller.bac.requestSubscription({ plan: "monthly", paymentMethod: "ccp" })).rejects.toMatchObject({ code: "CONFLICT" });
     // Still pending: nothing unlocked.
