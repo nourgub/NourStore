@@ -92,5 +92,19 @@ test("student journey from sign-up to unlocked content, with an admin confirming
   await expect(student.getByText("غير متصل: محفوظ على هذا الجهاز")).toBeVisible({ timeout: 10_000 });
   await student.context().setOffline(false);
   await expect(student.getByRole("status").filter({ hasText: /^محفوظ$/ })).toBeVisible({ timeout: 10_000 });
+
+  // Microphone: explained before the browser asks; typing always works.
+  await student.goto("/tafawoq/math-limits?tab=teacher");
+  await student.locator("button.tfq-live-open").nth(1).click();
+  await expect(student.getByRole("dialog", { name: "قبل استعمال الميكروفون" })).toBeVisible();
+  await student.getByRole("button", { name: "أكتب فقط" }).click();
+  await expect(student.getByRole("dialog")).toHaveCount(0);
+  await student.locator("button.tfq-live-open").nth(1).click();
+  await student.getByRole("button", { name: "متابعة" }).click();
+  const live = student.locator(".tfq-live-panel");
+  await live.locator("input.tfq-input").fill("اشرح");
+  await live.locator("button[type=submit]").click();
+  await expect(live.locator(".tfq-bubble.tutor")).toContainText(/\S{3,}/, { timeout: 15_000 });
+  await expectNoHorizontalScroll(student);
   await adminContext.close();
 });

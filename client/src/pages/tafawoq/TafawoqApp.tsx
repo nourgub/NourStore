@@ -906,6 +906,20 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
     [t, data.analysis.focusSkills, style, taught]
   );
 
+  // The microphone is explained once before the browser asks for it.
+  const [micAsk, setMicAsk] = useState<"call" | "live" | null>(null);
+  const openWithMic = (kind: "call" | "live") => {
+    let explained = false;
+    try {
+      explained = localStorage.getItem("tfq-mic-explained") === "1";
+    } catch {
+      explained = false;
+    }
+    if (!explained) setMicAsk(kind);
+    else if (kind === "call") setCall(true);
+    else setLive(true);
+  };
+
   const submit = (message: string) => {
     if (!message.trim() || send.isPending) return;
     setPending(message.trim());
@@ -938,13 +952,43 @@ function TeacherTab({ lessonKey, data }: { lessonKey: string; data: WorkspaceDat
       </div>
       <VoiceSwitch />
       <div className="tfq-call-row">
-        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => { unlockAudio(); setCall(true); }}>
+        <button type="button" className="tfq-btn tfq-live-open tfq-call-open" onClick={() => { unlockAudio(); openWithMic("call"); }}>
           <Phone size={18} /> <bdi>{t.callButton(teacherName)}</bdi>
         </button>
-        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => { unlockAudio(); setLive(true); }}>
+        <button type="button" className="tfq-btn ghost tfq-live-open" onClick={() => { unlockAudio(); openWithMic("live"); }}>
           <Mic size={18} /> {t.liveButton}
         </button>
       </div>
+      {micAsk && (
+        <div className="tfq-live" role="dialog" aria-modal="true" aria-labelledby="tfq-mic-title">
+          <div className="tfq-live-panel">
+            <h3 id="tfq-mic-title" style={{ marginTop: 0 }}>{t.micTitle}</h3>
+            <p>{t.micExplain}</p>
+            <div className="tfq-row">
+              <button
+                type="button"
+                className="tfq-btn"
+                autoFocus
+                onClick={() => {
+                  try {
+                    localStorage.setItem("tfq-mic-explained", "1");
+                  } catch {
+                    // shown again next time
+                  }
+                  if (micAsk === "call") setCall(true);
+                  else setLive(true);
+                  setMicAsk(null);
+                }}
+              >
+                {t.micContinue}
+              </button>
+              <button type="button" className="tfq-btn ghost" onClick={() => setMicAsk(null)}>
+                {t.micTypeInstead}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="tfq-chat" aria-live="polite">
         {data.messages.map(message =>
           message.structured ? (

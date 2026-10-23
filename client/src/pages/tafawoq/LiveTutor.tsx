@@ -34,7 +34,8 @@ export function LiveTutor({
   const utils = trpc.useUtils();
   const send = trpc.tafawoq.sendMessage.useMutation();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [handsFree, setHandsFree] = useState(true);
+  // Off by default: what was heard goes into the text box to check and correct before sending.
+  const [handsFree, setHandsFree] = useState(false);
   const [heard, setHeard] = useState("");
   // A language lesson taught in its own language: the session is held in it.
   const taught = style === "foreign" ? foreignLanguageOfLesson(lessonKey) : null;
@@ -92,7 +93,14 @@ export function LiveTutor({
       onInterim: text => setHeard(text),
       onFinal: text => {
         gotSpeech = true;
-        void ask(text);
+        if (handsFreeRef.current) {
+          void ask(text);
+          return;
+        }
+        // The heard text, editable: nothing is sent until the student sends it.
+        setTyped(text);
+        setPhase("idle");
+        setNotice(t.liveCheckHeard);
       },
       onError: error => {
         if (error === "not-allowed" || error === "service-not-allowed") setNotice(t.liveMicDenied);
@@ -188,7 +196,7 @@ export function LiveTutor({
           {t.liveHandsFree}
         </label>
 
-        {!canListen() && (
+        {(
           <form
             className="tfq-chat-input"
             onSubmit={event => {
