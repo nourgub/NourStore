@@ -808,6 +808,45 @@ export async function attemptTimesSince(studentId: number, since: Date) {
   return rows.map(row => row.createdAt);
 }
 
+/**
+ * One week of measured work: graded answers, how many were right, on how
+ * many days, and the time spent answering (each answer's response time,
+ * capped at 30 minutes; reading lessons and watching videos are not counted).
+ */
+export async function weekStats(studentId: number, since: Date) {
+  const db = await requireDb();
+  const rows = await db
+    .select({ createdAt: tafawoqAttempts.createdAt, correct: tafawoqAttempts.correct, responseMs: tafawoqAttempts.responseMs })
+    .from(tafawoqAttempts)
+    .where(and(eq(tafawoqAttempts.studentId, studentId), gte(tafawoqAttempts.createdAt, since)))
+    .limit(20000);
+  const days = new Set(rows.map(row => new Date(row.createdAt.getTime() + 60 * 60 * 1000).toISOString().slice(0, 10)));
+  const answered = rows.length;
+  const correct = rows.filter(row => row.correct === 1).length;
+  const timed = rows.filter(row => row.responseMs !== null);
+  const minutes = Math.round(timed.reduce((sum, row) => sum + Math.min(row.responseMs!, 30 * 60_000), 0) / 60_000);
+  return { activeDays: days.size, answered, correct, minutes, timedAnswers: timed.length };
+}
+
+/** A child's confirmed sessions still to come. */
+export async function upcomingSessionsOf(userId: number, now = new Date()) {
+  const db = await requireDb();
+  return db
+    .select({ id: tafawoqBookings.id, subject: tafawoqBookings.subject, startsAt: tafawoqTutorSlots.startsAt, tutorName: tafawoqTutors.displayName })
+    .from(tafawoqBookings)
+    .innerJoin(tafawoqTutorSlots, eq(tafawoqTutorSlots.id, tafawoqBookings.slotId))
+    .innerJoin(tafawoqTutors, eq(tafawoqTutors.id, tafawoqBookings.tutorId))
+    .where(and(eq(tafawoqBookings.userId, userId), eq(tafawoqBookings.status, "confirmed"), gte(tafawoqTutorSlots.startsAt, now)))
+    .orderBy(asc(tafawoqTutorSlots.startsAt))
+    .limit(5);
+}
+
+/** Every active parent → child link (for the weekly report). */
+export async function activeParentChildPairs() {
+  const db = await requireDb();
+  return db.select({ parentId: parentLinks.parentId, childId: parentLinks.childId }).from(parentLinks).where(eq(parentLinks.status, "active"));
+}
+
 export async function attemptTotals(studentId: number) {
   const db = await requireDb();
   const [row] = await db

@@ -379,6 +379,10 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — Tafawoq
     expect(child.bac?.stream).toBe("sciences");
     expect(child.bac?.subscription.status).toBe("active");
     expect(child.bac?.chats).toBeNull();
+    // Measured week: graded answers from the student's own attempts.
+    expect(child.bac?.week.answered).toBeGreaterThan(0);
+    expect(child.bac?.week.correct).toBeLessThanOrEqual(child.bac!.week.answered);
+    expect(Array.isArray(child.bac?.upcomingSessions)).toBe(true);
     await student.bac.setShareChats({ share: true });
     const [shared] = await parentCaller.bac.parentOverview();
     expect(shared.bac?.chats?.length).toBeGreaterThan(0);

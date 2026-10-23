@@ -1,12 +1,14 @@
 // Hourly reminders: subscription about to end or just ended, confirmed
-// sessions with a teacher in the next 24 hours, and the weekly test not yet
-// handed in (from Thursday, Algiers time).
+// sessions with a teacher in the next 24 hours, the weekly test not yet
+// handed in (from Thursday, Algiers time), and on Sunday a short weekly
+// report to each linked parent.
 //
 // Several server instances may run this at the same time: every reminder
 // carries a dedupe key and the unique (userId, dedupeKey) index lets one copy
 // in. No email is sent here; reminders are in-app notifications only.
 import { EXPIRY_WARNING_DAYS } from "@shared/bacPlatform";
 import * as bac from "../../db/bacPlatform";
+import * as store from "../../db/tafawoq";
 import { dayKey, weekKey } from "./plan";
 import { maybeNotifyExpiry, subscriptionSummary } from "./service";
 
@@ -19,7 +21,7 @@ function algiersTime(date: Date) {
 }
 
 export async function runReminders(now = new Date()) {
-  const sent = { expiring: 0, expired: 0, sessions: 0, weekly: 0 };
+  const sent = { expiring: 0, expired: 0, sessions: 0, weekly: 0, parentReports: 0 };
 
   // Subscriptions ending in the coming days, or ended in the last two days.
   const users = await bac.usersWithSubscriptionEndingBetween(new Date(now.getTime() - 2 * DAY_MS), new Date(now.getTime() + EXPIRY_WARNING_DAYS * DAY_MS));
@@ -66,6 +68,22 @@ export async function runReminders(now = new Date()) {
       students.map(userId => ({ userId, type: "bac_weekly_reminder", title: "اختبار الأسبوع", body: "اختبار هذا الأسبوع لم يُنجز بعد (على 20).", dedupeKey: key }))
     );
     sent.weekly = students.length;
+  }
+  // Sunday (Algiers): a short weekly report to each linked parent, once per week.
+  if ((local.getUTCDay() + 6) % 7 === 6) {
+    const week = weekKey(now);
+    for (const { parentId, childId } of await bac.activeParentChildPairs()) {
+      const student = await store.getTafawoqStudentByUser(childId);
+      if (!student) continue;
+      const stats = await bac.weekStats(student.id, new Date(now.getTime() - 7 * DAY_MS));
+      const rate = stats.answered ? Math.round((100 * stats.correct) / stats.answered) : null;
+      const body = stats.answered
+        ? `${student.displayName} هذا الأسبوع: ${stats.activeDays} أيام نشاط، ${stats.answered} إجابة مصححة (${rate}% صحيحة)، نحو ${stats.minutes} دقيقة في حل التمارين.`
+        : `${student.displayName}: لا تمارين مصححة هذا الأسبوع.`;
+      const key = `bac_parent_weekly:${childId}:${week}`;
+      await bac.insertNotifications([{ userId: parentId, type: "bac_parent_weekly", title: "التقرير الأسبوعي", body, dedupeKey: key }]);
+      sent.parentReports++;
+    }
   }
   return sent;
 }

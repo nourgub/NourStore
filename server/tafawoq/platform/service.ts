@@ -1502,10 +1502,12 @@ export async function parentOverview(parentUserId: number) {
           ]);
         }
       }
-      const [weekly, placement, chats] = await Promise.all([
+      const [weekly, placement, chats, week, sessions] = await Promise.all([
         store.listMarkedExams(student.id, 5, "weekly"),
         placementResult(childId),
         student.shareChatsWithParent === 1 ? recentChats(student.id) : Promise.resolve(null),
+        bac.weekStats(student.id, new Date(Date.now() - 7 * DAY_MS)),
+        bac.upcomingSessionsOf(childId),
       ]);
       return {
         ...report,
@@ -1517,6 +1519,9 @@ export async function parentOverview(parentUserId: number) {
           weekly: weekly.filter(row => row.score !== null).reverse().map(row => ({ week: row.weekKey, score: row.score! })),
           placement: placement ? { subjects: placement.subjects, date: placement.date } : null,
           alerts,
+          /** The last 7 days, measured (see bac.weekStats for what the minutes count). */
+          week,
+          upcomingSessions: sessions,
           chatsShared: student.shareChatsWithParent === 1,
           chats,
         },

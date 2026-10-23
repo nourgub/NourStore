@@ -33,6 +33,31 @@ export function ChildBacInfo({ bac }: { bac: ChildBac | null }) {
           {bac.alerts.map(alert => b.parentAlerts[alert]).join(" · ")}
         </div>
       )}
+      <h3 style={{ marginTop: 12 }}>{b.parentWeek.title}</h3>
+      {bac.week.answered ? (
+        <>
+          <div className="tfq-chips">
+            <span className="tfq-chip">{b.parentWeek.days(bac.week.activeDays)}</span>
+            <span className="tfq-chip">{b.parentWeek.answers(bac.week.answered, Math.round((100 * bac.week.correct) / bac.week.answered))}</span>
+            <span className="tfq-chip">{b.parentWeek.minutes(bac.week.minutes)}</span>
+          </div>
+          <p className="tfq-muted" style={{ fontSize: 12 }}>{b.parentWeek.method}</p>
+        </>
+      ) : (
+        <p className="tfq-muted">{b.parentWeek.none}</p>
+      )}
+      <h3 style={{ marginTop: 12 }}>{b.parentWeek.sessions}</h3>
+      {bac.upcomingSessions.length ? (
+        <ul className="tfq-list">
+          {bac.upcomingSessions.map(session => (
+            <li key={session.id}>
+              {b.subjects[session.subject as BacSubject] ?? session.subject} — {new Date(session.startsAt).toLocaleString(lang === "ar" ? "ar-DZ" : lang === "fr" ? "fr-DZ" : "en-GB")} · <span dir="auto">{session.tutorName}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="tfq-muted">{b.parentWeek.noSessions}</p>
+      )}
       {bac.placement && (
         <>
           <h3 style={{ marginTop: 12 }}>{b.parentPlacement}</h3>

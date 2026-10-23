@@ -156,6 +156,13 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — manual 
     await db.update(tafawoqSubscriptions).set({ endsAt: new Date(Date.now() - 86_400_000) }).where(eq(tafawoqSubscriptions.id, request.id));
     await Promise.all([runReminders(), runReminders()]);
     expect(await count("bac_sub_expired:")).toBe(1);
+
+    // Sunday: the weekly parent reports, sent once however many runs.
+    const sunday = new Date("2026-10-25T10:00:00Z");
+    await Promise.all([runReminders(sunday), runReminders(sunday)]);
+    const reports = await db.select().from(notifications).where(eq(notifications.type, "bac_parent_weekly"));
+    const keys = reports.map(row => `${row.userId}|${row.dedupeKey}`);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("refuses a payment only with a reason, which reaches the student", async () => {
