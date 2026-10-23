@@ -634,6 +634,7 @@ const ar = {
   },
   adminTabs: {
     quality: "جودة المحتوى",
+    support: "الدعم",
     accounts: "الحسابات",
     logs: "السجلات",
     overview: "نظرة عامة",
@@ -1314,6 +1315,7 @@ const fr: BacStrings = {
   },
   adminTabs: {
     quality: "Qualité du contenu",
+    support: "Support",
     accounts: "Comptes",
     logs: "Journaux",
     overview: "Vue d'ensemble",
@@ -1992,6 +1994,7 @@ const en: BacStrings = {
   },
   adminTabs: {
     quality: "Content quality",
+    support: "Support",
     accounts: "Accounts",
     logs: "Logs",
     overview: "Overview",

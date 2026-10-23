@@ -2,6 +2,7 @@
 // the server refuses it for any other role, whatever this page shows.
 import { AdminTutors } from "./Sessions";
 import { AdminAccounts, AdminLogs } from "./AdminAccounts";
+import { AdminSupport } from "./Support";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Shield } from "lucide-react";
@@ -24,7 +25,7 @@ import { useLang } from "./i18n";
 import { bacError, formatDate, streamLabel, useB } from "./bacI18n";
 import { SubscriptionBadge } from "./Dashboard";
 
-const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "quality", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors", "accounts", "logs"] as const;
+const TABS = ["overview", "students", "requests", "changes", "subscriptions", "content", "quality", "support", "bank", "coupons", "notify", "analytics", "events", "settings", "tutors", "accounts", "logs"] as const;
 type Tab = (typeof TABS)[number];
 
 function useAdminMutationOptions() {
@@ -74,6 +75,7 @@ export function AdminPanel() {
       {tab === "subscriptions" && <Subscriptions />}
       {tab === "content" && <ContentSwitches />}
       {tab === "quality" && <ContentQuality />}
+      {tab === "support" && <AdminSupport />}
       {tab === "bank" && <BankTopics />}
       {tab === "coupons" && <Coupons />}
       {tab === "notify" && <Broadcast />}

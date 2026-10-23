@@ -969,6 +969,9 @@ export const supportTickets = mysqlTable(
     priority: mysqlEnum("priority", ["low", "medium", "high"])
       .default("medium")
       .notNull(),
+    category: mysqlEnum("category", ["account", "payment", "content", "technical", "sessions", "other"]).default("other").notNull(),
+    /** Who wrote last (drizzle/0041): a student's reply shows as waiting for staff. */
+    lastSenderRole: mysqlEnum("lastSenderRole", ["user", "staff"]).default("user").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },

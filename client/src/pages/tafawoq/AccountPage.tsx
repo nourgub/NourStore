@@ -9,6 +9,7 @@ import { clearPrivateDeviceData, useAuth } from "@/_core/hooks/useAuth";
 import type { Lang } from "@/lib/language";
 import { formatDate } from "./bacI18n";
 import { useLang } from "./i18n";
+import { MySupport } from "./Support";
 
 const COPY = {
   ar: {
@@ -234,6 +235,8 @@ export function AccountPage() {
       </div>
 
       <ParentLinks c={c} role={user?.role} />
+
+      <MySupport />
 
       {user?.role !== "admin" && (
         <div className="tfq-card">
