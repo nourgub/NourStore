@@ -18,6 +18,7 @@ import * as bacDb from "../db/bacPlatform";
 import * as reviews from "../db/contentReviews";
 import { allBacLessons, contentInventory } from "../tafawoq/contentInventory";
 import * as quality from "../tafawoq/platform/quality";
+import * as legal from "../tafawoq/platform/legal";
 import { clearReviewCache } from "../tafawoq/platform/reviewPolicy";
 import { getLesson } from "../tafawoq/curriculum";
 import { setPlatformSetting } from "../db/platformSettings";
@@ -325,6 +326,15 @@ export const bacAdminRouter = router({
     .input(z.object({ id: z.number().int().positive(), status: z.enum(["reviewing", "resolved", "dismissed"]), adminNote: z.string().trim().max(2000).nullish() }))
     .mutation(({ ctx, input }) => quality.adminSetFlag(ctx.user.id, { id: input.id, status: input.status, adminNote: input.adminNote ?? null })),
   missedQuestions: adminProcedure.query(() => quality.adminMissedQuestions()),
+  legalInfo: adminProcedure.query(() => legal.legalInfo()),
+  setLegalInfo: adminProcedure
+    .input(z.object(Object.fromEntries(legal.LEGAL_FIELDS.map(field => [field, z.string().trim().max(field === "refundPolicy" || field === "dataRetention" ? 3000 : 300).nullish()])) as Record<legal.LegalField, z.ZodOptional<z.ZodNullable<z.ZodString>>>))
+    .mutation(async ({ ctx, input }) => {
+      const result = await legal.setLegalInfo(input);
+      await logAdminAction({ actorId: ctx.user.id, action: "legal_info", targetType: "setting", targetId: "legal", details: { fields: Object.keys(input) } });
+      return result;
+    }),
+  launchReadiness: adminProcedure.query(() => legal.launchReadiness()),
   setContentReview: adminProcedure
     .input(
       z.object({

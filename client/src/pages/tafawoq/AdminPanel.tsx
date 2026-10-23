@@ -62,7 +62,12 @@ export function AdminPanel() {
           </button>
         ))}
       </nav>
-      {tab === "overview" && <Overview onGo={setTab} />}
+      {tab === "overview" && (
+        <>
+          <LaunchReadiness />
+          <Overview onGo={setTab} />
+        </>
+      )}
       {tab === "students" && <Students />}
       {tab === "requests" && <Requests />}
       {tab === "changes" && <Changes />}
@@ -74,7 +79,12 @@ export function AdminPanel() {
       {tab === "notify" && <Broadcast />}
       {tab === "analytics" && <Analytics />}
       {tab === "events" && <Events />}
-      {tab === "settings" && <Settings />}
+      {tab === "settings" && (
+        <>
+          <Settings />
+          <LegalSettings />
+        </>
+      )}
       {tab === "tutors" && <AdminTutors />}
       {tab === "accounts" && <AdminAccounts />}
       {tab === "logs" && <AdminLogs />}
@@ -87,6 +97,85 @@ function Loading<T>({ query, children }: { query: { isLoading: boolean; error: {
   if (query.isLoading) return <p className="tfq-muted" aria-busy="true">…</p>;
   if (query.error) return <div className="tfq-card">{bacError(b, query.error)}</div>;
   return <>{children(query.data as T)}</>;
+}
+
+/** What blocks a launch, from the checks the code can make; manual items listed, never ticked. */
+function LaunchReadiness() {
+  const b = useB();
+  const r = b.readiness;
+  const query = trpc.bacAdmin.launchReadiness.useQuery();
+  return (
+    <Loading query={query}>
+      {data => (
+        <div className="tfq-card">
+          <h3 style={{ marginTop: 0 }}>{r.title}</h3>
+          <p className="tfq-muted">{r.intro}</p>
+          <ul className="tfq-list">
+            {data.checks.map(check => (
+              <li key={check.key}>
+                <span className={`tfq-chip ${check.status === "ok" ? "good" : ""}`}>{r[check.status]}</span> {r.checks[check.key] ?? check.key}
+                {check.detail !== undefined && check.detail !== "" && <small className="tfq-muted"> ({String(check.detail)})</small>}
+              </li>
+            ))}
+          </ul>
+          <h4>{r.manualTitle}</h4>
+          <ul className="tfq-list">
+            {data.manual.map(key => (
+              <li key={key}>○ {r.manual[key] ?? key}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Loading>
+  );
+}
+
+/** The owner's details shown on the legal pages; nothing filled in for them. */
+function LegalSettings() {
+  const b = useB();
+  const l = b.legal;
+  const query = trpc.bacAdmin.legalInfo.useQuery();
+  const save = trpc.bacAdmin.setLegalInfo.useMutation(useAdminMutationOptions());
+  const [draft, setDraft] = useState<Record<string, string> | null>(null);
+  return (
+    <Loading query={query}>
+      {data => {
+        const values = draft ?? Object.fromEntries(Object.entries(data.fields).map(([key, value]) => [key, value ?? ""]));
+        return (
+          <form
+            className="tfq-card tfq-form"
+            onSubmit={event => {
+              event.preventDefault();
+              save.mutate(values, { onSuccess: () => setDraft(null) });
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>{l.title}</h3>
+            <p className="tfq-muted">{l.intro}</p>
+            {Object.keys(data.fields).map(field => (
+              <label key={field} className="tfq-field">
+                {l.fields[field] ?? field}
+                {field === "refundPolicy" || field === "dataRetention" ? (
+                  <textarea className="tfq-input" dir="auto" rows={3} maxLength={3000} value={values[field]} onChange={event => setDraft({ ...values, [field]: event.target.value })} />
+                ) : (
+                  <input
+                    className="tfq-input"
+                    dir="auto"
+                    type={field === "updatedOn" ? "date" : field === "contactEmail" ? "email" : "text"}
+                    maxLength={300}
+                    value={values[field]}
+                    onChange={event => setDraft({ ...values, [field]: event.target.value })}
+                  />
+                )}
+              </label>
+            ))}
+            <button type="submit" className="tfq-btn" disabled={save.isPending || !draft}>
+              {l.save}
+            </button>
+          </form>
+        );
+      }}
+    </Loading>
+  );
 }
 
 function Overview({ onGo }: { onGo: (tab: Tab) => void }) {

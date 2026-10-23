@@ -112,4 +112,26 @@ describe.skipIf(!HAS_DB || !!process.env.ANTHROPIC_API_KEY)("REAL DB — content
     }
     await expect(newcomer.tafawoq.workspace({ lessonKey: "math-limits" })).resolves.toBeTruthy();
   });
+
+  it("shows the owner's details only as set by the admin, and lists what blocks a commercial launch", async () => {
+    const adminCaller = appRouter.createCaller(ctxFor(admin));
+    const { caller } = await subscribedStudent("legalreader");
+    await adminCaller.bacAdmin.setLegalInfo({ ownerName: "", contactEmail: "", contactAddress: "", refundPolicy: "", hostingLocation: "", dataRetention: "", updatedOn: "" });
+    const empty = await caller.tafawoq.legalInfo();
+    expect(empty.missing).toHaveLength(7);
+    expect(Object.values(empty.fields).every(value => value === null)).toBe(true);
+    const readiness = await adminCaller.bacAdmin.launchReadiness();
+    expect(readiness.checks.find(check => check.key === "legal_fields")?.status).toBe("commercial");
+    expect(readiness.manual).toContain("lawyer_review");
+    await expect(caller.bacAdmin.launchReadiness()).rejects.toBeTruthy();
+    try {
+      await adminCaller.bacAdmin.setLegalInfo({ ownerName: "اسم تجريبي للاختبار", contactEmail: "contact@example.test" });
+      const partial = await caller.tafawoq.legalInfo();
+      expect(partial.fields.ownerName).toBe("اسم تجريبي للاختبار");
+      expect(partial.missing).not.toContain("ownerName");
+      expect(partial.missing).toContain("refundPolicy");
+    } finally {
+      await adminCaller.bacAdmin.setLegalInfo({ ownerName: "", contactEmail: "" });
+    }
+  });
 });

@@ -9,6 +9,7 @@ import { learnerProcedure, parentProcedure, rateLimit, teacherProcedure } from "
 import * as tafawoq from "../tafawoq/service";
 import { trialCheck, trialLesson } from "../tafawoq/trial";
 import { flagQuestion } from "../tafawoq/platform/quality";
+import { legalInfo } from "../tafawoq/platform/legal";
 import { checkRateLimit } from "../rateLimit";
 import { TRPCError } from "@trpc/server";
 import { boardState } from "@shared/board";
@@ -31,6 +32,9 @@ const style = z.enum(["fusha", "darja", "foreign"]).optional();
 
 export const tafawoqRouter = router({
   catalog: publicProcedure.query(() => tafawoq.catalog()),
+
+  /** The owner's details for the legal pages (empty fields are shown as not set). */
+  legalInfo: publicProcedure.query(() => legalInfo()),
 
   /** The free trial lesson: open without an account, nothing stored. */
   trialLesson: publicProcedure.query(() => trialLesson()),

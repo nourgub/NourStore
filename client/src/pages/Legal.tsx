@@ -4,6 +4,7 @@ import { BackArrow } from "@/components/DirectionalArrow";
 import { Globe2, ShieldAlert } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getStoredLanguage, setStoredLanguage } from "@/lib/language";
+import { trpc } from "@/lib/trpc";
 
 type Lang = "ar" | "fr" | "en";
 type Doc = "privacy" | "terms";
@@ -11,6 +12,15 @@ type Doc = "privacy" | "terms";
 const nav = {
   ar: {
     back: "الرئيسية",
+    ownerTitle: "من يدير المنصة وكيف تتواصل معه",
+    owner: "صاحب المنصة",
+    email: "البريد",
+    address: "العنوان",
+    hosting: "مكان استضافة البيانات",
+    retention: "مدة الاحتفاظ التي حددها المالك",
+    refund: "سياسة الاسترجاع التي حددها المالك",
+    updated: "آخر تحديث",
+    notSet: "لم يحدده مالك المنصة بعد",
     privacy: "سياسة الخصوصية",
     terms: "شروط الاستخدام",
     draftNotice:
@@ -18,6 +28,15 @@ const nav = {
   },
   fr: {
     back: "Accueil",
+    ownerTitle: "Qui exploite la plateforme et comment le joindre",
+    owner: "Exploitant",
+    email: "E-mail",
+    address: "Adresse",
+    hosting: "Lieu d'hébergement des données",
+    retention: "Durée de conservation fixée par l'exploitant",
+    refund: "Politique de remboursement fixée par l'exploitant",
+    updated: "Dernière mise à jour",
+    notSet: "pas encore indiqué par l'exploitant",
     privacy: "Politique de confidentialité",
     terms: "Conditions d’utilisation",
     draftNotice:
@@ -25,6 +44,15 @@ const nav = {
   },
   en: {
     back: "Home",
+    ownerTitle: "Who runs the platform and how to reach them",
+    owner: "Operator",
+    email: "Email",
+    address: "Address",
+    hosting: "Where the data is hosted",
+    retention: "Retention period set by the operator",
+    refund: "Refund policy set by the operator",
+    updated: "Last updated",
+    notSet: "not set by the operator yet",
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     draftNotice:
@@ -286,6 +314,9 @@ export default function Legal() {
     setStoredLanguage(next);
   };
   const content = (doc === "privacy" ? privacyContent : termsContent)[lang];
+  // The owner's details (admin settings); what is not set yet says so.
+  const legal = trpc.tafawoq.legalInfo.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const owner = legal.data?.fields ?? { ownerName: null, contactEmail: null, contactAddress: null, refundPolicy: null, hostingLocation: null, dataRetention: null, updatedOn: null };
 
   return (
     <div
@@ -365,6 +396,27 @@ export default function Legal() {
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 15, marginBottom: 6, color: "#f1ce63" }}>{t.ownerTitle}</h2>
+              <dl style={{ margin: 0, fontSize: 13, lineHeight: 1.8, opacity: 0.85, display: "grid", gap: 4 }}>
+                {(
+                  [
+                    [t.owner, owner.ownerName],
+                    [t.email, owner.contactEmail],
+                    [t.address, owner.contactAddress],
+                    [t.hosting, owner.hostingLocation],
+                    ...(doc === "privacy" ? [[t.retention, owner.dataRetention] as const] : [[t.refund, owner.refundPolicy] as const]),
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt style={{ display: "inline", fontWeight: 600 }}>{label}: </dt>
+                    <dd style={{ display: "inline", margin: 0 }} dir="auto">
+                      {value ?? <em>{t.notSet}</em>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
             {content.sections.map(section => (
               <div key={section.h}>
                 <h2 style={{ fontSize: 15, marginBottom: 6, color: "#f1ce63" }}>
@@ -382,6 +434,9 @@ export default function Legal() {
                 </p>
               </div>
             ))}
+            <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>
+              {t.updated}: {owner.updatedOn ?? t.notSet}
+            </p>
           </div>
         </div>
       </main>
