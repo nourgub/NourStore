@@ -36,8 +36,8 @@ const SolutionSchema = z.object({
   rubric: z
     .array(z.object({ criterion: z.string(), points: z.number() }))
     .min(2)
-    .max(5)
-    .describe("معايير تصحيح تفصيلية مع توزيع تقريبي للنقاط"),
+    .max(12)
+    .describe("معايير تصحيح تفصيلية مع توزيع تقريبي للنقاط — تمرين متعدد الأجزاء يحتاج معيارًا لكل جزء"),
 });
 
 const SolutionsSchema = z.object({
@@ -65,13 +65,16 @@ export async function solveGivenExercises(input: SolveGivenExercisesInput): Prom
 
 ${exerciseList}
 
-لكل تمرين من التمارين أعلاه بنفس الترتيب، أنتج: حلًا نموذجيًا مفصّلاً خطوة بخطوة، ثم شبكة تصحيح (معايير مع نقاط تقريبية تجمع قريبًا من النقطة الكلية المحددة لذلك التمرين). اكتب كل شيء باللغة العربية الفصحى.`;
+لكل تمرين من التمارين أعلاه بنفس الترتيب، أنتج: حلًا نموذجيًا مفصّلاً خطوة بخطوة. إذا كان التمرين متعدد الأجزاء (مرقّمًا 1، 2، 3... أو أ، ب، ج... كما يحدث غالبًا في تمارين دراسة الدوال الجزائرية)، غطِّ كل جزء فرعي في الحل بنفس ترقيمه بالضبط، ثم أنتج شبكة تصحيح فيها معيار منفصل لكل جزء فرعي رئيسي (وليس معيارًا واحدًا عامًا للتمرين كله)، مع نقاط تقريبية تجمع قريبًا من النقطة الكلية المحددة لذلك التمرين. اكتب كل شيء باللغة العربية الفصحى.`;
 
   let response;
   try {
     response = await getClient().messages.parse({
       model: MODEL,
-      max_tokens: 16000,
+      // Raised from 16000 for the same reason as realContent.ts: a
+      // teacher-supplied multi-part exercise can need a long multi-step
+      // solution, and truncation would otherwise surface as a hard failure.
+      max_tokens: 24000,
       messages: [{ role: "user", content: prompt }],
       output_config: { format: zodOutputFormat(SolutionsSchema) },
     });
