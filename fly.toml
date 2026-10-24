@@ -1,0 +1,38 @@
+# Fly.io app configuration for NourStore.
+#
+# First-time deploy (run these yourself from a machine with flyctl + a Fly.io
+# account — see DEPLOY.md for the full walkthrough):
+#   flyctl auth login
+#   flyctl launch --no-deploy        # creates the app, keeps this file
+#   flyctl volumes create nourstore_data --size 1 --region <same as app>
+#   flyctl secrets set ANTHROPIC_API_KEY=... GEMINI_API_KEY=... ADMIN_EMAIL=...
+#   flyctl deploy
+#
+# Change `app` below to the name flyctl assigns (or pick your own with
+# `flyctl launch --name your-name --no-deploy`), then re-run deploy.
+
+app = "nourstore"
+primary_region = "cdg"
+
+[build]
+
+[env]
+  PORT = "3000"
+  DATA_DIR = "/data"
+  NODE_ENV = "production"
+
+[[mounts]]
+  source = "nourstore_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

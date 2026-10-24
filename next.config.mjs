@@ -5,6 +5,9 @@ const nextConfig = {
   // breaks that lookup, so keep it external and let Node load it directly.
   // better-sqlite3 ships a native .node binary that must stay unbundled too.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist", "better-sqlite3"],
+  // Produces a minimal self-contained server (.next/standalone) for Docker
+  // deployment, instead of requiring the full node_modules tree at runtime.
+  output: "standalone",
 };
 
 export default nextConfig;
