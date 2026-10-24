@@ -9,6 +9,7 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [emailMode, setEmailMode] = useState(false);
 
   const whatsappMessage = encodeURIComponent(
     `مرحبًا، نسيت كلمة مرور حسابي في منصة نور (${email || "بريدي الإلكتروني"}) وأحتاج استعادتها.`,
@@ -30,6 +31,7 @@ export function ForgotPasswordForm() {
       setError(data.error ?? "حدث خطأ غير متوقع");
       return;
     }
+    setEmailMode(Boolean(data.emailMode));
     setSent(true);
   }
 
@@ -37,7 +39,9 @@ export function ForgotPasswordForm() {
     return (
       <div className="space-y-4">
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          إذا كان هذا البريد مسجلاً لدينا، فقد وصل طلبك إلى الإدارة وستتم مراجعته قريبًا.
+          {emailMode
+            ? "إذا كان هذا البريد مسجلاً لدينا، فقد أرسلنا إليه رابطًا لإعادة تعيين كلمة المرور صالحًا لمدة ساعة."
+            : "إذا كان هذا البريد مسجلاً لدينا، فقد وصل طلبك إلى الإدارة وستتم مراجعته قريبًا."}
         </div>
         <a
           href={whatsappUrl}
@@ -45,7 +49,7 @@ export function ForgotPasswordForm() {
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
         >
-          <MessageCircle size={18} /> للأسرع — تواصل مباشرة عبر واتساب
+          <MessageCircle size={18} /> {emailMode ? "لم يصلك البريد؟ تواصل عبر واتساب" : "للأسرع — تواصل مباشرة عبر واتساب"}
         </a>
       </div>
     );

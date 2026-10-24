@@ -159,6 +159,19 @@ withBusyRetry(() =>
   );
   CREATE INDEX IF NOT EXISTS idx_password_reset_status ON password_reset_requests(status);
 
+  -- Self-service reset tokens (only ever created/consumed when SMTP_* is
+  -- configured — see src/lib/email.ts). Kept separate from
+  -- password_reset_requests (the admin-assisted fallback) so neither path
+  -- interferes with the other.
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_teacher ON password_reset_tokens(teacher_id);
+
   CREATE TABLE IF NOT EXISTS rate_limit_attempts (
     key TEXT PRIMARY KEY,
     count INTEGER NOT NULL DEFAULT 0,
@@ -551,6 +564,20 @@ export function insertRequest(request: GenerationRequest): void {
 
 export function updateRequestReview(id: string, review: GenerationRequest["review"]): void {
   db.prepare(`UPDATE requests SET review_json = ? WHERE id = ?`).run(JSON.stringify(review), id);
+}
+
+// Persists a teacher's edit to an exam's questions/rubric (see
+// src/lib/generation.ts's updateExamQuestions) and bumps rubricVersion in
+// the same write — grading_sessions/student_papers pin the rubricVersion
+// they were created/graded against, so this can never silently change an
+// already-graded paper's recorded result (approvePaperGrade's version check
+// blocks approval if a paper's grading ever becomes stale relative to it).
+export function updateRequestQuestions(id: string, questions: GenerationRequest["questions"], rubricVersion: number): void {
+  db.prepare(`UPDATE requests SET questions_json = ?, rubric_version = ? WHERE id = ?`).run(
+    JSON.stringify(questions),
+    rubricVersion,
+    id,
+  );
 }
 
 export function listRequests(teacherId: string, subjectId: SubjectId): GenerationRequest[] {
@@ -1218,6 +1245,62 @@ export function resolvePasswordResetRequestStatus(id: string): void {
     new Date().toISOString(),
     id,
   );
+}
+
+// ---------- Self-service password reset tokens (email path only) ----------
+
+interface PasswordResetTokenRow {
+  token: string;
+  teacher_id: string;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
+export interface PasswordResetToken {
+  token: string;
+  teacherId: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+}
+
+function rowToPasswordResetToken(row: PasswordResetTokenRow): PasswordResetToken {
+  return {
+    token: row.token,
+    teacherId: row.teacher_id,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    usedAt: row.used_at,
+  };
+}
+
+export function insertPasswordResetToken(entry: {
+  token: string;
+  teacherId: string;
+  createdAt: string;
+  expiresAt: string;
+}): void {
+  db.prepare(
+    `INSERT INTO password_reset_tokens (token, teacher_id, created_at, expires_at, used_at)
+     VALUES (@token, @teacherId, @createdAt, @expiresAt, NULL)`,
+  ).run(entry);
+}
+
+// Returns the token row only if it exists, is unused, and hasn't expired —
+// every other case (unknown/used/expired) returns null so callers can give a
+// single generic "invalid or expired" error without distinguishing why.
+export function findValidPasswordResetToken(token: string): PasswordResetToken | null {
+  const row = db.prepare(`SELECT * FROM password_reset_tokens WHERE token = ?`).get(token) as
+    | PasswordResetTokenRow
+    | undefined;
+  if (!row || row.used_at) return null;
+  if (new Date(row.expires_at).getTime() < Date.now()) return null;
+  return rowToPasswordResetToken(row);
+}
+
+export function markPasswordResetTokenUsed(token: string): void {
+  db.prepare(`UPDATE password_reset_tokens SET used_at = ? WHERE token = ?`).run(new Date().toISOString(), token);
 }
 
 // ---------- Rate limiting (DB-backed, no Redis available) ----------

@@ -1,0 +1,43 @@
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
+import { ResetPasswordForm } from "@/components/ResetPasswordForm";
+
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token?: string }>;
+}) {
+  const { token } = await searchParams;
+
+  return (
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
+            <Sparkles size={22} />
+          </span>
+          <span className="text-lg font-extrabold text-brand-900">نور</span>
+        </div>
+        <div className="rounded-2xl border border-brand-100 bg-white p-8 shadow-sm">
+          <h1 className="mb-1 text-xl font-bold text-brand-900">تعيين كلمة مرور جديدة</h1>
+          {token ? (
+            <>
+              <p className="mb-6 text-sm text-brand-600">اختر كلمة مرور جديدة لحسابك في منصة نور.</p>
+              <ResetPasswordForm token={token} />
+            </>
+          ) : (
+            <p className="mb-6 text-sm text-red-600">
+              الرابط غير صالح — تأكد من فتح نفس الرابط المُرسل إلى بريدك الإلكتروني بالكامل.
+            </p>
+          )}
+          <p className="mt-6 text-center text-sm text-brand-700">
+            تذكّرت كلمة المرور؟{" "}
+            <Link href="/login" className="font-semibold text-brand-600 hover:underline">
+              سجّل الدخول
+            </Link>
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}

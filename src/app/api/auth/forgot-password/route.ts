@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestPasswordReset } from "@/lib/passwordReset";
+import { isEmailConfigured } from "@/lib/email";
 import { enforceRateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
@@ -14,7 +15,10 @@ export async function POST(request: NextRequest) {
   const email = typeof body?.email === "string" ? body.email : "";
   if (!email) return NextResponse.json({ error: "البريد الإلكتروني مطلوب" }, { status: 400 });
 
-  requestPasswordReset(email);
-  // Always the same response, whether or not the email exists.
-  return NextResponse.json({ ok: true });
+  const baseUrl = process.env.APP_BASE_URL || request.nextUrl.origin;
+  await requestPasswordReset(email, baseUrl);
+  // Always the same response, whether or not the email exists — "emailMode"
+  // reflects only global server configuration (not this email's existence),
+  // so the UI can describe the right next step without an enumeration leak.
+  return NextResponse.json({ ok: true, emailMode: isEmailConfigured() });
 }

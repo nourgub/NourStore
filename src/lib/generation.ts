@@ -1,14 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
-import { GENERATED_DIR, findDocument, findRequest, insertRequest, listRequests, updateRequestReview } from "./db";
+import {
+  GENERATED_DIR,
+  findDocument,
+  findRequest,
+  insertRequest,
+  listRequests,
+  updateRequestQuestions,
+  updateRequestReview,
+} from "./db";
 import { runAgentPipeline } from "./agents/pipeline";
 import { buildExamDocx } from "./docx/buildExamDocx";
 import { buildSolutionDocx } from "./docx/buildSolutionDocx";
 import { buildRubricDocx } from "./docx/buildRubricDocx";
-import { emptyExamReview } from "./types";
+import { emptyExamReview, type GeneratedQuestion, type RubricCriterion } from "./types";
 import type { GenerationRequest, SubjectId } from "./types";
 import { enqueue, registerJobHandler } from "./jobs";
 import { isGeminiConfigured, reviewExamWithGemini, GeminiReviewError } from "./agents/geminiExamReviewAgent";
+import { toHundredths } from "./points";
 
 // Same bound used for exam generation's own curriculum excerpt (realContent.ts)
 // — keeps the review call's token cost predictable regardless of document size.
@@ -183,4 +192,138 @@ export async function getGenerationForTeacher(teacherId: string, requestId: stri
 
 export async function listGenerationsForTeacher(teacherId: string, subjectId: SubjectId): Promise<GenerationRequest[]> {
   return listRequests(teacherId, subjectId);
+}
+
+export interface EditedCriterionInput {
+  // Omitted/unknown id = a newly added criterion; an id matching an existing
+  // one on that question keeps it (and whatever grading history references
+  // it); any existing id simply left out of the edit is dropped.
+  id?: string | null;
+  criterion: string;
+  points: number;
+}
+
+export interface EditedQuestionInput {
+  // Required and must match an existing question's id — this version of the
+  // editor changes wording/points/rubric on the existing question set, not
+  // the number of questions (see DELIVERY_SUMMARY.md for the scope note).
+  id: string;
+  topic: string;
+  difficulty: GeneratedQuestion["difficulty"];
+  prompt: string;
+  solution: string;
+  points: number;
+  rubric: EditedCriterionInput[];
+}
+
+const VALID_DIFFICULTIES: GeneratedQuestion["difficulty"][] = ["سهل", "متوسط", "صعب"];
+const EXAM_TOTAL_POINTS_UNITS = toHundredths(20);
+
+// Validates a teacher's edit against the exam's *current* questions (for id
+// matching only — the returned list fully replaces them) and normalizes it
+// into stable GeneratedQuestion[]: existing ids are preserved exactly,
+// new criteria get a fresh `${questionId}_c${n}` id that never collides with
+// one already used on that question. Throws GenerationError with an Arabic
+// message describing the first problem found; never partially applies.
+function validateAndNormalizeEditedQuestions(
+  original: GeneratedQuestion[],
+  edited: EditedQuestionInput[],
+): GeneratedQuestion[] {
+  if (edited.length !== original.length) {
+    throw new GenerationError("لا يمكن حاليًا إضافة أو حذف أسئلة كاملة من هذا المحرر — فقط تعديل الموجود");
+  }
+  const originalById = new Map(original.map((q) => [q.id, q]));
+
+  const normalized: GeneratedQuestion[] = edited.map((q) => {
+    if (typeof q?.id !== "string") throw new GenerationError("بيانات سؤال غير صالحة");
+    const originalQuestion = originalById.get(q.id);
+    if (!originalQuestion) throw new GenerationError("سؤال غير معروف ضمن التعديل — أعد تحميل الصفحة وحاول مجددًا");
+    if (typeof q.prompt !== "string" || !q.prompt.trim()) throw new GenerationError("نص السؤال لا يمكن أن يكون فارغًا");
+    if (typeof q.solution !== "string" || !q.solution.trim())
+      throw new GenerationError("الحل النموذجي لا يمكن أن يكون فارغًا");
+    if (!VALID_DIFFICULTIES.includes(q.difficulty)) throw new GenerationError("مستوى صعوبة غير صالح");
+    if (typeof q.points !== "number" || !Number.isFinite(q.points) || !(q.points > 0)) {
+      throw new GenerationError("نقاط السؤال يجب أن تكون رقمًا أكبر من صفر");
+    }
+    if (!Array.isArray(q.rubric) || q.rubric.length === 0) {
+      throw new GenerationError("كل سؤال يحتاج معيارًا واحدًا على الأقل في سلم التنقيط");
+    }
+
+    const existingCriteriaIds = new Set(originalQuestion.rubric.map((c) => c.id));
+    let nextSuffix =
+      originalQuestion.rubric.reduce((max, c) => {
+        const match = /_c(\d+)$/.exec(c.id);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0) + 1;
+
+    const rubric: RubricCriterion[] = q.rubric.map((c) => {
+      if (typeof c?.criterion !== "string" || !c.criterion.trim()) {
+        throw new GenerationError("نص معيار التصحيح لا يمكن أن يكون فارغًا");
+      }
+      if (typeof c.points !== "number" || !Number.isFinite(c.points) || !(c.points > 0)) {
+        throw new GenerationError("نقاط كل معيار يجب أن تكون رقمًا أكبر من صفر");
+      }
+      const keepsExistingId = typeof c.id === "string" && existingCriteriaIds.has(c.id);
+      const id = keepsExistingId ? c.id! : `${q.id}_c${nextSuffix++}`;
+      return { id, criterion: c.criterion.trim(), points: c.points };
+    });
+
+    const criteriaSumUnits = rubric.reduce((sum, c) => sum + toHundredths(c.points), 0);
+    if (criteriaSumUnits !== toHundredths(q.points)) {
+      throw new GenerationError(
+        `مجموع نقاط معايير السؤال "${q.prompt.slice(0, 20)}..." (${rubric.reduce((s, c) => s + c.points, 0)}) لا يساوي نقاط السؤال (${q.points})`,
+      );
+    }
+
+    return {
+      id: q.id,
+      topic: typeof q.topic === "string" && q.topic.trim() ? q.topic.trim() : originalQuestion.topic,
+      difficulty: q.difficulty,
+      points: q.points,
+      prompt: q.prompt.trim(),
+      solution: q.solution.trim(),
+      rubric,
+    };
+  });
+
+  const totalUnits = normalized.reduce((sum, q) => sum + toHundredths(q.points), 0);
+  if (totalUnits !== EXAM_TOTAL_POINTS_UNITS) {
+    throw new GenerationError(
+      `مجموع نقاط الامتحان يجب أن يبقى 20 بالضبط (المجموع الحالي: ${normalized.reduce((s, q) => s + q.points, 0)})`,
+    );
+  }
+
+  return normalized;
+}
+
+export async function updateExamQuestions(
+  teacherId: string,
+  requestId: string,
+  edited: EditedQuestionInput[],
+): Promise<GenerationRequest> {
+  const request = findRequest(requestId, teacherId);
+  if (!request) throw new GenerationError("الامتحان غير موجود");
+  if (request.status !== "done") throw new GenerationError("لا يمكن تعديل امتحان لم يكتمل توليده بنجاح");
+
+  const normalizedQuestions = validateAndNormalizeEditedQuestions(request.questions, edited);
+  const newRubricVersion = request.rubricVersion + 1;
+  updateRequestQuestions(requestId, normalizedQuestions, newRubricVersion);
+
+  const updated: GenerationRequest = { ...request, questions: normalizedQuestions, rubricVersion: newRubricVersion };
+
+  // Keep the downloadable Word files in sync with the edit — same paths,
+  // regenerated contents, so a teacher who already shared a download link
+  // doesn't need to know a new path exists.
+  if (request.files.examDocx && request.files.solutionDocx && request.files.rubricDocx) {
+    const [examBuf, solutionBuf, rubricBuf] = await Promise.all([
+      buildExamDocx(updated),
+      buildSolutionDocx(updated),
+      buildRubricDocx(updated),
+    ]);
+    fs.writeFileSync(request.files.examDocx, examBuf);
+    fs.writeFileSync(request.files.solutionDocx, solutionBuf);
+    fs.writeFileSync(request.files.rubricDocx, rubricBuf);
+  }
+
+  return updated;
 }

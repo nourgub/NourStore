@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck, XCircle } from "lucide-react";
+import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck, XCircle, Pencil } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getGenerationForTeacher } from "@/lib/generation";
 import { getGradingSessionsForExam } from "@/lib/grading";
@@ -112,6 +112,17 @@ export default async function ResultsPage({
             </ul>
           )}
           <StartGradingSessionButton examRequestId={generation.id} examTitle={generation.examTitle} />
+        </section>
+
+        <section className="mb-2 flex justify-end">
+          {generation.status === "done" && (
+            <Link
+              href={`/subjects/${subjectId}/results/${requestId}/edit`}
+              className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline"
+            >
+              <Pencil size={14} /> تعديل الأسئلة وسلم التنقيط
+            </Link>
+          )}
         </section>
 
         <section className="space-y-4">
