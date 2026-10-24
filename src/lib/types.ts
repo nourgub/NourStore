@@ -84,6 +84,17 @@ export interface AgentStep {
   finishedAt?: string;
 }
 
+// A stable id, assigned once when the question/rubric is first created and
+// never regenerated — grading output (from Claude or Gemini) must reference
+// these ids explicitly instead of being matched by array position, so a
+// model that reorders, skips, or duplicates an entry is caught rather than
+// silently misattributed.
+export interface RubricCriterion {
+  id: string;
+  criterion: string;
+  points: number;
+}
+
 export interface GeneratedQuestion {
   id: string;
   topic: string;
@@ -91,7 +102,44 @@ export interface GeneratedQuestion {
   points: number;
   prompt: string;
   solution: string;
-  rubric: { criterion: string; points: number }[];
+  rubric: RubricCriterion[];
+}
+
+export type ExamReviewStatus = "not_configured" | "not_reviewed" | "reviewing" | "reviewed" | "failed";
+
+export type ExamIssueSeverity = "تحذير" | "خطأ";
+
+export type ExamIssueCategory =
+  | "اكتمال_المعطيات"
+  | "وضوح_الصياغة"
+  | "صحة_الحساب"
+  | "صحة_الحل"
+  | "ملاءمة_المستوى"
+  | "اتساق_السلم";
+
+export interface ExamReviewIssue {
+  questionId: string;
+  severity: ExamIssueSeverity;
+  category: ExamIssueCategory;
+  description: string;
+  suggestion: string;
+}
+
+// Gemini's independent review of Claude's draft exam — solved from the
+// references only, never shown Claude's own solution first. `status`
+// distinguishes "never attempted" (no key / feature off) from "attempted and
+// failed" so the UI never shows a fabricated "verified" badge for either.
+export interface ExamReview {
+  status: ExamReviewStatus;
+  reviewedAt: string | null;
+  model: string | null;
+  failureReason: string | null;
+  independentSolutions: { questionId: string; solution: string }[];
+  issues: ExamReviewIssue[];
+}
+
+export function emptyExamReview(): ExamReview {
+  return { status: "not_reviewed", reviewedAt: null, model: null, failureReason: null, independentSolutions: [], issues: [] };
 }
 
 export interface GenerationRequest {
@@ -105,8 +153,14 @@ export interface GenerationRequest {
   numQuestions: number;
   difficultyMix: "متوازن" | "سهل" | "صعب";
   status: GenerationStatus;
+  failureReason: string | null;
   steps: AgentStep[];
   questions: GeneratedQuestion[];
+  // Bumped only if the questions/rubric are ever edited after creation —
+  // grading sessions and student papers pin the version they graded against,
+  // so a later rubric edit can never silently change an already-graded paper.
+  rubricVersion: number;
+  review: ExamReview;
   files: { examDocx?: string; solutionDocx?: string; rubricDocx?: string };
   createdAt: string;
   finishedAt?: string;
@@ -116,21 +170,64 @@ export interface GradingSession {
   id: string;
   teacherId: string;
   examRequestId: string;
+  // The exam's rubricVersion at the moment this session was created — every
+  // paper submitted into this session is graded against this exact pin.
+  examVersion: number;
   title: string;
   createdAt: string;
 }
 
 export type PaperStatus = "pending" | "grading" | "graded" | "approved" | "failed";
 
+// Per-criterion outcome of comparing Claude's and Gemini's independent
+// grading. "agreed"/"disagreed" require both scores to be present (non-null);
+// "unreadable"/"missing_page" mean at least one model could not locate or
+// read the relevant answer — these never collapse to an automatic 0.
+export type CriterionReviewStatus = "not_reviewed" | "agreed" | "disagreed" | "unreadable" | "missing_page";
+
+export interface CriterionGradeResult {
+  criterionId: string;
+  criterion: string;
+  maxPoints: number;
+  claudeAwardedPoints: number | null;
+  claudeNote: string;
+  geminiAwardedPoints: number | null;
+  geminiNote: string;
+  status: CriterionReviewStatus;
+  // Set once resolved (models agreed, or the teacher decided) — null blocks
+  // approval of the paper.
+  finalAwardedPoints: number | null;
+  teacherOverride: boolean;
+  overrideReason: string | null;
+}
+
 export interface QuestionGradeResult {
   questionId: string;
   topic: string;
   maxPoints: number;
-  awardedPoints: number;
-  transcription: string;
-  feedback: string;
-  criteriaResults: { criterion: string; maxPoints: number; awardedPoints: number; note: string }[];
+  claudeTranscription: string;
+  claudeFeedback: string;
+  geminiTranscription: string;
+  geminiFeedback: string;
+  criteriaResults: CriterionGradeResult[];
+  // Sum of criteriaResults[].finalAwardedPoints, or null while any criterion
+  // in this question is still unresolved.
+  awardedPoints: number | null;
+  // Set when either model flagged writing in the paper that appears to
+  // address the grader/AI directly rather than answer the question.
+  suspiciousNote: string | null;
 }
+
+export interface GradeOverrideLogEntry {
+  questionId: string;
+  criterionId: string;
+  previousPoints: number | null;
+  newPoints: number;
+  reason: string;
+  changedAt: string;
+}
+
+export type GeminiReviewStatus = "not_configured" | "not_reviewed" | "reviewing" | "reviewed" | "failed";
 
 export interface StudentPaper {
   id: string;
@@ -140,9 +237,21 @@ export interface StudentPaper {
   imagePaths: string[];
   status: PaperStatus;
   failureReason: string | null;
+  // The exam's rubricVersion this paper was graded against (copied from the
+  // session at submission time) — approval is blocked if the exam's rubric
+  // has since moved to a newer version (see GenerationRequest.rubricVersion).
+  examVersion: number;
+  claudeModel: string | null;
+  geminiReviewStatus: GeminiReviewStatus;
+  geminiModel: string | null;
+  geminiFailureReason: string | null;
   questionResults: QuestionGradeResult[];
+  // true while any criterion is not yet "agreed" or teacher-resolved —
+  // the paper cannot be approved while this is true.
+  needsReview: boolean;
   draftTotal: number | null;
   approvedTotal: number | null;
+  overrideHistory: GradeOverrideLogEntry[];
   createdAt: string;
   gradedAt: string | null;
   approvedAt: string | null;

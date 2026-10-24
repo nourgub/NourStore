@@ -142,23 +142,20 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
     return { steps, ...EMPTY_SECTIONS, headerValues: result.headerValues, noteValues: result.noteValues, tableColumns: template.tableColumns, tableRows: result.tableRows };
   }
 
+  // A configured key means production mode — a failed call is a real failure
+  // of this request, never silently swapped for demo content and reported
+  // as success. The mock generator only ever runs with no key configured.
   let sections: LessonPrepSection[];
   let usedRealGeneration = false;
-  let fallbackReason: string | null = null;
 
   if (isLessonPrepConfigured()) {
-    try {
-      sections = await generateLessonPrepWithClaude({
-        subjectPersona: subject.persona,
-        lessonTitle: input.lessonTitle,
-        gradeLevel: input.gradeLevel,
-        styleNotes: input.styleNotes,
-      });
-      usedRealGeneration = true;
-    } catch (err) {
-      fallbackReason = err instanceof Error ? err.message : "خطأ غير معروف في نداء نموذج الذكاء الاصطناعي";
-      sections = generateMockLessonPrep(input.lessonTitle, input.gradeLevel);
-    }
+    sections = await generateLessonPrepWithClaude({
+      subjectPersona: subject.persona,
+      lessonTitle: input.lessonTitle,
+      gradeLevel: input.gradeLevel,
+      styleNotes: input.styleNotes,
+    });
+    usedRealGeneration = true;
   } else {
     sections = generateMockLessonPrep(input.lessonTitle, input.gradeLevel);
   }
@@ -170,9 +167,7 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
       `تم إعداد تحضير مكوّن من ${sections.length} قسمًا لدرس "${input.lessonTitle}" — ` +
         (usedRealGeneration
           ? "عبر نموذج الذكاء الاصطناعي (Claude)."
-          : fallbackReason
-            ? `تم التراجع إلى تحضير تجريبي عام بسبب: ${fallbackReason}.`
-            : "عبر تحضير تجريبي عام (لم يُفعَّل مفتاح Claude API بعد)."),
+          : "عبر تحضير تجريبي عام (وضع العرض التجريبي — لم يُفعَّل مفتاح Claude API)."),
     ),
   );
 

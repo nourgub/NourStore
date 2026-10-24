@@ -210,13 +210,14 @@ export function generateArabicQuestion(
   const template = TOPIC_TEMPLATES[topic] ?? TOPIC_TEMPLATES["القواعد النحوية"];
   const variant = pickRandom(template.variants[difficulty] ?? template.variants["متوسط"]);
 
+  const id = `q_${Math.random().toString(36).slice(2, 10)}`;
   return {
-    id: `q_${Math.random().toString(36).slice(2, 10)}`,
+    id,
     topic,
     difficulty,
     points: pointsBudget,
     prompt: variant.prompt,
     solution: variant.solution,
-    rubric: scaleRubricToBudget(variant.rubric, pointsBudget),
+    rubric: scaleRubricToBudget(variant.rubric, pointsBudget, id),
   };
 }

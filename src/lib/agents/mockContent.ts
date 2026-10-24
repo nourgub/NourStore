@@ -15,8 +15,15 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+interface RawQuestion {
+  prompt: string;
+  solution: string;
+  // Pre-scaling rubric — scaleRubricToBudget assigns final points + stable ids.
+  rubric: { criterion: string; points: number }[];
+}
+
 interface Template {
-  build: (difficulty: Difficulty) => Omit<GeneratedQuestion, "id" | "topic" | "difficulty" | "points">;
+  build: (difficulty: Difficulty) => RawQuestion;
 }
 
 const TOPIC_TEMPLATES: Record<string, Template> = {
@@ -135,13 +142,14 @@ export function generateMathQuestion(
     ? built.prompt
     : `[ملاحظة: الوضع التجريبي لا يغطي محور "${topic}" بدقة بعد — هذا سؤال نموذجي عام بديل. فعّل Claude API لتوليد أسئلة مطابقة لهذا المحور تحديدًا.]\n\n${built.prompt}`;
 
+  const id = `q_${Math.random().toString(36).slice(2, 10)}`;
   return {
-    id: `q_${Math.random().toString(36).slice(2, 10)}`,
+    id,
     topic,
     difficulty,
     points: pointsBudget,
     prompt,
     solution: built.solution,
-    rubric: scaleRubricToBudget(built.rubric, pointsBudget),
+    rubric: scaleRubricToBudget(built.rubric, pointsBudget, id),
   };
 }

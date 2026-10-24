@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck } from "lucide-react";
+import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck, XCircle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getGenerationForTeacher } from "@/lib/generation";
 import { getGradingSessionsForExam } from "@/lib/grading";
 import { SiteHeader } from "@/components/SiteHeader";
 import { StartGradingSessionButton } from "@/components/StartGradingSessionButton";
+import { ExamReviewPanel } from "@/components/ExamReviewPanel";
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   سهل: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -41,6 +42,13 @@ export default async function ResultsPage({
         <p className="mb-8 text-sm text-brand-600">
           {generation.gradeLevel} — {generation.questions.length} أسئلة — {generation.difficultyMix}
         </p>
+
+        {generation.status === "failed" && (
+          <div className="mb-8 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <XCircle size={20} className="shrink-0" />
+            <p>فشل توليد هذا الامتحان: {generation.failureReason ?? "خطأ غير معروف"}. أعد المحاولة من صفحة المادة.</p>
+          </div>
+        )}
 
         <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 font-bold text-brand-800">سجل عمل فريق الوكلاء</h2>
@@ -81,6 +89,8 @@ export default async function ResultsPage({
             <Table2 size={20} /> تنزيل شبكة التنقيط (Word)
           </a>
         </section>
+
+        {generation.status === "done" && <ExamReviewPanel requestId={generation.id} initialReview={generation.review} />}
 
         <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 flex items-center gap-2 font-bold text-brand-800">

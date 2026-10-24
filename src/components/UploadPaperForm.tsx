@@ -58,7 +58,7 @@ export function UploadPaperForm({ sessionId }: { sessionId: string }) {
           <span className="font-semibold text-brand-800">
             {files.length > 0 ? `${files.length} صورة مختارة` : "اضغط هنا لاختيار صور الورقة"}
           </span>
-          <span className="text-xs text-brand-500">JPG أو PNG — حتى 6 صفحات</span>
+          <span className="text-xs text-brand-500">JPG أو PNG — حتى 4 صفحات</span>
           <input
             type="file"
             accept="image/jpeg,image/png"
@@ -68,13 +68,17 @@ export function UploadPaperForm({ sessionId }: { sessionId: string }) {
           />
         </label>
       </div>
+      <p className="text-xs text-brand-500">
+        تُرسَل صور الورقة إلى Claude للتصحيح الأولي، وإلى Gemini لمراجعة مستقلة إن كانت مفعّلة على الخادم — كلاهما
+        خدمتا ذكاء اصطناعي خارجيتان.
+      </p>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <button
         type="submit"
         disabled={loading}
         className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
       >
-        {loading ? "الوكيل يقرأ الورقة ويصحّحها الآن..." : "تصحيح هذه الورقة"}
+        {loading ? "جارٍ الإرسال للتصحيح..." : "تصحيح هذه الورقة"}
       </button>
     </form>
   );

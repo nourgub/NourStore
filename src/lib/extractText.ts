@@ -42,8 +42,8 @@ export async function extractTextFromUpload(file: File): Promise<ExtractionResul
 
     const result = await mammoth.extractRawText({ buffer });
     return { status: "extracted", text: result.value.slice(0, MAX_STORED_CHARS) };
-  } catch (err) {
-    console.error("extractTextFromUpload failed:", err);
+  } catch {
+    // Never log the raw error — it can embed parsed document content.
     return { status: "failed", text: "" };
   }
 }

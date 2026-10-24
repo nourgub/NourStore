@@ -1,4 +1,5 @@
 import type { AgentStep, CurriculumDocument, GeneratedQuestion, SubjectId } from "../types";
+import { distributeEqualPoints } from "../points";
 import { getSubjectDefinition } from "./subjects";
 import { generateQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
 
@@ -67,34 +68,34 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
   );
 
   // 2) Exam Writer + Solution + Rubric agents (one Claude call covers all three
-  // when configured, since they share the same generation request)
+  // when configured, since they share the same generation request). Points are
+  // split in exact integer hundredths so N questions always sum to exactly
+  // totalPoints (never e.g. 6.7×3 = 20.1 from independent per-question rounding).
   const totalPoints = 20;
-  const pointsPerQuestion = Math.round((totalPoints / input.numQuestions) * 10) / 10;
+  const pointsPerQuestion = distributeEqualPoints(totalPoints, input.numQuestions);
   const specs: QuestionSpec[] = Array.from({ length: input.numQuestions }, (_, i) => ({
     topic: requestedTopics[i % requestedTopics.length],
     difficulty: pickDifficulty(input.difficultyMix, i, input.numQuestions),
-    pointsBudget: pointsPerQuestion,
+    pointsBudget: pointsPerQuestion[i],
   }));
 
   let questions: GeneratedQuestion[];
   let usedRealGeneration = false;
-  let fallbackReason: string | null = null;
 
+  // A configured key means this is a production request — a failed Claude
+  // call is a real failure of this generation, not a reason to quietly swap
+  // in demo content and report success. The mock bank only ever runs when no
+  // key is configured at all (explicit demo mode).
   if (isRealGenerationConfigured()) {
-    try {
-      questions = await generateQuestionsWithClaude({
-        subjectPersona: subject.persona,
-        examTitle: input.examTitle,
-        gradeLevel: input.gradeLevel,
-        styleNotes: styleNote,
-        curriculumText,
-        specs,
-      });
-      usedRealGeneration = true;
-    } catch (err) {
-      fallbackReason = err instanceof Error ? err.message : "خطأ غير معروف في نداء نموذج الذكاء الاصطناعي";
-      questions = specs.map((s) => subject.generateMockQuestion(s.topic, s.difficulty, s.pointsBudget));
-    }
+    questions = await generateQuestionsWithClaude({
+      subjectPersona: subject.persona,
+      examTitle: input.examTitle,
+      gradeLevel: input.gradeLevel,
+      styleNotes: styleNote,
+      curriculumText,
+      specs,
+    });
+    usedRealGeneration = true;
   } else {
     questions = specs.map((s) => subject.generateMockQuestion(s.topic, s.difficulty, s.pointsBudget));
   }
@@ -106,9 +107,7 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
       `تمت صياغة ${questions.length} سؤال(أسئلة) موزعة على المحاور: ${requestedTopics.join("، ")} — ` +
         (usedRealGeneration
           ? "عبر نموذج الذكاء الاصطناعي (Claude)."
-          : fallbackReason
-            ? `تم التراجع إلى بنك الأسئلة التجريبي بسبب: ${fallbackReason}.`
-            : "عبر بنك الأسئلة التجريبي (لم يُفعَّل مفتاح Claude API بعد)."),
+          : "عبر بنك الأسئلة التجريبي (وضع العرض التجريبي — لم يُفعَّل مفتاح Claude API)."),
     ),
   );
 

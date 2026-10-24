@@ -28,7 +28,9 @@ import type {
   UsageFeature,
 } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// Overridable so tests (and operators who want the DB/uploads on a separate
+// disk/volume) don't have to share the default in-repo `data/` directory.
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "nourstore.sqlite3");
 export const GENERATED_DIR = path.join(DATA_DIR, "generated");
 export const RECEIPTS_DIR = path.join(DATA_DIR, "receipts");
@@ -113,8 +115,11 @@ withBusyRetry(() =>
     num_questions INTEGER NOT NULL,
     difficulty_mix TEXT NOT NULL,
     status TEXT NOT NULL,
+    failure_reason TEXT,
     steps_json TEXT NOT NULL,
     questions_json TEXT NOT NULL,
+    rubric_version INTEGER NOT NULL DEFAULT 1,
+    review_json TEXT NOT NULL DEFAULT '{"status":"not_reviewed","reviewedAt":null,"model":null,"failureReason":null,"independentSolutions":[],"issues":[]}',
     files_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
     finished_at TEXT
@@ -164,6 +169,7 @@ withBusyRetry(() =>
     id TEXT PRIMARY KEY,
     teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
     exam_request_id TEXT NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    exam_version INTEGER NOT NULL DEFAULT 1,
     title TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
@@ -177,14 +183,40 @@ withBusyRetry(() =>
     image_paths_json TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     failure_reason TEXT,
+    exam_version INTEGER NOT NULL DEFAULT 1,
+    claude_model TEXT,
+    gemini_review_status TEXT NOT NULL DEFAULT 'not_configured',
+    gemini_model TEXT,
+    gemini_failure_reason TEXT,
     question_results_json TEXT NOT NULL DEFAULT '[]',
+    needs_review INTEGER NOT NULL DEFAULT 0,
     draft_total REAL,
     approved_total REAL,
+    override_history_json TEXT NOT NULL DEFAULT '[]',
+    claude_raw_grade_json TEXT,
+    gemini_raw_grade_json TEXT,
     created_at TEXT NOT NULL,
     graded_at TEXT,
     approved_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_student_papers_session ON student_papers(session_id);
+
+  CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    locked_at TEXT,
+    lease_expires_at TEXT,
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 
   CREATE TABLE IF NOT EXISTS lesson_preps (
     id TEXT PRIMARY KEY,
@@ -245,6 +277,63 @@ if (!paymentRequestColumns.some((c) => c.name === "requested_plan_id")) {
 if (!paymentRequestColumns.some((c) => c.name === "receipt_date")) {
   withBusyRetry(() => db.exec(`ALTER TABLE payment_requests ADD COLUMN receipt_date TEXT NOT NULL DEFAULT ''`));
 }
+
+const requestColumns = db.prepare(`PRAGMA table_info(requests)`).all() as { name: string }[];
+if (!requestColumns.some((c) => c.name === "failure_reason")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE requests ADD COLUMN failure_reason TEXT`));
+}
+if (!requestColumns.some((c) => c.name === "rubric_version")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE requests ADD COLUMN rubric_version INTEGER NOT NULL DEFAULT 1`));
+}
+if (!requestColumns.some((c) => c.name === "review_json")) {
+  withBusyRetry(() =>
+    db.exec(
+      `ALTER TABLE requests ADD COLUMN review_json TEXT NOT NULL DEFAULT '{"status":"not_reviewed","reviewedAt":null,"model":null,"failureReason":null,"independentSolutions":[],"issues":[]}'`,
+    ),
+  );
+}
+
+const gradingSessionColumns = db.prepare(`PRAGMA table_info(grading_sessions)`).all() as { name: string }[];
+if (!gradingSessionColumns.some((c) => c.name === "exam_version")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE grading_sessions ADD COLUMN exam_version INTEGER NOT NULL DEFAULT 1`));
+}
+
+const studentPaperColumns = db.prepare(`PRAGMA table_info(student_papers)`).all() as { name: string }[];
+if (!studentPaperColumns.some((c) => c.name === "exam_version")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN exam_version INTEGER NOT NULL DEFAULT 1`));
+}
+if (!studentPaperColumns.some((c) => c.name === "claude_model")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN claude_model TEXT`));
+}
+if (!studentPaperColumns.some((c) => c.name === "gemini_review_status")) {
+  withBusyRetry(() =>
+    db.exec(`ALTER TABLE student_papers ADD COLUMN gemini_review_status TEXT NOT NULL DEFAULT 'not_configured'`),
+  );
+}
+if (!studentPaperColumns.some((c) => c.name === "gemini_model")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN gemini_model TEXT`));
+}
+if (!studentPaperColumns.some((c) => c.name === "gemini_failure_reason")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN gemini_failure_reason TEXT`));
+}
+if (!studentPaperColumns.some((c) => c.name === "needs_review")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0`));
+}
+if (!studentPaperColumns.some((c) => c.name === "override_history_json")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN override_history_json TEXT NOT NULL DEFAULT '[]'`));
+}
+if (!studentPaperColumns.some((c) => c.name === "claude_raw_grade_json")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN claude_raw_grade_json TEXT`));
+}
+if (!studentPaperColumns.some((c) => c.name === "gemini_raw_grade_json")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN gemini_raw_grade_json TEXT`));
+}
+// Must run after the needs_review column migration above (not in the initial
+// CREATE TABLE block) — on a database that already had student_papers before
+// this column existed, creating this index any earlier would fail outright.
+withBusyRetry(() =>
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_student_papers_needs_review ON student_papers(teacher_id, needs_review)`),
+);
 
 // ---------- Teachers ----------
 
@@ -410,8 +499,11 @@ interface RequestRow {
   num_questions: number;
   difficulty_mix: GenerationRequest["difficultyMix"];
   status: GenerationRequest["status"];
+  failure_reason: string | null;
   steps_json: string;
   questions_json: string;
+  rubric_version: number;
+  review_json: string;
   files_json: string;
   created_at: string;
   finished_at: string | null;
@@ -429,8 +521,11 @@ function rowToRequest(row: RequestRow): GenerationRequest {
     numQuestions: row.num_questions,
     difficultyMix: row.difficulty_mix,
     status: row.status,
+    failureReason: row.failure_reason,
     steps: JSON.parse(row.steps_json),
     questions: JSON.parse(row.questions_json),
+    rubricVersion: row.rubric_version,
+    review: JSON.parse(row.review_json),
     files: JSON.parse(row.files_json),
     createdAt: row.created_at,
     finishedAt: row.finished_at ?? undefined,
@@ -439,17 +534,23 @@ function rowToRequest(row: RequestRow): GenerationRequest {
 
 export function insertRequest(request: GenerationRequest): void {
   db.prepare(
-    `INSERT INTO requests (id, teacher_id, subject_id, document_id, exam_title, grade_level, topics_json, num_questions, difficulty_mix, status, steps_json, questions_json, files_json, created_at, finished_at)
-     VALUES (@id, @teacherId, @subjectId, @documentId, @examTitle, @gradeLevel, @topicsJson, @numQuestions, @difficultyMix, @status, @stepsJson, @questionsJson, @filesJson, @createdAt, @finishedAt)`,
+    `INSERT INTO requests (id, teacher_id, subject_id, document_id, exam_title, grade_level, topics_json, num_questions, difficulty_mix, status, failure_reason, steps_json, questions_json, rubric_version, review_json, files_json, created_at, finished_at)
+     VALUES (@id, @teacherId, @subjectId, @documentId, @examTitle, @gradeLevel, @topicsJson, @numQuestions, @difficultyMix, @status, @failureReason, @stepsJson, @questionsJson, @rubricVersion, @reviewJson, @filesJson, @createdAt, @finishedAt)`,
   ).run({
     ...request,
     documentId: request.documentId ?? null,
+    failureReason: request.failureReason ?? null,
     topicsJson: JSON.stringify(request.topics),
     stepsJson: JSON.stringify(request.steps),
     questionsJson: JSON.stringify(request.questions),
+    reviewJson: JSON.stringify(request.review),
     filesJson: JSON.stringify(request.files),
     finishedAt: request.finishedAt ?? null,
   });
+}
+
+export function updateRequestReview(id: string, review: GenerationRequest["review"]): void {
+  db.prepare(`UPDATE requests SET review_json = ? WHERE id = ?`).run(JSON.stringify(review), id);
 }
 
 export function listRequests(teacherId: string, subjectId: SubjectId): GenerationRequest[] {
@@ -463,6 +564,13 @@ export function findRequest(id: string, teacherId: string): GenerationRequest | 
   const row = db.prepare(`SELECT * FROM requests WHERE id = ? AND teacher_id = ?`).get(id, teacherId) as
     | RequestRow
     | undefined;
+  return row ? rowToRequest(row) : null;
+}
+
+// Internal use only (background review jobs don't carry a teacherId check —
+// the job payload itself was created from an authenticated request).
+export function findRequestById(id: string): GenerationRequest | null {
+  const row = db.prepare(`SELECT * FROM requests WHERE id = ?`).get(id) as RequestRow | undefined;
   return row ? rowToRequest(row) : null;
 }
 
@@ -543,6 +651,7 @@ interface GradingSessionRow {
   id: string;
   teacher_id: string;
   exam_request_id: string;
+  exam_version: number;
   title: string;
   created_at: string;
 }
@@ -552,6 +661,7 @@ function rowToGradingSession(row: GradingSessionRow): GradingSession {
     id: row.id,
     teacherId: row.teacher_id,
     examRequestId: row.exam_request_id,
+    examVersion: row.exam_version,
     title: row.title,
     createdAt: row.created_at,
   };
@@ -559,8 +669,8 @@ function rowToGradingSession(row: GradingSessionRow): GradingSession {
 
 export function insertGradingSession(session: GradingSession): void {
   db.prepare(
-    `INSERT INTO grading_sessions (id, teacher_id, exam_request_id, title, created_at)
-     VALUES (@id, @teacherId, @examRequestId, @title, @createdAt)`,
+    `INSERT INTO grading_sessions (id, teacher_id, exam_request_id, exam_version, title, created_at)
+     VALUES (@id, @teacherId, @examRequestId, @examVersion, @title, @createdAt)`,
   ).run(session);
 }
 
@@ -586,9 +696,16 @@ interface StudentPaperRow {
   image_paths_json: string;
   status: PaperStatus;
   failure_reason: string | null;
+  exam_version: number;
+  claude_model: string | null;
+  gemini_review_status: StudentPaper["geminiReviewStatus"];
+  gemini_model: string | null;
+  gemini_failure_reason: string | null;
   question_results_json: string;
+  needs_review: number;
   draft_total: number | null;
   approved_total: number | null;
+  override_history_json: string;
   created_at: string;
   graded_at: string | null;
   approved_at: string | null;
@@ -603,9 +720,16 @@ function rowToStudentPaper(row: StudentPaperRow): StudentPaper {
     imagePaths: JSON.parse(row.image_paths_json),
     status: row.status,
     failureReason: row.failure_reason,
+    examVersion: row.exam_version,
+    claudeModel: row.claude_model,
+    geminiReviewStatus: row.gemini_review_status,
+    geminiModel: row.gemini_model,
+    geminiFailureReason: row.gemini_failure_reason,
     questionResults: JSON.parse(row.question_results_json) as QuestionGradeResult[],
+    needsReview: Boolean(row.needs_review),
     draftTotal: row.draft_total,
     approvedTotal: row.approved_total,
+    overrideHistory: JSON.parse(row.override_history_json),
     createdAt: row.created_at,
     gradedAt: row.graded_at,
     approvedAt: row.approved_at,
@@ -614,12 +738,14 @@ function rowToStudentPaper(row: StudentPaperRow): StudentPaper {
 
 export function insertStudentPaper(paper: StudentPaper): void {
   db.prepare(
-    `INSERT INTO student_papers (id, session_id, teacher_id, student_name, image_paths_json, status, failure_reason, question_results_json, draft_total, approved_total, created_at, graded_at, approved_at)
-     VALUES (@id, @sessionId, @teacherId, @studentName, @imagePathsJson, @status, @failureReason, @questionResultsJson, @draftTotal, @approvedTotal, @createdAt, @gradedAt, @approvedAt)`,
+    `INSERT INTO student_papers (id, session_id, teacher_id, student_name, image_paths_json, status, failure_reason, exam_version, claude_model, gemini_review_status, gemini_model, gemini_failure_reason, question_results_json, needs_review, draft_total, approved_total, override_history_json, created_at, graded_at, approved_at)
+     VALUES (@id, @sessionId, @teacherId, @studentName, @imagePathsJson, @status, @failureReason, @examVersion, @claudeModel, @geminiReviewStatus, @geminiModel, @geminiFailureReason, @questionResultsJson, @needsReview, @draftTotal, @approvedTotal, @overrideHistoryJson, @createdAt, @gradedAt, @approvedAt)`,
   ).run({
     ...paper,
     imagePathsJson: JSON.stringify(paper.imagePaths),
     questionResultsJson: JSON.stringify(paper.questionResults),
+    needsReview: paper.needsReview ? 1 : 0,
+    overrideHistoryJson: JSON.stringify(paper.overrideHistory),
   });
 }
 
@@ -637,28 +763,83 @@ export function findStudentPaper(id: string, teacherId: string): StudentPaper | 
   return row ? rowToStudentPaper(row) : null;
 }
 
-export function updateStudentPaperGraded(
-  id: string,
-  result: { status: PaperStatus; questionResults: QuestionGradeResult[]; draftTotal: number | null; failureReason: string | null },
-): void {
-  db.prepare(
-    `UPDATE student_papers
-     SET status = ?, question_results_json = ?, draft_total = ?, failure_reason = ?, graded_at = ?
-     WHERE id = ?`,
-  ).run(
-    result.status,
-    JSON.stringify(result.questionResults),
-    result.draftTotal,
-    result.failureReason,
-    new Date().toISOString(),
-    id,
-  );
+// Internal use only (background jobs carry no teacherId check of their own —
+// the job payload itself was created from an authenticated request).
+export function findStudentPaperById(id: string): StudentPaper | null {
+  const row = db.prepare(`SELECT * FROM student_papers WHERE id = ?`).get(id) as StudentPaperRow | undefined;
+  return row ? rowToStudentPaper(row) : null;
 }
 
-export function approveStudentPaper(id: string, approvedTotal: number, questionResults: QuestionGradeResult[]): void {
+type StudentPaperFieldUpdate = Partial<{
+  status: PaperStatus;
+  failureReason: string | null;
+  claudeModel: string | null;
+  geminiReviewStatus: StudentPaper["geminiReviewStatus"];
+  geminiModel: string | null;
+  geminiFailureReason: string | null;
+  questionResults: QuestionGradeResult[];
+  needsReview: boolean;
+  draftTotal: number | null;
+  gradedAt: string | null;
+}>;
+
+const FIELD_TO_COLUMN: Record<keyof StudentPaperFieldUpdate, string> = {
+  status: "status",
+  failureReason: "failure_reason",
+  claudeModel: "claude_model",
+  geminiReviewStatus: "gemini_review_status",
+  geminiModel: "gemini_model",
+  geminiFailureReason: "gemini_failure_reason",
+  questionResults: "question_results_json",
+  needsReview: "needs_review",
+  draftTotal: "draft_total",
+  gradedAt: "graded_at",
+};
+
+// A paper is written to by two independent background jobs (Claude grading,
+// Gemini review) that may finish in either order. Both read-modify-write the
+// full row synchronously (better-sqlite3 has no async gap between read and
+// write), so this partial update never clobbers a field the caller didn't
+// touch.
+export function updateStudentPaperFields(id: string, fields: StudentPaperFieldUpdate): void {
+  const keys = Object.keys(fields) as (keyof StudentPaperFieldUpdate)[];
+  if (keys.length === 0) return;
+  const setClause = keys.map((k) => `${FIELD_TO_COLUMN[k]} = ?`).join(", ");
+  const values = keys.map((k) => {
+    const v = fields[k];
+    if (k === "questionResults") return JSON.stringify(v);
+    if (k === "needsReview") return v ? 1 : 0;
+    return v as string | number | null;
+  });
+  db.prepare(`UPDATE student_papers SET ${setClause} WHERE id = ?`).run(...values, id);
+}
+
+// Internal merge state (not part of the teacher-facing StudentPaper type):
+// each independent grader's raw, unmerged output, kept so the two background
+// jobs can re-run the pure-code manager correctly however they interleave,
+// without reconstructing lossy approximations from the already-merged view.
+export function getStudentPaperRawGrade(id: string, source: "claude" | "gemini"): unknown | null {
+  const column = source === "claude" ? "claude_raw_grade_json" : "gemini_raw_grade_json";
+  const row = db.prepare(`SELECT ${column} AS raw FROM student_papers WHERE id = ?`).get(id) as
+    | { raw: string | null }
+    | undefined;
+  return row?.raw ? JSON.parse(row.raw) : null;
+}
+
+export function updateStudentPaperRawGrade(id: string, source: "claude" | "gemini", grade: unknown): void {
+  const column = source === "claude" ? "claude_raw_grade_json" : "gemini_raw_grade_json";
+  db.prepare(`UPDATE student_papers SET ${column} = ? WHERE id = ?`).run(JSON.stringify(grade), id);
+}
+
+export function approveStudentPaper(
+  id: string,
+  approvedTotal: number,
+  questionResults: QuestionGradeResult[],
+  overrideHistory: StudentPaper["overrideHistory"],
+): void {
   db.prepare(
-    `UPDATE student_papers SET status = 'approved', approved_total = ?, question_results_json = ?, approved_at = ? WHERE id = ?`,
-  ).run(approvedTotal, JSON.stringify(questionResults), new Date().toISOString(), id);
+    `UPDATE student_papers SET status = 'approved', approved_total = ?, question_results_json = ?, override_history_json = ?, approved_at = ? WHERE id = ?`,
+  ).run(approvedTotal, JSON.stringify(questionResults), JSON.stringify(overrideHistory), new Date().toISOString(), id);
 }
 
 // Papers approved long enough ago that their source images (sensitive,
@@ -675,6 +856,160 @@ export function listApprovedPapersForImageCleanup(cutoffIso: string): StudentPap
 
 export function clearStudentPaperImagePaths(id: string): void {
   db.prepare(`UPDATE student_papers SET image_paths_json = '[]' WHERE id = ?`).run(id);
+}
+
+export function countPapersNeedingReviewForTeacher(teacherId: string): number {
+  const row = db
+    .prepare(`SELECT COUNT(*) AS n FROM student_papers WHERE teacher_id = ? AND needs_review = 1`)
+    .get(teacherId) as { n: number };
+  return row.n;
+}
+
+// ---------- Background jobs ----------
+//
+// A minimal DB-backed queue for the two independent, parallelizable grading
+// calls (Claude grade, Gemini review). No Redis/external broker — state lives
+// entirely in this table, so a server restart loses nothing: any job still
+// "running" past its lease simply becomes claimable again.
+
+export type JobType = "grade_paper_claude" | "review_paper_gemini" | "review_exam_gemini";
+export type JobStatus = "queued" | "running" | "done" | "failed";
+
+export interface Job {
+  id: string;
+  type: JobType;
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+  status: JobStatus;
+  attempts: number;
+  maxAttempts: number;
+  lockedAt: string | null;
+  leaseExpiresAt: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface JobRow {
+  id: string;
+  type: JobType;
+  idempotency_key: string;
+  payload_json: string;
+  status: JobStatus;
+  attempts: number;
+  max_attempts: number;
+  locked_at: string | null;
+  lease_expires_at: string | null;
+  result_json: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToJob(row: JobRow): Job {
+  return {
+    id: row.id,
+    type: row.type,
+    idempotencyKey: row.idempotency_key,
+    payload: JSON.parse(row.payload_json),
+    status: row.status,
+    attempts: row.attempts,
+    maxAttempts: row.max_attempts,
+    lockedAt: row.locked_at,
+    leaseExpiresAt: row.lease_expires_at,
+    result: row.result_json ? JSON.parse(row.result_json) : null,
+    error: row.error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// Inserting with an idempotency key that already exists is a silent no-op
+// (INSERT OR IGNORE) — the caller can always re-enqueue defensively without
+// ever creating a duplicate job for the same paper/question.
+export function enqueueJob(job: {
+  id: string;
+  type: JobType;
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+  maxAttempts?: number;
+}): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT OR IGNORE INTO jobs (id, type, idempotency_key, payload_json, status, attempts, max_attempts, created_at, updated_at)
+     VALUES (@id, @type, @idempotencyKey, @payloadJson, 'queued', 0, @maxAttempts, @now, @now)`,
+  ).run({
+    id: job.id,
+    type: job.type,
+    idempotencyKey: job.idempotencyKey,
+    payloadJson: JSON.stringify(job.payload),
+    maxAttempts: job.maxAttempts ?? 3,
+    now,
+  });
+}
+
+// Atomically claims up to `limit` jobs that are queued, or were left
+// "running" past their lease (a crashed/restarted worker) — this is what
+// makes the queue resumable after a server restart with no extra bookkeeping.
+export function claimJobs(limit: number, leaseMs: number): Job[] {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const leaseExpiresAt = new Date(now.getTime() + leaseMs).toISOString();
+
+  const candidates = db
+    .prepare(
+      `SELECT * FROM jobs
+       WHERE (status = 'queued' OR (status = 'running' AND lease_expires_at < ?))
+         AND attempts < max_attempts
+       ORDER BY created_at ASC
+       LIMIT ?`,
+    )
+    .all(nowIso, limit) as JobRow[];
+
+  const claimed: Job[] = [];
+  for (const row of candidates) {
+    const result = db
+      .prepare(
+        `UPDATE jobs SET status = 'running', attempts = attempts + 1, locked_at = ?, lease_expires_at = ?, updated_at = ?
+         WHERE id = ? AND status = ?`,
+      )
+      .run(nowIso, leaseExpiresAt, nowIso, row.id, row.status);
+    if (result.changes > 0) {
+      claimed.push(rowToJob({ ...row, status: "running", attempts: row.attempts + 1 }));
+    }
+  }
+  return claimed;
+}
+
+export function completeJob(id: string, result: Record<string, unknown>): void {
+  db.prepare(`UPDATE jobs SET status = 'done', result_json = ?, error = NULL, updated_at = ? WHERE id = ?`).run(
+    JSON.stringify(result),
+    new Date().toISOString(),
+    id,
+  );
+}
+
+// A job whose attempts are exhausted is marked permanently 'failed'; one that
+// still has attempts left goes back to 'queued' for the next poll — this is
+// the queue's limited-retry behavior, never retried unboundedly.
+export function failOrRequeueJob(id: string, error: string): void {
+  const row = db.prepare(`SELECT attempts, max_attempts FROM jobs WHERE id = ?`).get(id) as
+    | { attempts: number; max_attempts: number }
+    | undefined;
+  if (!row) return;
+  const status: JobStatus = row.attempts >= row.max_attempts ? "failed" : "queued";
+  db.prepare(`UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?`).run(
+    status,
+    error,
+    new Date().toISOString(),
+    id,
+  );
+}
+
+export function findJobByIdempotencyKey(key: string): Job | null {
+  const row = db.prepare(`SELECT * FROM jobs WHERE idempotency_key = ?`).get(key) as JobRow | undefined;
+  return row ? rowToJob(row) : null;
 }
 
 // ---------- Lesson prep ----------

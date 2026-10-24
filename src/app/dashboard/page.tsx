@@ -5,6 +5,7 @@ import { getCurrentTeacher } from "@/lib/session";
 import { getUsageSummary, hasFreeTrialAvailable } from "@/lib/usage";
 import { PLANS } from "@/lib/plans";
 import { SiteHeader } from "@/components/SiteHeader";
+import { TeacherAssistantWidget } from "@/components/TeacherAssistantWidget";
 
 const SUBJECTS = [
   {
@@ -126,6 +127,7 @@ export default async function DashboardPage() {
           })}
         </div>
       </main>
+      <TeacherAssistantWidget />
     </>
   );
 }
