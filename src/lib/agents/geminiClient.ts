@@ -1,11 +1,16 @@
 import { GoogleGenAI, ApiError } from "@google/genai";
 
-// Verified against the installed @google/genai SDK's own type definitions
-// (v2.31.0) rather than assumed from memory — "gemini-flash-latest" and
-// "gemini-pro-latest" are official rolling aliases Google maintains, used in
-// the SDK's own code examples. Flash is the default here because this is an
-// auxiliary independent-review role, not primary content generation; set
-// GEMINI_MODEL=gemini-pro-latest on the server for stronger (pricier) review.
+// "gemini-flash-latest" is Google's official rolling alias for its current
+// Flash-tier model — re-confirmed live against ai.google.dev/gemini-api/docs/models
+// on 2026-10-24 (still that page's own example of the "latest" naming
+// pattern), after first being verified against the installed @google/genai
+// SDK's type definitions (v2.31.0). It auto-tracks whichever model Google
+// currently serves as "Flash", so it needs no code change as the lineup
+// moves forward. Flash is the default here because this is an auxiliary
+// independent-review role, not primary content generation. To pin an exact
+// model instead of following the rolling alias, set GEMINI_MODEL on the
+// server (e.g. a specific, currently-available Pro-tier id) — check the
+// docs link above first, since Google's lineup changes frequently.
 const DEFAULT_MODEL = "gemini-flash-latest";
 
 export function isGeminiConfigured(): boolean {

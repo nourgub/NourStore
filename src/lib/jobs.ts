@@ -108,3 +108,9 @@ export function startJobWorker(): void {
   // Node keeps the process alive while this timer is active, which is
   // exactly what a long-running `next start` server needs.
 }
+
+// Exposes one claim-and-run cycle for deterministic concurrency tests
+// (tests/jobs-concurrency.test.ts) — exercises the exact same claimJobs +
+// Promise.all(...runJob) path startJobWorker's interval drives, without
+// depending on real wall-clock polling.
+export { tick as runOneWorkerTick };
