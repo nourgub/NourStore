@@ -313,3 +313,49 @@ test("updateExamQuestions rejects editing an exam that hasn't finished generatin
     GenerationError,
   );
 });
+
+test("updateExamQuestions preserves a non-20 total (e.g. an imported exam) rather than forcing 20", async () => {
+  const teacherId = "t_edit_imported_total";
+  insertTeacher(makeTeacher(teacherId));
+  const exam = {
+    ...makeExam("exam_imported_total", teacherId),
+    questions: [
+      {
+        id: "q1",
+        topic: "امتحان مستورد",
+        difficulty: "متوسط" as const,
+        points: 15,
+        prompt: "سؤال أول من امتحان مستورد",
+        solution: "حل أول",
+        rubric: [{ id: "q1_c1", criterion: "معيار وحيد", points: 15 }],
+      },
+      {
+        id: "q2",
+        topic: "امتحان مستورد",
+        difficulty: "سهل" as const,
+        points: 25,
+        prompt: "سؤال ثانٍ من امتحان مستورد",
+        solution: "حل ثانٍ",
+        rubric: [{ id: "q2_c1", criterion: "معيار وحيد", points: 25 }],
+      },
+    ],
+  };
+  insertRequest(exam);
+
+  // Total is 40 (not 20) — editing while keeping that same total must succeed.
+  const result = await updateExamQuestions(teacherId, exam.id, [
+    { id: "q1", topic: "امتحان مستورد", difficulty: "صعب", prompt: "سؤال أول معدَّل", solution: "حل أول", points: 15, rubric: [{ id: "q1_c1", criterion: "معيار وحيد", points: 15 }] },
+    { id: "q2", topic: "امتحان مستورد", difficulty: "سهل", prompt: "سؤال ثانٍ من امتحان مستورد", solution: "حل ثانٍ", points: 25, rubric: [{ id: "q2_c1", criterion: "معيار وحيد", points: 25 }] },
+  ]);
+  assert.equal(result.questions.reduce((s, q) => s + q.points, 0), 40);
+
+  // But changing that 40 to anything else (including the "normal" 20) is still rejected.
+  await assert.rejects(
+    () =>
+      updateExamQuestions(teacherId, exam.id, [
+        { id: "q1", topic: "امتحان مستورد", difficulty: "صعب", prompt: "x", solution: "y", points: 10, rubric: [{ id: "q1_c1", criterion: "c", points: 10 }] },
+        { id: "q2", topic: "امتحان مستورد", difficulty: "سهل", prompt: "x", solution: "y", points: 10, rubric: [{ id: "q2_c1", criterion: "c", points: 10 }] },
+      ]),
+    GenerationError,
+  );
+});

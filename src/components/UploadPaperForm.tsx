@@ -58,7 +58,7 @@ export function UploadPaperForm({ sessionId }: { sessionId: string }) {
           <span className="font-semibold text-brand-800">
             {files.length > 0 ? `${files.length} صورة مختارة` : "اضغط هنا لاختيار صور الورقة"}
           </span>
-          <span className="text-xs text-brand-500">JPG أو PNG — حتى 4 صفحات</span>
+          <span className="text-xs text-brand-500">JPG أو PNG — حتى 10 صفحات</span>
           <input
             type="file"
             accept="image/jpeg,image/png"

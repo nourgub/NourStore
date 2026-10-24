@@ -3,6 +3,7 @@ import { distributeEqualPoints } from "../points";
 import { getSubjectDefinition } from "./subjects";
 import { generateQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
 import { solveGivenExercises, isGivenExerciseGenerationConfigured, GivenExerciseError } from "./givenExerciseAgent";
+import { importExamFromDocuments, isExamImportConfigured, ExamImportError } from "./examImportAgent";
 
 export interface PipelineInput {
   examTitle: string;
@@ -210,6 +211,71 @@ export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInp
       "التحقق من مطابقة النقاط",
       `تم التحقق من أن مجموع نقاط التمارين يساوي ${totalPoints} بالضبط.`,
     ),
+  );
+
+  return { steps, questions };
+}
+
+export interface ExamImportPipelineInput {
+  subjectId: SubjectId;
+  examTitle: string;
+  gradeLevel: string;
+  topic: string;
+  examText: string;
+  correctionText: string;
+}
+
+export { isExamImportConfigured, ExamImportError };
+
+/**
+ * The third exam-source path: lets a teacher use grading entirely without
+ * ever generating an exam through this platform — they upload an exam
+ * document and its model-correction document, and this extracts both into
+ * the same GeneratedQuestion[] shape the other two paths produce, so every
+ * downstream feature (grading sessions, dual-model paper grading, approval,
+ * docx export, editing) works unchanged. Like runGivenExercisesPipeline,
+ * there is no mock/demo fallback — understanding two arbitrary uploaded
+ * documents well enough to extract and solve their content needs a real
+ * model call, not a template.
+ */
+export async function runExamImportPipeline(input: ExamImportPipelineInput): Promise<PipelineOutput> {
+  const subject = getSubjectDefinition(input.subjectId);
+  const steps: AgentStep[] = [];
+
+  steps.push(
+    step(
+      "محلّل المنهج",
+      "قراءة ملفي الامتحان والتصحيح المرفوعين",
+      `تم استخراج نص ${input.examText.length.toLocaleString("ar")} حرفًا من ملف الامتحان، و${input.correctionText.length.toLocaleString("ar")} حرفًا من ملف التصحيح النموذجي.`,
+    ),
+  );
+
+  if (!isExamImportConfigured()) {
+    throw new ExamImportError(
+      "هذا الوضع (استيراد امتحان جاهز للتصحيح) يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لفهم واستخراج أسئلة من ملفات حقيقية.",
+    );
+  }
+
+  const questions = await importExamFromDocuments({
+    subjectPersona: subject.persona,
+    examTitle: input.examTitle,
+    gradeLevel: input.gradeLevel,
+    topic: input.topic,
+    examText: input.examText,
+    correctionText: input.correctionText,
+  });
+
+  const totalPoints = questions.reduce((s, q) => s + q.points, 0);
+  steps.push(
+    step(
+      "واضع الأسئلة",
+      "استخراج الأسئلة وبناء شبكة التنقيط",
+      `تم استخراج ${questions.length} سؤال(أسئلة) من ملف الامتحان ومطابقتها مع ملف التصحيح — مجموع النقاط: ${totalPoints}.`,
+    ),
+  );
+
+  steps.push(
+    step("المراجع", "التحقق النهائي", `الامتحان جاهز الآن ليُستعمل مباشرة في تصحيح أوراق التلاميذ.`),
   );
 
   return { steps, questions };

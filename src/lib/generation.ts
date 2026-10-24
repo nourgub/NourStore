@@ -9,7 +9,7 @@ import {
   updateRequestQuestions,
   updateRequestReview,
 } from "./db";
-import { runAgentPipeline, runGivenExercisesPipeline } from "./agents/pipeline";
+import { runAgentPipeline, runGivenExercisesPipeline, runExamImportPipeline } from "./agents/pipeline";
 import { buildExamDocx } from "./docx/buildExamDocx";
 import { buildSolutionDocx } from "./docx/buildSolutionDocx";
 import { buildRubricDocx } from "./docx/buildRubricDocx";
@@ -37,6 +37,11 @@ export interface CreateGenerationInput {
   // AI-generated content on the given topics — see runGivenExercisesPipeline.
   // topics/numQuestions/difficultyMix/documentId are ignored in this mode.
   pageExercises?: { pageNumber: number; promptText: string }[];
+  // When present, this exam is imported wholesale from a teacher's own exam
+  // + model-correction documents — lets grading be used standalone, without
+  // ever generating an exam through this platform. See runExamImportPipeline.
+  // topics/numQuestions/difficultyMix/documentId are ignored in this mode.
+  importedExam?: { examText: string; correctionText: string };
 }
 
 export class GenerationError extends Error {}
@@ -45,7 +50,10 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
   if (!input.examTitle.trim()) throw new GenerationError("عنوان الامتحان مطلوب");
 
   const usingPageExercises = Boolean(input.pageExercises && input.pageExercises.length > 0);
-  if (!usingPageExercises && (input.numQuestions < 1 || input.numQuestions > 20)) {
+  const usingImportedExam = Boolean(
+    input.importedExam && input.importedExam.examText.trim() && input.importedExam.correctionText.trim(),
+  );
+  if (!usingPageExercises && !usingImportedExam && (input.numQuestions < 1 || input.numQuestions > 20)) {
     throw new GenerationError("عدد الأسئلة يجب أن يكون بين 1 و20");
   }
   if (usingPageExercises && input.pageExercises!.length > 20) {
@@ -61,13 +69,19 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   // Normalized metadata stored on the request record either way — in the
-  // page-exercises mode, numQuestions/topics/difficultyMix come from the
-  // exercises themselves rather than whatever the client happened to send.
-  const effectiveNumQuestions = usingPageExercises ? input.pageExercises!.length : input.numQuestions;
+  // page-exercises/imported-exam modes, numQuestions/topics/difficultyMix
+  // are derived rather than whatever the client happened to send.
+  const effectiveNumQuestions = usingPageExercises
+    ? input.pageExercises!.length
+    : usingImportedExam
+      ? 0 // unknown until after extraction; corrected below once questions exist
+      : input.numQuestions;
   const effectiveTopics = usingPageExercises
     ? [input.topics[0]?.trim() || "تمارين من الوثيقة المرفوعة"]
-    : input.topics;
-  const effectiveDifficultyMix = usingPageExercises ? "متوازن" : input.difficultyMix;
+    : usingImportedExam
+      ? [input.topics[0]?.trim() || "امتحان مستورد (تصحيح مباشر)"]
+      : input.topics;
+  const effectiveDifficultyMix = usingPageExercises || usingImportedExam ? "متوازن" : input.difficultyMix;
 
   let steps, questions;
   try {
@@ -78,6 +92,15 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
         gradeLevel: input.gradeLevel,
         topic: input.topics[0]?.trim() || "تمارين من الوثيقة المرفوعة",
         exercises: input.pageExercises!,
+      }));
+    } else if (usingImportedExam) {
+      ({ steps, questions } = await runExamImportPipeline({
+        subjectId: input.subjectId,
+        examTitle: input.examTitle,
+        gradeLevel: input.gradeLevel,
+        topic: input.topics[0]?.trim() || "امتحان مستورد (تصحيح مباشر)",
+        examText: input.importedExam!.examText,
+        correctionText: input.importedExam!.correctionText,
       }));
     } else {
       ({ steps, questions } = await runAgentPipeline(input.subjectId, {
@@ -125,7 +148,7 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
     topics: effectiveTopics,
-    numQuestions: effectiveNumQuestions,
+    numQuestions: usingImportedExam ? questions.length : effectiveNumQuestions,
     difficultyMix: effectiveDifficultyMix,
     status: "done",
     failureReason: null,
@@ -246,7 +269,6 @@ export interface EditedQuestionInput {
 }
 
 const VALID_DIFFICULTIES: GeneratedQuestion["difficulty"][] = ["سهل", "متوسط", "صعب"];
-const EXAM_TOTAL_POINTS_UNITS = toHundredths(20);
 
 // Validates a teacher's edit against the exam's *current* questions (for id
 // matching only — the returned list fully replaces them) and normalizes it
@@ -315,10 +337,15 @@ function validateAndNormalizeEditedQuestions(
     };
   });
 
+  // The expected total is the exam's own original total (not a hardcoded
+  // 20) — this generalizes correctly to an imported exam whose source
+  // document may total any number of points, while still catching an edit
+  // that silently changes the exam's overall weight.
+  const originalTotalUnits = original.reduce((sum, q) => sum + toHundredths(q.points), 0);
   const totalUnits = normalized.reduce((sum, q) => sum + toHundredths(q.points), 0);
-  if (totalUnits !== EXAM_TOTAL_POINTS_UNITS) {
+  if (totalUnits !== originalTotalUnits) {
     throw new GenerationError(
-      `مجموع نقاط الامتحان يجب أن يبقى 20 بالضبط (المجموع الحالي: ${normalized.reduce((s, q) => s + q.points, 0)})`,
+      `مجموع نقاط الامتحان يجب أن يبقى ${original.reduce((s, q) => s + q.points, 0)} بالضبط كما كان (المجموع الحالي: ${normalized.reduce((s, q) => s + q.points, 0)})`,
     );
   }
 

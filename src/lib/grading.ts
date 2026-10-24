@@ -29,7 +29,11 @@ export class GradingError extends Error {}
 
 const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png"]);
 export const MAX_PAPER_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per page (pre-compression upload limit)
-const MAX_PAGES_PER_PAPER = 4;
+// Raised from 4 to 10 at the teacher's explicit request (student papers can
+// run 4-10 pages) — each extra page is a real per-paper cost increase (more
+// vision tokens sent to both Claude and Gemini), a deliberate tradeoff
+// accepted here over the earlier cost-control cap.
+const MAX_PAGES_PER_PAPER = 10;
 
 // Claude's vision pipeline resizes images to fit within ~1568px on the long
 // edge before reading them — anything bigger costs more tokens (and more
