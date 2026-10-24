@@ -2,6 +2,7 @@ import type { AgentStep, CurriculumDocument, GeneratedQuestion, SubjectId } from
 import { distributeEqualPoints } from "../points";
 import { getSubjectDefinition } from "./subjects";
 import { generateQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
+import { solveGivenExercises, isGivenExerciseGenerationConfigured, GivenExerciseError } from "./givenExerciseAgent";
 
 export interface PipelineInput {
   examTitle: string;
@@ -136,6 +137,78 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
       "التحقق من مطابقة المنهج والمستوى",
       `تم التحقق من أن جميع الأسئلة ضمن محاور "${input.gradeLevel}" المطلوبة، ولا تتجاوز المحاور المرفوعة.` +
         (styleNote ? ` روعي أسلوب الأستاذ في الصياغة حسب الملاحظة: "${styleNote}".` : ""),
+    ),
+  );
+
+  return { steps, questions };
+}
+
+export interface GivenExercisesPipelineInput {
+  subjectId: SubjectId;
+  examTitle: string;
+  gradeLevel: string;
+  topic: string;
+  // In page order as the teacher specified them — "exercise 1" is
+  // exercises[0], regardless of the page numbers' own order.
+  exercises: { pageNumber: number; promptText: string }[];
+}
+
+export { isGivenExerciseGenerationConfigured, GivenExerciseError };
+
+/**
+ * The second exam-generation path: every question's prompt is copied
+ * verbatim from a specific page of a Word file the teacher uploaded — never
+ * generated or rephrased — and Claude is only asked to solve it and build a
+ * grading rubric. There is no mock/demo fallback for this path: a mock bank
+ * can only template *new* questions on a topic, it cannot solve arbitrary
+ * teacher-supplied text, so this mode requires ANTHROPIC_API_KEY and fails
+ * clearly (never silently) when it isn't configured.
+ */
+export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInput): Promise<PipelineOutput> {
+  const subject = getSubjectDefinition(input.subjectId);
+  const steps: AgentStep[] = [];
+
+  steps.push(
+    step(
+      "محلّل المنهج",
+      "استخراج التمارين من الملف المرفوع",
+      `تم استخراج ${input.exercises.length} تمرين(تمارين) حرفيًا من الصفحات: ${input.exercises.map((e) => e.pageNumber).join("، ")} في ملف Word الذي رفعه الأستاذ.`,
+    ),
+  );
+
+  if (!isGivenExerciseGenerationConfigured()) {
+    throw new GivenExerciseError(
+      "هذا الوضع (تمارين محددة من ملف Word) يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لحل تمارين حقيقية معطاة.",
+    );
+  }
+
+  const totalPoints = 20;
+  const pointsPerExercise = distributeEqualPoints(totalPoints, input.exercises.length);
+  const questions = await solveGivenExercises({
+    subjectPersona: subject.persona,
+    examTitle: input.examTitle,
+    gradeLevel: input.gradeLevel,
+    topic: input.topic,
+    exercises: input.exercises.map((ex, i) => ({
+      pageNumber: ex.pageNumber,
+      promptText: ex.promptText,
+      pointsBudget: pointsPerExercise[i],
+    })),
+  });
+
+  steps.push(
+    step(
+      "معدّ الحلول النموذجية",
+      "حل التمارين المعطاة وبناء شبكة التنقيط",
+      `تم حل ${questions.length} تمرين(تمارين) كما وردت حرفيًا من الملف، مع بناء حل مفصّل وشبكة تصحيح لكل منها عبر Claude.`,
+    ),
+  );
+
+  steps.push(
+    step(
+      "المراجع",
+      "التحقق من مطابقة النقاط",
+      `تم التحقق من أن مجموع نقاط التمارين يساوي ${totalPoints} بالضبط.`,
     ),
   );
 

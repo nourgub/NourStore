@@ -9,7 +9,7 @@ import {
   updateRequestQuestions,
   updateRequestReview,
 } from "./db";
-import { runAgentPipeline } from "./agents/pipeline";
+import { runAgentPipeline, runGivenExercisesPipeline } from "./agents/pipeline";
 import { buildExamDocx } from "./docx/buildExamDocx";
 import { buildSolutionDocx } from "./docx/buildSolutionDocx";
 import { buildRubricDocx } from "./docx/buildRubricDocx";
@@ -32,14 +32,24 @@ export interface CreateGenerationInput {
   topics: string[];
   numQuestions: number;
   difficultyMix: "متوازن" | "سهل" | "صعب";
+  // When present, this exam is built from exercises the teacher copied
+  // verbatim from specific pages of an uploaded Word file, instead of
+  // AI-generated content on the given topics — see runGivenExercisesPipeline.
+  // topics/numQuestions/difficultyMix/documentId are ignored in this mode.
+  pageExercises?: { pageNumber: number; promptText: string }[];
 }
 
 export class GenerationError extends Error {}
 
 export async function createGeneration(input: CreateGenerationInput): Promise<GenerationRequest> {
   if (!input.examTitle.trim()) throw new GenerationError("عنوان الامتحان مطلوب");
-  if (input.numQuestions < 1 || input.numQuestions > 20) {
+
+  const usingPageExercises = Boolean(input.pageExercises && input.pageExercises.length > 0);
+  if (!usingPageExercises && (input.numQuestions < 1 || input.numQuestions > 20)) {
     throw new GenerationError("عدد الأسئلة يجب أن يكون بين 1 و20");
+  }
+  if (usingPageExercises && input.pageExercises!.length > 20) {
+    throw new GenerationError("عدد التمارين يجب ألا يتجاوز 20");
   }
 
   let document = null;
@@ -50,16 +60,35 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
 
   const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  // Normalized metadata stored on the request record either way — in the
+  // page-exercises mode, numQuestions/topics/difficultyMix come from the
+  // exercises themselves rather than whatever the client happened to send.
+  const effectiveNumQuestions = usingPageExercises ? input.pageExercises!.length : input.numQuestions;
+  const effectiveTopics = usingPageExercises
+    ? [input.topics[0]?.trim() || "تمارين من الوثيقة المرفوعة"]
+    : input.topics;
+  const effectiveDifficultyMix = usingPageExercises ? "متوازن" : input.difficultyMix;
+
   let steps, questions;
   try {
-    ({ steps, questions } = await runAgentPipeline(input.subjectId, {
-      examTitle: input.examTitle,
-      gradeLevel: input.gradeLevel,
-      topics: input.topics,
-      numQuestions: input.numQuestions,
-      difficultyMix: input.difficultyMix,
-      document,
-    }));
+    if (usingPageExercises) {
+      ({ steps, questions } = await runGivenExercisesPipeline({
+        subjectId: input.subjectId,
+        examTitle: input.examTitle,
+        gradeLevel: input.gradeLevel,
+        topic: input.topics[0]?.trim() || "تمارين من الوثيقة المرفوعة",
+        exercises: input.pageExercises!,
+      }));
+    } else {
+      ({ steps, questions } = await runAgentPipeline(input.subjectId, {
+        examTitle: input.examTitle,
+        gradeLevel: input.gradeLevel,
+        topics: input.topics,
+        numQuestions: input.numQuestions,
+        difficultyMix: input.difficultyMix,
+        document,
+      }));
+    }
   } catch (err) {
     // A real generation failure (Claude configured but the call failed) is
     // persisted as a failed request with the real reason — never silently
@@ -71,9 +100,9 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
       documentId: input.documentId,
       examTitle: input.examTitle,
       gradeLevel: input.gradeLevel,
-      topics: input.topics,
-      numQuestions: input.numQuestions,
-      difficultyMix: input.difficultyMix,
+      topics: effectiveTopics,
+      numQuestions: effectiveNumQuestions,
+      difficultyMix: effectiveDifficultyMix,
       status: "failed",
       failureReason: err instanceof Error ? err.message : "خطأ غير معروف أثناء توليد الامتحان",
       steps: [],
@@ -95,9 +124,9 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     documentId: input.documentId,
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
-    topics: input.topics,
-    numQuestions: input.numQuestions,
-    difficultyMix: input.difficultyMix,
+    topics: effectiveTopics,
+    numQuestions: effectiveNumQuestions,
+    difficultyMix: effectiveDifficultyMix,
     status: "done",
     failureReason: null,
     steps,

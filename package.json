@@ -13,8 +13,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@google/genai": "^2.31.0",
+    "@xmldom/xmldom": "^0.9.12",
     "better-sqlite3": "^13.0.3",
     "docx": "^9.7.1",
+    "jszip": "^3.10.2",
     "lucide-react": "^1.42.0",
     "mammoth": "^1.12.2",
     "next": "^16.4.1",

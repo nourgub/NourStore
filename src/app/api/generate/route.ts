@@ -18,6 +18,19 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
 
+  const pageExercises = Array.isArray(body.pageExercises)
+    ? body.pageExercises
+        .filter(
+          (e: unknown): e is { pageNumber: unknown; promptText: unknown } =>
+            typeof e === "object" && e !== null,
+        )
+        .map((e: { pageNumber: unknown; promptText: unknown }) => ({
+          pageNumber: Number(e.pageNumber) || 0,
+          promptText: typeof e.promptText === "string" ? e.promptText : "",
+        }))
+        .filter((e: { pageNumber: number; promptText: string }) => e.promptText.trim().length > 0)
+    : undefined;
+
   try {
     const request_ = await createGeneration({
       teacherId: teacher.id,
@@ -28,6 +41,7 @@ export async function POST(request: NextRequest) {
       topics: Array.isArray(body.topics) ? body.topics.filter((t: unknown) => typeof t === "string") : [],
       numQuestions: Number(body.numQuestions) || 6,
       difficultyMix: body.difficultyMix === "سهل" || body.difficultyMix === "صعب" ? body.difficultyMix : "متوازن",
+      pageExercises,
     });
     recordUsage(teacher, "exams");
     return NextResponse.json({ request: request_ });
