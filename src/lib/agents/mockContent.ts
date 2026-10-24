@@ -15,6 +15,14 @@ function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// Formats a coefficient-variable term in standard math notation — "x" or
+// "-x" rather than "1x"/"-1x", "3x" otherwise.
+function coefTerm(coef: number, variable: string): string {
+  if (coef === 1) return variable;
+  if (coef === -1) return `-${variable}`;
+  return `${coef}${variable}`;
+}
+
 interface RawQuestion {
   prompt: string;
   solution: string;
@@ -117,6 +125,69 @@ const TOPIC_TEMPLATES: Record<string, Template> = {
           { criterion: "كتابة القانون العام للمتتالية الحسابية", points: 2 },
           { criterion: "التعويض الصحيح بالقيم", points: 2 },
           { criterion: "الناتج النهائي الصحيح", points: 1 },
+        ],
+      };
+    },
+  },
+  // The three templates below cover topics that appear across most ثانوي
+  // (secondary/BAC) streams in mathCurriculum.ts — without them, any teacher
+  // selecting a 2nd/3rd-year ثانوي level saw almost every question fall back
+  // to the generic "معادلة خطية" template with a repeated demo-mode notice.
+  "النهايات والاستمرارية": {
+    build: (difficulty) => {
+      const a = randInt(1, difficulty === "صعب" ? 6 : 4);
+      const b = randInt(1, 20);
+      const c = randInt(1, difficulty === "صعب" ? 6 : 4);
+      return {
+        prompt: `ليكن f(x) = (${coefTerm(a, "x")} + ${b}) / (x - ${c}) دالة معرّفة على ℝ-{${c}}.\n1) أحسب نهاية الدالة f عند (+∞).\n2) أحسب نهاية الدالة f عندما تؤول x إلى ${c} من اليمين.`,
+        solution: `1) عند (+∞): نقسم البسط والمقام على x:\nf(x) = (${a} + ${b}/x) / (1 - ${c}/x)\nlim f(x) = ${a}/1 = ${a} (عندما x تؤول إلى +∞)\n\n2) عندما x تؤول إلى ${c} من اليمين (x > ${c}):\nالبسط يؤول إلى ${a}×${c} + ${b} = ${a * c + b} (عدد موجب)\nالمقام (x - ${c}) يؤول إلى 0⁺\nإذن lim f(x) = +∞ (عدد موجب مقسوم على عدد موجب يؤول إلى 0)`,
+        rubric: [
+          { criterion: "حساب النهاية عند +∞ بطريقة القسمة على أعلى قوة لـx", points: 2 },
+          { criterion: "تحديد إشارة البسط والمقام عند الاقتراب من x=c", points: 2 },
+          { criterion: "الاستنتاج الصحيح لقيمة النهاية (+∞) مع التعليل", points: 1 },
+        ],
+      };
+    },
+  },
+  "الاشتقاق والدراسة التامة للدوال": {
+    build: (difficulty) => {
+      const a = randInt(1, difficulty === "صعب" ? 4 : 3);
+      const k = randInt(-5, 5) || 1;
+      const b = 2 * a * k;
+      const c = randInt(-10, 10);
+      const x0 = -k;
+      const bTerm = b >= 0 ? `+ ${coefTerm(b, "x")}` : `- ${coefTerm(Math.abs(b), "x")}`;
+      const bTermDeriv = b >= 0 ? `+ ${b}` : `- ${Math.abs(b)}`;
+      const cTerm = c >= 0 ? `+ ${c}` : `- ${Math.abs(c)}`;
+      const squaredTerm = coefTerm(a, "x²");
+      const derivLeadTerm = coefTerm(2 * a, "x");
+      return {
+        prompt: `ليكن f(x) = ${squaredTerm} ${bTerm} ${cTerm} دالة معرّفة على ℝ.\n1) أحسب الدالة المشتقة f'(x).\n2) حل المعادلة f'(x) = 0.\n3) استنتج اتجاه تغير الدالة f على ℝ.`,
+        solution: `1) f'(x) = ${derivLeadTerm} ${bTermDeriv}\n\n2) f'(x) = 0 ⟺ ${derivLeadTerm} ${bTermDeriv} = 0 ⟺ x = ${x0}\n\n3) بما أن المعامل الرئيسي (${a}) موجب، فإن f' سالبة قبل x=${x0} وموجبة بعدها، ومنه:\nf متناقصة تمامًا على المجال ]−∞, ${x0}]\nf متزايدة تمامًا على المجال [${x0}, +∞[`,
+        rubric: [
+          { criterion: "حساب المشتقة f'(x) بشكل صحيح", points: 2 },
+          { criterion: "حل معادلة f'(x)=0 والوصول لقيمة x الصحيحة", points: 1 },
+          { criterion: "استنتاج اتجاه التغير بشكل صحيح مع التعليل", points: 2 },
+        ],
+      };
+    },
+  },
+  "الدوال اللوغاريتمية والأسية": {
+    build: (difficulty) => {
+      const a = randInt(1, difficulty === "صعب" ? 4 : 3);
+      const b = randInt(-5, 5);
+      const p = randInt(-5, 10);
+      const bTerm = b >= 0 ? `+ ${b}` : `- ${Math.abs(b)}`;
+      const rhs = p - b;
+      const xValue = rhs / a;
+      const axTerm = coefTerm(a, "x");
+      return {
+        prompt: `حل في ℝ المعادلة التالية: e^(${axTerm} ${bTerm}) = e^${p}`,
+        solution: `بما أن الدالة الأسية exp متباينة (one-to-one) على ℝ، فإن المعادلة تكافئ مساواة الأسّين:\n${axTerm} ${bTerm} = ${p}\n${axTerm} = ${p} - (${b}) = ${rhs}\nx = ${rhs}/${a}${Number.isInteger(xValue) ? ` = ${xValue}` : ""}`,
+        rubric: [
+          { criterion: "استعمال تباين الدالة الأسية لمساواة الأسّين", points: 2 },
+          { criterion: "حل المعادلة الخطية الناتجة بشكل صحيح", points: 2 },
+          { criterion: "الوصول للقيمة النهائية الصحيحة لـx", points: 1 },
         ],
       };
     },
