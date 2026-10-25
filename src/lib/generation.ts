@@ -19,6 +19,7 @@ import type { GenerationRequest, SubjectId } from "./types";
 import { enqueue, registerJobHandler } from "./jobs";
 import { isGeminiConfigured, reviewExamWithGemini, GeminiReviewError } from "./agents/geminiExamReviewAgent";
 import { toHundredths } from "./points";
+import { computeStructuralReview } from "./examStructuralReview";
 
 // Same bound used for exam generation's own curriculum excerpt (realContent.ts)
 // — keeps the review call's token cost predictable regardless of document size.
@@ -399,6 +400,18 @@ export async function approveGeneration(teacherId: string, requestId: string): P
   const request = findRequest(requestId, teacherId);
   if (!request) throw new GenerationError("الامتحان غير موجود");
   if (request.status !== "done") throw new GenerationError("لا يمكن اعتماد امتحان لم يكتمل توليده بنجاح");
+
+  // Defense in depth: every generation/edit path already enforces exact
+  // points arithmetic as it writes (scaleRubricToBudget, or
+  // validateAndNormalizeEditedQuestions's own check), so this should never
+  // actually fire — but approval is the one irreversible-feeling gate before
+  // real student grading, so it re-verifies independently rather than
+  // trusting that no future code path ever regresses this.
+  const structural = computeStructuralReview(request);
+  if (!structural.passed) {
+    const failed = structural.checks.filter((c) => !c.passed).map((c) => c.label);
+    throw new GenerationError(`لا يمكن اعتماد الامتحان — فشل الفحص الهيكلي الآلي: ${failed.join("؛ ")}`);
+  }
 
   const ok = approveGenerationRequest(requestId, teacherId, request.rubricVersion);
   if (!ok) {

@@ -5,10 +5,12 @@ import { getCurrentTeacher } from "@/lib/session";
 import { getGenerationForTeacher } from "@/lib/generation";
 import { getGradingSessionsForExam } from "@/lib/grading";
 import { isExamApproved } from "@/lib/types";
+import { computeStructuralReview } from "@/lib/examStructuralReview";
 import { SiteHeader } from "@/components/SiteHeader";
 import { StartGradingSessionButton } from "@/components/StartGradingSessionButton";
 import { ExamReviewPanel } from "@/components/ExamReviewPanel";
 import { ApproveExamButton } from "@/components/ApproveExamButton";
+import { StructuralReviewPanel } from "@/components/StructuralReviewPanel";
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   سهل: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -92,6 +94,8 @@ export default async function ResultsPage({
             <Table2 size={20} /> تنزيل شبكة التنقيط (Word)
           </a>
         </section>
+
+        {generation.status === "done" && <StructuralReviewPanel review={computeStructuralReview(generation)} />}
 
         {generation.status === "done" && <ExamReviewPanel requestId={generation.id} initialReview={generation.review} />}
 

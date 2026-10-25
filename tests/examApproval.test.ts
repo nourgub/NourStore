@@ -171,3 +171,15 @@ test("a teacher can never approve another teacher's exam", async () => {
 
   await assert.rejects(() => approveGeneration(otherId, "exam_owned"), GenerationError);
 });
+
+test("an exam that fails the structural check (criteria sum broken) can never be approved", async () => {
+  const teacherId = "t_approval_structural";
+  insertTeacher(makeTeacher(teacherId));
+  const exam = makeExam("exam_structural_broken", teacherId);
+  // Break the rubric sum directly, bypassing updateExamQuestions's own
+  // validation — simulates a future generation-path bug reaching approval.
+  exam.questions[0].rubric[0].points = 4;
+  insertRequest(exam);
+
+  await assert.rejects(() => approveGeneration(teacherId, "exam_structural_broken"), GenerationError);
+});

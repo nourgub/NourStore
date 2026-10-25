@@ -23,6 +23,8 @@ import { gradeStudentPaper, GradingAgentError } from "./agents/gradingAgent";
 import { reviewStudentPaperWithGemini, isGeminiConfigured, GeminiReviewError } from "./agents/geminiPaperReviewAgent";
 import { mergePaperGrades } from "./agents/gradingManager";
 import { reserveUsage, releaseUsage } from "./usage";
+import { computeClassAnalytics, type ClassAnalytics } from "./classAnalytics";
+import { buildSessionResultsCsv } from "./sessionExport";
 import type { IndependentPaperGrade } from "./agents/independentGradeTypes";
 import { isExamApproved } from "./types";
 import type { GeneratedQuestion, GradeOverrideLogEntry, GradingSession, StudentPaper, Teacher } from "./types";
@@ -142,6 +144,37 @@ export function getPapersForSession(sessionId: string, teacherId: string): Stude
 
 export function getStudentPaper(paperId: string, teacherId: string): StudentPaper | null {
   return findStudentPaper(paperId, teacherId);
+}
+
+// Pedagogical follow-up (class results distribution, recurring weak
+// criteria) — computed ONLY from approved papers, per this project's rule
+// that a draft grade must never feed a number the teacher might act on, and
+// only once enough papers are approved to say anything meaningful (see
+// MIN_PAPERS_FOR_ANALYTICS in classAnalytics.ts). Returns null only if the
+// session/exam itself can't be found or isn't this teacher's.
+export function getClassAnalytics(sessionId: string, teacherId: string): ClassAnalytics | null {
+  const session = findGradingSession(sessionId, teacherId);
+  if (!session) return null;
+  const exam = findRequest(session.examRequestId, teacherId);
+  if (!exam) return null;
+
+  const papers = listStudentPapers(sessionId, teacherId);
+  const totalPoints = exam.questions.reduce((s, q) => s + q.points, 0);
+  return computeClassAnalytics(papers, exam.questions, totalPoints);
+}
+
+// CSV export of every paper in the session (draft and approved alike, each
+// clearly labeled) — the caller is responsible for the UTF-8 BOM Excel needs
+// for Arabic text. Returns null for the same not-found/not-yours cases as
+// getClassAnalytics.
+export function exportSessionResultsCsv(sessionId: string, teacherId: string): string | null {
+  const session = findGradingSession(sessionId, teacherId);
+  if (!session) return null;
+  const exam = findRequest(session.examRequestId, teacherId);
+  if (!exam) return null;
+
+  const papers = listStudentPapers(sessionId, teacherId);
+  return buildSessionResultsCsv(papers, exam.questions);
 }
 
 export async function submitStudentPaper(

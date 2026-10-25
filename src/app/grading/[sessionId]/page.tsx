@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { ArrowRight, CheckCircle2, Clock, XCircle, FileCheck, AlertTriangle } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
-import { getGradingSession, getPapersForSession } from "@/lib/grading";
+import { getGradingSession, getPapersForSession, getClassAnalytics } from "@/lib/grading";
 import { getGenerationForTeacher } from "@/lib/generation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { UploadPaperForm } from "@/components/UploadPaperForm";
+import { ClassAnalyticsPanel } from "@/components/ClassAnalyticsPanel";
 
 const STATUS_STYLES: Record<string, { label: string; className: string; icon: typeof Clock }> = {
   pending: { label: "بانتظار التصحيح", className: "border-brand-200 bg-brand-50 text-brand-700", icon: Clock },
@@ -40,6 +41,7 @@ export default async function GradingSessionPage({
   const papers = filter === "needs_review" ? allPapers.filter((p) => p.needsReview) : allPapers;
 
   const totalPoints = exam?.questions.reduce((s, q) => s + q.points, 0) ?? 20;
+  const analytics = getClassAnalytics(sessionId, teacher.id);
 
   return (
     <>
@@ -59,6 +61,8 @@ export default async function GradingSessionPage({
         <section className="mb-8">
           <UploadPaperForm sessionId={sessionId} />
         </section>
+
+        {analytics && <ClassAnalyticsPanel sessionId={sessionId} analytics={analytics} />}
 
         <section className="space-y-2">
           <div className="mb-3 flex items-center justify-between">
