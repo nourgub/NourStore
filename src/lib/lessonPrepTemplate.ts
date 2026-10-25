@@ -4,7 +4,8 @@ import {
   insertLessonPrepTemplate,
 } from "./db";
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "./extractText";
-import { analyzeLessonPrepTemplate } from "./agents/lessonPrepAgent";
+import { analyzeLessonPrepTemplate, isLessonPrepConfigured } from "./agents/lessonPrepAgent";
+import { analyzeLessonPrepTemplateWithGemini, isLessonPrepConfiguredGemini } from "./agents/geminiLessonPrepAgent";
 import type { LessonPrepTemplate, SubjectId } from "./types";
 
 export class LessonPrepTemplateError extends Error {}
@@ -27,8 +28,17 @@ export async function uploadLessonPrepTemplate(input: UploadLessonPrepTemplateIn
     throw new LessonPrepTemplateError("الملف أكبر من الحجم المسموح به (10 ميغابايت)");
   }
 
+  const useClaude = isLessonPrepConfigured();
+  const useGemini = !useClaude && isLessonPrepConfiguredGemini();
+  if (!useClaude && !useGemini) {
+    throw new LessonPrepTemplateError(
+      "تحليل نموذج التحضير المرفوع يتطلب تفعيل مفتاح Claude API أو مفتاح Gemini API.",
+    );
+  }
+  const analyze = useClaude ? analyzeLessonPrepTemplate : analyzeLessonPrepTemplateWithGemini;
+
   const schema = isImageMime(file.type, file.name)
-    ? await analyzeLessonPrepTemplate({
+    ? await analyze({
         imageBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
         imageMimeType: file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg"),
       })
@@ -39,7 +49,7 @@ export async function uploadLessonPrepTemplate(input: UploadLessonPrepTemplateIn
             `تعذّر قراءة الملف "${file.name}" — الصيغ المدعومة: صورة JPG/PNG، PDF، أو Word (.docx)`,
           );
         }
-        return analyzeLessonPrepTemplate({ extractedText: extracted.text });
+        return analyze({ extractedText: extracted.text });
       })();
 
   const template: LessonPrepTemplate = {

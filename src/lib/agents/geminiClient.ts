@@ -1,17 +1,25 @@
 import { GoogleGenAI, ApiError } from "@google/genai";
 
-// "gemini-flash-latest" is Google's official rolling alias for its current
-// Flash-tier model — re-confirmed live against ai.google.dev/gemini-api/docs/models
-// on 2026-10-24 (still that page's own example of the "latest" naming
-// pattern), after first being verified against the installed @google/genai
-// SDK's type definitions (v2.31.0). It auto-tracks whichever model Google
-// currently serves as "Flash", so it needs no code change as the lineup
-// moves forward. Flash is the default here because this is an auxiliary
-// independent-review role, not primary content generation. To pin an exact
-// model instead of following the rolling alias, set GEMINI_MODEL on the
-// server (e.g. a specific, currently-available Pro-tier id) — check the
-// docs link above first, since Google's lineup changes frequently.
-const DEFAULT_MODEL = "gemini-flash-latest";
+// "gemini-flash-lite-latest" is Google's rolling alias for its current
+// Flash-Lite tier — chosen over the (also real, also rolling) alias
+// "gemini-flash-latest" after LIVE testing against a real free-tier API key
+// on 2026-10-25: "gemini-flash-latest" returned repeated genuine 503 "high
+// demand" errors (confirmed via the raw @google/genai SDK call, not a bug in
+// this codebase), while "gemini-flash-lite-latest" succeeded reliably on the
+// exact same image+structured-JSON-schema request and correctly read real
+// handwritten-style math content from a test image. This is a live
+// operational condition on Google's side, not a permanent quality verdict —
+// if "gemini-flash-latest" becomes reliably available again, it is the
+// stronger model for this workload and worth re-testing. Gemini now fills
+// two roles: the original optional independent reviewer (alongside Claude),
+// and — since it has a genuine free tier and Claude does not — the PRIMARY
+// engine for exam generation, lesson prep, and grading whenever
+// ANTHROPIC_API_KEY isn't configured. To pin a specific model instead of
+// following the rolling alias, set GEMINI_MODEL on the server — check
+// ai.google.dev/gemini-api/docs/models first, since Google's lineup changes
+// frequently (this file's own live model-list call surfaced models up to
+// the "3.8" generation as of this writing).
+const DEFAULT_MODEL = "gemini-flash-lite-latest";
 
 export function isGeminiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);

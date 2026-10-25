@@ -2,8 +2,11 @@ import type { AgentStep, CurriculumDocument, GeneratedQuestion, SubjectId } from
 import { distributeEqualPoints } from "../points";
 import { getSubjectDefinition } from "./subjects";
 import { generateQuestionsWithClaude, isRealGenerationConfigured, type QuestionSpec } from "./realContent";
+import { generateQuestionsWithGemini, isGeminiRealGenerationConfigured } from "./geminiRealContent";
 import { solveGivenExercises, isGivenExerciseGenerationConfigured, GivenExerciseError } from "./givenExerciseAgent";
 import { importExamFromDocuments, isExamImportConfigured, ExamImportError } from "./examImportAgent";
+import { solveGivenExercisesWithGemini, isGivenExerciseGenerationConfiguredGemini } from "./geminiGivenExerciseAgent";
+import { importExamFromDocumentsWithGemini, isExamImportConfiguredGemini } from "./geminiExamImportAgent";
 
 export interface PipelineInput {
   examTitle: string;
@@ -88,12 +91,14 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
   }));
 
   let questions: GeneratedQuestion[];
-  let usedRealGeneration = false;
+  let generationEngine: "claude" | "gemini" | "mock" = "mock";
 
-  // A configured key means this is a production request — a failed Claude
-  // call is a real failure of this generation, not a reason to quietly swap
-  // in demo content and report success. The mock bank only ever runs when no
-  // key is configured at all (explicit demo mode).
+  // Claude is used whenever it's configured (today's higher-quality engine
+  // for this workload); otherwise Gemini — a real model with a genuine free
+  // tier, never a mock — takes over as the primary generator. The mock bank
+  // only ever runs when NEITHER key is configured (explicit demo mode). A
+  // failed real call is a real failure of this generation, never silently
+  // swapped for mock content reported as success.
   if (isRealGenerationConfigured()) {
     questions = await generateQuestionsWithClaude({
       subjectPersona: subject.persona,
@@ -103,19 +108,31 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
       curriculumText,
       specs,
     });
-    usedRealGeneration = true;
+    generationEngine = "claude";
+  } else if (isGeminiRealGenerationConfigured()) {
+    questions = await generateQuestionsWithGemini({
+      subjectPersona: subject.persona,
+      examTitle: input.examTitle,
+      gradeLevel: input.gradeLevel,
+      styleNotes: styleNote,
+      curriculumText,
+      specs,
+    });
+    generationEngine = "gemini";
   } else {
     questions = specs.map((s) => subject.generateMockQuestion(s.topic, s.difficulty, s.pointsBudget));
   }
 
+  const ENGINE_LABEL: Record<typeof generationEngine, string> = {
+    claude: "عبر نموذج الذكاء الاصطناعي (Claude).",
+    gemini: "عبر نموذج الذكاء الاصطناعي (Gemini).",
+    mock: "عبر بنك الأسئلة التجريبي (وضع العرض التجريبي — لم يُفعَّل أي مفتاح API).",
+  };
   steps.push(
     step(
       "واضع الأسئلة",
       "صياغة أسئلة الامتحان",
-      `تمت صياغة ${questions.length} سؤال(أسئلة) موزعة على المحاور: ${requestedTopics.join("، ")} — ` +
-        (usedRealGeneration
-          ? "عبر نموذج الذكاء الاصطناعي (Claude)."
-          : "عبر بنك الأسئلة التجريبي (وضع العرض التجريبي — لم يُفعَّل مفتاح Claude API)."),
+      `تمت صياغة ${questions.length} سؤال(أسئلة) موزعة على المحاور: ${requestedTopics.join("، ")} — ${ENGINE_LABEL[generationEngine]}`,
     ),
   );
 
@@ -162,11 +179,11 @@ export { isGivenExerciseGenerationConfigured, GivenExerciseError };
 /**
  * The second exam-generation path: every question's prompt is copied
  * verbatim from a specific page of a Word file the teacher uploaded — never
- * generated or rephrased — and Claude is only asked to solve it and build a
- * grading rubric. There is no mock/demo fallback for this path: a mock bank
- * can only template *new* questions on a topic, it cannot solve arbitrary
- * teacher-supplied text, so this mode requires ANTHROPIC_API_KEY and fails
- * clearly (never silently) when it isn't configured.
+ * generated or rephrased — and the model is only asked to solve it and build
+ * a grading rubric. There is no mock/demo fallback for this path: a mock
+ * bank can only template *new* questions on a topic, it cannot solve
+ * arbitrary teacher-supplied text — so it requires Claude or Gemini and
+ * fails clearly (never silently) when neither is configured.
  */
 export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInput): Promise<PipelineOutput> {
   const subject = getSubjectDefinition(input.subjectId);
@@ -180,15 +197,17 @@ export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInp
     ),
   );
 
-  if (!isGivenExerciseGenerationConfigured()) {
+  const useClaude = isGivenExerciseGenerationConfigured();
+  const useGemini = !useClaude && isGivenExerciseGenerationConfiguredGemini();
+  if (!useClaude && !useGemini) {
     throw new GivenExerciseError(
-      "هذا الوضع (تمارين محددة من ملف Word) يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لحل تمارين حقيقية معطاة.",
+      "هذا الوضع (تمارين محددة من ملف Word) يتطلب تفعيل مفتاح Claude API أو مفتاح Gemini API — لا يوجد بديل تجريبي لحل تمارين حقيقية معطاة.",
     );
   }
 
   const totalPoints = 20;
   const pointsPerExercise = distributeEqualPoints(totalPoints, input.exercises.length);
-  const questions = await solveGivenExercises({
+  const solveInput = {
     subjectPersona: subject.persona,
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
@@ -198,13 +217,14 @@ export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInp
       promptText: ex.promptText,
       pointsBudget: pointsPerExercise[i],
     })),
-  });
+  };
+  const questions = useClaude ? await solveGivenExercises(solveInput) : await solveGivenExercisesWithGemini(solveInput);
 
   steps.push(
     step(
       "معدّ الحلول النموذجية",
       "حل التمارين المعطاة وبناء شبكة التنقيط",
-      `تم حل ${questions.length} تمرين(تمارين) كما وردت حرفيًا من الملف، مع بناء حل مفصّل وشبكة تصحيح لكل منها عبر Claude.`,
+      `تم حل ${questions.length} تمرين(تمارين) كما وردت حرفيًا من الملف، مع بناء حل مفصّل وشبكة تصحيح لكل منها عبر نموذج الذكاء الاصطناعي (${useClaude ? "Claude" : "Gemini"}).`,
     ),
   );
 
@@ -239,7 +259,7 @@ export { isExamImportConfigured, ExamImportError };
  * docx export, editing) works unchanged. Like runGivenExercisesPipeline,
  * there is no mock/demo fallback — understanding two arbitrary uploaded
  * documents well enough to extract and solve their content needs a real
- * model call, not a template.
+ * model call (Claude or, as a free-tier fallback, Gemini), not a template.
  */
 export async function runExamImportPipeline(input: ExamImportPipelineInput): Promise<PipelineOutput> {
   const subject = getSubjectDefinition(input.subjectId);
@@ -253,27 +273,30 @@ export async function runExamImportPipeline(input: ExamImportPipelineInput): Pro
     ),
   );
 
-  if (!isExamImportConfigured()) {
+  const useClaude = isExamImportConfigured();
+  const useGemini = !useClaude && isExamImportConfiguredGemini();
+  if (!useClaude && !useGemini) {
     throw new ExamImportError(
-      "هذا الوضع (استيراد امتحان جاهز للتصحيح) يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لفهم واستخراج أسئلة من ملفات حقيقية.",
+      "هذا الوضع (استيراد امتحان جاهز للتصحيح) يتطلب تفعيل مفتاح Claude API أو مفتاح Gemini API — لا يوجد بديل تجريبي لفهم واستخراج أسئلة من ملفات حقيقية.",
     );
   }
 
-  const questions = await importExamFromDocuments({
+  const importInput = {
     subjectPersona: subject.persona,
     examTitle: input.examTitle,
     gradeLevel: input.gradeLevel,
     topic: input.topic,
     examText: input.examText,
     correctionText: input.correctionText,
-  });
+  };
+  const questions = useClaude ? await importExamFromDocuments(importInput) : await importExamFromDocumentsWithGemini(importInput);
 
   const totalPoints = questions.reduce((s, q) => s + q.points, 0);
   steps.push(
     step(
       "واضع الأسئلة",
       "استخراج الأسئلة وبناء شبكة التنقيط",
-      `تم استخراج ${questions.length} سؤال(أسئلة) من ملف الامتحان ومطابقتها مع ملف التصحيح — مجموع النقاط: ${totalPoints}.`,
+      `تم استخراج ${questions.length} سؤال(أسئلة) من ملف الامتحان ومطابقتها مع ملف التصحيح عبر نموذج الذكاء الاصطناعي (${useClaude ? "Claude" : "Gemini"}) — مجموع النقاط: ${totalPoints}.`,
     ),
   );
 

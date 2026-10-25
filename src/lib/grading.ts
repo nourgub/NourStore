@@ -19,7 +19,7 @@ import {
   updateStudentPaperRawGrade,
 } from "./db";
 import { enqueue, registerJobHandler } from "./jobs";
-import { gradeStudentPaper, GradingAgentError } from "./agents/gradingAgent";
+import { gradeStudentPaper, isGradingConfigured, GradingAgentError } from "./agents/gradingAgent";
 import { reviewStudentPaperWithGemini, isGeminiConfigured, GeminiReviewError } from "./agents/geminiPaperReviewAgent";
 import { mergePaperGrades } from "./agents/gradingManager";
 import { reserveUsage, releaseUsage } from "./usage";
@@ -62,6 +62,22 @@ const MAX_IMAGE_DIMENSION = 1568;
 // the same paper without needing to store anything extra.
 export function pseudonymizeStudent(paperId: string): string {
   return `تلميذ (مُعرّف الورقة: ${paperId.slice(-8)})`;
+}
+
+// Claude is the primary grader whenever it's configured — Gemini then plays
+// its original role, an independent second opinion. When Claude isn't
+// configured (no paid key), Gemini takes over the primary slot entirely
+// instead of grading being unavailable, since Gemini's free tier is a fully
+// real, capable model — never a mock. A true independent review needs TWO
+// distinct models, so it only ever runs when both are configured; with
+// Gemini alone in the primary slot there is no second model left to review
+// it.
+export function isPrimaryGraderClaude(): boolean {
+  return isGradingConfigured();
+}
+
+export function shouldRunIndependentGeminiReview(): boolean {
+  return isGradingConfigured() && isGeminiConfigured();
 }
 
 // Shared input shape for both gradeStudentPaper and
@@ -136,12 +152,12 @@ function resetPaperForRegrade(paperId: string): void {
     needsReview: false,
     draftTotal: null,
     gradedAt: null,
-    geminiReviewStatus: isGeminiConfigured() ? "not_reviewed" : "not_configured",
+    geminiReviewStatus: shouldRunIndependentGeminiReview() ? "not_reviewed" : "not_configured",
     geminiModel: null,
     geminiFailureReason: null,
   });
   enqueueClaudeGradeJob(paperId, true);
-  if (isGeminiConfigured()) {
+  if (shouldRunIndependentGeminiReview()) {
     enqueueGeminiReviewJob(paperId, true);
   }
 }
@@ -264,7 +280,7 @@ export async function submitStudentPaper(
       failureReason: null,
       examVersion: session.examVersion,
       claudeModel: null,
-      geminiReviewStatus: isGeminiConfigured() ? "not_reviewed" : "not_configured",
+      geminiReviewStatus: shouldRunIndependentGeminiReview() ? "not_reviewed" : "not_configured",
       geminiModel: null,
       geminiFailureReason: null,
       questionResults: [],
@@ -286,7 +302,7 @@ export async function submitStudentPaper(
     // grading permanently fails (see below) — a successful submission that
     // simply hasn't finished grading yet is not a failure.
     enqueueClaudeGradeJob(paperId, false);
-    if (isGeminiConfigured()) {
+    if (shouldRunIndependentGeminiReview()) {
       enqueueGeminiReviewJob(paperId, false);
     }
     return paper;
@@ -415,14 +431,17 @@ async function handleClaudeGradeJob(
 
   let claudeGrade: IndependentPaperGrade;
   const startedAt = Date.now();
+  const useClaude = isPrimaryGraderClaude();
   try {
-    const { grade, usage } = await gradeStudentPaper(buildIndependentGradeCallInput(paper, exam));
+    const { grade, usage } = useClaude
+      ? await gradeStudentPaper(buildIndependentGradeCallInput(paper, exam))
+      : await reviewStudentPaperWithGemini(buildIndependentGradeCallInput(paper, exam));
     claudeGrade = grade;
     recordAiUsage({
       teacherId: paper.teacherId,
       feature: "grading",
       operationId: paperId,
-      provider: "claude",
+      provider: useClaude ? "claude" : "gemini",
       model: grade.model,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -431,7 +450,9 @@ async function handleClaudeGradeJob(
     });
   } catch (err) {
     const failureReason =
-      err instanceof GradingAgentError || err instanceof Error ? err.message : "خطأ غير معروف أثناء التصحيح";
+      err instanceof GradingAgentError || err instanceof GeminiReviewError || err instanceof Error
+        ? err.message
+        : "خطأ غير معروف أثناء التصحيح";
     // Only write a user-visible "failed" once retries are exhausted — an
     // attempt the queue will silently retry shouldn't flash "failed" at the
     // teacher in between. Same point: only a *permanent* failure refunds the

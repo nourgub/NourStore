@@ -249,7 +249,7 @@ export function ApprovePaperForm({
       <div className="order-1 space-y-4 lg:order-2">
       <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
         <span className="flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2.5 py-1 text-brand-600">
-          Claude: {paper.claudeModel ?? "—"}
+          النموذج: {paper.claudeModel ?? "—"}
         </span>
         <span className={`flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2.5 py-1 ${geminiStatus.className}`}>
           {paper.geminiReviewStatus === "reviewed" ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
