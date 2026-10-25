@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
 import { callGeminiJson, isGeminiConfigured, GeminiReviewError, type GeminiImageInput } from "./geminiClient";
-import { validateAgainstRubric, type IndependentPaperGrade } from "./independentGradeTypes";
+import { validateAgainstRubric, type IndependentPaperGrade, type TokenUsage } from "./independentGradeTypes";
 
 export { isGeminiConfigured, GeminiReviewError };
 
@@ -89,7 +89,9 @@ export interface GeminiGradePaperInput {
  * rubric, but never shown Claude's scores or notes. Used only to produce a
  * second, independent opinion for the grading manager to compare.
  */
-export async function reviewStudentPaperWithGemini(input: GeminiGradePaperInput): Promise<IndependentPaperGrade> {
+export async function reviewStudentPaperWithGemini(
+  input: GeminiGradePaperInput,
+): Promise<{ grade: IndependentPaperGrade; usage: TokenUsage }> {
   const questionList = input.questions
     .map((q) => {
       const rubricLines = q.rubric
@@ -127,7 +129,7 @@ ${questionList}${knownTranscriptionsBlock}
 - أضف ملاحظة قصيرة وبنّاءة للطالب في feedback.
 أعد فقط JSON مطابقًا للمخطط المطلوب، بدون أي نص إضافي.`;
 
-  const { text, model } = await callGeminiJson({
+  const { text, model, usage } = await callGeminiJson({
     prompt,
     images,
     jsonSchema: RESPONSE_JSON_SCHEMA,
@@ -149,18 +151,21 @@ ${questionList}${knownTranscriptionsBlock}
   validateAgainstRubric(result.data.questions, input.questions, GeminiReviewError);
 
   return {
-    model,
-    questions: result.data.questions.map((q) => ({
-      questionId: q.questionId,
-      transcription: q.transcription,
-      feedback: q.feedback,
-      answerStatus: q.answerStatus,
-      criteriaAwards: q.criteriaAwards.map((a) => ({
-        criterionId: a.criterionId,
-        awardedPoints: a.awardedPoints,
-        note: a.note,
+    grade: {
+      model,
+      questions: result.data.questions.map((q) => ({
+        questionId: q.questionId,
+        transcription: q.transcription,
+        feedback: q.feedback,
+        answerStatus: q.answerStatus,
+        criteriaAwards: q.criteriaAwards.map((a) => ({
+          criterionId: a.criterionId,
+          awardedPoints: a.awardedPoints,
+          note: a.note,
+        })),
+        suspiciousInstructionNote: q.suspiciousInstructionNote,
       })),
-      suspiciousInstructionNote: q.suspiciousInstructionNote,
-    })),
+    },
+    usage,
   };
 }

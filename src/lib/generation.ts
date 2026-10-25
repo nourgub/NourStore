@@ -20,6 +20,7 @@ import { enqueue, registerJobHandler } from "./jobs";
 import { isGeminiConfigured, reviewExamWithGemini, GeminiReviewError } from "./agents/geminiExamReviewAgent";
 import { toHundredths } from "./points";
 import { computeStructuralReview } from "./examStructuralReview";
+import { selectRelevantChunks } from "./curriculumChunking";
 
 // Same bound used for exam generation's own curriculum excerpt (realContent.ts)
 // — keeps the review call's token cost predictable regardless of document size.
@@ -213,8 +214,11 @@ async function handleExamReviewJob(
   updateRequestReview(requestId, { ...request.review, status: "reviewing" });
 
   const document = request.documentId ? findDocument(request.documentId, teacherId) : null;
+  const reviewKeywords = [...new Set([...request.topics, ...request.questions.map((q) => q.topic)])];
   const curriculumExcerpt =
-    document?.extractionStatus === "extracted" ? document.extractedText.slice(0, MAX_CURRICULUM_CHARS_IN_PROMPT) : undefined;
+    document?.extractionStatus === "extracted"
+      ? selectRelevantChunks(document.extractedText, reviewKeywords, { maxChars: MAX_CURRICULUM_CHARS_IN_PROMPT })
+      : undefined;
 
   try {
     const result = await reviewExamWithGemini({

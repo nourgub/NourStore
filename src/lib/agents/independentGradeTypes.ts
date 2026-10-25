@@ -6,6 +6,13 @@ import type { GeneratedQuestion } from "../types";
 
 export type AnswerStatus = "answered" | "empty" | "unreadable" | "missing_page";
 
+// Real token counts from the provider's own response — never estimated —
+// used by grading.ts to log actual per-call AI cost/usage.
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface IndependentCriterionAward {
   criterionId: string;
   // null only when the question's answerStatus is not "answered" — an

@@ -64,7 +64,12 @@ export interface Session {
   expiresAt: string;
 }
 
-export type ExtractionStatus = "none" | "extracted" | "unsupported" | "failed";
+// "scanned_no_text": the file parsed successfully (so it isn't "failed") but
+// yielded no real text — the classic symptom of a scanned/photographed PDF
+// with no embedded text layer. Kept distinct from "extracted" so the teacher
+// is told their document needs OCR, instead of the platform silently
+// proceeding as if the reference material were simply empty.
+export type ExtractionStatus = "none" | "extracted" | "unsupported" | "failed" | "scanned_no_text";
 
 export interface CurriculumDocument {
   id: string;

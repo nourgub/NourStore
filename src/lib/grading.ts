@@ -25,9 +25,17 @@ import { mergePaperGrades } from "./agents/gradingManager";
 import { reserveUsage, releaseUsage } from "./usage";
 import { computeClassAnalytics, type ClassAnalytics } from "./classAnalytics";
 import { buildSessionResultsCsv } from "./sessionExport";
+import { recordAiUsage } from "./aiUsageLog";
 import type { IndependentPaperGrade } from "./agents/independentGradeTypes";
 import { isExamApproved } from "./types";
-import type { GeneratedQuestion, GradeOverrideLogEntry, GradingSession, StudentPaper, Teacher } from "./types";
+import type {
+  GeneratedQuestion,
+  GenerationRequest,
+  GradeOverrideLogEntry,
+  GradingSession,
+  StudentPaper,
+  Teacher,
+} from "./types";
 
 export class GradingError extends Error {}
 
@@ -45,6 +53,44 @@ const MAX_PAGES_PER_PAPER = 10;
 // JPEG also caps per-customer storage growth, since nothing here is ever
 // deleted automatically.
 const MAX_IMAGE_DIMENSION = 1568;
+
+// The student's real name is never sent to Claude or Gemini — only used for
+// the teacher's own UI and exports. The model only needs a stable label to
+// refer to "this paper" by in its narration; it never needs the real
+// identity, and grading/feedback quality is unaffected by swapping it.
+// Derived from the paper's own id so it's stable across retries/re-grades of
+// the same paper without needing to store anything extra.
+export function pseudonymizeStudent(paperId: string): string {
+  return `تلميذ (مُعرّف الورقة: ${paperId.slice(-8)})`;
+}
+
+// Shared input shape for both gradeStudentPaper and
+// reviewStudentPaperWithGemini — kept in one place so the student's real
+// name can never accidentally be reintroduced at one of the two call sites
+// without the other.
+export function buildIndependentGradeCallInput(
+  paper: StudentPaper,
+  exam: GenerationRequest,
+): {
+  examTitle: string;
+  gradeLevel: string;
+  studentName: string;
+  questions: GeneratedQuestion[];
+  imagePaths: string[];
+  imageMimeTypes: string[];
+  knownTranscriptions?: { questionId: string; text: string }[];
+} {
+  return {
+    examTitle: exam.examTitle,
+    gradeLevel: exam.gradeLevel,
+    studentName: pseudonymizeStudent(paper.id),
+    questions: exam.questions,
+    imagePaths: paper.imagePaths,
+    imageMimeTypes: paper.imagePaths.map(() => "image/jpeg"),
+    knownTranscriptions:
+      paper.teacherCorrectedTranscriptions.length > 0 ? paper.teacherCorrectedTranscriptions : undefined,
+  };
+}
 const JPEG_QUALITY = 82;
 
 function validatePaperImageFiles(files: File[]): void {
@@ -368,16 +414,20 @@ async function handleClaudeGradeJob(
   }
 
   let claudeGrade: IndependentPaperGrade;
+  const startedAt = Date.now();
   try {
-    claudeGrade = await gradeStudentPaper({
-      examTitle: exam.examTitle,
-      gradeLevel: exam.gradeLevel,
-      studentName: paper.studentName,
-      questions: exam.questions,
-      imagePaths: paper.imagePaths,
-      imageMimeTypes: paper.imagePaths.map(() => "image/jpeg"),
-      knownTranscriptions:
-        paper.teacherCorrectedTranscriptions.length > 0 ? paper.teacherCorrectedTranscriptions : undefined,
+    const { grade, usage } = await gradeStudentPaper(buildIndependentGradeCallInput(paper, exam));
+    claudeGrade = grade;
+    recordAiUsage({
+      teacherId: paper.teacherId,
+      feature: "grading",
+      operationId: paperId,
+      provider: "claude",
+      model: grade.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: Date.now() - startedAt,
+      pageCount: paper.imagePaths.length,
     });
   } catch (err) {
     const failureReason =
@@ -419,16 +469,20 @@ async function handleGeminiReviewJob(
   }
 
   let geminiGrade: IndependentPaperGrade;
+  const startedAt = Date.now();
   try {
-    geminiGrade = await reviewStudentPaperWithGemini({
-      examTitle: exam.examTitle,
-      gradeLevel: exam.gradeLevel,
-      studentName: paper.studentName,
-      questions: exam.questions,
-      imagePaths: paper.imagePaths,
-      imageMimeTypes: paper.imagePaths.map(() => "image/jpeg"),
-      knownTranscriptions:
-        paper.teacherCorrectedTranscriptions.length > 0 ? paper.teacherCorrectedTranscriptions : undefined,
+    const { grade, usage } = await reviewStudentPaperWithGemini(buildIndependentGradeCallInput(paper, exam));
+    geminiGrade = grade;
+    recordAiUsage({
+      teacherId: paper.teacherId,
+      feature: "grading",
+      operationId: paperId,
+      provider: "gemini",
+      model: grade.model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      durationMs: Date.now() - startedAt,
+      pageCount: paper.imagePaths.length,
     });
   } catch (err) {
     const failureReason =

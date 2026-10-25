@@ -3,7 +3,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
-import { validateAgainstRubric as sharedValidateAgainstRubric, type IndependentPaperGrade } from "./independentGradeTypes";
+import {
+  validateAgainstRubric as sharedValidateAgainstRubric,
+  type IndependentPaperGrade,
+  type TokenUsage,
+} from "./independentGradeTypes";
 
 // Configurable on the server via ANTHROPIC_MODEL — defaults to Sonnet 5
 // (vision-capable, matches the cost tier already used for exam generation).
@@ -78,7 +82,9 @@ export interface GradePaperInput {
   knownTranscriptions?: { questionId: string; text: string }[];
 }
 
-export async function gradeStudentPaper(input: GradePaperInput): Promise<ClaudePaperGrade> {
+export async function gradeStudentPaper(
+  input: GradePaperInput,
+): Promise<{ grade: ClaudePaperGrade; usage: TokenUsage }> {
   if (!isGradingConfigured()) {
     throw new GradingAgentError(
       "تصحيح الأوراق يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لقراءة خط الطالب اليدوي.",
@@ -158,18 +164,24 @@ ${questionList}${knownTranscriptionsBlock}
   sharedValidateAgainstRubric(parsed.questions, input.questions, GradingAgentError);
 
   return {
-    model: MODEL,
-    questions: parsed.questions.map((q) => ({
-      questionId: q.questionId,
-      transcription: q.transcription,
-      feedback: q.feedback,
-      answerStatus: q.answerStatus,
-      criteriaAwards: q.criteriaAwards.map((a) => ({
-        criterionId: a.criterionId,
-        awardedPoints: a.awardedPoints,
-        note: a.note,
+    grade: {
+      model: MODEL,
+      questions: parsed.questions.map((q) => ({
+        questionId: q.questionId,
+        transcription: q.transcription,
+        feedback: q.feedback,
+        answerStatus: q.answerStatus,
+        criteriaAwards: q.criteriaAwards.map((a) => ({
+          criterionId: a.criterionId,
+          awardedPoints: a.awardedPoints,
+          note: a.note,
+        })),
+        suspiciousInstructionNote: q.suspiciousInstructionNote,
       })),
-      suspiciousInstructionNote: q.suspiciousInstructionNote,
-    })),
+    },
+    usage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    },
   };
 }

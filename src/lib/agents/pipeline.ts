@@ -63,7 +63,13 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
         ? `تم تحليل الوثيقة "${input.document.fileName}" (${input.document.gradeLevel}).` +
             (curriculumText
               ? ` تم استخراج ${curriculumText.length} حرفًا من محتوى الملف الفعلي واعتمادها كسياق مرجعي.`
-              : ` لم يتم استخراج نص من الملف (${input.document.extractionStatus === "unsupported" ? "نوع ملف غير مدعوم" : "تعذّر استخراج المحتوى"})، تم الاعتماد على المحاور المُدخلة يدويًا.`) +
+              : ` لم يتم استخراج نص من الملف (${
+                  input.document.extractionStatus === "unsupported"
+                    ? "نوع ملف غير مدعوم"
+                    : input.document.extractionStatus === "scanned_no_text"
+                      ? "الملف يبدو PDF ممسوحًا ضوئيًا بلا طبقة نص — يحتاج OCR أو رفع نسخة Word"
+                      : "تعذّر استخراج المحتوى"
+                })، تم الاعتماد على المحاور المُدخلة يدويًا.`) +
             (styleNote ? ` ملاحظات الأسلوب المعتمدة: "${styleNote}".` : "")
         : `لا توجد وثيقة منهج مرفوعة لهذا الطلب — تم الاعتماد على المحاور المُدخلة يدويًا: ${requestedTopics.join("، ")}.`,
     ),

@@ -80,6 +80,14 @@ export default async function SubjectPage({ params }: { params: Promise<{ subjec
                         تعذّر استخراج المحتوى
                       </span>
                     )}
+                    {d.extractionStatus === "scanned_no_text" && (
+                      <span
+                        className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                        title="هذا الملف يبدو صورًا ممسوحة ضوئيًا (PDF بلا طبقة نص)، وليس نصًا رقميًا — النظام لا يستطيع قراءته حاليًا. امسح الملف عبر أداة OCR أو ارفع نسخة Word بدلًا منه."
+                      >
+                        PDF ممسوح ضوئيًا — بلا نص قابل للقراءة
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 text-brand-700">
                     {d.gradeLevel} — المحاور: {d.topics.join("، ")}

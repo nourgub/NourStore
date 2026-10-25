@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
+import { selectRelevantChunks } from "../curriculumChunking";
 
 // Configurable on the server via ANTHROPIC_MODEL — defaults to Sonnet 5,
 // which balances output quality against per-generation cost for this
@@ -59,7 +60,13 @@ export async function generateQuestionsWithClaude(
     .map((s, i) => `${i + 1}. المحور: "${s.topic}" — مستوى الصعوبة: ${s.difficulty} — النقطة الكلية لهذا السؤال: ${s.pointsBudget}`)
     .join("\n");
 
-  const curriculumExcerpt = input.curriculumText?.slice(0, MAX_CURRICULUM_CHARS_IN_PROMPT);
+  // Select the passages actually relevant to the requested topics instead of
+  // blindly keeping the document's opening — the relevant section of a long
+  // curriculum file is rarely in its first few thousand characters.
+  const requestedTopics = [...new Set(input.specs.map((s) => s.topic))];
+  const curriculumExcerpt = input.curriculumText
+    ? selectRelevantChunks(input.curriculumText, requestedTopics, { maxChars: MAX_CURRICULUM_CHARS_IN_PROMPT })
+    : undefined;
 
   const prompt = `أنت ${input.subjectPersona} خبير في إعداد فروض واختبارات حقيقية بمستوى الامتحانات الرسمية الجزائرية (البكالوريا وشهادة التعليم المتوسط)، وتُعِدّ الآن امتحانًا بعنوان "${input.examTitle}" لمستوى "${input.gradeLevel}".
 

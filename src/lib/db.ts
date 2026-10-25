@@ -234,6 +234,27 @@ withBusyRetry(() =>
   );
   CREATE INDEX IF NOT EXISTS idx_student_papers_session ON student_papers(session_id);
 
+  -- One row per actual AI provider call (never per feature-level operation —
+  -- a single paper grading produces one Claude row and, separately, one
+  -- Gemini row). estimated_cost_usd is exactly that: an estimate from a
+  -- pricing table that must be kept in sync with the provider's own pricing
+  -- page, never treated as an authoritative bill.
+  CREATE TABLE IF NOT EXISTS ai_usage_log (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    feature TEXT NOT NULL,
+    operation_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    estimated_cost_usd REAL NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    page_count INTEGER,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ai_usage_log_teacher ON ai_usage_log(teacher_id, created_at);
+
   CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
@@ -1119,6 +1140,84 @@ export function failOrRequeueJob(id: string, error: string): void {
 export function findJobByIdempotencyKey(key: string): Job | null {
   const row = db.prepare(`SELECT * FROM jobs WHERE idempotency_key = ?`).get(key) as JobRow | undefined;
   return row ? rowToJob(row) : null;
+}
+
+// ---------- AI usage/cost log ----------
+
+export interface AiUsageLogEntry {
+  id: string;
+  teacherId: string;
+  feature: string;
+  operationId: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  durationMs: number;
+  pageCount: number | null;
+  createdAt: string;
+}
+
+export function insertAiUsageLog(entry: AiUsageLogEntry): void {
+  db.prepare(
+    `INSERT INTO ai_usage_log (id, teacher_id, feature, operation_id, provider, model, input_tokens, output_tokens, estimated_cost_usd, duration_ms, page_count, created_at)
+     VALUES (@id, @teacherId, @feature, @operationId, @provider, @model, @inputTokens, @outputTokens, @estimatedCostUsd, @durationMs, @pageCount, @createdAt)`,
+  ).run({ ...entry, pageCount: entry.pageCount ?? null });
+}
+
+export interface AiUsageCostSummary {
+  totalCostUsd: number;
+  totalCalls: number;
+  totalDurationMs: number;
+  byFeature: { feature: string; costUsd: number; calls: number }[];
+}
+
+function summarizeAiUsageRows(
+  rows: { feature: string; estimated_cost_usd: number; duration_ms: number }[],
+): AiUsageCostSummary {
+  const byFeatureMap = new Map<string, { costUsd: number; calls: number }>();
+  let totalCostUsd = 0;
+  let totalDurationMs = 0;
+  for (const row of rows) {
+    totalCostUsd += row.estimated_cost_usd;
+    totalDurationMs += row.duration_ms;
+    const existing = byFeatureMap.get(row.feature) ?? { costUsd: 0, calls: 0 };
+    existing.costUsd += row.estimated_cost_usd;
+    existing.calls += 1;
+    byFeatureMap.set(row.feature, existing);
+  }
+
+  return {
+    totalCostUsd: Math.round(totalCostUsd * 10000) / 10000,
+    totalCalls: rows.length,
+    totalDurationMs,
+    byFeature: Array.from(byFeatureMap.entries()).map(([feature, v]) => ({
+      feature,
+      costUsd: Math.round(v.costUsd * 10000) / 10000,
+      calls: v.calls,
+    })),
+  };
+}
+
+// Scoped to a billing/quota period (same `period` string convention as
+// usage_counters: "YYYY-MM-DD" subscription-cycle start, or "YYYY-MM" for a
+// never-expiring account) via a createdAt range the caller computes — kept
+// here as a plain date range rather than importing usage.ts's period logic,
+// to avoid a dependency cycle between db.ts and the feature layer above it.
+export function getAiUsageCostSummary(teacherId: string, sinceIso: string): AiUsageCostSummary {
+  const rows = db
+    .prepare(`SELECT feature, estimated_cost_usd, duration_ms FROM ai_usage_log WHERE teacher_id = ? AND created_at >= ?`)
+    .all(teacherId, sinceIso) as { feature: string; estimated_cost_usd: number; duration_ms: number }[];
+  return summarizeAiUsageRows(rows);
+}
+
+// Platform-wide (all teachers) — for the admin operational cost view only.
+export function getPlatformAiUsageCostSummary(sinceIso: string): AiUsageCostSummary {
+  const rows = db
+    .prepare(`SELECT feature, estimated_cost_usd, duration_ms FROM ai_usage_log WHERE created_at >= ?`)
+    .all(sinceIso) as { feature: string; estimated_cost_usd: number; duration_ms: number }[];
+  return summarizeAiUsageRows(rows);
 }
 
 // ---------- Lesson prep ----------

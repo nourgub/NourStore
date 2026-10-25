@@ -4,7 +4,15 @@ import mammoth from "mammoth";
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 const MAX_STORED_CHARS = 20000; // keeps prompt size + storage bounded
 
-export type ExtractionStatus = "none" | "extracted" | "unsupported" | "failed";
+export type ExtractionStatus = "none" | "extracted" | "unsupported" | "failed" | "scanned_no_text";
+
+// A PDF page with no embedded text layer (a scan or photo saved as PDF)
+// still parses "successfully" — pdf-parse just returns an empty or
+// near-empty string, with no exception to catch. Below this many
+// non-whitespace characters, treat it as "no real text", not "extracted",
+// so it's never silently used as reference material and the teacher is told
+// their file needs OCR instead.
+const MIN_MEANINGFUL_CHARS = 20;
 
 export interface ExtractionResult {
   status: ExtractionStatus;
@@ -34,6 +42,9 @@ export async function extractTextFromUpload(file: File): Promise<ExtractionResul
       const parser = new PDFParse({ data: buffer });
       try {
         const result = await parser.getText();
+        if (result.text.trim().length < MIN_MEANINGFUL_CHARS) {
+          return { status: "scanned_no_text", text: "" };
+        }
         return { status: "extracted", text: result.text.slice(0, MAX_STORED_CHARS) };
       } finally {
         await parser.destroy();

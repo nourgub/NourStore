@@ -31,7 +31,14 @@ export interface ImportExamInput {
   correctionText: string;
 }
 
-const MAX_CHARS_IN_PROMPT = 12000;
+// This is the teacher's OWN exam/correction content being digitized
+// verbatim — unlike a broad curriculum reference document, there is no
+// "less relevant part" to drop here; losing the tail of a long exam would
+// silently drop real questions from grading. The limit is generous (well
+// within the model's context window) specifically so it's never actually
+// hit in practice; if it somehow is, importExamFromDocuments refuses with a
+// clear error instead of silently truncating and grading an incomplete exam.
+const MAX_CHARS_IN_PROMPT = 60000;
 
 const ImportedQuestionSchema = z.object({
   prompt: z
@@ -61,8 +68,13 @@ function getClient(): Anthropic {
 export class ExamImportError extends Error {}
 
 export async function importExamFromDocuments(input: ImportExamInput): Promise<GeneratedQuestion[]> {
-  const examExcerpt = input.examText.slice(0, MAX_CHARS_IN_PROMPT);
-  const correctionExcerpt = input.correctionText.slice(0, MAX_CHARS_IN_PROMPT);
+  if (input.examText.length > MAX_CHARS_IN_PROMPT || input.correctionText.length > MAX_CHARS_IN_PROMPT) {
+    throw new ExamImportError(
+      "ملف الامتحان أو ملف التصحيح طويل جدًا لمعالجته دفعة واحدة — قسّمه إلى ملفات أصغر (مثلًا حسب الأجزاء أو الصفحات) وأعد الاستيراد لكل جزء على حدة.",
+    );
+  }
+  const examExcerpt = input.examText;
+  const correctionExcerpt = input.correctionText;
 
   const prompt = `أنت ${input.subjectPersona} تساعد في رقمنة امتحان جاهز بعنوان "${input.examTitle}" لمستوى "${input.gradeLevel}"، لتجهيزه للتصحيح الآلي.
 

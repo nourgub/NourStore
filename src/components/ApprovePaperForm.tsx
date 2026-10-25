@@ -13,7 +13,7 @@ import {
   ImageUp,
   PencilLine,
 } from "lucide-react";
-import type { CriterionReviewStatus, StudentPaper } from "@/lib/types";
+import type { CriterionReviewStatus, GeneratedQuestion, StudentPaper } from "@/lib/types";
 
 const CRITERION_STATUS_LABEL: Record<CriterionReviewStatus, { label: string; className: string }> = {
   agreed: { label: "متفق عليه بين النموذجين", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
@@ -33,7 +33,18 @@ const GEMINI_STATUS_LABEL: Record<StudentPaper["geminiReviewStatus"], { label: s
 
 type OverrideState = Record<string, { value: string; reason: string }>; // key: `${questionId}:${criterionId}`
 
-export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: StudentPaper; totalPoints: number }) {
+export function ApprovePaperForm({
+  initialPaper,
+  totalPoints,
+  examQuestions,
+}: {
+  initialPaper: StudentPaper;
+  totalPoints: number;
+  // The exam's own questions, carrying the expected model solution — shown
+  // side by side with the student's transcribed answer so the teacher never
+  // has to leave this screen to check what the "correct" answer was.
+  examQuestions: GeneratedQuestion[];
+}) {
   const router = useRouter();
   const [paper, setPaper] = useState(initialPaper);
   const [overrides, setOverrides] = useState<OverrideState>({});
@@ -210,9 +221,32 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
   }
 
   const geminiStatus = GEMINI_STATUS_LABEL[paper.geminiReviewStatus];
+  const solutionByQuestionId = new Map(examQuestions.map((q) => [q.id, q]));
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+      {paper.imagePaths.length > 0 ? (
+        <div className="order-2 space-y-3 lg:order-1 lg:sticky lg:top-4 lg:self-start">
+          <p className="text-xs font-semibold text-brand-600">ورقة إجابة التلميذ ({paper.imagePaths.length} صفحة)</p>
+          {paper.imagePaths.map((_, i) => (
+            <a key={i} href={`/api/grading/images/${paper.id}/${i}`} target="_blank" rel="noreferrer" className="block">
+              {/* eslint-disable-next-line @next/next/no-img-element -- served from our own API route, not a static asset Next can optimize */}
+              <img
+                src={`/api/grading/images/${paper.id}/${i}`}
+                alt={`صفحة ${i + 1} من ورقة ${paper.studentName}`}
+                className="w-full rounded-xl border border-brand-200 shadow-sm"
+              />
+            </a>
+          ))}
+          <p className="text-[11px] text-brand-400">اضغط على أي صورة لفتحها بحجمها الكامل في تبويب جديد.</p>
+        </div>
+      ) : (
+        <div className="order-2 lg:order-1 rounded-xl border border-brand-100 bg-brand-50/40 p-3 text-xs text-brand-500 lg:sticky lg:top-4 lg:self-start">
+          صور هذه الورقة لم تعد متوفرة (حُذفت ضمن سياسة الاحتفاظ بالبيانات بعد الاعتماد) — التصحيح المحفوظ يبقى كما هو.
+        </div>
+      )}
+
+      <div className="order-1 space-y-4 lg:order-2">
       <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
         <span className="flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2.5 py-1 text-brand-600">
           Claude: {paper.claudeModel ?? "—"}
@@ -272,16 +306,24 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
             </div>
           )}
 
-          <p className="mb-2 whitespace-pre-wrap text-sm text-brand-700">
-            <span className="font-semibold text-brand-600">نقل Claude: </span>
-            {q.claudeTranscription || "—"}
-          </p>
-          {paper.geminiReviewStatus === "reviewed" && q.geminiTranscription && (
-            <p className="mb-3 whitespace-pre-wrap text-sm text-brand-700">
-              <span className="font-semibold text-brand-600">نقل Gemini: </span>
-              {q.geminiTranscription}
-            </p>
-          )}
+          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-brand-100 bg-brand-50/30 p-2">
+              <p className="mb-1 text-xs font-semibold text-brand-600">ما كُتب في الورقة (حسب القراءة الآلية)</p>
+              <p className="whitespace-pre-wrap text-sm text-brand-800">{q.claudeTranscription || "—"}</p>
+              {paper.geminiReviewStatus === "reviewed" && q.geminiTranscription && q.geminiTranscription !== q.claudeTranscription && (
+                <p className="mt-2 whitespace-pre-wrap border-t border-brand-100 pt-2 text-xs text-brand-600">
+                  <span className="font-semibold">قراءة Gemini (مختلفة): </span>
+                  {q.geminiTranscription}
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-2">
+              <p className="mb-1 text-xs font-semibold text-emerald-700">الحل النموذجي المتوقع</p>
+              <p className="whitespace-pre-wrap text-sm text-emerald-900">
+                {solutionByQuestionId.get(q.questionId)?.solution || "غير متوفر"}
+              </p>
+            </div>
+          </div>
 
           {paper.status !== "approved" &&
             (correctingQuestionId === q.questionId ? (
@@ -423,6 +465,7 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
           </ul>
         </details>
       )}
+      </div>
     </div>
   );
 }

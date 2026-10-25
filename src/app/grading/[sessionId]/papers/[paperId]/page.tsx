@@ -26,7 +26,7 @@ export default async function StudentPaperPage({
   return (
     <>
       <SiteHeader teacherName={teacher.fullName} />
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main className="mx-auto max-w-5xl px-4 py-10">
         <Link
           href={`/grading/${sessionId}`}
           className="mb-4 inline-flex items-center gap-1 text-sm text-brand-600 hover:underline"
@@ -35,7 +35,7 @@ export default async function StudentPaperPage({
         </Link>
         <h1 className="mb-1 text-2xl font-bold text-brand-900">{paper.studentName}</h1>
 
-        <ApprovePaperForm initialPaper={paper} totalPoints={totalPoints} />
+        <ApprovePaperForm initialPaper={paper} totalPoints={totalPoints} examQuestions={exam?.questions ?? []} />
       </main>
     </>
   );

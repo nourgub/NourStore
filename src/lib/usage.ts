@@ -17,11 +17,19 @@ export class UsageLimitError extends Error {}
 // teacher with no expiry at all (a never-expiring account predating this
 // field) falls back to a calendar-month period, since there is no cycle to
 // anchor to.
-function currentPeriod(teacher: Teacher): string {
+function currentPeriodStart(teacher: Teacher): Date {
   if (teacher.subscriptionExpiresAt) {
     const cycleStartMs =
       new Date(teacher.subscriptionExpiresAt).getTime() - SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000;
-    return new Date(cycleStartMs).toISOString().slice(0, 10);
+    return new Date(cycleStartMs);
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function currentPeriod(teacher: Teacher): string {
+  if (teacher.subscriptionExpiresAt) {
+    return currentPeriodStart(teacher).toISOString().slice(0, 10);
   }
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

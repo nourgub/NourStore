@@ -50,6 +50,7 @@ export interface GeminiJsonCallResult {
   /** Raw JSON text — callers parse and validate it themselves (e.g. with Zod). */
   text: string;
   model: string;
+  usage: { inputTokens: number; outputTokens: number };
 }
 
 /**
@@ -70,6 +71,7 @@ export async function callGeminiJson(input: GeminiJsonCallInput): Promise<Gemini
   ];
 
   let text: string | undefined;
+  let usage = { inputTokens: 0, outputTokens: 0 };
   try {
     const response = await getClient().models.generateContent({
       model,
@@ -82,6 +84,10 @@ export async function callGeminiJson(input: GeminiJsonCallInput): Promise<Gemini
       },
     });
     text = response.text;
+    usage = {
+      inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+    };
   } catch (err) {
     // Never log `err` itself — it may embed request content (images/answers)
     // or, in rare SDK error paths, request metadata. Only ever surface a
@@ -105,5 +111,5 @@ export async function callGeminiJson(input: GeminiJsonCallInput): Promise<Gemini
     throw new GeminiReviewError("فشلت المراجعة — لم تُرجع خدمة Gemini أي محتوى");
   }
 
-  return { text, model };
+  return { text, model, usage };
 }
