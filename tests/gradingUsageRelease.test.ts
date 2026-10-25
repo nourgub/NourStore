@@ -108,6 +108,8 @@ function makeExam(id: string, teacherId: string) {
     files: {},
     createdAt: new Date().toISOString(),
     finishedAt: new Date().toISOString(),
+    approvedRubricVersion: 1,
+    approvedAt: new Date().toISOString(),
   };
 }
 

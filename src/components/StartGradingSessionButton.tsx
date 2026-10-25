@@ -3,7 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function StartGradingSessionButton({ examRequestId, examTitle }: { examRequestId: string; examTitle: string }) {
+export function StartGradingSessionButton({
+  examRequestId,
+  examTitle,
+  examApproved,
+}: {
+  examRequestId: string;
+  examTitle: string;
+  // When false, the server will refuse anyway (see createGradingSession) —
+  // disabling here just avoids making the teacher click through to find
+  // that out, and explains why in the same place as the approve action.
+  examApproved: boolean;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +34,14 @@ export function StartGradingSessionButton({ examRequestId, examTitle }: { examRe
       return;
     }
     router.push(`/grading/${data.session.id}`);
+  }
+
+  if (!examApproved) {
+    return (
+      <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+        اعتمد الامتحان أولًا (أعلاه) قبل أن تتمكن من بدء جلسة تصحيح حقيقية لأوراق التلاميذ.
+      </p>
+    );
   }
 
   return (

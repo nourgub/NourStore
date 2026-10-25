@@ -24,6 +24,7 @@ import { reviewStudentPaperWithGemini, isGeminiConfigured, GeminiReviewError } f
 import { mergePaperGrades } from "./agents/gradingManager";
 import { reserveUsage, releaseUsage } from "./usage";
 import type { IndependentPaperGrade } from "./agents/independentGradeTypes";
+import { isExamApproved } from "./types";
 import type { GeneratedQuestion, GradeOverrideLogEntry, GradingSession, StudentPaper, Teacher } from "./types";
 
 export class GradingError extends Error {}
@@ -44,6 +45,59 @@ const MAX_PAGES_PER_PAPER = 10;
 const MAX_IMAGE_DIMENSION = 1568;
 const JPEG_QUALITY = 82;
 
+function validatePaperImageFiles(files: File[]): void {
+  if (files.length === 0) throw new GradingError("أرفق صورة واحدة على الأقل من ورقة الإجابة");
+  if (files.length > MAX_PAGES_PER_PAPER) throw new GradingError(`الحد الأقصى ${MAX_PAGES_PER_PAPER} صفحات لكل ورقة`);
+  for (const file of files) {
+    if (!ALLOWED_IMAGE_MIME.has(file.type)) {
+      throw new GradingError("صيغة الصورة غير مدعومة — يُقبل فقط JPG أو PNG");
+    }
+    if (file.size > MAX_PAPER_IMAGE_BYTES) {
+      throw new GradingError("حجم إحدى الصور يتجاوز الحد المسموح (10 ميغابايت)");
+    }
+  }
+}
+
+async function writePaperImages(paperDir: string, files: File[]): Promise<string[]> {
+  fs.mkdirSync(paperDir, { recursive: true });
+  const imagePaths: string[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const imagePath = path.join(paperDir, `page-${i + 1}.jpg`);
+    const original = Buffer.from(await file.arrayBuffer());
+    const resized = await sharp(original)
+      .rotate() // respect EXIF orientation from phone cameras before stripping metadata
+      .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: JPEG_QUALITY })
+      .toBuffer();
+    fs.writeFileSync(imagePath, resized);
+    imagePaths.push(imagePath);
+  }
+  return imagePaths;
+}
+
+// Shared reset applied whenever a paper is sent back through grading (plain
+// retry, after a corrected transcription, or after replacement images) — a
+// stale grade must never linger next to a "grading" status.
+function resetPaperForRegrade(paperId: string): void {
+  updateStudentPaperFields(paperId, {
+    status: "grading",
+    failureReason: null,
+    claudeModel: null,
+    questionResults: [],
+    needsReview: false,
+    draftTotal: null,
+    gradedAt: null,
+    geminiReviewStatus: isGeminiConfigured() ? "not_reviewed" : "not_configured",
+    geminiModel: null,
+    geminiFailureReason: null,
+  });
+  enqueueClaudeGradeJob(paperId, true);
+  if (isGeminiConfigured()) {
+    enqueueGeminiReviewJob(paperId, true);
+  }
+}
+
 export async function createGradingSession(
   teacherId: string,
   examRequestId: string,
@@ -52,6 +106,11 @@ export async function createGradingSession(
   const exam = findRequest(examRequestId, teacherId);
   if (!exam) throw new GradingError("الامتحان المرتبط غير موجود");
   if (exam.questions.length === 0) throw new GradingError("هذا الامتحان لا يحتوي على أسئلة لتصحيحها");
+  if (!isExamApproved(exam)) {
+    throw new GradingError(
+      "هذا الامتحان ما يزال مسودة — راجع الأسئلة والحلول وسلم التنقيط واعتمده أولًا قبل بدء تصحيح حقيقي لأوراق التلاميذ",
+    );
+  }
 
   const session: GradingSession = {
     id: `grd_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -95,17 +154,7 @@ export async function submitStudentPaper(
   const session = findGradingSession(sessionId, teacherId);
   if (!session) throw new GradingError("جلسة التصحيح غير موجودة");
   if (!studentName.trim()) throw new GradingError("اسم التلميذ مطلوب");
-  if (files.length === 0) throw new GradingError("أرفق صورة واحدة على الأقل من ورقة الإجابة");
-  if (files.length > MAX_PAGES_PER_PAPER) throw new GradingError(`الحد الأقصى ${MAX_PAGES_PER_PAPER} صفحات لكل ورقة`);
-
-  for (const file of files) {
-    if (!ALLOWED_IMAGE_MIME.has(file.type)) {
-      throw new GradingError("صيغة الصورة غير مدعومة — يُقبل فقط JPG أو PNG");
-    }
-    if (file.size > MAX_PAPER_IMAGE_BYTES) {
-      throw new GradingError("حجم إحدى الصور يتجاوز الحد المسموح (10 ميغابايت)");
-    }
-  }
+  validatePaperImageFiles(files);
 
   const exam = findRequest(session.examRequestId, teacherId);
   if (!exam) throw new GradingError("الامتحان المرتبط بجلسة التصحيح لم يعد موجودًا");
@@ -124,21 +173,7 @@ export async function submitStudentPaper(
 
   try {
     const paperDir = path.join(PAPERS_DIR, teacherId, paperId);
-    fs.mkdirSync(paperDir, { recursive: true });
-
-    const imagePaths: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const imagePath = path.join(paperDir, `page-${i + 1}.jpg`);
-      const original = Buffer.from(await file.arrayBuffer());
-      const resized = await sharp(original)
-        .rotate() // respect EXIF orientation from phone cameras before stripping metadata
-        .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: JPEG_QUALITY })
-        .toBuffer();
-      fs.writeFileSync(imagePath, resized);
-      imagePaths.push(imagePath);
-    }
+    const imagePaths = await writePaperImages(paperDir, files);
 
     const paper: StudentPaper = {
       id: paperId,
@@ -158,6 +193,7 @@ export async function submitStudentPaper(
       draftTotal: null,
       approvedTotal: null,
       overrideHistory: [],
+      teacherCorrectedTranscriptions: [],
       createdAt: new Date().toISOString(),
       gradedAt: null,
       approvedAt: null,
@@ -207,12 +243,71 @@ export function retryPaperGrading(paperId: string, teacherId: string): StudentPa
   if (!paper) throw new GradingError("الورقة غير موجودة");
   if (paper.status === "approved") throw new GradingError("لا يمكن إعادة تصحيح ورقة مُعتمدة بالفعل");
 
-  updateStudentPaperFields(paperId, { status: "grading", failureReason: null });
-  enqueueClaudeGradeJob(paperId, true);
-  if (isGeminiConfigured()) {
-    updateStudentPaperFields(paperId, { geminiReviewStatus: "not_reviewed", geminiFailureReason: null });
-    enqueueGeminiReviewJob(paperId, true);
+  resetPaperForRegrade(paperId);
+  return findStudentPaper(paperId, teacherId)!;
+}
+
+/**
+ * Replaces a paper's page images (e.g. a blurry scan, the wrong page, a
+ * photo taken sideways) and triggers a full re-grade from scratch — this is
+ * the "إعادة رفع الصورة" half of the unreadable-answer workflow: a bad photo
+ * is not the student's fault, and should never need a whole new paper
+ * submission (and a second quota charge) to fix.
+ */
+export async function replacePaperImages(teacherId: string, paperId: string, files: File[]): Promise<StudentPaper> {
+  const paper = findStudentPaper(paperId, teacherId);
+  if (!paper) throw new GradingError("الورقة غير موجودة");
+  if (paper.status === "approved") throw new GradingError("لا يمكن استبدال صور ورقة مُعتمدة بالفعل");
+  validatePaperImageFiles(files);
+
+  const oldImagePaths = paper.imagePaths;
+  const paperDir = path.join(PAPERS_DIR, teacherId, paperId);
+  const newImagePaths = await writePaperImages(paperDir, files);
+
+  updateStudentPaperFields(paperId, { imagePaths: newImagePaths });
+  for (const oldPath of oldImagePaths) {
+    if (newImagePaths.includes(oldPath)) continue; // writePaperImages reuses the same page-N.jpg names
+    try {
+      fs.unlinkSync(oldPath);
+    } catch {
+      // Already missing — nothing to clean up.
+    }
   }
+
+  resetPaperForRegrade(paperId);
+  return findStudentPaper(paperId, teacherId)!;
+}
+
+/**
+ * Records the teacher's correction of what a specific question's answer
+ * actually says (the "تصحيح النص المستخرج" half of the unreadable-answer
+ * workflow — used when the teacher can read the handwriting but the model
+ * couldn't) and triggers a full re-grade: both gradeStudentPaper and the
+ * Gemini reviewer are told to trust this text for this question instead of
+ * re-reading it from the image (see knownTranscriptions in GradePaperInput).
+ */
+export function correctPaperTranscription(
+  teacherId: string,
+  paperId: string,
+  questionId: string,
+  correctedText: string,
+): StudentPaper {
+  const paper = findStudentPaper(paperId, teacherId);
+  if (!paper) throw new GradingError("الورقة غير موجودة");
+  if (paper.status === "approved") throw new GradingError("لا يمكن تصحيح نص ورقة مُعتمدة بالفعل");
+  if (!correctedText.trim()) throw new GradingError("النص المصحَّح لا يمكن أن يكون فارغًا");
+
+  const session = findGradingSession(paper.sessionId, teacherId);
+  const exam = session ? findRequest(session.examRequestId, teacherId) : null;
+  if (!exam || !exam.questions.some((q) => q.id === questionId)) {
+    throw new GradingError("السؤال المحدَّد غير موجود في هذا الامتحان");
+  }
+
+  const corrections = paper.teacherCorrectedTranscriptions.filter((c) => c.questionId !== questionId);
+  corrections.push({ questionId, text: correctedText.trim() });
+  updateStudentPaperFields(paperId, { teacherCorrectedTranscriptions: corrections });
+
+  resetPaperForRegrade(paperId);
   return findStudentPaper(paperId, teacherId)!;
 }
 
@@ -248,6 +343,8 @@ async function handleClaudeGradeJob(
       questions: exam.questions,
       imagePaths: paper.imagePaths,
       imageMimeTypes: paper.imagePaths.map(() => "image/jpeg"),
+      knownTranscriptions:
+        paper.teacherCorrectedTranscriptions.length > 0 ? paper.teacherCorrectedTranscriptions : undefined,
     });
   } catch (err) {
     const failureReason =
@@ -297,6 +394,8 @@ async function handleGeminiReviewJob(
       questions: exam.questions,
       imagePaths: paper.imagePaths,
       imageMimeTypes: paper.imagePaths.map(() => "image/jpeg"),
+      knownTranscriptions:
+        paper.teacherCorrectedTranscriptions.length > 0 ? paper.teacherCorrectedTranscriptions : undefined,
     });
   } catch (err) {
     const failureReason =

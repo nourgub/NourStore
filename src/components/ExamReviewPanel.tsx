@@ -53,14 +53,21 @@ export function ExamReviewPanel({ requestId, initialReview }: { requestId: strin
     );
   }
 
-  // status === "reviewed"
+  // status === "reviewed" — note the wording throughout this branch: Gemini's
+  // review is informative, never a correctness guarantee. A second model
+  // finding no issues does not mean the exam has no errors, and must never
+  // be presented as "verified" or "صحيح" — only the teacher's own explicit
+  // approval (see ApproveExamButton) does that.
   return (
     <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
       <h2 className="mb-3 flex items-center gap-2 font-bold text-brand-800">
-        <ShieldCheck size={18} className="text-emerald-600" /> مراجعة مستقلة عبر Gemini ({review.model})
+        <ShieldCheck size={18} className="text-brand-500" /> مراجعة مستقلة عبر Gemini ({review.model})
       </h2>
       {review.issues.length === 0 ? (
-        <p className="text-sm text-emerald-700">لم تُسجَّل أي ملاحظة من المراجعة المستقلة.</p>
+        <p className="text-sm text-brand-700">
+          لم يسجّل المراجع المستقل أي ملاحظة — هذا لا يعني ضمان خلو الامتحان من الأخطاء، فالمراجعة الآلية قد تفوّت
+          أخطاء حقيقية. راجع الأسئلة والحلول وسلم التنقيط بنفسك قبل اعتماد الامتحان.
+        </p>
       ) : (
         <ul className="space-y-2">
           {review.issues.map((issue, i) => (

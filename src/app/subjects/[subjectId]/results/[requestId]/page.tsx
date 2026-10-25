@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck, XCircle, Pencil } from "lucide-react";
+import { ArrowRight, FileDown, CheckCircle2, Table2, ClipboardCheck, XCircle, Pencil, BadgeCheck } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getGenerationForTeacher } from "@/lib/generation";
 import { getGradingSessionsForExam } from "@/lib/grading";
+import { isExamApproved } from "@/lib/types";
 import { SiteHeader } from "@/components/SiteHeader";
 import { StartGradingSessionButton } from "@/components/StartGradingSessionButton";
 import { ExamReviewPanel } from "@/components/ExamReviewPanel";
+import { ApproveExamButton } from "@/components/ApproveExamButton";
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   سهل: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -27,6 +29,7 @@ export default async function ResultsPage({
   if (!generation) notFound();
 
   const gradingSessions = getGradingSessionsForExam(generation.id, teacher.id);
+  const approved = isExamApproved(generation);
 
   return (
     <>
@@ -92,6 +95,15 @@ export default async function ResultsPage({
 
         {generation.status === "done" && <ExamReviewPanel requestId={generation.id} initialReview={generation.review} />}
 
+        {generation.status === "done" && (approved ? (
+          <div className="mb-8 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+            <BadgeCheck size={18} className="shrink-0" />
+            اعتمدت هذا الامتحان بأسئلته وحلوله وسلم تنقيطه — جاهز لتصحيح أوراق التلاميذ حقيقيًا.
+          </div>
+        ) : (
+          <ApproveExamButton requestId={generation.id} />
+        ))}
+
         <section className="mb-8 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
           <h2 className="mb-3 flex items-center gap-2 font-bold text-brand-800">
             <ClipboardCheck size={18} className="text-brand-500" /> تصحيح أوراق التلاميذ
@@ -111,7 +123,7 @@ export default async function ResultsPage({
               ))}
             </ul>
           )}
-          <StartGradingSessionButton examRequestId={generation.id} examTitle={generation.examTitle} />
+          <StartGradingSessionButton examRequestId={generation.id} examTitle={generation.examTitle} examApproved={approved} />
         </section>
 
         <section className="mb-2 flex justify-end">

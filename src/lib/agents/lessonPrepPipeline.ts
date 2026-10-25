@@ -132,13 +132,11 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
         `تم إعداد تحضير بنفس شكل نموذجك المرفوع (${result.tableRows.length} مرحلة) لدرس "${input.lessonTitle}"، عبر نموذج الذكاء الاصطناعي (Claude).`,
       ),
     );
-    steps.push(
-      step(
-        "المراجع",
-        "مراجعة التحضير",
-        `تم التحقق من أن التحضير يطابق حقول نموذجك المرفوع ومناسب لمستوى "${input.gradeLevel}".`,
-      ),
-    );
+    // No separate review step is logged here — nothing in this pipeline
+    // actually re-checks the output against the template fields or grade
+    // level after generation, so claiming a "مراجعة" ran would be an unearned
+    // "reviewed" message. The teacher's own read of the result before export
+    // is the real check.
     return { steps, ...EMPTY_SECTIONS, headerValues: result.headerValues, noteValues: result.noteValues, tableColumns: template.tableColumns, tableRows: result.tableRows };
   }
 
@@ -171,13 +169,8 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
     ),
   );
 
-  steps.push(
-    step(
-      "المراجع",
-      "مراجعة التحضير",
-      `تم التحقق من أن التحضير يغطي مراحل الدرس الأساسية ومناسب لمستوى "${input.gradeLevel}".`,
-    ),
-  );
+  // Same reasoning as the templated branch above: no code here actually
+  // re-checks the generated sections, so no "reviewed" step is logged.
 
   return { steps, sections, ...EMPTY_TEMPLATED };
 }

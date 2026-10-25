@@ -122,7 +122,9 @@ withBusyRetry(() =>
     review_json TEXT NOT NULL DEFAULT '{"status":"not_reviewed","reviewedAt":null,"model":null,"failureReason":null,"independentSolutions":[],"issues":[]}',
     files_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    finished_at TEXT
+    finished_at TEXT,
+    approved_rubric_version INTEGER,
+    approved_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_requests_teacher_subject ON requests(teacher_id, subject_id);
 
@@ -225,6 +227,7 @@ withBusyRetry(() =>
     override_history_json TEXT NOT NULL DEFAULT '[]',
     claude_raw_grade_json TEXT,
     gemini_raw_grade_json TEXT,
+    teacher_corrected_transcriptions_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     graded_at TEXT,
     approved_at TEXT
@@ -339,6 +342,17 @@ if (!requestColumns.some((c) => c.name === "review_json")) {
     ),
   );
 }
+// Draft-until-approved: an exam generated before this migration ships stays
+// a draft (approved_rubric_version IS NULL) until the teacher explicitly
+// approves it — this is a deliberate behavior change (see
+// approveGenerationRequest below), not a bug: new grading sessions can no
+// longer start against an exam the teacher never actually reviewed.
+if (!requestColumns.some((c) => c.name === "approved_rubric_version")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE requests ADD COLUMN approved_rubric_version INTEGER`));
+}
+if (!requestColumns.some((c) => c.name === "approved_at")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE requests ADD COLUMN approved_at TEXT`));
+}
 
 const gradingSessionColumns = db.prepare(`PRAGMA table_info(grading_sessions)`).all() as { name: string }[];
 if (!gradingSessionColumns.some((c) => c.name === "exam_version")) {
@@ -374,6 +388,11 @@ if (!studentPaperColumns.some((c) => c.name === "claude_raw_grade_json")) {
 }
 if (!studentPaperColumns.some((c) => c.name === "gemini_raw_grade_json")) {
   withBusyRetry(() => db.exec(`ALTER TABLE student_papers ADD COLUMN gemini_raw_grade_json TEXT`));
+}
+if (!studentPaperColumns.some((c) => c.name === "teacher_corrected_transcriptions_json")) {
+  withBusyRetry(() =>
+    db.exec(`ALTER TABLE student_papers ADD COLUMN teacher_corrected_transcriptions_json TEXT NOT NULL DEFAULT '[]'`),
+  );
 }
 // Must run after the needs_review column migration above (not in the initial
 // CREATE TABLE block) — on a database that already had student_papers before
@@ -554,6 +573,8 @@ interface RequestRow {
   files_json: string;
   created_at: string;
   finished_at: string | null;
+  approved_rubric_version: number | null;
+  approved_at: string | null;
 }
 
 function rowToRequest(row: RequestRow): GenerationRequest {
@@ -576,13 +597,15 @@ function rowToRequest(row: RequestRow): GenerationRequest {
     files: JSON.parse(row.files_json),
     createdAt: row.created_at,
     finishedAt: row.finished_at ?? undefined,
+    approvedRubricVersion: row.approved_rubric_version,
+    approvedAt: row.approved_at,
   };
 }
 
 export function insertRequest(request: GenerationRequest): void {
   db.prepare(
-    `INSERT INTO requests (id, teacher_id, subject_id, document_id, exam_title, grade_level, topics_json, num_questions, difficulty_mix, status, failure_reason, steps_json, questions_json, rubric_version, review_json, files_json, created_at, finished_at)
-     VALUES (@id, @teacherId, @subjectId, @documentId, @examTitle, @gradeLevel, @topicsJson, @numQuestions, @difficultyMix, @status, @failureReason, @stepsJson, @questionsJson, @rubricVersion, @reviewJson, @filesJson, @createdAt, @finishedAt)`,
+    `INSERT INTO requests (id, teacher_id, subject_id, document_id, exam_title, grade_level, topics_json, num_questions, difficulty_mix, status, failure_reason, steps_json, questions_json, rubric_version, review_json, files_json, created_at, finished_at, approved_rubric_version, approved_at)
+     VALUES (@id, @teacherId, @subjectId, @documentId, @examTitle, @gradeLevel, @topicsJson, @numQuestions, @difficultyMix, @status, @failureReason, @stepsJson, @questionsJson, @rubricVersion, @reviewJson, @filesJson, @createdAt, @finishedAt, @approvedRubricVersion, @approvedAt)`,
   ).run({
     ...request,
     documentId: request.documentId ?? null,
@@ -593,11 +616,29 @@ export function insertRequest(request: GenerationRequest): void {
     reviewJson: JSON.stringify(request.review),
     filesJson: JSON.stringify(request.files),
     finishedAt: request.finishedAt ?? null,
+    approvedRubricVersion: request.approvedRubricVersion ?? null,
+    approvedAt: request.approvedAt ?? null,
   });
 }
 
 export function updateRequestReview(id: string, review: GenerationRequest["review"]): void {
   db.prepare(`UPDATE requests SET review_json = ? WHERE id = ?`).run(JSON.stringify(review), id);
+}
+
+// Approves the exam at exactly `expectedRubricVersion` — guards against a
+// stale approval (the teacher had an old version of the page open, the exam
+// was edited in another tab since) silently approving the wrong version.
+// Returns false (no-op) if the exam's rubric has moved on since the teacher
+// last loaded it; the caller should tell them to refresh and re-check.
+export function approveGenerationRequest(id: string, teacherId: string, expectedRubricVersion: number): boolean {
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `UPDATE requests SET approved_rubric_version = ?, approved_at = ?
+       WHERE id = ? AND teacher_id = ? AND rubric_version = ? AND status = 'done'`,
+    )
+    .run(expectedRubricVersion, now, id, teacherId, expectedRubricVersion);
+  return result.changes > 0;
 }
 
 // Persists a teacher's edit to an exam's questions/rubric (see
@@ -767,6 +808,7 @@ interface StudentPaperRow {
   draft_total: number | null;
   approved_total: number | null;
   override_history_json: string;
+  teacher_corrected_transcriptions_json: string;
   created_at: string;
   graded_at: string | null;
   approved_at: string | null;
@@ -791,6 +833,7 @@ function rowToStudentPaper(row: StudentPaperRow): StudentPaper {
     draftTotal: row.draft_total,
     approvedTotal: row.approved_total,
     overrideHistory: JSON.parse(row.override_history_json),
+    teacherCorrectedTranscriptions: JSON.parse(row.teacher_corrected_transcriptions_json),
     createdAt: row.created_at,
     gradedAt: row.graded_at,
     approvedAt: row.approved_at,
@@ -799,14 +842,15 @@ function rowToStudentPaper(row: StudentPaperRow): StudentPaper {
 
 export function insertStudentPaper(paper: StudentPaper): void {
   db.prepare(
-    `INSERT INTO student_papers (id, session_id, teacher_id, student_name, image_paths_json, status, failure_reason, exam_version, claude_model, gemini_review_status, gemini_model, gemini_failure_reason, question_results_json, needs_review, draft_total, approved_total, override_history_json, created_at, graded_at, approved_at)
-     VALUES (@id, @sessionId, @teacherId, @studentName, @imagePathsJson, @status, @failureReason, @examVersion, @claudeModel, @geminiReviewStatus, @geminiModel, @geminiFailureReason, @questionResultsJson, @needsReview, @draftTotal, @approvedTotal, @overrideHistoryJson, @createdAt, @gradedAt, @approvedAt)`,
+    `INSERT INTO student_papers (id, session_id, teacher_id, student_name, image_paths_json, status, failure_reason, exam_version, claude_model, gemini_review_status, gemini_model, gemini_failure_reason, question_results_json, needs_review, draft_total, approved_total, override_history_json, teacher_corrected_transcriptions_json, created_at, graded_at, approved_at)
+     VALUES (@id, @sessionId, @teacherId, @studentName, @imagePathsJson, @status, @failureReason, @examVersion, @claudeModel, @geminiReviewStatus, @geminiModel, @geminiFailureReason, @questionResultsJson, @needsReview, @draftTotal, @approvedTotal, @overrideHistoryJson, @teacherCorrectedTranscriptionsJson, @createdAt, @gradedAt, @approvedAt)`,
   ).run({
     ...paper,
     imagePathsJson: JSON.stringify(paper.imagePaths),
     questionResultsJson: JSON.stringify(paper.questionResults),
     needsReview: paper.needsReview ? 1 : 0,
     overrideHistoryJson: JSON.stringify(paper.overrideHistory),
+    teacherCorrectedTranscriptionsJson: JSON.stringify(paper.teacherCorrectedTranscriptions),
   });
 }
 
@@ -842,6 +886,8 @@ type StudentPaperFieldUpdate = Partial<{
   needsReview: boolean;
   draftTotal: number | null;
   gradedAt: string | null;
+  imagePaths: string[];
+  teacherCorrectedTranscriptions: StudentPaper["teacherCorrectedTranscriptions"];
 }>;
 
 const FIELD_TO_COLUMN: Record<keyof StudentPaperFieldUpdate, string> = {
@@ -855,6 +901,8 @@ const FIELD_TO_COLUMN: Record<keyof StudentPaperFieldUpdate, string> = {
   needsReview: "needs_review",
   draftTotal: "draft_total",
   gradedAt: "graded_at",
+  imagePaths: "image_paths_json",
+  teacherCorrectedTranscriptions: "teacher_corrected_transcriptions_json",
 };
 
 // A paper is written to by two independent background jobs (Claude grading,
@@ -868,7 +916,7 @@ export function updateStudentPaperFields(id: string, fields: StudentPaperFieldUp
   const setClause = keys.map((k) => `${FIELD_TO_COLUMN[k]} = ?`).join(", ");
   const values = keys.map((k) => {
     const v = fields[k];
-    if (k === "questionResults") return JSON.stringify(v);
+    if (k === "questionResults" || k === "imagePaths" || k === "teacherCorrectedTranscriptions") return JSON.stringify(v);
     if (k === "needsReview") return v ? 1 : 0;
     return v as string | number | null;
   });

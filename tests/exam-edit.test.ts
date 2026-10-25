@@ -105,6 +105,8 @@ function makeExam(id: string, teacherId: string, status: "done" | "failed" = "do
     files: { examDocx, solutionDocx, rubricDocx },
     createdAt: new Date().toISOString(),
     finishedAt: new Date().toISOString(),
+    approvedRubricVersion: null,
+    approvedAt: null,
   };
 }
 

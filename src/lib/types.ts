@@ -170,6 +170,22 @@ export interface GenerationRequest {
   files: { examDocx?: string; solutionDocx?: string; rubricDocx?: string };
   createdAt: string;
   finishedAt?: string;
+  // Set once the teacher explicitly approves THIS rubricVersion's questions,
+  // solutions and grading rubric (see approveGeneration in generation.ts).
+  // null (or not matching the current rubricVersion, e.g. after an edit)
+  // means the exam is still a draft — createGradingSession refuses to start
+  // real student grading against a draft. Never set automatically by any AI
+  // review: a second model's "no issues found" is informative, never a
+  // substitute for this explicit human approval.
+  approvedRubricVersion: number | null;
+  approvedAt: string | null;
+}
+
+// An exam is "approved" only when the teacher approved exactly the rubric
+// version currently in effect — editing questions/rubric bumps rubricVersion
+// and silently reverts the exam back to draft until re-approved.
+export function isExamApproved(exam: Pick<GenerationRequest, "approvedRubricVersion" | "rubricVersion">): boolean {
+  return exam.approvedRubricVersion !== null && exam.approvedRubricVersion === exam.rubricVersion;
 }
 
 export interface GradingSession {
@@ -258,6 +274,12 @@ export interface StudentPaper {
   draftTotal: number | null;
   approvedTotal: number | null;
   overrideHistory: GradeOverrideLogEntry[];
+  // Teacher corrections of what a question's answer actually says, when the
+  // teacher could read the handwriting better than the model could (see
+  // correctPaperTranscription in grading.ts). Persists across re-grades: the
+  // next grading call is told to trust this text for that question instead
+  // of re-reading it from the image.
+  teacherCorrectedTranscriptions: { questionId: string; text: string }[];
   createdAt: string;
   gradedAt: string | null;
   approvedAt: string | null;

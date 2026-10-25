@@ -58,6 +58,8 @@ function makeExam(id: string, teacherId: string) {
     files: {},
     createdAt: new Date().toISOString(),
     finishedAt: new Date().toISOString(),
+    approvedRubricVersion: 1,
+    approvedAt: new Date().toISOString(),
   };
 }
 
@@ -123,6 +125,7 @@ function makeGradedPaper(id: string, sessionId: string, teacherId: string) {
     draftTotal: 5,
     approvedTotal: null,
     overrideHistory: [],
+    teacherCorrectedTranscriptions: [],
     createdAt: new Date().toISOString(),
     gradedAt: new Date().toISOString(),
     approvedAt: null,

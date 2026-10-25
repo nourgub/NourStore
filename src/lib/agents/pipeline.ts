@@ -131,15 +131,12 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
     ),
   );
 
-  // 5) Reviewer Agent
-  steps.push(
-    step(
-      "المراجع",
-      "التحقق من مطابقة المنهج والمستوى",
-      `تم التحقق من أن جميع الأسئلة ضمن محاور "${input.gradeLevel}" المطلوبة، ولا تتجاوز المحاور المرفوعة.` +
-        (styleNote ? ` روعي أسلوب الأستاذ في الصياغة حسب الملاحظة: "${styleNote}".` : ""),
-    ),
-  );
+  // There is deliberately no "reviewer" step claiming topic/level conformance
+  // was verified here — nothing in this pipeline actually checks that Claude
+  // stayed within requestedTopics, so logging such a claim would be exactly
+  // the kind of unearned "reviewed" message this project must never show
+  // (the real, independently-run review is Gemini's, surfaced honestly with
+  // its own not_reviewed/reviewing/failed states in ExamReviewPanel).
 
   return { steps, questions };
 }
@@ -274,9 +271,10 @@ export async function runExamImportPipeline(input: ExamImportPipelineInput): Pro
     ),
   );
 
-  steps.push(
-    step("المراجع", "التحقق النهائي", `الامتحان جاهز الآن ليُستعمل مباشرة في تصحيح أوراق التلاميذ.`),
-  );
+  // No fake "final verification" step here: nothing re-checks the extracted
+  // questions against the uploaded files beyond what importExamFromDocuments
+  // itself did, and the exam is NOT yet usable for grading — the teacher
+  // must review and approve it first (see isExamApproved / ApproveExamButton).
 
   return { steps, questions };
 }

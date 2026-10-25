@@ -71,6 +71,14 @@ export default async function DashboardPage() {
                 تغيير الباقة
               </Link>
             </div>
+            {teacher.subscriptionExpiresAt && (
+              <p className="mb-3 text-xs text-brand-500">
+                حصتك الحالية تتجدد بالكامل مع دورة اشتراكك — تاريخ التجديد القادم:{" "}
+                <span className="font-semibold text-brand-700">
+                  {new Date(teacher.subscriptionExpiresAt).toLocaleDateString("ar")}
+                </span>
+              </p>
+            )}
             <div className="space-y-2">
               {getUsageSummary(teacher)
                 .filter((entry) => entry.enabled)
@@ -81,7 +89,7 @@ export default async function DashboardPage() {
                       <div className="mb-1 flex justify-between text-xs text-brand-600">
                         <span>{entry.label}</span>
                         <span>
-                          {entry.used} / {entry.limit} هذا الشهر
+                          {entry.used} / {entry.limit} لهذه الدورة
                         </span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-brand-100">

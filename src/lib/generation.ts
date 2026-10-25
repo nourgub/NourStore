@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   GENERATED_DIR,
+  approveGenerationRequest,
   findDocument,
   findRequest,
   insertRequest,
@@ -135,6 +136,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
       files: {},
       createdAt: new Date().toISOString(),
       finishedAt: new Date().toISOString(),
+      approvedRubricVersion: null,
+      approvedAt: null,
     };
     insertRequest(failed);
     return failed;
@@ -159,6 +162,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
     files: {},
     createdAt: new Date().toISOString(),
     finishedAt: new Date().toISOString(),
+    approvedRubricVersion: null,
+    approvedAt: null,
   };
 
   const outDir = path.join(GENERATED_DIR, input.teacherId, requestId);
@@ -382,4 +387,25 @@ export async function updateExamQuestions(
   }
 
   return updated;
+}
+
+// Explicit teacher approval of THIS rubric version's questions, solutions
+// and grading criteria — required before any new grading session can be
+// started against this exam (see isExamApproved / createGradingSession).
+// This is a deliberate human checkpoint: an independent model's review
+// (Gemini, in ExamReview) can surface issues to help the teacher decide, but
+// it never grants approval itself — only the teacher clicking "اعتماد" does.
+export async function approveGeneration(teacherId: string, requestId: string): Promise<GenerationRequest> {
+  const request = findRequest(requestId, teacherId);
+  if (!request) throw new GenerationError("الامتحان غير موجود");
+  if (request.status !== "done") throw new GenerationError("لا يمكن اعتماد امتحان لم يكتمل توليده بنجاح");
+
+  const ok = approveGenerationRequest(requestId, teacherId, request.rubricVersion);
+  if (!ok) {
+    throw new GenerationError(
+      "تغيّر الامتحان منذ آخر مرة فتحته — أعد تحميل الصفحة وراجع النسخة الحالية قبل الاعتماد",
+    );
+  }
+
+  return { ...request, approvedRubricVersion: request.rubricVersion, approvedAt: new Date().toISOString() };
 }

@@ -1,12 +1,48 @@
 import { getUsageCount, reserveUsageAtomic, releaseUsageAtomic, reserveFreeTrialAtomic } from "./db";
 import { featureLabel, PLANS } from "./plans";
+import { SUBSCRIPTION_PERIOD_DAYS } from "./billing";
 import type { Teacher, UsageFeature } from "./types";
 
 export class UsageLimitError extends Error {}
 
-function currentPeriod(): string {
+// The quota cycle is anchored to the teacher's OWN subscription cycle, not
+// the calendar month — a teacher who subscribes on the 20th must get a full
+// SUBSCRIPTION_PERIOD_DAYS before their quota resets, not just the handful
+// of days left until the 1st (and a teacher subscribing on the 1st shouldn't
+// get a "free" top-up on the 1st of next month either). billing.ts always
+// extends subscriptionExpiresAt by exactly SUBSCRIPTION_PERIOD_DAYS on each
+// renewal, so the current cycle's start is simply
+// `expiresAt - SUBSCRIPTION_PERIOD_DAYS` — no separate "cycle start" column
+// to keep in sync, and it moves forward automatically on each renewal. A
+// teacher with no expiry at all (a never-expiring account predating this
+// field) falls back to a calendar-month period, since there is no cycle to
+// anchor to.
+function currentPeriod(teacher: Teacher): string {
+  if (teacher.subscriptionExpiresAt) {
+    const cycleStartMs =
+      new Date(teacher.subscriptionExpiresAt).getTime() - SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+    return new Date(cycleStartMs).toISOString().slice(0, 10);
+  }
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// The server-side subscription gate: a plan id alone is not proof of a live
+// subscription (it stays set after expiry/rejection — only subscriptionStatus
+// and subscriptionExpiresAt change), so every paid-feature check must verify
+// both explicitly here rather than trusting the caller already did. Never
+// called for a teacher with no plan at all — that path is the free trial,
+// gated separately below.
+function assertSubscriptionActive(teacher: Teacher): void {
+  const expired =
+    teacher.subscriptionExpiresAt !== null && new Date(teacher.subscriptionExpiresAt).getTime() <= Date.now();
+  if (teacher.subscriptionStatus !== "active" || expired) {
+    throw new UsageLimitError(
+      teacher.subscriptionStatus === "rejected"
+        ? "تم رفض طلب اشتراكك الأخير — راجع الإدارة أو أرسل وصل دفع جديدًا من صفحة الاشتراك."
+        : "اشتراكك غير نشط حاليًا (منتهٍ أو بانتظار التفعيل) — يجب تجديده لمتابعة استعمال هذه الميزة.",
+    );
+  }
 }
 
 // A teacher who never had a plan (never paid) gets exactly one free
@@ -39,6 +75,8 @@ export function reserveUsage(teacher: Teacher, feature: UsageFeature, operationI
     return { release: () => releaseUsageAtomic(operationId) };
   }
 
+  assertSubscriptionActive(teacher);
+
   const plan = PLANS[teacher.planId];
   if (!plan.features[feature]) {
     throw new UsageLimitError(
@@ -46,17 +84,23 @@ export function reserveUsage(teacher: Teacher, feature: UsageFeature, operationI
     );
   }
 
-  const period = currentPeriod();
+  const period = currentPeriod(teacher);
   const limit = plan.limits[feature];
   const reserved = reserveUsageAtomic(operationId, teacher.id, period, feature, limit);
   if (!reserved) {
     const used = getUsageCount(teacher.id, period, feature);
     throw new UsageLimitError(
-      `لقد بلغت الحد الشهري لميزة ${featureLabel(feature)} ضمن باقتك "${plan.displayName}" (${used}/${limit}). ` +
-        `سيتجدد الحد في بداية الشهر القادم، أو يمكنك الترقية لباقة أعلى.`,
+      `لقد بلغت حد ميزة ${featureLabel(feature)} ضمن باقتك "${plan.displayName}" لهذه الدورة (${used}/${limit}). ` +
+        renewalHint(teacher) +
+        " أو يمكنك الترقية لباقة أعلى.",
     );
   }
   return { release: () => releaseUsageAtomic(operationId) };
+}
+
+function renewalHint(teacher: Teacher): string {
+  if (!teacher.subscriptionExpiresAt) return "سيتجدد الحد في بداية الشهر القادم.";
+  return `سيتجدد الحد مع دورة اشتراكك القادمة بتاريخ ${new Date(teacher.subscriptionExpiresAt).toLocaleDateString("ar")}.`;
 }
 
 // Standalone release for code that only knows the operationId, far from
@@ -80,6 +124,7 @@ export function assertFeatureEnabled(teacher: Teacher, feature: UsageFeature): v
       "اشتراكك غير مفعّل، وقد استعملت تجربتك المجانية الوحيدة بالفعل — يجب اختيار باقة وتفعيلها.",
     );
   }
+  assertSubscriptionActive(teacher);
   const plan = PLANS[teacher.planId];
   if (!plan.features[feature]) {
     throw new UsageLimitError(
@@ -102,7 +147,7 @@ export function getUsageSummary(teacher: Teacher): UsageSummaryEntry[] {
     return features.map((feature) => ({ feature, label: featureLabel(feature), enabled: false, used: 0, limit: 0 }));
   }
   const plan = PLANS[teacher.planId];
-  const period = currentPeriod();
+  const period = currentPeriod(teacher);
   return features.map((feature) => ({
     feature,
     label: featureLabel(feature),

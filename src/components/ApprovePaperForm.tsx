@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   ShieldOff,
   MessageSquareWarning,
+  ImageUp,
+  PencilLine,
 } from "lucide-react";
 import type { CriterionReviewStatus, StudentPaper } from "@/lib/types";
 
@@ -37,6 +39,9 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
   const [overrides, setOverrides] = useState<OverrideState>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<FileList | null>(null);
+  const [correctingQuestionId, setCorrectingQuestionId] = useState<string | null>(null);
+  const [correctionText, setCorrectionText] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isInFlight = paper.status === "pending" || paper.status === "grading";
@@ -64,6 +69,49 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
       setError(data.error ?? "حدث خطأ غير متوقع");
       return;
     }
+    setPaper(data.paper);
+  }
+
+  async function submitImageReplacement() {
+    if (!imageFiles || imageFiles.length === 0) {
+      setError("اختر صورة واحدة على الأقل");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const form = new FormData();
+    for (const file of Array.from(imageFiles)) form.append("files", file);
+    const res = await fetch(`/api/grading/papers/${paper.id}/images`, { method: "POST", body: form });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "حدث خطأ غير متوقع");
+      return;
+    }
+    setImageFiles(null);
+    setPaper(data.paper);
+  }
+
+  async function submitTranscriptionCorrection(questionId: string) {
+    if (!correctionText.trim()) {
+      setError("اكتب النص المصحَّح أولًا");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const res = await fetch(`/api/grading/papers/${paper.id}/correct-transcription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionId, text: correctionText.trim() }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "حدث خطأ غير متوقع");
+      return;
+    }
+    setCorrectingQuestionId(null);
+    setCorrectionText("");
     setPaper(data.paper);
   }
 
@@ -131,6 +179,23 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
         >
           <RefreshCw size={16} /> {loading ? "جارٍ إعادة المحاولة..." : "إعادة المحاولة"}
         </button>
+        <div className="mt-4 border-t border-rose-200 pt-4">
+          <p className="mb-2 text-xs">إن كان السبب صورة سيئة أو صفحة خاطئة، يمكنك استبدال صور الورقة بدل إعادة المحاولة بنفس الصور:</p>
+          <input
+            type="file"
+            accept="image/jpeg,image/png"
+            multiple
+            onChange={(e) => setImageFiles(e.target.files)}
+            className="mb-2 block w-full text-xs"
+          />
+          <button
+            onClick={submitImageReplacement}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+          >
+            <ImageUp size={14} /> استبدال الصور وإعادة التصحيح
+          </button>
+        </div>
         {error && <p className="mt-3 text-rose-700">{error}</p>}
       </div>
     );
@@ -168,6 +233,27 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
         )}
       </div>
 
+      {paper.status !== "approved" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
+          <p className="mb-2 font-semibold">صورة الإجابة غير واضحة أو خاطئة؟</p>
+          <p className="mb-2">يمكنك استبدال صور الورقة كاملة وإعادة التصحيح تلقائيًا، بدل اعتماد نقطة غير دقيقة:</p>
+          <input
+            type="file"
+            accept="image/jpeg,image/png"
+            multiple
+            onChange={(e) => setImageFiles(e.target.files)}
+            className="mb-2 block w-full"
+          />
+          <button
+            onClick={submitImageReplacement}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+          >
+            <ImageUp size={14} /> استبدال الصور وإعادة التصحيح
+          </button>
+        </div>
+      )}
+
       {paper.questionResults.map((q, i) => (
         <div key={q.questionId} className="rounded-2xl border border-brand-100 bg-white p-5 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
@@ -196,6 +282,49 @@ export function ApprovePaperForm({ initialPaper, totalPoints }: { initialPaper: 
               {q.geminiTranscription}
             </p>
           )}
+
+          {paper.status !== "approved" &&
+            (correctingQuestionId === q.questionId ? (
+              <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50/40 p-2">
+                <p className="mb-1 text-xs text-brand-600">
+                  اكتب ما كتبه التلميذ فعلًا لهذا السؤال — سيُعتمد هذا النص بدل قراءة النماذج من الصورة، وتُعاد عملية التصحيح تلقائيًا:
+                </p>
+                <textarea
+                  value={correctionText}
+                  onChange={(e) => setCorrectionText(e.target.value)}
+                  rows={3}
+                  className="mb-2 block w-full rounded border border-brand-200 p-2 text-xs"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => submitTranscriptionCorrection(q.questionId)}
+                    disabled={loading}
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                  >
+                    حفظ النص وإعادة التصحيح
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCorrectingQuestionId(null);
+                      setCorrectionText("");
+                    }}
+                    className="rounded-lg border border-brand-200 px-3 py-1.5 text-xs text-brand-600 hover:bg-brand-50"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setCorrectingQuestionId(q.questionId);
+                  setCorrectionText(q.claudeTranscription);
+                }}
+                className="mb-3 flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+              >
+                <PencilLine size={12} /> النص المستخرج غير صحيح؟ صحّحه هنا
+              </button>
+            ))}
 
           <table className="w-full border-collapse text-xs">
             <thead>
