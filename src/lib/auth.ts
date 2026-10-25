@@ -22,3 +22,18 @@ export function generateToken(): string {
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+
+// Constant-time secret comparison — used for the admin bootstrap token
+// (see /api/auth/signup) so a wrong guess can't be narrowed down via
+// response-time differences the way a plain `===` could leak.
+export function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) {
+    // Still run a comparison of equal-length buffers so the time taken
+    // doesn't itself reveal the length mismatch.
+    crypto.timingSafeEqual(a, a);
+    return false;
+  }
+  return crypto.timingSafeEqual(a, b);
+}

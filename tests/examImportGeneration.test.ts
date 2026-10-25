@@ -38,6 +38,7 @@ before(async () => {
     planId: "grading_only",
     subscriptionExpiresAt: null,
     freeTrialUsedAt: null,
+    isAdmin: false,
     createdAt: new Date().toISOString(),
   });
 });

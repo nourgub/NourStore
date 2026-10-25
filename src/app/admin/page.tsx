@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentTeacher } from "@/lib/session";
-import { isAdminEmail } from "@/lib/billingConfig";
+import { isAdminTeacher } from "@/lib/billingConfig";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AdminPaymentRequestsList } from "@/components/AdminPaymentRequestsList";
 import { AdminPasswordResetsList } from "@/components/AdminPasswordResetsList";
@@ -9,7 +9,7 @@ import { AdminCleanupOldPapers } from "@/components/AdminCleanupOldPapers";
 export default async function AdminPage() {
   const teacher = await getCurrentTeacher();
   if (!teacher) redirect("/login");
-  if (!isAdminEmail(teacher.email)) redirect("/dashboard");
+  if (!isAdminTeacher(teacher)) redirect("/dashboard");
 
   return (
     <>

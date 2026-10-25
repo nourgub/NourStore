@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
 import { createGeneration, GenerationError } from "@/lib/generation";
-import { assertFeatureAllowed, recordUsage, UsageLimitError } from "@/lib/usage";
+import { reserveUsage, UsageLimitError } from "@/lib/usage";
 import type { SubjectId } from "@/lib/types";
 
 export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
+  const body = await request.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
+
+  let release: () => void;
   try {
-    assertFeatureAllowed(teacher, "exams");
+    ({ release } = reserveUsage(teacher, "exams", `exams:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`));
   } catch (err) {
     if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
     throw err;
   }
-
-  const body = await request.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
 
   const pageExercises = Array.isArray(body.pageExercises)
     ? body.pageExercises
@@ -43,9 +44,12 @@ export async function POST(request: NextRequest) {
       difficultyMix: body.difficultyMix === "سهل" || body.difficultyMix === "صعب" ? body.difficultyMix : "متوازن",
       pageExercises,
     });
-    recordUsage(teacher, "exams");
+    // A caught-and-persisted "failed" generation is still a service failure
+    // from the teacher's point of view — never charge the quota for it.
+    if (request_.status === "failed") release();
     return NextResponse.json({ request: request_ });
   } catch (err) {
+    release();
     if (err instanceof GenerationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }

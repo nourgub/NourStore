@@ -150,6 +150,23 @@ withBusyRetry(() =>
   );
   CREATE INDEX IF NOT EXISTS idx_usage_counters_teacher_period ON usage_counters(teacher_id, period);
 
+  -- One row per attempted usage-consuming operation (an exam generation
+  -- request, a lesson prep, a submitted student paper), keyed by that
+  -- operation's own id. Lets reserveUsage/releaseUsage be both atomic
+  -- (reserve-then-act, never check-then-act across an await boundary) and
+  -- idempotent (releasing the same operation id twice, or an id that was
+  -- never reserved, is always a safe no-op) — see src/lib/usage.ts.
+  CREATE TABLE IF NOT EXISTS usage_reservations (
+    id TEXT PRIMARY KEY,
+    teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    period TEXT NOT NULL,
+    feature TEXT NOT NULL,
+    is_free_trial INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'reserved',
+    created_at TEXT NOT NULL,
+    released_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS password_reset_requests (
     id TEXT PRIMARY KEY,
     teacher_id TEXT NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
@@ -280,6 +297,23 @@ if (!teacherColumns.some((c) => c.name === "subscription_expires_at")) {
 if (!teacherColumns.some((c) => c.name === "free_trial_used_at")) {
   withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN free_trial_used_at TEXT`));
 }
+if (!teacherColumns.some((c) => c.name === "is_admin")) {
+  withBusyRetry(() => db.exec(`ALTER TABLE teachers ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`));
+  // One-time grandfather: before this migration, admin access was granted
+  // dynamically to *whoever currently owns an account whose email matches
+  // ADMIN_EMAIL* — a real signup-time takeover risk (anyone who learns the
+  // admin's email could have registered it first and been treated as admin
+  // forever, with no way for the real owner to reclaim it). From here on,
+  // is_admin is a one-time flag set at signup only when ADMIN_BOOTSTRAP_TOKEN
+  // is also proven (see /api/auth/signup), never derived from email alone.
+  // This UPDATE preserves access for whichever account already legitimately
+  // holds that email in an existing deployment, so this fix never locks out
+  // a real admin who signed up before it shipped.
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (adminEmail) {
+    withBusyRetry(() => db.prepare(`UPDATE teachers SET is_admin = 1 WHERE LOWER(email) = ?`).run(adminEmail));
+  }
+}
 
 const paymentRequestColumns = db.prepare(`PRAGMA table_info(payment_requests)`).all() as { name: string }[];
 if (!paymentRequestColumns.some((c) => c.name === "requested_plan_id")) {
@@ -360,6 +394,7 @@ interface TeacherRow {
   plan_id: PlanId | null;
   subscription_expires_at: string | null;
   free_trial_used_at: string | null;
+  is_admin: number;
   created_at: string;
 }
 
@@ -374,19 +409,21 @@ function rowToTeacher(row: TeacherRow): Teacher {
     planId: row.plan_id,
     subscriptionExpiresAt: row.subscription_expires_at,
     freeTrialUsedAt: row.free_trial_used_at,
+    isAdmin: row.is_admin === 1,
     createdAt: row.created_at,
   };
 }
 
 export function insertTeacher(teacher: Teacher): void {
   db.prepare(
-    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, plan_id, subscription_expires_at, free_trial_used_at, created_at)
-     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @planId, @subscriptionExpiresAt, @freeTrialUsedAt, @createdAt)`,
+    `INSERT INTO teachers (id, full_name, email, password_hash, password_salt, subscription_status, plan_id, subscription_expires_at, free_trial_used_at, is_admin, created_at)
+     VALUES (@id, @fullName, @email, @passwordHash, @passwordSalt, @subscriptionStatus, @planId, @subscriptionExpiresAt, @freeTrialUsedAt, @isAdmin, @createdAt)`,
   ).run({
     ...teacher,
     planId: teacher.planId ?? null,
     subscriptionExpiresAt: teacher.subscriptionExpiresAt ?? null,
     freeTrialUsedAt: teacher.freeTrialUsedAt ?? null,
+    isAdmin: teacher.isAdmin ? 1 : 0,
   });
 }
 
@@ -412,9 +449,6 @@ export function activateTeacherSubscription(teacherId: string, expiresAt: string
   );
 }
 
-export function markFreeTrialUsed(teacherId: string): void {
-  db.prepare(`UPDATE teachers SET free_trial_used_at = ? WHERE id = ?`).run(new Date().toISOString(), teacherId);
-}
 
 export function updateTeacherPlan(teacherId: string, planId: PlanId): void {
   db.prepare(`UPDATE teachers SET plan_id = ? WHERE id = ?`).run(planId, teacherId);
@@ -1185,6 +1219,104 @@ export function incrementUsageCount(teacherId: string, period: string, feature: 
     period,
     feature,
   });
+}
+
+// Atomically checks the monthly cap AND consumes one slot in a single
+// SQLite transaction (better-sqlite3's db.transaction wraps this in
+// BEGIN/COMMIT, and SQLite serializes writers), so two concurrent requests
+// racing to reserve the last slot can never both succeed — one necessarily
+// sees the other's write. `operationId` (e.g. a specific exam-generation
+// request id, a specific student-paper id) makes this idempotent: reserving
+// the same operation twice is a safe no-op that returns the first outcome,
+// so a client retry of the same operation can never double-charge.
+// Returns true if a slot was reserved (or already had been, for this exact
+// operationId), false if the plan's monthly cap was reached.
+export function reserveUsageAtomic(
+  operationId: string,
+  teacherId: string,
+  period: string,
+  feature: UsageFeature,
+  limit: number,
+): boolean {
+  const run = db.transaction((): boolean => {
+    const existing = db.prepare(`SELECT status FROM usage_reservations WHERE id = ?`).get(operationId) as
+      | { status: string }
+      | undefined;
+    if (existing) return true; // already reserved (or released) under this id — never double-charge
+
+    const row = db.prepare(`SELECT count FROM usage_counters WHERE teacher_id = ? AND period = ? AND feature = ?`).get(
+      teacherId,
+      period,
+      feature,
+    ) as { count: number } | undefined;
+    const current = row?.count ?? 0;
+    if (current >= limit) return false;
+
+    incrementUsageCount(teacherId, period, feature);
+    db.prepare(
+      `INSERT INTO usage_reservations (id, teacher_id, period, feature, is_free_trial, status, created_at)
+       VALUES (?, ?, ?, ?, 0, 'reserved', ?)`,
+    ).run(operationId, teacherId, period, feature, new Date().toISOString());
+    return true;
+  });
+  return run();
+}
+
+// Same reserve idempotency guarantee as above, for the one-time free trial
+// (a boolean on teachers, not a counted quota) — also recorded in
+// usage_reservations (is_free_trial=1) so releaseUsageAtomic can release
+// *either* kind of reservation by operationId alone, without the caller
+// needing to remember which path was used. This matters for a reservation
+// released from code that only knows the operationId, far from where it was
+// made (e.g. a background grading job releasing a paper's reservation on
+// final failure, long after the HTTP request that created it returned).
+// The conditional WHERE…IS NULL makes the teachers-row update itself atomic
+// against concurrent first-ever requests from the same brand-new teacher.
+export function reserveFreeTrialAtomic(operationId: string, teacherId: string): boolean {
+  const run = db.transaction((): boolean => {
+    const existing = db.prepare(`SELECT status FROM usage_reservations WHERE id = ?`).get(operationId) as
+      | { status: string }
+      | undefined;
+    if (existing) return true;
+
+    const result = db
+      .prepare(`UPDATE teachers SET free_trial_used_at = ? WHERE id = ? AND free_trial_used_at IS NULL`)
+      .run(new Date().toISOString(), teacherId);
+    if (result.changes === 0) return false;
+
+    db.prepare(
+      `INSERT INTO usage_reservations (id, teacher_id, period, feature, is_free_trial, status, created_at)
+       VALUES (?, ?, '', 'freeTrial', 1, 'reserved', ?)`,
+    ).run(operationId, teacherId, new Date().toISOString());
+    return true;
+  });
+  return run();
+}
+
+// Releases a previously reserved slot — plan-based usage or free trial,
+// whichever this operationId was reserved as — safe to call even if the
+// operation was never reserved, or was already released (both are no-ops),
+// so a defensive double-release (e.g. a job retried after already failing
+// once) can never credit back more than was actually charged.
+export function releaseUsageAtomic(operationId: string): void {
+  db.transaction(() => {
+    const reservation = db.prepare(`SELECT * FROM usage_reservations WHERE id = ? AND status = 'reserved'`).get(
+      operationId,
+    ) as { teacher_id: string; period: string; feature: UsageFeature; is_free_trial: number } | undefined;
+    if (!reservation) return;
+
+    if (reservation.is_free_trial) {
+      db.prepare(`UPDATE teachers SET free_trial_used_at = NULL WHERE id = ?`).run(reservation.teacher_id);
+    } else {
+      db.prepare(
+        `UPDATE usage_counters SET count = MAX(0, count - 1) WHERE teacher_id = ? AND period = ? AND feature = ?`,
+      ).run(reservation.teacher_id, reservation.period, reservation.feature);
+    }
+    db.prepare(`UPDATE usage_reservations SET status = 'released', released_at = ? WHERE id = ?`).run(
+      new Date().toISOString(),
+      operationId,
+    );
+  })();
 }
 
 // ---------- Password reset requests (admin-assisted — no email infra exists) ----------

@@ -21,6 +21,12 @@ export interface Teacher {
   // When the teacher's one free trial operation (any single feature, before
   // ever paying) was used. null means it's still available.
   freeTrialUsedAt: string | null;
+  // Set exactly once, at signup, only when the email matched ADMIN_EMAIL AND
+  // the correct ADMIN_BOOTSTRAP_TOKEN was supplied (see /api/auth/signup) —
+  // never re-derived from email alone afterward, so registering an account
+  // whose email merely matches ADMIN_EMAIL (without the secret token) never
+  // grants admin access.
+  isAdmin: boolean;
   createdAt: string;
 }
 

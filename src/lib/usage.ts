@@ -1,4 +1,4 @@
-import { getUsageCount, incrementUsageCount, markFreeTrialUsed } from "./db";
+import { getUsageCount, reserveUsageAtomic, releaseUsageAtomic, reserveFreeTrialAtomic } from "./db";
 import { featureLabel, PLANS } from "./plans";
 import type { Teacher, UsageFeature } from "./types";
 
@@ -15,19 +15,30 @@ export function hasFreeTrialAvailable(teacher: Teacher): boolean {
   return !teacher.planId && !teacher.freeTrialUsedAt;
 }
 
-// Throws a clear Arabic error if the teacher's plan doesn't include this
-// feature at all, or if they've already used up this month's allowance.
-// A teacher with no plan but an unused free trial is let through once.
-// Does not consume a usage slot by itself — call recordUsage after the
-// feature's action actually runs (see createGeneration/createLessonPrep/
-// submitStudentPaper call sites).
-export function assertFeatureAllowed(teacher: Teacher, feature: UsageFeature): void {
+// Atomically checks the plan/limit AND consumes one usage slot in the same
+// step — call this BEFORE starting the feature's actual (often slow, async)
+// work, never after. The old pattern (assertFeatureAllowed, await the work,
+// then recordUsage on success) left a real race window: several concurrent
+// requests near the monthly cap could all pass the check before any of them
+// recorded usage, oversubscribing the plan. `operationId` must be a stable
+// id for this specific operation (the exam-generation request id, the
+// student-paper id, …) — calling this again with the same id is always
+// a safe no-op, so a client retry can never double-charge.
+//
+// Returns a `release()` callback you MUST call if the operation ultimately
+// fails (the service errored, the AI call failed) — this refunds the slot,
+// per this project's "a failure must never cost a paid teacher their
+// quota" rule. On success, simply don't call it.
+export function reserveUsage(teacher: Teacher, feature: UsageFeature, operationId: string): { release: () => void } {
   if (!teacher.planId) {
-    if (hasFreeTrialAvailable(teacher)) return;
-    throw new UsageLimitError(
-      "اشتراكك غير مفعّل، وقد استعملت تجربتك المجانية الوحيدة بالفعل — يجب اختيار باقة وتفعيلها.",
-    );
+    if (!reserveFreeTrialAtomic(operationId, teacher.id)) {
+      throw new UsageLimitError(
+        "اشتراكك غير مفعّل، وقد استعملت تجربتك المجانية الوحيدة بالفعل — يجب اختيار باقة وتفعيلها.",
+      );
+    }
+    return { release: () => releaseUsageAtomic(operationId) };
   }
+
   const plan = PLANS[teacher.planId];
   if (!plan.features[feature]) {
     throw new UsageLimitError(
@@ -35,31 +46,33 @@ export function assertFeatureAllowed(teacher: Teacher, feature: UsageFeature): v
     );
   }
 
+  const period = currentPeriod();
   const limit = plan.limits[feature];
-  const used = getUsageCount(teacher.id, currentPeriod(), feature);
-  if (used >= limit) {
+  const reserved = reserveUsageAtomic(operationId, teacher.id, period, feature, limit);
+  if (!reserved) {
+    const used = getUsageCount(teacher.id, period, feature);
     throw new UsageLimitError(
       `لقد بلغت الحد الشهري لميزة ${featureLabel(feature)} ضمن باقتك "${plan.displayName}" (${used}/${limit}). ` +
         `سيتجدد الحد في بداية الشهر القادم، أو يمكنك الترقية لباقة أعلى.`,
     );
   }
+  return { release: () => releaseUsageAtomic(operationId) };
 }
 
-// Call once the feature's action actually succeeds. A teacher still on
-// their free trial (no plan yet) has that trial marked used instead of
-// incrementing a monthly counter that doesn't apply to them yet.
-export function recordUsage(teacher: Teacher, feature: UsageFeature): void {
-  if (!teacher.planId) {
-    markFreeTrialUsed(teacher.id);
-    return;
-  }
-  incrementUsageCount(teacher.id, currentPeriod(), feature);
+// Standalone release for code that only knows the operationId, far from
+// where reserveUsage was originally called — e.g. a background grading job
+// releasing a student paper's reservation once it permanently fails, long
+// after the HTTP request that submitted it has returned. Same no-op-if-
+// already-released/never-reserved safety as the release() reserveUsage
+// returns (they're backed by the same releaseUsageAtomic).
+export function releaseUsage(operationId: string): void {
+  releaseUsageAtomic(operationId);
 }
 
 // Checks plan inclusion only, without touching the monthly cap — for
 // prerequisite actions (starting a grading session, uploading a lesson-prep
 // template) that don't themselves consume a usage slot. Same free-trial
-// carve-out as assertFeatureAllowed.
+// carve-out as reserveUsage.
 export function assertFeatureEnabled(teacher: Teacher, feature: UsageFeature): void {
   if (!teacher.planId) {
     if (hasFreeTrialAvailable(teacher)) return;

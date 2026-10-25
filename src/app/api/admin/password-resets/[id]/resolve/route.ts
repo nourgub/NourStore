@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
-import { isAdminEmail } from "@/lib/billingConfig";
+import { isAdminTeacher } from "@/lib/billingConfig";
 import { PasswordResetError, resolvePasswordReset } from "@/lib/passwordReset";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const teacher = await getCurrentTeacher();
-  if (!teacher || !isAdminEmail(teacher.email)) {
+  if (!teacher || !isAdminTeacher(teacher)) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
   }
 

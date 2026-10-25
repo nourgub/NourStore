@@ -72,6 +72,7 @@ function makeTeacher(id: string, email: string) {
     planId: "full" as const,
     subscriptionExpiresAt: null,
     freeTrialUsedAt: null,
+    isAdmin: false,
     createdAt: new Date().toISOString(),
   };
 }

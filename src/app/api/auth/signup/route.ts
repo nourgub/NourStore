@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { findTeacherByEmail, insertTeacher } from "@/lib/db";
 import { hashPassword, isValidEmail } from "@/lib/auth";
 import { createSessionCookie } from "@/lib/session";
-import { getAdminEmail } from "@/lib/billingConfig";
+import { shouldGrantAdminOnSignup } from "@/lib/billingConfig";
 import { enforceRateLimit, getClientIp, RateLimitError } from "@/lib/rateLimit";
 import type { Teacher } from "@/lib/types";
 
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
   const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : "";
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+  const adminToken = typeof body?.adminToken === "string" ? body.adminToken : "";
 
   if (!fullName || !email || !password) {
     return NextResponse.json({ error: "الاسم والبريد الإلكتروني وكلمة المرور مطلوبة" }, { status: 400 });
@@ -34,7 +35,14 @@ export async function POST(request: NextRequest) {
   }
 
   const { hash, salt } = hashPassword(password);
-  const isAdmin = email === getAdminEmail();
+  // Admin status requires BOTH the email match AND proof of the server-side
+  // secret (ADMIN_BOOTSTRAP_TOKEN) — matching ADMIN_EMAIL alone is no longer
+  // enough. Without this, anyone who learns the admin's email (it's rarely
+  // truly secret) could register it first and keep admin access forever,
+  // locking the real owner out. If ADMIN_BOOTSTRAP_TOKEN isn't configured at
+  // all, admin can never be granted via signup — it must be set directly by
+  // whoever controls the server's database.
+  const isAdmin = shouldGrantAdminOnSignup(email, adminToken);
   const teacher: Teacher = {
     id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     fullName,
@@ -47,6 +55,7 @@ export async function POST(request: NextRequest) {
     planId: isAdmin ? "full" : null,
     subscriptionExpiresAt: null,
     freeTrialUsedAt: null,
+    isAdmin,
     createdAt: new Date().toISOString(),
   };
 

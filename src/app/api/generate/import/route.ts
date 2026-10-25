@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
 import { createGeneration, GenerationError } from "@/lib/generation";
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "@/lib/extractText";
-import { assertFeatureAllowed, recordUsage, UsageLimitError } from "@/lib/usage";
+import { reserveUsage, UsageLimitError } from "@/lib/usage";
 import type { SubjectId } from "@/lib/types";
 
 // Lets a teacher use grading entirely standalone: upload an exam they
@@ -15,13 +15,6 @@ import type { SubjectId } from "@/lib/types";
 export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
-
-  try {
-    assertFeatureAllowed(teacher, "grading");
-  } catch (err) {
-    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
-    throw err;
-  }
 
   const form = await request.formData();
   const examTitle = String(form.get("examTitle") ?? "");
@@ -59,6 +52,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let release: () => void;
+  try {
+    ({ release } = reserveUsage(
+      teacher,
+      "grading",
+      `grading-import:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    ));
+  } catch (err) {
+    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
+  }
+
   try {
     const request_ = await createGeneration({
       teacherId: teacher.id,
@@ -71,9 +76,10 @@ export async function POST(request: NextRequest) {
       difficultyMix: "متوازن",
       importedExam: { examText: examExtraction.text, correctionText: correctionExtraction.text },
     });
-    recordUsage(teacher, "grading");
+    if (request_.status === "failed") release();
     return NextResponse.json({ request: request_ });
   } catch (err) {
+    release();
     if (err instanceof GenerationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }

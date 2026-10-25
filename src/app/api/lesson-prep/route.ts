@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentTeacher } from "@/lib/session";
 import { createLessonPrep, LessonPrepError, listLessonPrepsForTeacher } from "@/lib/lessonPrep";
-import { assertFeatureAllowed, recordUsage, UsageLimitError } from "@/lib/usage";
+import { reserveUsage, UsageLimitError } from "@/lib/usage";
 import type { LessonPrepMode, SubjectId } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -17,13 +17,6 @@ export async function POST(request: NextRequest) {
   const teacher = await getCurrentTeacher();
   if (!teacher) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
-  try {
-    assertFeatureAllowed(teacher, "lessonPrep");
-  } catch (err) {
-    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
-    throw err;
-  }
-
   const form = await request.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "بيانات غير صالحة" }, { status: 400 });
 
@@ -33,6 +26,18 @@ export async function POST(request: NextRequest) {
   const gradeLevel = String(form.get("gradeLevel") ?? "");
   const styleNotes = String(form.get("styleNotes") ?? "") || undefined;
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
+
+  let release: () => void;
+  try {
+    ({ release } = reserveUsage(
+      teacher,
+      "lessonPrep",
+      `lessonPrep:${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    ));
+  } catch (err) {
+    if (err instanceof UsageLimitError) return NextResponse.json({ error: err.message }, { status: 403 });
+    throw err;
+  }
 
   try {
     const lessonPrep = await createLessonPrep({
@@ -44,9 +49,10 @@ export async function POST(request: NextRequest) {
       styleNotes,
       files,
     });
-    recordUsage(teacher, "lessonPrep");
+    if (lessonPrep.status === "failed") release();
     return NextResponse.json({ lessonPrep });
   } catch (err) {
+    release();
     if (err instanceof LessonPrepError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }

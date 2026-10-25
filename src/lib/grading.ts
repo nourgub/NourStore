@@ -22,8 +22,9 @@ import { enqueue, registerJobHandler } from "./jobs";
 import { gradeStudentPaper, GradingAgentError } from "./agents/gradingAgent";
 import { reviewStudentPaperWithGemini, isGeminiConfigured, GeminiReviewError } from "./agents/geminiPaperReviewAgent";
 import { mergePaperGrades } from "./agents/gradingManager";
+import { reserveUsage, releaseUsage } from "./usage";
 import type { IndependentPaperGrade } from "./agents/independentGradeTypes";
-import type { GeneratedQuestion, GradeOverrideLogEntry, GradingSession, StudentPaper } from "./types";
+import type { GeneratedQuestion, GradeOverrideLogEntry, GradingSession, StudentPaper, Teacher } from "./types";
 
 export class GradingError extends Error {}
 
@@ -85,11 +86,12 @@ export function getStudentPaper(paperId: string, teacherId: string): StudentPape
 }
 
 export async function submitStudentPaper(
-  teacherId: string,
+  teacher: Teacher,
   sessionId: string,
   studentName: string,
   files: File[],
 ): Promise<StudentPaper> {
+  const teacherId = teacher.id;
   const session = findGradingSession(sessionId, teacherId);
   if (!session) throw new GradingError("جلسة التصحيح غير موجودة");
   if (!studentName.trim()) throw new GradingError("اسم التلميذ مطلوب");
@@ -109,56 +111,74 @@ export async function submitStudentPaper(
   if (!exam) throw new GradingError("الامتحان المرتبط بجلسة التصحيح لم يعد موجودًا");
 
   const paperId = `paper_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const paperDir = path.join(PAPERS_DIR, teacherId, paperId);
-  fs.mkdirSync(paperDir, { recursive: true });
 
-  const imagePaths: string[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const imagePath = path.join(paperDir, `page-${i + 1}.jpg`);
-    const original = Buffer.from(await file.arrayBuffer());
-    const resized = await sharp(original)
-      .rotate() // respect EXIF orientation from phone cameras before stripping metadata
-      .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: JPEG_QUALITY })
-      .toBuffer();
-    fs.writeFileSync(imagePath, resized);
-    imagePaths.push(imagePath);
+  // Reserved atomically right after all cheap validation and before any
+  // file I/O — the paper's own id doubles as the usage-reservation id, so
+  // the background grading job can release it later (on permanent failure)
+  // by that same id alone, and a client retry of this exact submission can
+  // never double-charge. May throw UsageLimitError — left to propagate as-is
+  // (not wrapped into GradingError) so callers can tell a quota rejection
+  // (403) apart from an ordinary validation error (400), same as every
+  // other usage-gated route in this app.
+  const { release } = reserveUsage(teacher, "grading", paperId);
+
+  try {
+    const paperDir = path.join(PAPERS_DIR, teacherId, paperId);
+    fs.mkdirSync(paperDir, { recursive: true });
+
+    const imagePaths: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const imagePath = path.join(paperDir, `page-${i + 1}.jpg`);
+      const original = Buffer.from(await file.arrayBuffer());
+      const resized = await sharp(original)
+        .rotate() // respect EXIF orientation from phone cameras before stripping metadata
+        .resize({ width: MAX_IMAGE_DIMENSION, height: MAX_IMAGE_DIMENSION, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: JPEG_QUALITY })
+        .toBuffer();
+      fs.writeFileSync(imagePath, resized);
+      imagePaths.push(imagePath);
+    }
+
+    const paper: StudentPaper = {
+      id: paperId,
+      sessionId,
+      teacherId,
+      studentName: studentName.trim(),
+      imagePaths,
+      status: "grading",
+      failureReason: null,
+      examVersion: session.examVersion,
+      claudeModel: null,
+      geminiReviewStatus: isGeminiConfigured() ? "not_reviewed" : "not_configured",
+      geminiModel: null,
+      geminiFailureReason: null,
+      questionResults: [],
+      needsReview: false,
+      draftTotal: null,
+      approvedTotal: null,
+      overrideHistory: [],
+      createdAt: new Date().toISOString(),
+      gradedAt: null,
+      approvedAt: null,
+    };
+    insertStudentPaper(paper);
+
+    // Grading runs entirely in the background — this returns as soon as the
+    // work is queued. The paper stays "grading" until the Claude job (and,
+    // if configured, the Gemini review job) complete. The usage slot stays
+    // reserved from here on; handleClaudeGradeJob releases it if Claude's
+    // grading permanently fails (see below) — a successful submission that
+    // simply hasn't finished grading yet is not a failure.
+    enqueueClaudeGradeJob(paperId, false);
+    if (isGeminiConfigured()) {
+      enqueueGeminiReviewJob(paperId, false);
+    }
+    return paper;
+  } catch (err) {
+    release();
+    throw err;
   }
-
-  const paper: StudentPaper = {
-    id: paperId,
-    sessionId,
-    teacherId,
-    studentName: studentName.trim(),
-    imagePaths,
-    status: "grading",
-    failureReason: null,
-    examVersion: session.examVersion,
-    claudeModel: null,
-    geminiReviewStatus: isGeminiConfigured() ? "not_reviewed" : "not_configured",
-    geminiModel: null,
-    geminiFailureReason: null,
-    questionResults: [],
-    needsReview: false,
-    draftTotal: null,
-    approvedTotal: null,
-    overrideHistory: [],
-    createdAt: new Date().toISOString(),
-    gradedAt: null,
-    approvedAt: null,
-  };
-  insertStudentPaper(paper);
-
-  // Grading runs entirely in the background — this returns as soon as the
-  // work is queued. The paper stays "grading" until the Claude job (and, if
-  // configured, the Gemini review job) complete.
-  enqueueClaudeGradeJob(paperId, false);
-  if (isGeminiConfigured()) {
-    enqueueGeminiReviewJob(paperId, false);
-  }
-
-  return paper;
 }
 
 function enqueueClaudeGradeJob(paperId: string, isRetry: boolean): void {
@@ -212,7 +232,10 @@ async function handleClaudeGradeJob(
   const exam = session ? findRequest(session.examRequestId, paper.teacherId) : null;
   if (!exam) {
     const reason = session ? "الامتحان المرتبط لم يعد موجودًا" : "جلسة التصحيح لم تعد موجودة";
-    if (isLastAttempt) updateStudentPaperFields(paperId, { status: "failed", failureReason: reason });
+    if (isLastAttempt) {
+      updateStudentPaperFields(paperId, { status: "failed", failureReason: reason });
+      releaseUsage(paperId); // a permanent failure must never cost the teacher their quota
+    }
     throw new Error(reason);
   }
 
@@ -231,8 +254,12 @@ async function handleClaudeGradeJob(
       err instanceof GradingAgentError || err instanceof Error ? err.message : "خطأ غير معروف أثناء التصحيح";
     // Only write a user-visible "failed" once retries are exhausted — an
     // attempt the queue will silently retry shouldn't flash "failed" at the
-    // teacher in between.
-    if (isLastAttempt) updateStudentPaperFields(paperId, { status: "failed", failureReason });
+    // teacher in between. Same point: only a *permanent* failure refunds the
+    // reserved usage slot, matching the status change it's tied to.
+    if (isLastAttempt) {
+      updateStudentPaperFields(paperId, { status: "failed", failureReason });
+      releaseUsage(paperId);
+    }
     throw err instanceof Error ? err : new Error(failureReason);
   }
 

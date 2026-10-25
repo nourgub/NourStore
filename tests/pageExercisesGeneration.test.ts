@@ -38,6 +38,7 @@ before(async () => {
     planId: "full",
     subscriptionExpiresAt: null,
     freeTrialUsedAt: null,
+    isAdmin: false,
     createdAt: new Date().toISOString(),
   });
 });
