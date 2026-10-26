@@ -1795,6 +1795,10 @@ export function touchKbSourceLastChecked(id: string, lastCheckedAt: string): voi
   db.prepare(`UPDATE kb_sources SET last_checked_at = ? WHERE id = ?`).run(lastCheckedAt, id);
 }
 
+export function updateKbSourceLicense(id: string, licenseStatus: KbSource["licenseStatus"], lastCheckedAt: string): void {
+  db.prepare(`UPDATE kb_sources SET license_status = ?, last_checked_at = ? WHERE id = ?`).run(licenseStatus, lastCheckedAt, id);
+}
+
 interface KbSourceDocumentRow {
   id: string;
   source_id: string;

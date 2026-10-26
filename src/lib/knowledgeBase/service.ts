@@ -19,6 +19,7 @@ import {
   updateKbLessonStatus,
   updateKbSourceDocumentExtraction,
   updateKbSourceDocumentStatus,
+  updateKbSourceLicense,
 } from "../db";
 import type {
   KbContentStatus,
@@ -80,6 +81,14 @@ export function registerSource(input: RegisterSourceInput): KbSource {
 
 export function getAllSources(): KbSource[] {
   return listKbSources();
+}
+
+// A human (admin) decision only — nothing in this codebase infers or
+// upgrades a source's license status on its own. This is the one action
+// that unblocks extractSourceDocument from storing any text for that
+// source's documents (see canStoreFullText/canStoreExcerpt).
+export function setSourceLicenseStatus(sourceId: string, licenseStatus: KbSource["licenseStatus"]): void {
+  updateKbSourceLicense(sourceId, licenseStatus, new Date().toISOString());
 }
 
 // ---------- Source documents ----------

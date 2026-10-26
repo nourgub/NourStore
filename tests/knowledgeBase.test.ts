@@ -16,6 +16,7 @@ process.env.DATA_DIR = tmpDir;
 let registerSource: typeof import("../src/lib/knowledgeBase/service").registerSource;
 let recordSourceDocument: typeof import("../src/lib/knowledgeBase/service").recordSourceDocument;
 let extractSourceDocument: typeof import("../src/lib/knowledgeBase/service").extractSourceDocument;
+let setSourceLicenseStatus: typeof import("../src/lib/knowledgeBase/service").setSourceLicenseStatus;
 let classifyAsLesson: typeof import("../src/lib/knowledgeBase/service").classifyAsLesson;
 let classifyAsExercise: typeof import("../src/lib/knowledgeBase/service").classifyAsExercise;
 let classifyAsExam: typeof import("../src/lib/knowledgeBase/service").classifyAsExam;
@@ -40,6 +41,7 @@ before(async () => {
   classifyAsLesson = service.classifyAsLesson;
   classifyAsExercise = service.classifyAsExercise;
   classifyAsExam = service.classifyAsExam;
+  setSourceLicenseStatus = service.setSourceLicenseStatus;
   submitForVerification = service.submitForVerification;
   runDeterministicVerification = service.runDeterministicVerification;
   markVerifiedByHuman = service.markVerifiedByHuman;
@@ -385,4 +387,45 @@ test("published exam creates one searchable chunk per question", () => {
 
   const chunks = searchKbChunks({ subjectId: "math", educationLevelId: "4am", query: "2x+1" });
   assert.ok(chunks.some((c) => c.sourceExamId === exam.id));
+});
+
+test("the admin-review flow: a source stuck at unknown license blocks extraction until explicitly reclassified", () => {
+  const source = makeSource("unknown");
+  const doc = recordSourceDocument({
+    sourceId: source.id,
+    url: `https://example-test.dz/admin-review-${Math.random()}`,
+    title: "وثيقة بانتظار مراجعة الترخيص",
+    fileType: "html",
+    subjectId: "math",
+    educationLevelId: "4am",
+    documentKind: "exam",
+    contentYear: "2024",
+  });
+
+  // Before the admin acts: extraction stores nothing, same as any
+  // unknown-license source.
+  const before = extractSourceDocument({ documentId: doc.id, sourceLicenseStatus: "unknown", extractedText: "نص الامتحان" });
+  assert.equal(before.document.status, "needs_human_review");
+  assert.equal(before.document.rawText, null);
+
+  // The admin reviews the source's actual terms of use and marks it public
+  // domain — exactly the action the admin KB panel's license dropdown
+  // performs (POST /api/admin/knowledge-base/sources/[id]/license).
+  setSourceLicenseStatus(source.id, "public_domain");
+
+  // A second document from the now-reclassified source stores full text
+  // immediately, with no other code change needed.
+  const doc2 = recordSourceDocument({
+    sourceId: source.id,
+    url: `https://example-test.dz/admin-review-2-${Math.random()}`,
+    title: "وثيقة ثانية بعد تحديث الترخيص",
+    fileType: "html",
+    subjectId: "math",
+    educationLevelId: "4am",
+    documentKind: "exam",
+    contentYear: "2024",
+  });
+  const after = extractSourceDocument({ documentId: doc2.id, sourceLicenseStatus: "public_domain", extractedText: "نص الامتحان الثاني" });
+  assert.equal(after.document.status, "extracted");
+  assert.equal(after.document.rawText, "نص الامتحان الثاني");
 });

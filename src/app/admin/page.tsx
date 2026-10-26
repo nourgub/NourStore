@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { AdminPaymentRequestsList } from "@/components/AdminPaymentRequestsList";
 import { AdminPasswordResetsList } from "@/components/AdminPasswordResetsList";
 import { AdminCleanupOldPapers } from "@/components/AdminCleanupOldPapers";
+import { AdminKnowledgeBasePanel } from "@/components/AdminKnowledgeBasePanel";
 
 const FEATURE_LABEL: Record<string, string> = { grading: "تصحيح الأوراق", exams: "توليد الامتحانات", lessonPrep: "تحضير الدروس" };
 
@@ -28,6 +29,12 @@ export default async function AdminPage() {
         <h2 className="mb-1 mt-12 text-xl font-bold text-brand-900">طلبات استعادة كلمة المرور</h2>
         <p className="mb-6 text-sm text-brand-600">عيّن كلمة مرور جديدة للأستاذ وأرسلها له مباشرة</p>
         <AdminPasswordResetsList />
+
+        <h2 className="mb-1 mt-12 text-xl font-bold text-brand-900">قاعدة المعرفة التعليمية</h2>
+        <p className="mb-6 text-sm text-brand-600">
+          مصادر ووثائق المنهاج الجزائري المكتشفة — حدِّد حالة ترخيص كل مصدر أولًا، ثم استخرج النص الذي تحققت منه بنفسك.
+        </p>
+        <AdminKnowledgeBasePanel />
 
         <h2 className="mb-1 mt-12 text-xl font-bold text-brand-900">إدارة التخزين</h2>
         <p className="mb-6 text-sm text-brand-600">صور أوراق التلاميذ لا تُحذف تلقائيًا — نظّفها يدويًا من هنا</p>
