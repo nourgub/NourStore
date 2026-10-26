@@ -6,6 +6,15 @@ import type {
   ExtractionStatus,
   GenerationRequest,
   GradingSession,
+  KbChunk,
+  KbContentStatus,
+  KbExam,
+  KbExercise,
+  KbLesson,
+  KbSource,
+  KbSourceDocument,
+  KbVerification,
+  KbVerificationTargetType,
   LessonPrepFieldValue,
   LessonPrepRequest,
   LessonPrepSection,
@@ -303,6 +312,123 @@ withBusyRetry(() =>
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_lesson_prep_templates_teacher_subject ON lesson_prep_templates(teacher_id, subject_id);
+
+  -- Knowledge base: a platform-wide, admin-curated library (not teacher
+  -- data) — see the "Knowledge Base" block in types.ts for the full
+  -- lifecycle this schema enforces (collected -> ... -> published).
+  CREATE TABLE IF NOT EXISTS kb_sources (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    license_status TEXT NOT NULL DEFAULT 'unknown',
+    reliability_note TEXT NOT NULL DEFAULT '',
+    discovered_at TEXT NOT NULL,
+    last_checked_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS kb_source_documents (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL REFERENCES kb_sources(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    education_level_id TEXT NOT NULL,
+    document_kind TEXT NOT NULL,
+    content_year TEXT,
+    raw_text TEXT,
+    excerpt TEXT,
+    checksum TEXT,
+    status TEXT NOT NULL DEFAULT 'collected',
+    notes TEXT NOT NULL DEFAULT '',
+    collected_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_source_documents_source ON kb_source_documents(source_id);
+  CREATE INDEX IF NOT EXISTS idx_kb_source_documents_level ON kb_source_documents(subject_id, education_level_id);
+  CREATE INDEX IF NOT EXISTS idx_kb_source_documents_status ON kb_source_documents(status);
+  -- Partial unique index: only enforced once a checksum is actually known
+  -- (NULL checksums — not-yet-extracted rows — never collide with NULL).
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_source_documents_checksum ON kb_source_documents(checksum) WHERE checksum IS NOT NULL;
+
+  CREATE TABLE IF NOT EXISTS kb_lessons (
+    id TEXT PRIMARY KEY,
+    source_document_id TEXT REFERENCES kb_source_documents(id) ON DELETE SET NULL,
+    subject_id TEXT NOT NULL,
+    education_level_id TEXT NOT NULL,
+    curriculum_topic TEXT NOT NULL,
+    title TEXT NOT NULL,
+    sections_json TEXT NOT NULL DEFAULT '[]',
+    skills_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'collected',
+    verified_at TEXT,
+    verified_by TEXT REFERENCES teachers(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_lessons_level_topic ON kb_lessons(subject_id, education_level_id, curriculum_topic);
+  CREATE INDEX IF NOT EXISTS idx_kb_lessons_status ON kb_lessons(status);
+
+  CREATE TABLE IF NOT EXISTS kb_exercises (
+    id TEXT PRIMARY KEY,
+    source_document_id TEXT REFERENCES kb_source_documents(id) ON DELETE SET NULL,
+    subject_id TEXT NOT NULL,
+    education_level_id TEXT NOT NULL,
+    curriculum_topic TEXT NOT NULL,
+    prompt_text TEXT NOT NULL,
+    solution_text TEXT,
+    rubric_json TEXT NOT NULL DEFAULT '[]',
+    points REAL NOT NULL,
+    difficulty TEXT NOT NULL DEFAULT 'متوسط',
+    status TEXT NOT NULL DEFAULT 'collected',
+    verified_at TEXT,
+    verified_by TEXT REFERENCES teachers(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_exercises_level_topic ON kb_exercises(subject_id, education_level_id, curriculum_topic);
+  CREATE INDEX IF NOT EXISTS idx_kb_exercises_status ON kb_exercises(status);
+
+  CREATE TABLE IF NOT EXISTS kb_exams (
+    id TEXT PRIMARY KEY,
+    source_document_id TEXT REFERENCES kb_source_documents(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    exam_type TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    education_level_id TEXT NOT NULL,
+    content_year TEXT,
+    questions_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'collected',
+    verified_at TEXT,
+    verified_by TEXT REFERENCES teachers(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_exams_level ON kb_exams(subject_id, education_level_id);
+  CREATE INDEX IF NOT EXISTS idx_kb_exams_status ON kb_exams(status);
+
+  CREATE TABLE IF NOT EXISTS kb_verifications (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    method TEXT NOT NULL,
+    result TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    checked_at TEXT NOT NULL,
+    checked_by TEXT REFERENCES teachers(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_verifications_target ON kb_verifications(target_type, target_id);
+
+  CREATE TABLE IF NOT EXISTS kb_chunks (
+    id TEXT PRIMARY KEY,
+    subject_id TEXT NOT NULL,
+    education_level_id TEXT NOT NULL,
+    curriculum_topic TEXT NOT NULL,
+    chunk_type TEXT NOT NULL,
+    text TEXT NOT NULL,
+    source_lesson_id TEXT REFERENCES kb_lessons(id) ON DELETE CASCADE,
+    source_exercise_id TEXT REFERENCES kb_exercises(id) ON DELETE CASCADE,
+    source_exam_id TEXT REFERENCES kb_exams(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_kb_chunks_level_topic ON kb_chunks(subject_id, education_level_id, curriculum_topic);
 `),
 );
 
@@ -1610,4 +1736,530 @@ export function checkAndIncrementRateLimit(key: string, maxAttempts: number, win
   if (row.count >= maxAttempts) return false;
   db.prepare(`UPDATE rate_limit_attempts SET count = count + 1 WHERE key = ?`).run(key);
   return true;
+}
+
+// ---------- Knowledge base ----------
+// Platform-wide, admin-curated library — every function here deliberately
+// takes no teacherId (unlike almost everything above this section): these
+// rows aren't scoped to one teacher's data, they ARE the shared library.
+// Write access is gated in the service layer (knowledgeBase/*.ts) by admin
+// checks, not by a DB-level teacherId filter.
+
+interface KbSourceRow {
+  id: string;
+  name: string;
+  url: string;
+  source_type: KbSource["sourceType"];
+  license_status: KbSource["licenseStatus"];
+  reliability_note: string;
+  discovered_at: string;
+  last_checked_at: string | null;
+}
+
+function rowToKbSource(row: KbSourceRow): KbSource {
+  return {
+    id: row.id,
+    name: row.name,
+    url: row.url,
+    sourceType: row.source_type,
+    licenseStatus: row.license_status,
+    reliabilityNote: row.reliability_note,
+    discoveredAt: row.discovered_at,
+    lastCheckedAt: row.last_checked_at,
+  };
+}
+
+export function insertKbSource(source: KbSource): void {
+  db.prepare(
+    `INSERT INTO kb_sources (id, name, url, source_type, license_status, reliability_note, discovered_at, last_checked_at)
+     VALUES (@id, @name, @url, @sourceType, @licenseStatus, @reliabilityNote, @discoveredAt, @lastCheckedAt)`,
+  ).run(source);
+}
+
+export function listKbSources(): KbSource[] {
+  const rows = db.prepare(`SELECT * FROM kb_sources ORDER BY discovered_at DESC`).all() as KbSourceRow[];
+  return rows.map(rowToKbSource);
+}
+
+export function getKbSource(id: string): KbSource | null {
+  const row = db.prepare(`SELECT * FROM kb_sources WHERE id = ?`).get(id) as KbSourceRow | undefined;
+  return row ? rowToKbSource(row) : null;
+}
+
+export function findKbSourceByUrl(url: string): KbSource | null {
+  const row = db.prepare(`SELECT * FROM kb_sources WHERE url = ?`).get(url) as KbSourceRow | undefined;
+  return row ? rowToKbSource(row) : null;
+}
+
+export function touchKbSourceLastChecked(id: string, lastCheckedAt: string): void {
+  db.prepare(`UPDATE kb_sources SET last_checked_at = ? WHERE id = ?`).run(lastCheckedAt, id);
+}
+
+interface KbSourceDocumentRow {
+  id: string;
+  source_id: string;
+  url: string;
+  title: string;
+  file_type: KbSourceDocument["fileType"];
+  subject_id: SubjectId;
+  education_level_id: string;
+  document_kind: KbSourceDocument["documentKind"];
+  content_year: string | null;
+  raw_text: string | null;
+  excerpt: string | null;
+  checksum: string | null;
+  status: KbContentStatus;
+  notes: string;
+  collected_at: string;
+}
+
+function rowToKbSourceDocument(row: KbSourceDocumentRow): KbSourceDocument {
+  return {
+    id: row.id,
+    sourceId: row.source_id,
+    url: row.url,
+    title: row.title,
+    fileType: row.file_type,
+    subjectId: row.subject_id,
+    educationLevelId: row.education_level_id,
+    documentKind: row.document_kind,
+    contentYear: row.content_year,
+    rawText: row.raw_text,
+    excerpt: row.excerpt,
+    checksum: row.checksum,
+    status: row.status,
+    notes: row.notes,
+    collectedAt: row.collected_at,
+  };
+}
+
+export function insertKbSourceDocument(doc: KbSourceDocument): void {
+  db.prepare(
+    `INSERT INTO kb_source_documents
+       (id, source_id, url, title, file_type, subject_id, education_level_id, document_kind, content_year, raw_text, excerpt, checksum, status, notes, collected_at)
+     VALUES (@id, @sourceId, @url, @title, @fileType, @subjectId, @educationLevelId, @documentKind, @contentYear, @rawText, @excerpt, @checksum, @status, @notes, @collectedAt)`,
+  ).run(doc);
+}
+
+export function getKbSourceDocument(id: string): KbSourceDocument | null {
+  const row = db.prepare(`SELECT * FROM kb_source_documents WHERE id = ?`).get(id) as KbSourceDocumentRow | undefined;
+  return row ? rowToKbSourceDocument(row) : null;
+}
+
+export function listKbSourceDocuments(filter?: { subjectId?: SubjectId; educationLevelId?: string; status?: KbContentStatus }): KbSourceDocument[] {
+  const conditions: string[] = [];
+  const params: Record<string, string> = {};
+  if (filter?.subjectId) {
+    conditions.push("subject_id = @subjectId");
+    params.subjectId = filter.subjectId;
+  }
+  if (filter?.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = filter.educationLevelId;
+  }
+  if (filter?.status) {
+    conditions.push("status = @status");
+    params.status = filter.status;
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM kb_source_documents ${where} ORDER BY collected_at DESC`).all(params) as KbSourceDocumentRow[];
+  return rows.map(rowToKbSourceDocument);
+}
+
+export function findKbSourceDocumentByChecksum(checksum: string): KbSourceDocument | null {
+  const row = db.prepare(`SELECT * FROM kb_source_documents WHERE checksum = ?`).get(checksum) as
+    | KbSourceDocumentRow
+    | undefined;
+  return row ? rowToKbSourceDocument(row) : null;
+}
+
+export function updateKbSourceDocumentExtraction(args: {
+  id: string;
+  rawText: string | null;
+  excerpt: string | null;
+  checksum: string | null;
+  status: KbContentStatus;
+}): void {
+  db.prepare(
+    `UPDATE kb_source_documents SET raw_text = @rawText, excerpt = @excerpt, checksum = @checksum, status = @status WHERE id = @id`,
+  ).run(args);
+}
+
+export function updateKbSourceDocumentStatus(id: string, status: KbContentStatus, notes?: string): void {
+  if (notes !== undefined) {
+    db.prepare(`UPDATE kb_source_documents SET status = ?, notes = ? WHERE id = ?`).run(status, notes, id);
+  } else {
+    db.prepare(`UPDATE kb_source_documents SET status = ? WHERE id = ?`).run(status, id);
+  }
+}
+
+interface KbLessonRow {
+  id: string;
+  source_document_id: string | null;
+  subject_id: SubjectId;
+  education_level_id: string;
+  curriculum_topic: string;
+  title: string;
+  sections_json: string;
+  skills_json: string;
+  status: KbContentStatus;
+  verified_at: string | null;
+  verified_by: string | null;
+  created_at: string;
+}
+
+function rowToKbLesson(row: KbLessonRow): KbLesson {
+  return {
+    id: row.id,
+    sourceDocumentId: row.source_document_id,
+    subjectId: row.subject_id,
+    educationLevelId: row.education_level_id,
+    curriculumTopic: row.curriculum_topic,
+    title: row.title,
+    sections: JSON.parse(row.sections_json),
+    skills: JSON.parse(row.skills_json),
+    status: row.status,
+    verifiedAt: row.verified_at,
+    verifiedBy: row.verified_by,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertKbLesson(lesson: KbLesson): void {
+  db.prepare(
+    `INSERT INTO kb_lessons (id, source_document_id, subject_id, education_level_id, curriculum_topic, title, sections_json, skills_json, status, verified_at, verified_by, created_at)
+     VALUES (@id, @sourceDocumentId, @subjectId, @educationLevelId, @curriculumTopic, @title, @sectionsJson, @skillsJson, @status, @verifiedAt, @verifiedBy, @createdAt)`,
+  ).run({ ...lesson, sectionsJson: JSON.stringify(lesson.sections), skillsJson: JSON.stringify(lesson.skills) });
+}
+
+export function getKbLesson(id: string): KbLesson | null {
+  const row = db.prepare(`SELECT * FROM kb_lessons WHERE id = ?`).get(id) as KbLessonRow | undefined;
+  return row ? rowToKbLesson(row) : null;
+}
+
+export function listKbLessons(filter?: { subjectId?: SubjectId; educationLevelId?: string; status?: KbContentStatus }): KbLesson[] {
+  const conditions: string[] = [];
+  const params: Record<string, string> = {};
+  if (filter?.subjectId) {
+    conditions.push("subject_id = @subjectId");
+    params.subjectId = filter.subjectId;
+  }
+  if (filter?.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = filter.educationLevelId;
+  }
+  if (filter?.status) {
+    conditions.push("status = @status");
+    params.status = filter.status;
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM kb_lessons ${where} ORDER BY created_at DESC`).all(params) as KbLessonRow[];
+  return rows.map(rowToKbLesson);
+}
+
+export function updateKbLessonStatus(args: { id: string; status: KbContentStatus; verifiedAt?: string | null; verifiedBy?: string | null }): void {
+  if (args.verifiedAt !== undefined || args.verifiedBy !== undefined) {
+    db.prepare(`UPDATE kb_lessons SET status = @status, verified_at = @verifiedAt, verified_by = @verifiedBy WHERE id = @id`).run({
+      id: args.id,
+      status: args.status,
+      verifiedAt: args.verifiedAt ?? null,
+      verifiedBy: args.verifiedBy ?? null,
+    });
+  } else {
+    db.prepare(`UPDATE kb_lessons SET status = ? WHERE id = ?`).run(args.status, args.id);
+  }
+}
+
+interface KbExerciseRow {
+  id: string;
+  source_document_id: string | null;
+  subject_id: SubjectId;
+  education_level_id: string;
+  curriculum_topic: string;
+  prompt_text: string;
+  solution_text: string | null;
+  rubric_json: string;
+  points: number;
+  difficulty: KbExercise["difficulty"];
+  status: KbContentStatus;
+  verified_at: string | null;
+  verified_by: string | null;
+  created_at: string;
+}
+
+function rowToKbExercise(row: KbExerciseRow): KbExercise {
+  return {
+    id: row.id,
+    sourceDocumentId: row.source_document_id,
+    subjectId: row.subject_id,
+    educationLevelId: row.education_level_id,
+    curriculumTopic: row.curriculum_topic,
+    promptText: row.prompt_text,
+    solutionText: row.solution_text,
+    rubric: JSON.parse(row.rubric_json),
+    points: row.points,
+    difficulty: row.difficulty,
+    status: row.status,
+    verifiedAt: row.verified_at,
+    verifiedBy: row.verified_by,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertKbExercise(ex: KbExercise): void {
+  db.prepare(
+    `INSERT INTO kb_exercises (id, source_document_id, subject_id, education_level_id, curriculum_topic, prompt_text, solution_text, rubric_json, points, difficulty, status, verified_at, verified_by, created_at)
+     VALUES (@id, @sourceDocumentId, @subjectId, @educationLevelId, @curriculumTopic, @promptText, @solutionText, @rubricJson, @points, @difficulty, @status, @verifiedAt, @verifiedBy, @createdAt)`,
+  ).run({ ...ex, rubricJson: JSON.stringify(ex.rubric) });
+}
+
+export function getKbExercise(id: string): KbExercise | null {
+  const row = db.prepare(`SELECT * FROM kb_exercises WHERE id = ?`).get(id) as KbExerciseRow | undefined;
+  return row ? rowToKbExercise(row) : null;
+}
+
+export function listKbExercises(filter?: { subjectId?: SubjectId; educationLevelId?: string; status?: KbContentStatus }): KbExercise[] {
+  const conditions: string[] = [];
+  const params: Record<string, string> = {};
+  if (filter?.subjectId) {
+    conditions.push("subject_id = @subjectId");
+    params.subjectId = filter.subjectId;
+  }
+  if (filter?.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = filter.educationLevelId;
+  }
+  if (filter?.status) {
+    conditions.push("status = @status");
+    params.status = filter.status;
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM kb_exercises ${where} ORDER BY created_at DESC`).all(params) as KbExerciseRow[];
+  return rows.map(rowToKbExercise);
+}
+
+export function updateKbExerciseStatus(args: { id: string; status: KbContentStatus; verifiedAt?: string | null; verifiedBy?: string | null }): void {
+  if (args.verifiedAt !== undefined || args.verifiedBy !== undefined) {
+    db.prepare(`UPDATE kb_exercises SET status = @status, verified_at = @verifiedAt, verified_by = @verifiedBy WHERE id = @id`).run({
+      id: args.id,
+      status: args.status,
+      verifiedAt: args.verifiedAt ?? null,
+      verifiedBy: args.verifiedBy ?? null,
+    });
+  } else {
+    db.prepare(`UPDATE kb_exercises SET status = ? WHERE id = ?`).run(args.status, args.id);
+  }
+}
+
+interface KbExamRow {
+  id: string;
+  source_document_id: string | null;
+  title: string;
+  exam_type: KbExam["examType"];
+  subject_id: SubjectId;
+  education_level_id: string;
+  content_year: string | null;
+  questions_json: string;
+  status: KbContentStatus;
+  verified_at: string | null;
+  verified_by: string | null;
+  created_at: string;
+}
+
+function rowToKbExam(row: KbExamRow): KbExam {
+  return {
+    id: row.id,
+    sourceDocumentId: row.source_document_id,
+    title: row.title,
+    examType: row.exam_type,
+    subjectId: row.subject_id,
+    educationLevelId: row.education_level_id,
+    contentYear: row.content_year,
+    questions: JSON.parse(row.questions_json),
+    status: row.status,
+    verifiedAt: row.verified_at,
+    verifiedBy: row.verified_by,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertKbExam(exam: KbExam): void {
+  db.prepare(
+    `INSERT INTO kb_exams (id, source_document_id, title, exam_type, subject_id, education_level_id, content_year, questions_json, status, verified_at, verified_by, created_at)
+     VALUES (@id, @sourceDocumentId, @title, @examType, @subjectId, @educationLevelId, @contentYear, @questionsJson, @status, @verifiedAt, @verifiedBy, @createdAt)`,
+  ).run({ ...exam, questionsJson: JSON.stringify(exam.questions) });
+}
+
+export function getKbExam(id: string): KbExam | null {
+  const row = db.prepare(`SELECT * FROM kb_exams WHERE id = ?`).get(id) as KbExamRow | undefined;
+  return row ? rowToKbExam(row) : null;
+}
+
+export function listKbExams(filter?: { subjectId?: SubjectId; educationLevelId?: string; status?: KbContentStatus }): KbExam[] {
+  const conditions: string[] = [];
+  const params: Record<string, string> = {};
+  if (filter?.subjectId) {
+    conditions.push("subject_id = @subjectId");
+    params.subjectId = filter.subjectId;
+  }
+  if (filter?.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = filter.educationLevelId;
+  }
+  if (filter?.status) {
+    conditions.push("status = @status");
+    params.status = filter.status;
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM kb_exams ${where} ORDER BY created_at DESC`).all(params) as KbExamRow[];
+  return rows.map(rowToKbExam);
+}
+
+export function updateKbExamStatus(args: { id: string; status: KbContentStatus; verifiedAt?: string | null; verifiedBy?: string | null }): void {
+  if (args.verifiedAt !== undefined || args.verifiedBy !== undefined) {
+    db.prepare(`UPDATE kb_exams SET status = @status, verified_at = @verifiedAt, verified_by = @verifiedBy WHERE id = @id`).run({
+      id: args.id,
+      status: args.status,
+      verifiedAt: args.verifiedAt ?? null,
+      verifiedBy: args.verifiedBy ?? null,
+    });
+  } else {
+    db.prepare(`UPDATE kb_exams SET status = ? WHERE id = ?`).run(args.status, args.id);
+  }
+}
+
+interface KbVerificationRow {
+  id: string;
+  target_type: KbVerificationTargetType;
+  target_id: string;
+  method: KbVerification["method"];
+  result: KbVerification["result"];
+  detail: string;
+  checked_at: string;
+  checked_by: string | null;
+}
+
+function rowToKbVerification(row: KbVerificationRow): KbVerification {
+  return {
+    id: row.id,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    method: row.method,
+    result: row.result,
+    detail: row.detail,
+    checkedAt: row.checked_at,
+    checkedBy: row.checked_by,
+  };
+}
+
+export function insertKbVerification(v: KbVerification): void {
+  db.prepare(
+    `INSERT INTO kb_verifications (id, target_type, target_id, method, result, detail, checked_at, checked_by)
+     VALUES (@id, @targetType, @targetId, @method, @result, @detail, @checkedAt, @checkedBy)`,
+  ).run(v);
+}
+
+export function listKbVerificationsForTarget(targetType: KbVerificationTargetType, targetId: string): KbVerification[] {
+  const rows = db
+    .prepare(`SELECT * FROM kb_verifications WHERE target_type = ? AND target_id = ? ORDER BY checked_at ASC`)
+    .all(targetType, targetId) as KbVerificationRow[];
+  return rows.map(rowToKbVerification);
+}
+
+interface KbChunkRow {
+  id: string;
+  subject_id: SubjectId;
+  education_level_id: string;
+  curriculum_topic: string;
+  chunk_type: KbChunk["chunkType"];
+  text: string;
+  source_lesson_id: string | null;
+  source_exercise_id: string | null;
+  source_exam_id: string | null;
+  created_at: string;
+}
+
+function rowToKbChunk(row: KbChunkRow): KbChunk {
+  return {
+    id: row.id,
+    subjectId: row.subject_id,
+    educationLevelId: row.education_level_id,
+    curriculumTopic: row.curriculum_topic,
+    chunkType: row.chunk_type,
+    text: row.text,
+    sourceLessonId: row.source_lesson_id,
+    sourceExerciseId: row.source_exercise_id,
+    sourceExamId: row.source_exam_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function insertKbChunk(chunk: KbChunk): void {
+  db.prepare(
+    `INSERT INTO kb_chunks (id, subject_id, education_level_id, curriculum_topic, chunk_type, text, source_lesson_id, source_exercise_id, source_exam_id, created_at)
+     VALUES (@id, @subjectId, @educationLevelId, @curriculumTopic, @chunkType, @text, @sourceLessonId, @sourceExerciseId, @sourceExamId, @createdAt)`,
+  ).run(chunk);
+}
+
+// Lexical substring search only (SQL LIKE) — a real semantic/vector search
+// is a separate infrastructure decision (see knowledgeBase/README notes),
+// deliberately deferred rather than faked with a keyword match dressed up
+// as "retrieval".
+export function searchKbChunks(args: { subjectId: SubjectId; educationLevelId?: string; query: string; limit?: number }): KbChunk[] {
+  const conditions = ["subject_id = @subjectId", "text LIKE @query"];
+  const params: Record<string, string | number> = { subjectId: args.subjectId, query: `%${args.query}%`, limit: args.limit ?? 20 };
+  if (args.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = args.educationLevelId;
+  }
+  const rows = db
+    .prepare(`SELECT * FROM kb_chunks WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC LIMIT @limit`)
+    .all(params) as KbChunkRow[];
+  return rows.map(rowToKbChunk);
+}
+
+export function listKbChunks(filter?: { subjectId?: SubjectId; educationLevelId?: string }): KbChunk[] {
+  const conditions: string[] = [];
+  const params: Record<string, string> = {};
+  if (filter?.subjectId) {
+    conditions.push("subject_id = @subjectId");
+    params.subjectId = filter.subjectId;
+  }
+  if (filter?.educationLevelId) {
+    conditions.push("education_level_id = @educationLevelId");
+    params.educationLevelId = filter.educationLevelId;
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`SELECT * FROM kb_chunks ${where} ORDER BY created_at DESC`).all(params) as KbChunkRow[];
+  return rows.map(rowToKbChunk);
+}
+
+export function countKbRows(): {
+  sources: number;
+  sourceDocuments: number;
+  lessons: number;
+  exercises: number;
+  exams: number;
+  chunks: number;
+  byStatus: Record<string, number>;
+} {
+  const sources = (db.prepare(`SELECT COUNT(*) AS c FROM kb_sources`).get() as { c: number }).c;
+  const sourceDocuments = (db.prepare(`SELECT COUNT(*) AS c FROM kb_source_documents`).get() as { c: number }).c;
+  const lessons = (db.prepare(`SELECT COUNT(*) AS c FROM kb_lessons`).get() as { c: number }).c;
+  const exercises = (db.prepare(`SELECT COUNT(*) AS c FROM kb_exercises`).get() as { c: number }).c;
+  const exams = (db.prepare(`SELECT COUNT(*) AS c FROM kb_exams`).get() as { c: number }).c;
+  const chunks = (db.prepare(`SELECT COUNT(*) AS c FROM kb_chunks`).get() as { c: number }).c;
+  const statusRows = db
+    .prepare(
+      `SELECT status, COUNT(*) AS c FROM (
+         SELECT status FROM kb_source_documents
+         UNION ALL SELECT status FROM kb_lessons
+         UNION ALL SELECT status FROM kb_exercises
+         UNION ALL SELECT status FROM kb_exams
+       ) GROUP BY status`,
+    )
+    .all() as { status: string; c: number }[];
+  const byStatus: Record<string, number> = {};
+  for (const row of statusRows) byStatus[row.status] = row.c;
+  return { sources, sourceDocuments, lessons, exercises, exams, chunks, byStatus };
 }

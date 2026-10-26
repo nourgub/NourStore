@@ -347,3 +347,185 @@ export interface LessonPrepRequest {
   fileDocx: string | null;
   createdAt: string;
 }
+
+// ---------- Knowledge Base (Algerian curriculum reference library) ----------
+//
+// This is a platform-wide, admin-curated library — NOT teacher-owned data
+// (unlike every table above). It backs the teacher-facing library (browsing
+// verified lessons/exercises/exams) and, later, retrieval for exam
+// generation. Every content row carries this same lifecycle so nothing is
+// ever surfaced to a teacher or fed to a generation prompt before it has
+// actually been checked:
+//
+//   collected -> extracted -> classified -> pending_verification
+//     -> verified -> published
+//                 -> needs_human_review (never silently skipped to verified)
+//                 -> rejected (terminal; kept for audit, never deleted)
+//
+// A row only reaches "published" through this chain — never created
+// directly in that state.
+export type KbContentStatus =
+  | "collected"
+  | "extracted"
+  | "classified"
+  | "pending_verification"
+  | "verified"
+  | "needs_human_review"
+  | "rejected"
+  | "published";
+
+export type KbSourceType = "official_ministry" | "trusted_educational_site" | "textbook_publisher" | "other";
+
+// Governs whether a source document's full text may be stored (see
+// KbSourceDocument.rawText). "unknown" is the safe default — treated the
+// same as "restricted" by the ingestion code until a human sets it
+// explicitly, never assumed permissive.
+export type KbLicenseStatus = "public_domain" | "permitted_excerpt" | "unknown" | "restricted";
+
+export type KbDocumentKind = "lesson" | "exercise_sheet" | "exam" | "model_answer" | "curriculum_reference" | "other";
+
+export type KbExamType = "bem" | "bac" | "فرض" | "اختبار" | "other";
+
+export interface KbSource {
+  id: string;
+  name: string;
+  url: string;
+  sourceType: KbSourceType;
+  licenseStatus: KbLicenseStatus;
+  // Free-text note on why this source was trusted (or not) — e.g. "موقع
+  // الديوان الوطني للامتحانات والمسابقات (ONEC) الرسمي". Never left implicit.
+  reliabilityNote: string;
+  discoveredAt: string;
+  lastCheckedAt: string | null;
+}
+
+export interface KbSourceDocument {
+  id: string;
+  sourceId: string;
+  url: string;
+  title: string;
+  fileType: "pdf" | "docx" | "html" | "image" | "text";
+  subjectId: SubjectId;
+  // Matches an id from the curriculum level taxonomy (see
+  // src/lib/knowledgeBase/levels.ts), e.g. "4am" — validated in code, no DB
+  // foreign key (same convention as subjectId elsewhere in this schema).
+  educationLevelId: string;
+  documentKind: KbDocumentKind;
+  // The real year this document is FROM (e.g. a 2023 BEM paper) — distinct
+  // from collectedAt (when this platform found it).
+  contentYear: string | null;
+  // Full extracted text — null whenever licenseStatus isn't clearly
+  // permissive (see KbLicenseStatus), per instruction 13 (never exceed
+  // copyright). excerpt still allows a short, clearly-permitted snippet.
+  rawText: string | null;
+  excerpt: string | null;
+  // SHA-256 of rawText (or excerpt when rawText is null) — duplicate
+  // detection across re-collected/mirrored copies of the same document.
+  checksum: string | null;
+  status: KbContentStatus;
+  notes: string;
+  collectedAt: string;
+}
+
+export interface KbLesson {
+  id: string;
+  sourceDocumentId: string | null;
+  subjectId: SubjectId;
+  educationLevelId: string;
+  curriculumTopic: string;
+  title: string;
+  sections: LessonPrepSection[];
+  skills: string[];
+  status: KbContentStatus;
+  verifiedAt: string | null;
+  // Admin teacher id who performed the human_review step, if any — null
+  // when the row has only passed automated/deterministic checks so far.
+  verifiedBy: string | null;
+  createdAt: string;
+}
+
+export interface KbExercise {
+  id: string;
+  sourceDocumentId: string | null;
+  subjectId: SubjectId;
+  educationLevelId: string;
+  curriculumTopic: string;
+  promptText: string;
+  solutionText: string | null;
+  rubric: RubricCriterion[];
+  points: number;
+  difficulty: "سهل" | "متوسط" | "صعب";
+  status: KbContentStatus;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  createdAt: string;
+}
+
+// A single exam question, folded into KbExam.questions (one JSON column)
+// rather than a separate table — the same convention already used by
+// requests.questions_json for teacher-generated exams.
+export interface KbExamQuestion {
+  id: string;
+  orderIndex: number;
+  promptText: string;
+  points: number;
+  curriculumTopic: string;
+  solutionText: string | null;
+  rubric: RubricCriterion[];
+}
+
+export interface KbExam {
+  id: string;
+  sourceDocumentId: string | null;
+  title: string;
+  examType: KbExamType;
+  subjectId: SubjectId;
+  educationLevelId: string;
+  contentYear: string | null;
+  questions: KbExamQuestion[];
+  status: KbContentStatus;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  createdAt: string;
+}
+
+export type KbVerificationTargetType = "source_document" | "lesson" | "exercise" | "exam";
+export type KbVerificationMethod =
+  | "deterministic_points"
+  | "deterministic_completeness"
+  | "deterministic_duplicate"
+  | "claude_review"
+  | "gemini_review"
+  | "human_review";
+export type KbVerificationResult = "pass" | "fail" | "inconclusive";
+
+export interface KbVerification {
+  id: string;
+  targetType: KbVerificationTargetType;
+  targetId: string;
+  method: KbVerificationMethod;
+  result: KbVerificationResult;
+  detail: string;
+  checkedAt: string;
+  // Admin teacher id, set only for method === "human_review".
+  checkedBy: string | null;
+}
+
+// The retrieval unit for the future RAG wiring (deferred past this phase) —
+// a focused, independently-retrievable piece of verified content. Only ever
+// created from a row that has actually reached "published" (enforced in
+// knowledgeBase/service.ts, not just by convention).
+export type KbChunkType = "definition" | "rule" | "example" | "exercise" | "solution" | "other";
+
+export interface KbChunk {
+  id: string;
+  subjectId: SubjectId;
+  educationLevelId: string;
+  curriculumTopic: string;
+  chunkType: KbChunkType;
+  text: string;
+  sourceLessonId: string | null;
+  sourceExerciseId: string | null;
+  sourceExamId: string | null;
+  createdAt: string;
+}
