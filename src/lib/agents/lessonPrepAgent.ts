@@ -2,6 +2,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { LessonPrepFieldValue, LessonPrepSection, LessonPrepTableRow, LessonPrepTemplateSchema } from "../types";
+import type { TokenUsage } from "./independentGradeTypes";
+
+function usageFrom(response: { usage?: { input_tokens?: number; output_tokens?: number } }): TokenUsage {
+  return { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 };
+}
 
 const MODEL = "claude-sonnet-5";
 
@@ -47,7 +52,9 @@ export interface GenerateLessonPrepInput {
   styleNotes?: string;
 }
 
-export async function generateLessonPrepWithClaude(input: GenerateLessonPrepInput): Promise<LessonPrepSection[]> {
+export async function generateLessonPrepWithClaude(
+  input: GenerateLessonPrepInput,
+): Promise<{ sections: LessonPrepSection[]; usage: TokenUsage; model: string }> {
   const prompt = `أنت ${input.subjectPersona} تُحضّر درسًا بعنوان "${input.lessonTitle}" لمستوى "${input.gradeLevel}".
 ${SECTION_STRUCTURE_HINT}
 ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب مراعاتها: "${input.styleNotes}"\n` : ""}
@@ -65,7 +72,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!parsed || parsed.sections.length === 0) {
     throw new LessonPrepAgentError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return parsed.sections;
+  return { sections: parsed.sections, usage: usageFrom(response), model: MODEL };
 }
 
 const IMAGE_MIME_TO_CONTENT_TYPE: Record<string, "image/jpeg" | "image/png"> = {
@@ -104,7 +111,9 @@ export interface MergeLessonPrepInput {
 // Merging a teacher's own notes (which may be scanned/photographed and only
 // readable via vision) has no sensible mock substitute — same posture as
 // gradingAgent.ts — so this always requires a real Claude API call.
-export async function mergeLessonPrepWithClaude(input: MergeLessonPrepInput): Promise<LessonPrepSection[]> {
+export async function mergeLessonPrepWithClaude(
+  input: MergeLessonPrepInput,
+): Promise<{ sections: LessonPrepSection[]; usage: TokenUsage; model: string }> {
   if (!isLessonPrepConfigured()) {
     throw new LessonPrepAgentError(
       "دمج المذكرات المرفوعة يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لقراءة ودمج محتوى ملفاتك الفعلية.",
@@ -142,7 +151,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!parsed || parsed.sections.length === 0) {
     throw new LessonPrepAgentError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return parsed.sections;
+  return { sections: parsed.sections, usage: usageFrom(response), model: MODEL };
 }
 
 // ---------- Teacher's own template: analysis + templated content ----------
@@ -176,7 +185,9 @@ export interface AnalyzeTemplateInput {
 
 // Analyzing an arbitrary teacher-uploaded form (especially a photographed or
 // scanned one) needs real vision/reading, not a template bank — no mock path.
-export async function analyzeLessonPrepTemplate(input: AnalyzeTemplateInput): Promise<LessonPrepTemplateSchema> {
+export async function analyzeLessonPrepTemplate(
+  input: AnalyzeTemplateInput,
+): Promise<{ schema: LessonPrepTemplateSchema; usage: TokenUsage; model: string }> {
   if (!isLessonPrepConfigured()) {
     throw new LessonPrepAgentError("تحليل نموذج التحضير المرفوع يتطلب تفعيل مفتاح Claude API.");
   }
@@ -208,7 +219,7 @@ ${input.extractedText ? `\nفيما يلي نص مستخرج من الملف ا�
   if (!parsed) {
     throw new LessonPrepAgentError("تعذّر تحليل شكل النموذج المرفوع");
   }
-  return parsed;
+  return { schema: parsed, usage: usageFrom(response), model: MODEL };
 }
 
 const TemplatedLessonPrepSchema = z.object({
@@ -245,7 +256,7 @@ export interface TemplatedLessonPrepResult {
 
 export async function generateTemplatedLessonPrepWithClaude(
   input: GenerateTemplatedLessonPrepInput,
-): Promise<TemplatedLessonPrepResult> {
+): Promise<{ result: TemplatedLessonPrepResult; usage: TokenUsage; model: string }> {
   const prompt = `أنت ${input.subjectPersona} تُحضّر درسًا بعنوان "${input.lessonTitle}" لمستوى "${input.gradeLevel}".
 ${templateInstructions(input.template)}
 ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب مراعاتها: "${input.styleNotes}"\n` : ""}
@@ -263,7 +274,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!parsed || parsed.tableRows.length === 0) {
     throw new LessonPrepAgentError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return parsed;
+  return { result: parsed, usage: usageFrom(response), model: MODEL };
 }
 
 export interface MergeTemplatedLessonPrepInput extends MergeLessonPrepInput {
@@ -273,7 +284,7 @@ export interface MergeTemplatedLessonPrepInput extends MergeLessonPrepInput {
 // Same no-mock posture as mergeLessonPrepWithClaude.
 export async function mergeTemplatedLessonPrepWithClaude(
   input: MergeTemplatedLessonPrepInput,
-): Promise<TemplatedLessonPrepResult> {
+): Promise<{ result: TemplatedLessonPrepResult; usage: TokenUsage; model: string }> {
   if (!isLessonPrepConfigured()) {
     throw new LessonPrepAgentError(
       "دمج المذكرات المرفوعة يتطلب تفعيل مفتاح Claude API — لا يوجد بديل تجريبي لقراءة ودمج محتوى ملفاتك الفعلية.",
@@ -303,5 +314,5 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!parsed || parsed.tableRows.length === 0) {
     throw new LessonPrepAgentError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return parsed;
+  return { result: parsed, usage: usageFrom(response), model: MODEL };
 }

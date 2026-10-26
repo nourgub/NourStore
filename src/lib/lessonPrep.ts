@@ -91,6 +91,8 @@ export async function createLessonPrep(input: CreateLessonPrepInput): Promise<Le
       textSources,
       imageSources,
       template: activeTemplate?.schema,
+      teacherId: input.teacherId,
+      operationId: requestId,
     });
 
     const outDir = path.join(GENERATED_DIR, input.teacherId, requestId);

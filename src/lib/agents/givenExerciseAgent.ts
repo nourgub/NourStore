@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Solves teacher-supplied exercises *as given* — the prompt text is never
 // generated or rephrased by the model, only copied verbatim from the page
@@ -52,7 +53,9 @@ function getClient(): Anthropic {
 
 export class GivenExerciseError extends Error {}
 
-export async function solveGivenExercises(input: SolveGivenExercisesInput): Promise<GeneratedQuestion[]> {
+export async function solveGivenExercises(
+  input: SolveGivenExercisesInput,
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   const exerciseList = input.exercises
     .map(
       (ex, i) =>
@@ -99,17 +102,23 @@ ${exerciseList}
     throw new GivenExerciseError("لم يتمكن النموذج من حل جميع التمارين المعطاة بالصيغة المتوقعة");
   }
 
-  return parsed.solutions.map((sol, i) => {
+  const questions = parsed.solutions.map((sol, i) => {
     const ex = input.exercises[i];
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     return {
       id,
       topic: input.topic,
-      difficulty: "متوسط",
+      difficulty: "متوسط" as const,
       points: ex.pointsBudget,
       prompt: ex.promptText, // verbatim — never the model's own text
       solution: sol.solution,
       rubric: scaleRubricToBudget(sol.rubric, ex.pointsBudget, id),
     };
   });
+
+  return {
+    questions,
+    usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
+    model: MODEL,
+  };
 }

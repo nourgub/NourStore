@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
 import { selectRelevantChunks } from "../curriculumChunking";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Configurable on the server via ANTHROPIC_MODEL — defaults to Sonnet 5,
 // which balances output quality against per-generation cost for this
@@ -55,7 +56,7 @@ function getClient(): Anthropic {
 
 export async function generateQuestionsWithClaude(
   input: RealGenerationInput,
-): Promise<GeneratedQuestion[]> {
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   const questionList = input.specs
     .map((s, i) => `${i + 1}. المحور: "${s.topic}" — مستوى الصعوبة: ${s.difficulty} — النقطة الكلية لهذا السؤال: ${s.pointsBudget}`)
     .join("\n");
@@ -129,7 +130,7 @@ ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب
     throw new Error("لم يتمكن النموذج من إرجاع العدد المطلوب من الأسئلة بالصيغة المتوقعة");
   }
 
-  return parsed.questions.map((q, i) => {
+  const questions = parsed.questions.map((q, i) => {
     const spec = input.specs[i];
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     return {
@@ -142,4 +143,10 @@ ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب
       rubric: scaleRubricToBudget(q.rubric, spec.pointsBudget, id),
     };
   });
+
+  return {
+    questions,
+    usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
+    model: MODEL,
+  };
 }

@@ -4,6 +4,7 @@ import { scaleRubricToBudget } from "./scaleRubric";
 import { toHundredths, fromHundredths } from "../points";
 import { callGeminiJson, isGeminiConfigured, GeminiReviewError } from "./geminiClient";
 import type { ImportExamInput } from "./examImportAgent";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Gemini's equivalent of examImportAgent.ts's importExamFromDocuments — used
 // as the PRIMARY engine for this mode whenever ANTHROPIC_API_KEY isn't
@@ -67,7 +68,9 @@ const ImportedExamResultSchema = z.object({ questions: z.array(ImportedQuestionR
 
 export class GeminiExamImportError extends GeminiReviewError {}
 
-export async function importExamFromDocumentsWithGemini(input: ImportExamInput): Promise<GeneratedQuestion[]> {
+export async function importExamFromDocumentsWithGemini(
+  input: ImportExamInput,
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   if (input.examText.length > MAX_CHARS_IN_PROMPT || input.correctionText.length > MAX_CHARS_IN_PROMPT) {
     throw new GeminiExamImportError(
       "ملف الامتحان أو ملف التصحيح طويل جدًا لمعالجته دفعة واحدة — قسّمه إلى ملفات أصغر (مثلًا حسب الأجزاء أو الصفحات) وأعد الاستيراد لكل جزء على حدة.",
@@ -91,7 +94,7 @@ ${input.correctionText}
 مهمتك: استخرج كل سؤال/تمرين مستقل من ملف الامتحان (احتفظ بنصه الأصلي حرفيًا دون أي تغيير أو تصحيح أو إعادة صياغة، بما في ذلك كل أجزائه الفرعية إن كان متعدد الأجزاء)، وطابقه مع حله وشبكة تصحيحه في ملف التصحيح. إن كان ملف التصحيح يحتوي شبكة تنقيط صريحة (معايير ونقاط)، استعملها كما هي بدل استنتاج معايير جديدة. إن لم تجد نقطة صريحة لسؤال ما في أي من الملفين، قدّر نقطة معقولة بما يتناسب مع وزنه النسبي مقارنة بباقي الأسئلة.
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, jsonSchema: IMPORTED_EXAM_JSON_SCHEMA, maxOutputTokens: 24000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, jsonSchema: IMPORTED_EXAM_JSON_SCHEMA, maxOutputTokens: 24000 });
 
   let rawParsed: unknown;
   try {
@@ -105,7 +108,7 @@ ${input.correctionText}
     throw new GeminiExamImportError("لم يتمكن النموذج من استخراج أي سؤال من الملفات المرفوعة بالصيغة المتوقعة");
   }
 
-  return result.data.questions.map((q) => {
+  const questions = result.data.questions.map((q) => {
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     const points = fromHundredths(toHundredths(q.points > 0 ? q.points : 1));
     return {
@@ -118,4 +121,6 @@ ${input.correctionText}
       rubric: scaleRubricToBudget(q.rubric, points, id),
     };
   });
+
+  return { questions, usage, model };
 }

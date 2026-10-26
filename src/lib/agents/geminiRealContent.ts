@@ -3,6 +3,7 @@ import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
 import { selectRelevantChunks } from "../curriculumChunking";
 import { callGeminiJson, isGeminiConfigured, GeminiReviewError } from "./geminiClient";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Gemini's equivalent of realContent.ts's generateQuestionsWithClaude — used
 // as the PRIMARY exam-generation engine whenever ANTHROPIC_API_KEY isn't
@@ -75,7 +76,9 @@ const ExamResultSchema = z.object({ questions: z.array(QuestionResultSchema) });
 
 export class GeminiRealContentError extends GeminiReviewError {}
 
-export async function generateQuestionsWithGemini(input: RealGenerationInput): Promise<GeneratedQuestion[]> {
+export async function generateQuestionsWithGemini(
+  input: RealGenerationInput,
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   const questionList = input.specs
     .map((s, i) => `${i + 1}. المحور: "${s.topic}" — مستوى الصعوبة: ${s.difficulty} — النقطة الكلية لهذا السؤال: ${s.pointsBudget}`)
     .join("\n");
@@ -114,7 +117,7 @@ ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب
 اكتب كل شيء باللغة العربية الفصحى، وتجنّب تكرار نفس السياق أو الأرقام بين الأسئلة.
 أعد فقط JSON مطابقًا للمخطط المطلوب، بعدد أسئلة يساوي بالضبط ${input.specs.length}، بنفس الترتيب أعلاه.`;
 
-  const { text } = await callGeminiJson({ prompt, jsonSchema: EXAM_JSON_SCHEMA, maxOutputTokens: 24000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, jsonSchema: EXAM_JSON_SCHEMA, maxOutputTokens: 24000 });
 
   let rawParsed: unknown;
   try {
@@ -128,7 +131,7 @@ ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب
     throw new GeminiRealContentError("لم يتمكن النموذج من إرجاع العدد المطلوب من الأسئلة بالصيغة المتوقعة");
   }
 
-  return result.data.questions.map((q, i) => {
+  const questions = result.data.questions.map((q, i) => {
     const spec = input.specs[i];
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     return {
@@ -141,4 +144,6 @@ ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب
       rubric: scaleRubricToBudget(q.rubric, spec.pointsBudget, id),
     };
   });
+
+  return { questions, usage, model };
 }

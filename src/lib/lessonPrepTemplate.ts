@@ -6,6 +6,7 @@ import {
 import { extractTextFromUpload, MAX_UPLOAD_BYTES } from "./extractText";
 import { analyzeLessonPrepTemplate, isLessonPrepConfigured } from "./agents/lessonPrepAgent";
 import { analyzeLessonPrepTemplateWithGemini, isLessonPrepConfiguredGemini } from "./agents/geminiLessonPrepAgent";
+import { recordAiUsage } from "./aiUsageLog";
 import type { LessonPrepTemplate, SubjectId } from "./types";
 
 export class LessonPrepTemplateError extends Error {}
@@ -36,8 +37,10 @@ export async function uploadLessonPrepTemplate(input: UploadLessonPrepTemplateIn
     );
   }
   const analyze = useClaude ? analyzeLessonPrepTemplate : analyzeLessonPrepTemplateWithGemini;
+  const templateId = `lpt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const schema = isImageMime(file.type, file.name)
+  const startedAt = Date.now();
+  const { schema, usage, model } = isImageMime(file.type, file.name)
     ? await analyze({
         imageBase64: Buffer.from(await file.arrayBuffer()).toString("base64"),
         imageMimeType: file.type || (/\.png$/i.test(file.name) ? "image/png" : "image/jpeg"),
@@ -51,9 +54,19 @@ export async function uploadLessonPrepTemplate(input: UploadLessonPrepTemplateIn
         }
         return analyze({ extractedText: extracted.text });
       })();
+  recordAiUsage({
+    teacherId: input.teacherId,
+    feature: "lessonPrep",
+    operationId: templateId,
+    provider: useClaude ? "claude" : "gemini",
+    model,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    durationMs: Date.now() - startedAt,
+  });
 
   const template: LessonPrepTemplate = {
-    id: `lpt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: templateId,
     teacherId: input.teacherId,
     subjectId: input.subjectId,
     fileName: file.name,

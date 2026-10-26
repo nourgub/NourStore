@@ -7,6 +7,7 @@ import { solveGivenExercises, isGivenExerciseGenerationConfigured, GivenExercise
 import { importExamFromDocuments, isExamImportConfigured, ExamImportError } from "./examImportAgent";
 import { solveGivenExercisesWithGemini, isGivenExerciseGenerationConfiguredGemini } from "./geminiGivenExerciseAgent";
 import { importExamFromDocumentsWithGemini, isExamImportConfiguredGemini } from "./geminiExamImportAgent";
+import { recordAiUsage } from "../aiUsageLog";
 
 export interface PipelineInput {
   examTitle: string;
@@ -15,6 +16,8 @@ export interface PipelineInput {
   numQuestions: number;
   difficultyMix: "متوازن" | "سهل" | "صعب";
   document: CurriculumDocument | null;
+  teacherId: string;
+  operationId: string;
 }
 
 export interface PipelineOutput {
@@ -100,7 +103,8 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
   // failed real call is a real failure of this generation, never silently
   // swapped for mock content reported as success.
   if (isRealGenerationConfigured()) {
-    questions = await generateQuestionsWithClaude({
+    const startedAt = Date.now();
+    const result = await generateQuestionsWithClaude({
       subjectPersona: subject.persona,
       examTitle: input.examTitle,
       gradeLevel: input.gradeLevel,
@@ -108,15 +112,38 @@ export async function runAgentPipeline(subjectId: SubjectId, input: PipelineInpu
       curriculumText,
       specs,
     });
+    questions = result.questions;
+    recordAiUsage({
+      teacherId: input.teacherId,
+      feature: "exams",
+      operationId: input.operationId,
+      provider: "claude",
+      model: result.model,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      durationMs: Date.now() - startedAt,
+    });
     generationEngine = "claude";
   } else if (isGeminiRealGenerationConfigured()) {
-    questions = await generateQuestionsWithGemini({
+    const startedAt = Date.now();
+    const result = await generateQuestionsWithGemini({
       subjectPersona: subject.persona,
       examTitle: input.examTitle,
       gradeLevel: input.gradeLevel,
       styleNotes: styleNote,
       curriculumText,
       specs,
+    });
+    questions = result.questions;
+    recordAiUsage({
+      teacherId: input.teacherId,
+      feature: "exams",
+      operationId: input.operationId,
+      provider: "gemini",
+      model: result.model,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      durationMs: Date.now() - startedAt,
     });
     generationEngine = "gemini";
   } else {
@@ -172,6 +199,8 @@ export interface GivenExercisesPipelineInput {
   // In page order as the teacher specified them — "exercise 1" is
   // exercises[0], regardless of the page numbers' own order.
   exercises: { pageNumber: number; promptText: string }[];
+  teacherId: string;
+  operationId: string;
 }
 
 export { isGivenExerciseGenerationConfigured, GivenExerciseError };
@@ -218,7 +247,19 @@ export async function runGivenExercisesPipeline(input: GivenExercisesPipelineInp
       pointsBudget: pointsPerExercise[i],
     })),
   };
-  const questions = useClaude ? await solveGivenExercises(solveInput) : await solveGivenExercisesWithGemini(solveInput);
+  const startedAt = Date.now();
+  const result = useClaude ? await solveGivenExercises(solveInput) : await solveGivenExercisesWithGemini(solveInput);
+  const questions = result.questions;
+  recordAiUsage({
+    teacherId: input.teacherId,
+    feature: "exams",
+    operationId: input.operationId,
+    provider: useClaude ? "claude" : "gemini",
+    model: result.model,
+    inputTokens: result.usage.inputTokens,
+    outputTokens: result.usage.outputTokens,
+    durationMs: Date.now() - startedAt,
+  });
 
   steps.push(
     step(
@@ -246,6 +287,8 @@ export interface ExamImportPipelineInput {
   topic: string;
   examText: string;
   correctionText: string;
+  teacherId: string;
+  operationId: string;
 }
 
 export { isExamImportConfigured, ExamImportError };
@@ -289,7 +332,19 @@ export async function runExamImportPipeline(input: ExamImportPipelineInput): Pro
     examText: input.examText,
     correctionText: input.correctionText,
   };
-  const questions = useClaude ? await importExamFromDocuments(importInput) : await importExamFromDocumentsWithGemini(importInput);
+  const startedAt = Date.now();
+  const importResult = useClaude ? await importExamFromDocuments(importInput) : await importExamFromDocumentsWithGemini(importInput);
+  const questions = importResult.questions;
+  recordAiUsage({
+    teacherId: input.teacherId,
+    feature: "exams",
+    operationId: input.operationId,
+    provider: useClaude ? "claude" : "gemini",
+    model: importResult.model,
+    inputTokens: importResult.usage.inputTokens,
+    outputTokens: importResult.usage.outputTokens,
+    durationMs: Date.now() - startedAt,
+  });
 
   const totalPoints = questions.reduce((s, q) => s + q.points, 0);
   steps.push(

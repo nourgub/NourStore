@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
 import { toHundredths, fromHundredths } from "../points";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Lets a teacher use grading entirely standalone, without ever generating an
 // exam through this platform: they upload an exam document they already
@@ -67,7 +68,9 @@ function getClient(): Anthropic {
 
 export class ExamImportError extends Error {}
 
-export async function importExamFromDocuments(input: ImportExamInput): Promise<GeneratedQuestion[]> {
+export async function importExamFromDocuments(
+  input: ImportExamInput,
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   if (input.examText.length > MAX_CHARS_IN_PROMPT || input.correctionText.length > MAX_CHARS_IN_PROMPT) {
     throw new ExamImportError(
       "ملف الامتحان أو ملف التصحيح طويل جدًا لمعالجته دفعة واحدة — قسّمه إلى ملفات أصغر (مثلًا حسب الأجزاء أو الصفحات) وأعد الاستيراد لكل جزء على حدة.",
@@ -121,7 +124,7 @@ ${correctionExcerpt}
     throw new ExamImportError("لم يتمكن النموذج من استخراج أي سؤال من الملفات المرفوعة بالصيغة المتوقعة");
   }
 
-  return parsed.questions.map((q) => {
+  const questions = parsed.questions.map((q) => {
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     // Points read from the documents are rounded to the nearest hundredth —
     // the same precision every other points value in this app is stored at
@@ -137,4 +140,10 @@ ${correctionExcerpt}
       rubric: scaleRubricToBudget(q.rubric, points, id),
     };
   });
+
+  return {
+    questions,
+    usage: { inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0 },
+    model: MODEL,
+  };
 }

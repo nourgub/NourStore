@@ -3,6 +3,7 @@ import type { GeneratedQuestion } from "../types";
 import { scaleRubricToBudget } from "./scaleRubric";
 import { callGeminiJson, isGeminiConfigured, GeminiReviewError } from "./geminiClient";
 import type { GivenExercise, SolveGivenExercisesInput } from "./givenExerciseAgent";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Gemini's equivalent of givenExerciseAgent.ts's solveGivenExercises — used
 // as the PRIMARY engine for this mode whenever ANTHROPIC_API_KEY isn't
@@ -53,7 +54,9 @@ const SolutionsResultSchema = z.object({ solutions: z.array(SolutionResultSchema
 
 export class GeminiGivenExerciseError extends GeminiReviewError {}
 
-export async function solveGivenExercisesWithGemini(input: SolveGivenExercisesInput): Promise<GeneratedQuestion[]> {
+export async function solveGivenExercisesWithGemini(
+  input: SolveGivenExercisesInput,
+): Promise<{ questions: GeneratedQuestion[]; usage: TokenUsage; model: string }> {
   const exerciseList = input.exercises
     .map(
       (ex: GivenExercise, i: number) =>
@@ -69,7 +72,7 @@ ${exerciseList}
 لكل تمرين من التمارين أعلاه بنفس الترتيب، أنتج: حلًا نموذجيًا مفصّلاً خطوة بخطوة. إذا كان التمرين متعدد الأجزاء (مرقّمًا 1، 2، 3... أو أ، ب، ج... كما يحدث غالبًا في تمارين دراسة الدوال الجزائرية)، غطِّ كل جزء فرعي في الحل بنفس ترقيمه بالضبط، ثم أنتج شبكة تصحيح فيها معيار منفصل لكل جزء فرعي رئيسي (وليس معيارًا واحدًا عامًا للتمرين كله)، مع نقاط تقريبية تجمع قريبًا من النقطة الكلية المحددة لذلك التمرين. اكتب كل شيء باللغة العربية الفصحى.
 أعد فقط JSON مطابقًا للمخطط المطلوب، بعدد حلول يساوي بالضبط ${input.exercises.length}، بنفس ترتيب التمارين أعلاه.`;
 
-  const { text } = await callGeminiJson({ prompt, jsonSchema: SOLUTIONS_JSON_SCHEMA, maxOutputTokens: 24000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, jsonSchema: SOLUTIONS_JSON_SCHEMA, maxOutputTokens: 24000 });
 
   let rawParsed: unknown;
   try {
@@ -83,7 +86,7 @@ ${exerciseList}
     throw new GeminiGivenExerciseError("لم يتمكن النموذج من حل جميع التمارين المعطاة بالصيغة المتوقعة");
   }
 
-  return result.data.solutions.map((sol, i) => {
+  const questions = result.data.solutions.map((sol, i) => {
     const ex = input.exercises[i];
     const id = `q_${Math.random().toString(36).slice(2, 10)}`;
     return {
@@ -96,4 +99,6 @@ ${exerciseList}
       rubric: scaleRubricToBudget(sol.rubric, ex.pointsBudget, id),
     };
   });
+
+  return { questions, usage, model };
 }

@@ -95,6 +95,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
         gradeLevel: input.gradeLevel,
         topic: input.topics[0]?.trim() || "تمارين من الوثيقة المرفوعة",
         exercises: input.pageExercises!,
+        teacherId: input.teacherId,
+        operationId: requestId,
       }));
     } else if (usingImportedExam) {
       ({ steps, questions } = await runExamImportPipeline({
@@ -104,6 +106,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
         topic: input.topics[0]?.trim() || "امتحان مستورد (تصحيح مباشر)",
         examText: input.importedExam!.examText,
         correctionText: input.importedExam!.correctionText,
+        teacherId: input.teacherId,
+        operationId: requestId,
       }));
     } else {
       ({ steps, questions } = await runAgentPipeline(input.subjectId, {
@@ -113,6 +117,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Ge
         numQuestions: input.numQuestions,
         difficultyMix: input.difficultyMix,
         document,
+        teacherId: input.teacherId,
+        operationId: requestId,
       }));
     }
   } catch (err) {

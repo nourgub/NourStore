@@ -10,6 +10,7 @@ import type {
   MergeTemplatedLessonPrepInput,
   TemplatedLessonPrepResult,
 } from "./lessonPrepAgent";
+import type { TokenUsage } from "./independentGradeTypes";
 
 // Gemini's equivalent of lessonPrepAgent.ts — used as the PRIMARY engine for
 // lesson prep (generate / merge / template analysis / templated generate /
@@ -71,7 +72,9 @@ const SectionsResultSchema = z.object({
   sections: z.array(z.object({ heading: z.string(), body: z.string() })).min(4),
 });
 
-export async function generateLessonPrepWithGemini(input: GenerateLessonPrepInput): Promise<LessonPrepSection[]> {
+export async function generateLessonPrepWithGemini(
+  input: GenerateLessonPrepInput,
+): Promise<{ sections: LessonPrepSection[]; usage: TokenUsage; model: string }> {
   const prompt = `أنت ${input.subjectPersona} تُحضّر درسًا بعنوان "${input.lessonTitle}" لمستوى "${input.gradeLevel}".
 ${SECTION_STRUCTURE_HINT}
 ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب مراعاتها: "${input.styleNotes}"\n` : ""}
@@ -79,7 +82,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
 اكتب كل شيء باللغة العربية الفصحى، بأسلوب تربوي واضح ومناسب لمستوى التلاميذ المستهدف.
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, jsonSchema: SECTIONS_JSON_SCHEMA, maxOutputTokens: 8000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, jsonSchema: SECTIONS_JSON_SCHEMA, maxOutputTokens: 8000 });
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(text);
@@ -90,10 +93,12 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!result.success || result.data.sections.length === 0) {
     throw new GeminiLessonPrepError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return result.data.sections;
+  return { sections: result.data.sections, usage, model };
 }
 
-export async function mergeLessonPrepWithGemini(input: MergeLessonPrepInput): Promise<LessonPrepSection[]> {
+export async function mergeLessonPrepWithGemini(
+  input: MergeLessonPrepInput,
+): Promise<{ sections: LessonPrepSection[]; usage: TokenUsage; model: string }> {
   const images = input.imageSources.map(toGeminiImage);
   const textExcerpt = input.textSources.map((s) => `--- ملف: ${s.fileName} ---\n${s.text}`).join("\n\n");
 
@@ -107,7 +112,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
 اكتب كل شيء باللغة العربية الفصحى.
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, images, jsonSchema: SECTIONS_JSON_SCHEMA, maxOutputTokens: 8000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, images, jsonSchema: SECTIONS_JSON_SCHEMA, maxOutputTokens: 8000 });
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(text);
@@ -118,7 +123,7 @@ ${MATH_NOTATION_INSTRUCTIONS}
   if (!result.success || result.data.sections.length === 0) {
     throw new GeminiLessonPrepError("لم يتمكن النموذج من إرجاع تحضير الدرس بالصيغة المتوقعة");
   }
-  return result.data.sections;
+  return { sections: result.data.sections, usage, model };
 }
 
 const TEMPLATE_SCHEMA_JSON_SCHEMA = {
@@ -154,7 +159,9 @@ const TemplateSchemaResultSchema = z.object({
   tableColumns: z.array(z.string()).min(1),
 });
 
-export async function analyzeLessonPrepTemplateWithGemini(input: AnalyzeTemplateInput): Promise<LessonPrepTemplateSchema> {
+export async function analyzeLessonPrepTemplateWithGemini(
+  input: AnalyzeTemplateInput,
+): Promise<{ schema: LessonPrepTemplateSchema; usage: TokenUsage; model: string }> {
   const images: GeminiImageInput[] = [];
   if (input.imageBase64 && input.imageMimeType) {
     const mimeType = IMAGE_MIME_TO_GEMINI[input.imageMimeType];
@@ -170,7 +177,7 @@ export async function analyzeLessonPrepTemplateWithGemini(input: AnalyzeTemplate
 ${input.extractedText ? `\nفيما يلي نص مستخرج من الملف المرفوع:\n"""\n${input.extractedText.slice(0, 8000)}\n"""\n` : ""}
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, images, jsonSchema: TEMPLATE_SCHEMA_JSON_SCHEMA, maxOutputTokens: 2000 });
+  const { text, model, usage } = await callGeminiJson({ prompt, images, jsonSchema: TEMPLATE_SCHEMA_JSON_SCHEMA, maxOutputTokens: 2000 });
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(text);
@@ -181,7 +188,7 @@ ${input.extractedText ? `\nفيما يلي نص مستخرج من الملف ا�
   if (!result.success) {
     throw new GeminiLessonPrepError("تعذّر تحليل شكل النموذج المرفوع");
   }
-  return result.data;
+  return { schema: result.data, usage, model };
 }
 
 function templateInstructions(schema: LessonPrepTemplateSchema): string {
@@ -251,7 +258,7 @@ function parseTemplatedResult(text: string): TemplatedLessonPrepResult {
 
 export async function generateTemplatedLessonPrepWithGemini(
   input: GenerateTemplatedLessonPrepInput,
-): Promise<TemplatedLessonPrepResult> {
+): Promise<{ result: TemplatedLessonPrepResult; usage: TokenUsage; model: string }> {
   const prompt = `أنت ${input.subjectPersona} تُحضّر درسًا بعنوان "${input.lessonTitle}" لمستوى "${input.gradeLevel}".
 ${templateInstructions(input.template)}
 ${input.styleNotes ? `\nملاحظات أسلوب الأستاذ التي يجب مراعاتها: "${input.styleNotes}"\n` : ""}
@@ -259,13 +266,13 @@ ${MATH_NOTATION_INSTRUCTIONS}
 اكتب كل شيء باللغة العربية الفصحى، بأسلوب تربوي واضح ومناسب لمستوى التلاميذ المستهدف.
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, jsonSchema: TEMPLATED_RESULT_JSON_SCHEMA, maxOutputTokens: 8000 });
-  return parseTemplatedResult(text);
+  const { text, model, usage } = await callGeminiJson({ prompt, jsonSchema: TEMPLATED_RESULT_JSON_SCHEMA, maxOutputTokens: 8000 });
+  return { result: parseTemplatedResult(text), usage, model };
 }
 
 export async function mergeTemplatedLessonPrepWithGemini(
   input: MergeTemplatedLessonPrepInput,
-): Promise<TemplatedLessonPrepResult> {
+): Promise<{ result: TemplatedLessonPrepResult; usage: TokenUsage; model: string }> {
   const images = input.imageSources.map(toGeminiImage);
   const textExcerpt = input.textSources.map((s) => `--- ملف: ${s.fileName} ---\n${s.text}`).join("\n\n");
 
@@ -279,6 +286,6 @@ ${MATH_NOTATION_INSTRUCTIONS}
 اكتب كل شيء باللغة العربية الفصحى.
 أعد فقط JSON مطابقًا للمخطط المطلوب.`;
 
-  const { text } = await callGeminiJson({ prompt, images, jsonSchema: TEMPLATED_RESULT_JSON_SCHEMA, maxOutputTokens: 8000 });
-  return parseTemplatedResult(text);
+  const { text, model, usage } = await callGeminiJson({ prompt, images, jsonSchema: TEMPLATED_RESULT_JSON_SCHEMA, maxOutputTokens: 8000 });
+  return { result: parseTemplatedResult(text), usage, model };
 }

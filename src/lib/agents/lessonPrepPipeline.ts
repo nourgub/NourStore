@@ -25,6 +25,8 @@ import {
   mergeTemplatedLessonPrepWithGemini,
 } from "./geminiLessonPrepAgent";
 import { generateMockLessonPrep } from "./lessonPrepMock";
+import { recordAiUsage } from "../aiUsageLog";
+import type { TokenUsage } from "./independentGradeTypes";
 
 export interface LessonPrepPipelineInput {
   mode: LessonPrepMode;
@@ -37,6 +39,8 @@ export interface LessonPrepPipelineInput {
   // When set, output is shaped to match the teacher's own uploaded form
   // instead of the generic heading/body sections.
   template?: LessonPrepTemplateSchema;
+  teacherId: string;
+  operationId: string;
 }
 
 export interface LessonPrepPipelineOutput {
@@ -63,6 +67,25 @@ const EMPTY_TEMPLATED: Pick<LessonPrepPipelineOutput, "headerValues" | "noteValu
 };
 
 const EMPTY_SECTIONS: Pick<LessonPrepPipelineOutput, "sections"> = { sections: [] };
+
+function logLessonPrepUsage(
+  input: LessonPrepPipelineInput,
+  provider: "claude" | "gemini",
+  model: string,
+  usage: TokenUsage,
+  startedAt: number,
+): void {
+  recordAiUsage({
+    teacherId: input.teacherId,
+    feature: "lessonPrep",
+    operationId: input.operationId,
+    provider,
+    model,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    durationMs: Date.now() - startedAt,
+  });
+}
 
 export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Promise<LessonPrepPipelineOutput> {
   const subject = getSubjectDefinition(input.subjectId);
@@ -102,9 +125,11 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
     const mergeEngineLabel = mergeUseClaude ? "Claude" : "Gemini";
 
     if (template) {
-      const result = mergeUseClaude
+      const startedAt = Date.now();
+      const { result, usage, model } = mergeUseClaude
         ? await mergeTemplatedLessonPrepWithClaude({ ...mergeArgs, template })
         : await mergeTemplatedLessonPrepWithGemini({ ...mergeArgs, template });
+      logLessonPrepUsage(input, mergeUseClaude ? "claude" : "gemini", model, usage, startedAt);
       steps.push(
         step(
           "دامج المذكرات",
@@ -115,7 +140,11 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
       return { steps, ...EMPTY_SECTIONS, headerValues: result.headerValues, noteValues: result.noteValues, tableColumns: template.tableColumns, tableRows: result.tableRows };
     }
 
-    const sections = mergeUseClaude ? await mergeLessonPrepWithClaude(mergeArgs) : await mergeLessonPrepWithGemini(mergeArgs);
+    const mergeStartedAt = Date.now();
+    const { sections, usage: mergeUsage, model: mergeModel } = mergeUseClaude
+      ? await mergeLessonPrepWithClaude(mergeArgs)
+      : await mergeLessonPrepWithGemini(mergeArgs);
+    logLessonPrepUsage(input, mergeUseClaude ? "claude" : "gemini", mergeModel, mergeUsage, mergeStartedAt);
     steps.push(
       step(
         "دامج المذكرات",
@@ -145,9 +174,11 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
       styleNotes: input.styleNotes,
       template,
     };
-    const result = templatedUseClaude
+    const templatedStartedAt = Date.now();
+    const { result, usage: templatedUsage, model: templatedModel } = templatedUseClaude
       ? await generateTemplatedLessonPrepWithClaude(templatedArgs)
       : await generateTemplatedLessonPrepWithGemini(templatedArgs);
+    logLessonPrepUsage(input, templatedUseClaude ? "claude" : "gemini", templatedModel, templatedUsage, templatedStartedAt);
     steps.push(
       step(
         "معدّ تحضير الدرس",
@@ -172,20 +203,26 @@ export async function runLessonPrepPipeline(input: LessonPrepPipelineInput): Pro
   let generationEngine: "claude" | "gemini" | "mock" = "mock";
 
   if (isLessonPrepConfigured()) {
-    sections = await generateLessonPrepWithClaude({
+    const startedAt = Date.now();
+    const result = await generateLessonPrepWithClaude({
       subjectPersona: subject.persona,
       lessonTitle: input.lessonTitle,
       gradeLevel: input.gradeLevel,
       styleNotes: input.styleNotes,
     });
+    sections = result.sections;
+    logLessonPrepUsage(input, "claude", result.model, result.usage, startedAt);
     generationEngine = "claude";
   } else if (isLessonPrepConfiguredGemini()) {
-    sections = await generateLessonPrepWithGemini({
+    const startedAt = Date.now();
+    const result = await generateLessonPrepWithGemini({
       subjectPersona: subject.persona,
       lessonTitle: input.lessonTitle,
       gradeLevel: input.gradeLevel,
       styleNotes: input.styleNotes,
     });
+    sections = result.sections;
+    logLessonPrepUsage(input, "gemini", result.model, result.usage, startedAt);
     generationEngine = "gemini";
   } else {
     sections = generateMockLessonPrep(input.lessonTitle, input.gradeLevel);
