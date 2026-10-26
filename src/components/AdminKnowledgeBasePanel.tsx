@@ -25,6 +25,13 @@ interface KbSourceDocument {
   collectedAt: string;
 }
 
+interface KbContentItem {
+  id: string;
+  title: string;
+  status: string;
+  verifiedBy: string | null;
+}
+
 interface KbStats {
   sources: number;
   sourceDocuments: number;
@@ -57,8 +64,13 @@ export function AdminKnowledgeBasePanel() {
   const [stats, setStats] = useState<KbStats | null>(null);
   const [sources, setSources] = useState<KbSource[]>([]);
   const [documents, setDocuments] = useState<KbSourceDocument[]>([]);
+  const [lessons, setLessons] = useState<KbContentItem[]>([]);
+  const [exercises, setExercises] = useState<KbContentItem[]>([]);
+  const [exams, setExams] = useState<KbContentItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [extractDraft, setExtractDraft] = useState<Record<string, string>>({});
+  const [correctionChoice, setCorrectionChoice] = useState<Record<string, string>>({});
+  const [rejectDraft, setRejectDraft] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function load() {
@@ -68,6 +80,16 @@ export function AdminKnowledgeBasePanel() {
       setStats(data.stats);
       setSources(data.sources);
       setDocuments(data.documents);
+      setLessons(data.lessons.map((l: { id: string; title: string; status: string; verifiedBy: string | null }) => l));
+      setExercises(
+        data.exercises.map((e: { id: string; promptText: string; status: string; verifiedBy: string | null }) => ({
+          id: e.id,
+          title: e.promptText.slice(0, 80),
+          status: e.status,
+          verifiedBy: e.verifiedBy,
+        })),
+      );
+      setExams(data.exams.map((x: { id: string; title: string; status: string; verifiedBy: string | null }) => x));
     } else {
       setError(data.error ?? "تعذّر تحميل قاعدة المعرفة");
     }
@@ -111,6 +133,41 @@ export function AdminKnowledgeBasePanel() {
       return;
     }
     setExtractDraft((prev) => ({ ...prev, [documentId]: "" }));
+    load();
+  }
+
+  async function proposeClassification(documentId: string) {
+    setBusyId(documentId);
+    setError(null);
+    const correctionDocumentId = correctionChoice[documentId] || undefined;
+    const res = await fetch(`/api/admin/knowledge-base/documents/${documentId}/propose`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ correctionDocumentId }),
+    });
+    const data = await res.json();
+    setBusyId(null);
+    if (!res.ok) {
+      setError(data.error ?? "تعذّر اقتراح التصنيف");
+      return;
+    }
+    load();
+  }
+
+  async function contentAction(type: "lesson" | "exercise" | "exam", id: string, action: string, extra?: Record<string, string>) {
+    setBusyId(id);
+    setError(null);
+    const res = await fetch(`/api/admin/knowledge-base/content/${type}/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    const data = await res.json();
+    setBusyId(null);
+    if (!res.ok) {
+      setError(data.error ?? "تعذّر تنفيذ الإجراء");
+      return;
+    }
     load();
   }
 
@@ -204,11 +261,157 @@ export function AdminKnowledgeBasePanel() {
                       : "حدِّد حالة ترخيص المصدر أعلاه أولًا (ملك عام أو مقتطف مسموح) قبل الاستخراج."}
                   </p>
                 )}
+                {d.status === "extracted" && (
+                  <div className="mt-2 space-y-2">
+                    {d.documentKind === "exam" && (
+                      <select
+                        value={correctionChoice[d.id] ?? ""}
+                        onChange={(e) => setCorrectionChoice((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                        className="w-full rounded-lg border border-brand-200 px-2 py-1 text-xs"
+                      >
+                        <option value="">بدون وثيقة تصحيح (استنتاج آلي للحل)</option>
+                        {documents
+                          .filter((od) => od.documentKind === "model_answer")
+                          .map((od) => (
+                            <option key={od.id} value={od.id}>
+                              وثيقة التصحيح: {od.title}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={() => proposeClassification(d.id)}
+                      disabled={busyId === d.id}
+                      className="rounded-lg border border-brand-700 px-3 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-50"
+                    >
+                      اقترح تصنيفًا بالذكاء الاصطناعي (Gemini)
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
           {documents.length === 0 && <p className="text-sm text-brand-500">لا توجد وثائق مسجَّلة بعد.</p>}
         </div>
+      </div>
+
+      <ContentSection
+        title="الدروس المصنَّفة"
+        items={lessons}
+        type="lesson"
+        busyId={busyId}
+        rejectDraft={rejectDraft}
+        setRejectDraft={setRejectDraft}
+        onAction={contentAction}
+      />
+      <ContentSection
+        title="التمارين المصنَّفة"
+        items={exercises}
+        type="exercise"
+        busyId={busyId}
+        rejectDraft={rejectDraft}
+        setRejectDraft={setRejectDraft}
+        onAction={contentAction}
+      />
+      <ContentSection
+        title="الامتحانات المصنَّفة"
+        items={exams}
+        type="exam"
+        busyId={busyId}
+        rejectDraft={rejectDraft}
+        setRejectDraft={setRejectDraft}
+        onAction={contentAction}
+      />
+    </div>
+  );
+}
+
+function ContentSection({
+  title,
+  items,
+  type,
+  busyId,
+  rejectDraft,
+  setRejectDraft,
+  onAction,
+}: {
+  title: string;
+  items: KbContentItem[];
+  type: "lesson" | "exercise" | "exam";
+  busyId: string | null;
+  rejectDraft: Record<string, string>;
+  setRejectDraft: (updater: (prev: Record<string, string>) => Record<string, string>) => void;
+  onAction: (type: "lesson" | "exercise" | "exam", id: string, action: string, extra?: Record<string, string>) => void;
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 font-semibold text-brand-900">{title}</h3>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <div key={item.id} className="rounded-xl border border-brand-100 bg-white p-4 text-sm">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold text-brand-800">{item.title}</p>
+              <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-700">{STATUS_LABEL[item.status] ?? item.status}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(item.status === "classified" || item.status === "needs_human_review") && (
+                <button
+                  onClick={() => onAction(type, item.id, item.status === "classified" ? "submit_verification" : "verify")}
+                  disabled={busyId === item.id}
+                  className="rounded-lg border border-brand-300 px-3 py-1 text-xs disabled:opacity-50"
+                >
+                  {item.status === "classified" ? "إرسال للتحقق" : "إعادة التحقق الآلي"}
+                </button>
+              )}
+              {item.status === "pending_verification" && (
+                <button
+                  onClick={() => onAction(type, item.id, "verify")}
+                  disabled={busyId === item.id}
+                  className="rounded-lg border border-brand-300 px-3 py-1 text-xs disabled:opacity-50"
+                >
+                  تشغيل التحقق الحتمي
+                </button>
+              )}
+              {(item.status === "needs_human_review" || item.status === "pending_verification" || item.status === "classified") && (
+                <button
+                  onClick={() => onAction(type, item.id, "approve")}
+                  disabled={busyId === item.id}
+                  className="rounded-lg bg-emerald-700 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  اعتماد بشري
+                </button>
+              )}
+              {item.status === "verified" && (
+                <button
+                  onClick={() => onAction(type, item.id, "publish")}
+                  disabled={busyId === item.id}
+                  className="rounded-lg bg-brand-700 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  نشر
+                </button>
+              )}
+              {item.status !== "rejected" && item.status !== "published" && (
+                <>
+                  <input
+                    value={rejectDraft[item.id] ?? ""}
+                    onChange={(e) => setRejectDraft((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    placeholder="سبب الرفض..."
+                    className="rounded-lg border border-brand-200 px-2 py-1 text-xs"
+                  />
+                  <button
+                    onClick={() => onAction(type, item.id, "reject", { reason: rejectDraft[item.id] ?? "" })}
+                    disabled={busyId === item.id || !rejectDraft[item.id]?.trim()}
+                    className="rounded-lg border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-50"
+                  >
+                    رفض
+                  </button>
+                </>
+              )}
+            </div>
+            {item.verifiedBy && <p className="mt-1 text-xs text-brand-500">اعتُمد بواسطة: {item.verifiedBy}</p>}
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-sm text-brand-500">لا يوجد محتوى مصنَّف بعد.</p>}
       </div>
     </div>
   );

@@ -13,7 +13,11 @@ import {
   insertKbSource,
   insertKbSourceDocument,
   insertKbVerification,
+  listKbExams,
+  listKbExercises,
+  listKbLessons,
   listKbSources,
+  searchKbChunks,
   updateKbExamStatus,
   updateKbExerciseStatus,
   updateKbLessonStatus,
@@ -514,4 +518,26 @@ export function publishContent(targetType: TargetType, id: string): void {
   else if (targetType === "exercise") chunkExercise(target as KbExercise);
   else chunkExam(target as KbExam);
   setStatus(targetType, id, "published", target.verifiedBy);
+}
+
+// ---------- Teacher-facing reads (published content only) ----------
+// Everything below reads status === "published" exclusively — a teacher
+// browsing the library can never see classified/pending/needs-review
+// content, even by guessing an id, since these list functions don't take
+// one.
+
+export function listPublishedLessons(subjectId: SubjectId, educationLevelId?: string): KbLesson[] {
+  return listKbLessons({ subjectId, educationLevelId, status: "published" });
+}
+
+export function listPublishedExercises(subjectId: SubjectId, educationLevelId?: string): KbExercise[] {
+  return listKbExercises({ subjectId, educationLevelId, status: "published" });
+}
+
+export function listPublishedExams(subjectId: SubjectId, educationLevelId?: string): KbExam[] {
+  return listKbExams({ subjectId, educationLevelId, status: "published" });
+}
+
+export function searchPublishedChunks(subjectId: SubjectId, query: string, educationLevelId?: string) {
+  return searchKbChunks({ subjectId, educationLevelId, query });
 }

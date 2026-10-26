@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle, Gift } from "lucide-react";
+import { Calculator, BookOpen, Atom, ArrowLeft, AlertCircle, Gift, Library } from "lucide-react";
 import { getCurrentTeacher } from "@/lib/session";
 import { getUsageSummary, hasFreeTrialAvailable } from "@/lib/usage";
 import { PLANS } from "@/lib/plans";
@@ -134,6 +134,20 @@ export default async function DashboardPage() {
             );
           })}
         </div>
+
+        <Link
+          href="/library"
+          className="group mt-4 flex items-center gap-3 rounded-2xl border border-brand-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-400 hover:shadow-lg"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
+            <Library size={20} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-brand-800">المكتبة التعليمية</h2>
+            <p className="text-sm text-brand-600">دروس وتمارين وامتحانات من المنهاج الجزائري، راجعها الإداري واعتمدها.</p>
+          </div>
+          <ArrowLeft size={16} className="text-brand-400 transition group-hover:-translate-x-1" />
+        </Link>
       </main>
       <TeacherAssistantWidget />
     </>
