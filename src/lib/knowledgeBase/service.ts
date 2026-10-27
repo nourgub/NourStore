@@ -24,6 +24,7 @@ import {
   updateKbSourceDocumentExtraction,
   updateKbSourceDocumentStatus,
   updateKbSourceLicense,
+  appendKbSourceReliabilityNote,
 } from "../db";
 import type {
   KbContentStatus,
@@ -93,6 +94,17 @@ export function getAllSources(): KbSource[] {
 // source's documents (see canStoreFullText/canStoreExcerpt).
 export function setSourceLicenseStatus(sourceId: string, licenseStatus: KbSource["licenseStatus"]): void {
   updateKbSourceLicense(sourceId, licenseStatus, new Date().toISOString());
+}
+
+// Records a new research finding about a source (e.g. "its footer claims
+// all rights reserved", "content is image-only, not extractable text")
+// without erasing what was already known about it — informs the human
+// license decision, never makes it. Idempotent on exact note text so a
+// reseed script can call this safely on every run.
+export function addSourceResearchNote(sourceId: string, note: string): void {
+  const source = listKbSources().find((s) => s.id === sourceId);
+  if (source?.reliabilityNote.includes(note)) return;
+  appendKbSourceReliabilityNote(sourceId, note, new Date().toISOString());
 }
 
 // ---------- Source documents ----------

@@ -1,14 +1,15 @@
-// Registers the REAL sources found via live web research on 2026-10-26 for
-// the Algerian math / 4AM (BEM) knowledge-base pilot (see DELIVERY_SUMMARY
-// section "NourStore Knowledge Engine"). Metadata + URL only — no content is
-// fetched or stored here, since none of these sources' license status has
-// been confirmed yet (see knowledgeBase/service.ts's canStoreFullText /
-// canStoreExcerpt gating). Safe to re-run: registerSource is idempotent on
-// url, and this script skips a source document whose url is already
+// Registers the REAL sources found via live web research on 2026-10-26 and
+// 2026-10-27 for the Algerian math / 4AM (BEM) knowledge-base pilot (see
+// DELIVERY_SUMMARY section "NourStore Knowledge Engine"). Metadata + URL
+// only — no content is fetched or stored here, since none of these sources'
+// license status has been confirmed yet (see knowledgeBase/service.ts's
+// canStoreFullText/canStoreExcerpt gating). Safe to re-run: registerSource
+// is idempotent on url, addSourceResearchNote is idempotent on exact note
+// text, and this script skips a source document whose url is already
 // recorded.
 //
 // Run with: npx tsx scripts/seedKbSources4am.ts
-import { registerSource, recordSourceDocument } from "../src/lib/knowledgeBase/service";
+import { addSourceResearchNote, registerSource, recordSourceDocument } from "../src/lib/knowledgeBase/service";
 import { listKbSourceDocuments } from "../src/lib/db";
 
 function alreadyRecorded(url: string): boolean {
@@ -40,6 +41,33 @@ const dzexams = registerSource({
   licenseStatus: "unknown",
   reliabilityNote: "موقع تعليمي جزائري يستضيف دروسًا وتمارين لمادة الرياضيات للسنة الرابعة متوسط من إعداد أساتذة أفراد، وليس محتوى وزاريًا رسميًا.",
 });
+
+const educationGov = registerSource({
+  name: "education.gov.dz — الموقع الرسمي لوزارة التربية الوطنية الجزائرية",
+  url: "https://www.education.gov.dz",
+  sourceType: "official_ministry",
+  licenseStatus: "unknown",
+  reliabilityNote:
+    'الموقع الرسمي لوزارة التربية الوطنية الجزائرية. تأكدنا عبر بحث حي بتاريخ 2026-10-27 من وجود صفحة فهرس رسمية لمناهج التعليم المتوسط تحتوي ملف "منهاج الرياضيات.pdf" (1.33 ميغابايت) ضمن المسار: وثائق بيداغوجية / مرحلة التعليم المتوسط / مناهج التعليم المتوسط. لم نتمكن من تنزيل الملف آليًا (الخادم أرجع أخطاء اتصال متكررة 503 وانقطاع اتصال عبر عدة محاولات حية) — هذا على الأرجح حماية تقنية للخادم ضد الزيارات الآلية، وليس بالضرورة منعًا مقصودًا؛ يحتاج تنزيلاً يدويًا من متصفح حقيقي ثم رفعه هنا. محتوى منهاج رسمي صادر عن الوزارة نفسها — أقرب حالة لدينا لملك عام حقيقي.',
+});
+
+const dzexamsPro = registerSource({
+  name: "dzexams.pro",
+  url: "https://www.dzexams.pro",
+  sourceType: "trusted_educational_site",
+  licenseStatus: "unknown",
+  reliabilityNote:
+    "موقع يستضيف ملفات PDF تعليمية جزائرية قابلة للتنزيل المباشر (روابط مباشرة من نوع /data/<id>/<id>.pdf)، وُجد عبر بحث حي بتاريخ 2026-10-27. أحد الملفات المكتشفة (34117.pdf) يبدو من وصف نتائج البحث أنه توزيع فصلي لمنهاج الرياضيات لكن حجمه تجاوز حد الأداة التقنية المتاحة لنا فلم نراجع محتواه الكامل فعليًا — لا يزال غير مؤكَّد المستوى والمصدر الحقيقي (موقع فردي، وليس وزاريًا).",
+});
+
+addSourceResearchNote(
+  eddirasa.id,
+  'مراجعة حية لصفحتي موضوع 2024 وتصحيح 2022: تذييل الموقع يذكر صراحة "جميع الحقوق محفوظة" — يستبعد افتراض الملك العام. محتوى الامتحان/التصحيح معروض كصورة (معاينة/تحميل PDF) وليس نصًا قابلًا للنسخ على الصفحة نفسها، فالاستخراج يحتاج قراءة الملف يدويًا (تنزيل + فتح) لا مجرد نسخ نص من الصفحة. لم تذكر الصفحتان أن الموضوع نفسه "رسمي" بشكل قاطع.',
+);
+addSourceResearchNote(
+  dzexams.id,
+  "محاولة وصول آلي للصفحة أرجعت خطأ 403 (ممنوع) — الموقع يحجب أدوات الجلب الآلي صراحة. أي استخراج من هذا المصدر يحتاج قراءة ونسخًا يدويين من متصفح حقيقي، لا جلبًا آليًا بأي شكل.",
+);
 
 const candidates = [
   {

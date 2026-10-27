@@ -1799,6 +1799,16 @@ export function updateKbSourceLicense(id: string, licenseStatus: KbSource["licen
   db.prepare(`UPDATE kb_sources SET license_status = ?, last_checked_at = ? WHERE id = ?`).run(licenseStatus, lastCheckedAt, id);
 }
 
+// Appends to the existing note rather than replacing it — each research
+// pass adds what it actually found without erasing an earlier pass's
+// findings (or a human reviewer's own notes).
+export function appendKbSourceReliabilityNote(id: string, additionalNote: string, lastCheckedAt: string): void {
+  const row = db.prepare(`SELECT reliability_note FROM kb_sources WHERE id = ?`).get(id) as { reliability_note: string } | undefined;
+  if (!row) return;
+  const updated = `${row.reliability_note}\n\n[تحديث ${lastCheckedAt.slice(0, 10)}]: ${additionalNote}`;
+  db.prepare(`UPDATE kb_sources SET reliability_note = ?, last_checked_at = ? WHERE id = ?`).run(updated, lastCheckedAt, id);
+}
+
 interface KbSourceDocumentRow {
   id: string;
   source_id: string;
